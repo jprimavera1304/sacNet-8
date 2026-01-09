@@ -32,7 +32,7 @@ public class UserService : IUserService
 
     public async Task<List<UserResponse>> GetAllAsync()
     {
-        var users = await _repo.GetAllAsync();
+         var users = await _repo.GetAllAsync();
 
         return users.Select(u => new UserResponse(
             u.Id, u.Email, u.Role, u.CreatedAt
