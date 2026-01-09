@@ -11,6 +11,6 @@ public class ErrorController : ControllerBase
     [HttpGet]
     public IActionResult Error()
     {
-        return Problem(title: "An unexpected error occurred.");
+        return Problem(title: "Error al buscar.");
     }
 }
