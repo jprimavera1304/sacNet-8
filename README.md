@@ -1,0 +1,1 @@
+# MyApp – ASP.NET Core Web API + HTML5 Frontend
