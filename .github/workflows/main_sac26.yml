@@ -23,14 +23,18 @@ jobs:
         with:
           dotnet-version: '8.x'
 
+      # Ruta CORRECTA al .sln según tu estructura:
+      # (repo root)/
+      #   ISL_Service/
+      #     ISL_Service.sln
       - name: Restore with dotnet
-        run: dotnet restore ./sacNet-8/ISL_Service/ISL_Service.sln
+        run: dotnet restore ./ISL_Service/ISL_Service.sln
 
       - name: Build with dotnet
-        run: dotnet build ./sacNet-8/ISL_Service/ISL_Service.sln --configuration Release --no-restore
+        run: dotnet build ./ISL_Service/ISL_Service.sln --configuration Release --no-restore
 
       - name: dotnet publish
-        run: dotnet publish ./sacNet-8/ISL_Service/ISL_Service.sln -c Release -o ./publish --no-build
+        run: dotnet publish ./ISL_Service/ISL_Service.sln -c Release -o ./publish --no-build
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
@@ -43,7 +47,7 @@ jobs:
     needs: build
     permissions:
       id-token: write #This is required for requesting the JWT
-      contents: read #This is required for actions/checkout
+      contents: read  #This is required for actions/checkout
 
     steps:
       - name: Download artifact from build job
