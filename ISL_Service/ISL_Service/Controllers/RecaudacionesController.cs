@@ -42,6 +42,10 @@ namespace ISL_Service.Controllers
             {
                 Encryptacion encryptacion = new Encryptacion();
 
+                qr = qr.Replace("@", "/");
+                qr = qr.Replace("|", "=");
+                qr = qr.Replace("*", "&");
+
                 // IDRecaudacion + | + IDCaja + | + Dv1
                 cadenaDesencriptada = encryptacion.Decrypt(qr);
 

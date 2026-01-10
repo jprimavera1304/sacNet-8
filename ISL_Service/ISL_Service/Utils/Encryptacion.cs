@@ -93,8 +93,9 @@ namespace ISL_Service.Utils
                     return String.Concat(Bits);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                string err = ex.Message;
                 return "";
             }
         }
