@@ -3,8 +3,6 @@ using ISL_Service.Application.Services;
 using ISL_Service.Utils;
 using Microsoft.AspNetCore.Mvc;
 
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-
 namespace ISL_Service.Controllers
 {
 
@@ -13,9 +11,7 @@ namespace ISL_Service.Controllers
     public class RecaudacionesController : ControllerBase
     {
 
-
         private readonly RecaudacionService _recaudacionService;
-
 
         // Inyección del servicio a través del constructor
         public RecaudacionesController(RecaudacionService recaudacionService)
@@ -30,13 +26,6 @@ namespace ISL_Service.Controllers
         {
             return new string[] { "value1", "value2" };
         }
-
-        ////// GET api/<RecaudacionesController>/5
-        ////[HttpGet("{id}")]
-        ////public string Get(int id)
-        ////{
-        ////    return "value";
-        ////}
 
 
         //[HttpGet("{r}/{c}")]
@@ -81,16 +70,13 @@ namespace ISL_Service.Controllers
             }
             catch (Exception ex)
             {
-                if (ex.Message.Contains("Error al ejecutar el procedimiento almacenado"))
-                {
-                    return StatusCode(500, "Error en la conexión o al ejecutar el procedimiento almacenado: " + ex.Message);
-                }
-                return StatusCode(500, "Ocurrió un error inesperado: " + ex.Message);
-            }
+                //if (ex.Message.Contains("Error al ejecutar el procedimiento almacenado"))
+                //{
+                //    return StatusCode(500, "Error en la conexión o al ejecutar el procedimiento almacenado: " + ex.Message);
+                //}
 
-            ////var result = recaudacionService.GetById(id);
-            ////if (result == null) return NotFound();
-            ////return Ok(result);
+                return StatusCode(500, "Error en la aplicación: " + ex.Message);
+            }
         }
 
 
@@ -112,4 +98,5 @@ namespace ISL_Service.Controllers
         {
         }
     }
+
 }

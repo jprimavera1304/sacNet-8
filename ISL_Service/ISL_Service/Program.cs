@@ -9,7 +9,6 @@ using ISL_Service.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using ISL_Service.Infrastructure.Repositories.RecaudacionRepo;
 
 
 var builder = WebApplication.CreateBuilder(args);
