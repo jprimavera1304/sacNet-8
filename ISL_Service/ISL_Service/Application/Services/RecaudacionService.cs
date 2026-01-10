@@ -32,10 +32,13 @@ namespace ISL_Service.Application.Services
 
                 else if (recaudacionInputDTO.IDRecaudacion > 0)
                 {
-                    // Busqueda por un IDRecaudacion
+                    // Busqueda por un IDRecaudacion e IDCaja
                     int IDRecaudacion = recaudacionInputDTO.IDRecaudacion;
+                    int IDCaja = recaudacionInputDTO.IDCaja;
+
                     recaudacionInputDTO = new RecaudacionInputDTO();
                     recaudacionInputDTO.IDsRecaudacion = IDRecaudacion.ToString();
+                    recaudacionInputDTO.IDCaja = IDCaja;
                 }
 
                 // Si es por folio, entonces se ignoran todos los demas filtros, en otro caso si se toman los filtros
