@@ -42,7 +42,7 @@ namespace ISL_Service.Controllers
             {
                 Encryptacion encryptacion = new Encryptacion();
 
-                qr = qr.Replace("@", "/");
+                qr = qr.Replace("CBA-_ABC", "/");
                 qr = qr.Replace("_", "=");
                 qr = qr.Replace("-", "+");
                 qr = qr.Replace("*", "&");
