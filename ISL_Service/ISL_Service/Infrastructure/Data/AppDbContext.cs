@@ -1,10 +1,26 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using ISL_Service.Domain.Entities;
+using Microsoft.Data.SqlClient;
+using System.Data;
 
 namespace ISL_Service.Infrastructure.Data;
 
 public class AppDbContext : DbContext
 {
+
+    public readonly string _connectionString;
+
+    public AppDbContext(string connectionString)
+    {
+        _connectionString = connectionString;
+    }
+
+    public IDbConnection CreateConnection()
+    {
+        return new SqlConnection(_connectionString);
+    }
+
+
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
     }

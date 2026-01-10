@@ -6,9 +6,9 @@ namespace ISL_Service.Infrastructure.Data
     public class Mac3SqlServerConnector
     {
 
-
-        private string ConnectionString = "Mac3";
+        //private string ConnectionString = "Mac3";
         //private string ConnectionString = ConfigurationManager.ConnectionStrings["Mac3"].ConnectionString;
+        //private string ConnectionString = "";
 
         private SqlConnection SqlConn = null;
 
@@ -19,30 +19,31 @@ namespace ISL_Service.Infrastructure.Data
             set { SqlConn = value; }
         }
 
-        public Mac3SqlServerConnector()
+        public Mac3SqlServerConnector(string connectionString)
         {
 
-            if (this.ConnectionString.Contains("Aviacion"))
+            if (connectionString.Contains("Aviacion"))
             {
-                string cadena = this.ConnectionString.Substring(0, 20);
+                string cadena = connectionString.Substring(0, 20);
 
                 if (cadena.Contains("Aviacion"))
                 {
                     // Cadena de Conexion Encriptada
-                    this.ConnectionString = this.ConnectionString.Replace("Aviacion", "");
+                    connectionString = connectionString.Replace("Aviacion", "");
 
                     Encryptacion encryptacion = new Encryptacion();
-                    string cadenaDesencriptada = encryptacion.Decrypt(this.ConnectionString);
+                    string cadenaDesencriptada = encryptacion.Decrypt(connectionString);
 
-                    this.ConnectionString = cadenaDesencriptada;
+                    connectionString = cadenaDesencriptada;
                 }
 
             }
 
-            if (this.ConnectionString.Contains("@Info"))
-                this.ConnectionString = this.ConnectionString.Replace("@Info", "User Id=sa; Password=Hope5y2k");
+            if (connectionString.Contains("@Info"))
+                connectionString = connectionString.Replace("@Info", "User Id=sa; Password=Hope5y2k");
 
-            SqlConn = new SqlConnection(this.ConnectionString);
+            SqlConn = new SqlConnection(connectionString);
+            connectionString = connectionString;
         }
 
         public Mac3SqlServerConnector(int NumCaja)
@@ -54,10 +55,10 @@ namespace ISL_Service.Infrastructure.Data
             SqlConn = new SqlConnection(ConnectionStringServer);
         }
 
-        public Mac3SqlServerConnector(string connectionString)
-        {
-            SqlConn = new SqlConnection(connectionString);
-        }
+        ////public Mac3SqlServerConnector(string connectionString)
+        ////{
+        ////    SqlConn = new SqlConnection(connectionString);
+        ////}
 
     }
 }

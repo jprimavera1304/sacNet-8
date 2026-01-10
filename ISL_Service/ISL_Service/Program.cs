@@ -9,9 +9,21 @@ using ISL_Service.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using ISL_Service.Infrastructure.Repositories.RecaudacionRepo;
 
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Registrar el repositorio y el servicio
+//builder.Services.AddSingleton(new MyRepository(builder.Configuration.GetConnectionString("Mac3")));
+//builder.Services.AddScoped<MyService>();
+
+builder.Services.AddSingleton(new AppDbContext(builder.Configuration.GetConnectionString("Mac3")));
+
+builder.Services.AddScoped<RecaudacionRepository>();
+builder.Services.AddScoped<RecaudacionService>();
+//builder.Services.AddScoped<MyService>();
+
 
 // Add services to the container.
 builder.Services.AddControllers();

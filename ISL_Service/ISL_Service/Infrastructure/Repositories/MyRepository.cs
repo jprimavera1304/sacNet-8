@@ -15,8 +15,8 @@ namespace ISL_Service.Infrastructure.Repositories
         {
             _connectionString = connectionString;
 
-            Mac3SqlServerConnector objConn = new Mac3SqlServerConnector();
-            SqlConnection Conn = objConn.GetConnection;
+            //Mac3SqlServerConnector objConn = new Mac3SqlServerConnector();
+            //SqlConnection Conn = objConn.GetConnection;
         }
 
         public MyEntity GetById(int id)

@@ -1,6 +1,4 @@
-﻿using ISL_Service.Application.DTOs.GenericResponse;
-using System.Net;
-using System.Net.Http;
+﻿using System.Net;
 
 namespace ISL_Service.Application.DTOs.GenericHttpResponse
 {
