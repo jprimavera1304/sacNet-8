@@ -44,6 +44,7 @@ namespace ISL_Service.Controllers
 
                 qr = qr.Replace("@", "/");
                 qr = qr.Replace("_", "=");
+                qr = qr.Replace("-", "+");
                 qr = qr.Replace("*", "&");
 
                 // IDRecaudacion + | + IDCaja + | + Dv1
