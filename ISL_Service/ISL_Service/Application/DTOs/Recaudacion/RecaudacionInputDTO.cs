@@ -86,6 +86,7 @@ namespace ISL_Service.Application.DTOs.Recaudacion
         public int ExisteCorteDiaAnterior { get; set; }
         public int UltimoDiaCorte { get; set; }
 
+        public int Dv1 { get; set; }
 
         public int IDUsuario { get; set; }
         public string Equipo { get; set; }

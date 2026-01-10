@@ -1,5 +1,6 @@
 ﻿using ISL_Service.Application.DTOs.Recaudacion;
 using ISL_Service.Application.Services;
+using ISL_Service.Utils;
 using Microsoft.AspNetCore.Mvc;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
@@ -38,15 +39,40 @@ namespace ISL_Service.Controllers
         ////}
 
 
-        [HttpGet("{r}/{c}")]
-        public IActionResult Get(int r, int c)
+        //[HttpGet("{r}/{c}")]
+        //public IActionResult Get(int r, int c)
+
+        [HttpGet("{qr}")]
+        public IActionResult Get(string qr)
         {
+
+            string cadenaDesencriptada = "";
+            int IDRecaudacion = 0, IDCaja = 0, Dv1 = 0;
 
             try
             {
+                Encryptacion encryptacion = new Encryptacion();
+
+                // IDRecaudacion + | + IDCaja + | + Dv1
+                cadenaDesencriptada = encryptacion.Decrypt(qr);
+
+                IDRecaudacion = int.Parse(cadenaDesencriptada.Split("|")[0].ToString());
+                IDCaja = int.Parse(cadenaDesencriptada.Split("|")[1].ToString());
+                Dv1 = int.Parse(cadenaDesencriptada.Split("|")[2].ToString());
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Ticket Inválido");
+            }
+
+            try
+                {
                 RecaudacionInputDTO recaudacionInputDTO = new RecaudacionInputDTO();
-                recaudacionInputDTO.IDRecaudacion = r;
-                recaudacionInputDTO.IDCaja = c;
+
+                // IDRecaudacion + | + IDCaja + | + Dv1
+                recaudacionInputDTO.IDRecaudacion = IDRecaudacion;
+                recaudacionInputDTO.IDCaja = IDCaja;
+                recaudacionInputDTO.Dv1 = Dv1;
 
                 var result = _recaudacionService.GetById(recaudacionInputDTO);
                 if (result == null || result.Count == 0) return NotFound("No se encontraron registros.");
