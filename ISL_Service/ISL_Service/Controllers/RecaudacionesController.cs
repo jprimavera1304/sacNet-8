@@ -60,7 +60,7 @@ namespace ISL_Service.Controllers
             }
 
             try
-                {
+            {
                 RecaudacionInputDTO recaudacionInputDTO = new RecaudacionInputDTO();
 
                 // IDRecaudacion + | + IDCaja + | + Dv1

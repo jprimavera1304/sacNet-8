@@ -21,7 +21,9 @@ builder.Services.AddSingleton(new AppDbContext(builder.Configuration.GetConnecti
 
 builder.Services.AddScoped<RecaudacionRepository>();
 builder.Services.AddScoped<RecaudacionService>();
-//builder.Services.AddScoped<MyService>();
+
+builder.Services.AddScoped<ProveedoresPagosRepository>();
+builder.Services.AddScoped<ProveedoresPagosService>();
 
 
 // Add services to the container.
