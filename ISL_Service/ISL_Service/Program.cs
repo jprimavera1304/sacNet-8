@@ -10,23 +10,11 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
-
 var builder = WebApplication.CreateBuilder(args);
 
-// Registrar el repositorio y el servicio
-//builder.Services.AddSingleton(new MyRepository(builder.Configuration.GetConnectionString("Mac3")));
-//builder.Services.AddScoped<MyService>();
+// -------------------- Services --------------------
 
-builder.Services.AddSingleton(new AppDbContext(builder.Configuration.GetConnectionString("Mac3")));
-
-builder.Services.AddScoped<RecaudacionRepository>();
-builder.Services.AddScoped<RecaudacionService>();
-
-builder.Services.AddScoped<ProveedoresPagosRepository>();
-builder.Services.AddScoped<ProveedoresPagosService>();
-
-
-// Add services to the container.
+// Controllers + Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -52,18 +40,29 @@ builder.Services.AddSwaggerGen(c =>
                     Id = "Bearer"
                 }
             },
-            new string[] {}
+            Array.Empty<string>()
         }
     });
 });
 
+// DbContext (recomendado: solo esta forma, scoped por request)
 builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
+
+// Repositories / Services
+builder.Services.AddScoped<RecaudacionRepository>();
+builder.Services.AddScoped<RecaudacionService>();
+
+builder.Services.AddScoped<ProveedoresPagosRepository>();
+builder.Services.AddScoped<ProveedoresPagosService>();
+
+builder.Services.AddScoped<IPersonasRepository, PersonasRepository>();
+builder.Services.AddScoped<IPersonasService, PersonasService>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
 
-//Token
+// JWT
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
 builder.Services
@@ -86,7 +85,7 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
-
+// CORS (DEV: abierto)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendPolicy", policy =>
@@ -98,9 +97,24 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("DevCors", policy =>
+        policy
+            .WithOrigins(
+                "http://127.0.0.1:5500",
+                "http://localhost:5500"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+    );
+});
+
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// -------------------- Pipeline --------------------
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -108,12 +122,18 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors("DevCors");
+
+// CORS debe ir ANTES de auth/authorization y ANTES de MapControllers
 app.UseCors("FrontendPolicy");
 
 app.UseAuthentication();
 app.UseAuthorization();
 
+// (Opcional) Exception handler — normalmente va antes de auth también, pero así funciona
 app.UseExceptionHandler("/error");
 
 app.MapControllers();
+
 app.Run();

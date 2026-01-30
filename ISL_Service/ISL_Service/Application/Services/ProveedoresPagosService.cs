@@ -29,10 +29,18 @@ namespace ISL_Service.Application.Services
             }
         }
 
+
         public int Insertar(ProveedorPagoInputDTO input)
         {
             try
             {
+                if (input.IDPersona <= 0) throw new Exception("IDPersona es requerido.");
+                //if (input.IDProveedor <= 0) throw new Exception("IDProveedor es requerido.");
+
+                if (input.IDUsuario <= 0) throw new Exception("IDUsuario es requerido.");
+                if (string.IsNullOrWhiteSpace(input.Equipo)) throw new Exception("Equipo es requerido.");
+                if (string.IsNullOrWhiteSpace(input.FechaPago)) throw new Exception("FechaPago es requerido.");
+
                 return proveedoresPagosRepository.Insertar(input);
             }
             catch (SqlException ex)
@@ -45,10 +53,15 @@ namespace ISL_Service.Application.Services
             }
         }
 
+
         public void Cancelar(ProveedorPagoInputDTO input)
         {
             try
             {
+                if (input.IDProveedorPago <= 0) throw new Exception("IDProveedorPago es requerido.");
+                if (input.IDUsuarioCancelacion <= 0) throw new Exception("IDUsuarioCancelacion es requerido.");
+                if (string.IsNullOrWhiteSpace(input.EquipoCancelacion)) throw new Exception("EquipoCancelacion es requerido.");
+
                 proveedoresPagosRepository.Cancelar(input);
             }
             catch (SqlException ex)
@@ -65,6 +78,10 @@ namespace ISL_Service.Application.Services
         {
             try
             {
+                if (input.IDProveedorPago <= 0) throw new Exception("IDProveedorPago es requerido.");
+                if (input.IDUsuarioModificacion <= 0) throw new Exception("IDUsuarioModificacion es requerido.");
+                if (string.IsNullOrWhiteSpace(input.EquipoModificacion)) throw new Exception("EquipoModificacion es requerido.");
+
                 proveedoresPagosRepository.Actualizar(input);
             }
             catch (SqlException ex)

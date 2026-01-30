@@ -5,7 +5,7 @@ namespace ISL_Service.Application.DTOs.ProveedoresPagos
     public class ProveedorPagoDTO
     {
         public int IDProveedorPago { get; set; }
-        public int IDProveedor { get; set; }
+        public int IDPersona { get; set; }
 
         /// <summary>
         /// 1 = Activo, 2 = Cancelado

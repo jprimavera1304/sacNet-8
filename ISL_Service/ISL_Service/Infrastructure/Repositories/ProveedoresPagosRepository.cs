@@ -80,13 +80,13 @@ namespace ISL_Service.Infrastructure.Repositories
                 DateTime? fechaFinal = TryParseDate(input.FechaFinal);
 
                 command.Parameters.AddWithValue("@IDProveedorPago", input.IDProveedorPago);
-                command.Parameters.AddWithValue("@IDProveedor", input.IDProveedor);
+                command.Parameters.AddWithValue("@IDPersona", input.IDPersona);
                 command.Parameters.AddWithValue("@IDStatus", input.IDStatus);
                 command.Parameters.AddWithValue("@FechaInicial", (object?)fechaInicial ?? DBNull.Value);
                 command.Parameters.AddWithValue("@FechaFinal", (object?)fechaFinal ?? DBNull.Value);
                 command.Parameters.AddWithValue("@IncluirCancelados", input.IncluirCancelados);
 
-                debug = $"{sp} {input.IDProveedorPago}, {input.IDProveedor}, {input.IDStatus}, {input.IncluirCancelados}";
+                debug = $"{sp} {input.IDProveedorPago}, {input.IDPersona}, {input.IDStatus}, {input.IncluirCancelados}";
 
                 using SqlDataAdapter da = new SqlDataAdapter(command);
                 da.Fill(ds);
@@ -122,7 +122,9 @@ namespace ISL_Service.Infrastructure.Repositories
 
                 DateTime fechaPago = ParseRequiredDate(input.FechaPago, "FechaPago");
 
-                command.Parameters.AddWithValue("@IDProveedor", input.IDProveedor);
+                command.Parameters.AddWithValue("@IDPersona", input.IDPersona);
+                //command.Parameters.AddWithValue("@IDProveedor", input.IDProveedor);
+
                 command.Parameters.AddWithValue("@Facturas", (object?)NullIfEmpty(input.Facturas) ?? DBNull.Value);
                 command.Parameters.AddWithValue("@TotalFactura", (object?)input.TotalFactura ?? DBNull.Value);
                 command.Parameters.AddWithValue("@FechaPago", fechaPago);
@@ -148,7 +150,9 @@ namespace ISL_Service.Infrastructure.Repositories
             }
         }
 
+
         #endregion
+
 
         #region Actualizar
 
@@ -167,7 +171,7 @@ namespace ISL_Service.Infrastructure.Repositories
                 DateTime? fechaPago = TryParseDate(input.FechaPago);
 
                 command.Parameters.AddWithValue("@IDProveedorPago", input.IDProveedorPago);
-                command.Parameters.AddWithValue("@IDProveedor", input.IDProveedor == 0 ? DBNull.Value : (object)input.IDProveedor);
+                command.Parameters.AddWithValue("@IDPersona", input.IDPersona == 0 ? DBNull.Value : (object)input.IDPersona);
                 command.Parameters.AddWithValue("@Facturas", (object?)NullIfEmpty(input.Facturas) ?? DBNull.Value);
                 command.Parameters.AddWithValue("@TotalFactura", (object?)input.TotalFactura ?? DBNull.Value);
                 command.Parameters.AddWithValue("@FechaPago", (object?)fechaPago ?? DBNull.Value);

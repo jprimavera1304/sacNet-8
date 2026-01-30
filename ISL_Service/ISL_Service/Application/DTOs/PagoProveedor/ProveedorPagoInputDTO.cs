@@ -12,7 +12,7 @@ namespace ISL_Service.Application.DTOs.ProveedoresPagos
 
         // ===== Consultar =====
         public int IDProveedorPago { get; set; }
-        public int IDProveedor { get; set; }
+        public int IDPersona { get; set; }
         public int IDStatus { get; set; }              // filtro opcional (0 = todos)
         public string FechaInicial { get; set; }
         public string FechaFinal { get; set; }
@@ -21,8 +21,11 @@ namespace ISL_Service.Application.DTOs.ProveedoresPagos
         // ===== Insertar / Actualizar =====
         public string Facturas { get; set; }
         public decimal? TotalFactura { get; set; }
-        public string FechaPago { get; set; }          // se envía desde front; se convierte en repository
+        public string FechaPago { get; set; }
         public string Observaciones { get; set; }
+
+        // NO requerido para insertar por Personas
+        //public int IDProveedor { get; set; }
 
         // ===== Cancelar =====
         public string MotivoCancelacion { get; set; }
