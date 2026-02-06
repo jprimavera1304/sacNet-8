@@ -9,27 +9,58 @@ using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Services;
 using ISL_Service.Infrastructure.Repositories;
 
-// Login/JWT + Middleware (AGREGADO)
+// Login/JWT + Middleware
 using ISL_Service.Infrastructure.Security;
 using ISL_Service.Infrastructure.Middleware;
-
-using Microsoft.AspNetCore.Routing;
-
-using ISL_Service.Application.DTOs.Requests;
+using Microsoft.OpenApi.Models;
 
 
 var builder = WebApplication.CreateBuilder(args);
 
 // -------------------- Services --------------------
 
-// Controllers + Swagger
+// Controllers + Swagger (lo dejo porque dijiste "sin borrar")
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
 builder.Services.AddSwaggerGen(c =>
 {
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "ISL_Service",
+        Version = "v1"
+    });
+
+    // Definición de seguridad JWT
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Escribe: Bearer {tu token JWT}"
+    });
+
+    // Requerir JWT en endpoints protegidos
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
 });
 
-// DbContext (recomendado: solo esta forma, scoped por request)
+
+// DbContext
 builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseSqlServer(builder.Configuration.GetConnectionString("Local")));
 
@@ -43,16 +74,19 @@ builder.Services.AddScoped<ProveedoresPagosService>();
 builder.Services.AddScoped<IPersonasRepository, PersonasRepository>();
 builder.Services.AddScoped<IPersonasService, PersonasService>();
 
-// -------------------- LOGIN (AGREGADO) --------------------
-// Asegúrate de haber creado estos archivos/clases:
-// - IUserRepository + UserRepository
-// - IUserService + UserService
-// - IJwtTokenGenerator + JwtTokenGenerator
+// -------------------- LOGIN (YA TENIAS) --------------------
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
-// JWT Authentication (AGREGADO)
+// -------------------- USER ADMIN (NUEVO) --------------------
+builder.Services.AddScoped<IUserAdminService, UserAdminService>();
+
+builder.Services.AddScoped<IEmpresaRepository, EmpresaRepository>();
+builder.Services.AddScoped<IEmpresaService, EmpresaService>();
+
+
+// -------------------- JWT Authentication --------------------
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtKey = jwtSection["Key"];
 var jwtIssuer = jwtSection["Issuer"];
@@ -62,7 +96,6 @@ if (string.IsNullOrWhiteSpace(jwtKey) ||
     string.IsNullOrWhiteSpace(jwtIssuer) ||
     string.IsNullOrWhiteSpace(jwtAudience))
 {
-    // Si falta algo, el proyecto va a truonar al arrancar
     throw new InvalidOperationException("Faltan configuraciones Jwt:Key / Jwt:Issuer / Jwt:Audience en appsettings.json.");
 }
 
@@ -84,25 +117,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             // Para que tu MeController pueda leer sub como Id
             NameClaimType = "sub",
 
-            // tolerancia pequeña
+            // Si tu token mete "rol" en vez de ClaimTypes.Role, descomenta esta línea:
+            // RoleClaimType = "rol",
+
             ClockSkew = TimeSpan.FromMinutes(1)
         };
     });
 
 builder.Services.AddAuthorization();
 
-// CORS (DEV: abierto) (YA TENIAS)
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("FrontendPolicy", policy =>
-    {
-        policy
-            .AllowAnyOrigin()
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-    });
-});
-
+// -------------------- CORS --------------------
+// OJO: solo una política. Antes tenías 2 AddCors, y eso confunde/sobrescribe.
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("DevCors", policy =>
@@ -128,14 +153,13 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// CORS
 app.UseCors("DevCors");
 
-
-// Middleware de errores (AGREGADO)
-// Lo dejo además de tu UseExceptionHandler, sin quitar nada.
+// Middleware de errores
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-// Auth (AGREGADO)
+// Auth
 app.UseAuthentication();
 app.UseAuthorization();
 

@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.Interfaces;
 
 namespace ISL_Service.Controllers;
@@ -10,10 +11,12 @@ namespace ISL_Service.Controllers;
 public class MeController : ControllerBase
 {
     private readonly IUserRepository _users;
+    private readonly IUserAdminService _userAdminService;
 
-    public MeController(IUserRepository users)
+    public MeController(IUserRepository users, IUserAdminService userAdminService)
     {
         _users = users;
+        _userAdminService = userAdminService;
     }
 
     [Authorize]
@@ -37,5 +40,13 @@ public class MeController : ControllerBase
             empresaId = user.EmpresaId,
             debeCambiarContrasena = user.DebeCambiarContrasena
         });
+    }
+
+    [Authorize]
+    [HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest req, CancellationToken ct)
+    {
+        await _userAdminService.ChangeMyPasswordAsync(req, User, ct);
+        return NoContent();
     }
 }

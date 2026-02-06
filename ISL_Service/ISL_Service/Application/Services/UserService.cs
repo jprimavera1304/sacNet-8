@@ -20,7 +20,14 @@ public class UserService : IUserService
     {
         var user = await _repo.GetByUsuarioAsync(request.Usuario.Trim(), ct);
         if (user is null) throw new AuthenticationException("Credenciales inválidas.");
-        if (user.Estado != 1) throw new AuthenticationException("Usuario inactivo.");
+
+        // Estados: 1=Activo, 2=Inactivo, 3=Bloqueado
+        if (user.Estado != 1)
+        {
+            if (user.Estado == 2) throw new AuthenticationException("Usuario inactivo.");
+            if (user.Estado == 3) throw new AuthenticationException("Usuario bloqueado.");
+            throw new AuthenticationException("Usuario no autorizado.");
+        }
 
         if (!BCrypt.Net.BCrypt.Verify(request.Contrasena, user.ContrasenaHash))
             throw new AuthenticationException("Credenciales inválidas.");
