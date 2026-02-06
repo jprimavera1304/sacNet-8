@@ -4,8 +4,6 @@ namespace ISL_Service.Application.Interfaces;
 
 public interface IUserRepository
 {
-    Task<List<User>> GetAllAsync();
-    Task<User?> FindByEmailAsync(string email);
-    Task AddAsync(User user);
-    Task SaveChangesAsync();
+    Task<Usuario?> GetByUsuarioAsync(string usuario, CancellationToken ct);
+    Task<Usuario?> GetByIdAsync(Guid id, CancellationToken ct);
 }

@@ -1,7 +1,7 @@
-﻿using ISL_Service.Application.DTOs.Requests;
+﻿using System.Security.Authentication;
+using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
-using ISL_Service.Domain.Entities;
 
 namespace ISL_Service.Application.Services;
 
@@ -16,48 +16,25 @@ public class UserService : IUserService
         _jwt = jwt;
     }
 
-    public async Task<LoginResponse?> LoginAsync(LoginRequest request)
+    public async Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken ct)
     {
-        var email = request.Email.Trim().ToLower();
+        var user = await _repo.GetByUsuarioAsync(request.Usuario.Trim(), ct);
+        if (user is null) throw new AuthenticationException("Credenciales inválidas.");
+        if (user.Estado != 1) throw new AuthenticationException("Usuario inactivo.");
 
-        var user = await _repo.FindByEmailAsync(email);
-        if (user is null) return null;
+        if (!BCrypt.Net.BCrypt.Verify(request.Contrasena, user.ContrasenaHash))
+            throw new AuthenticationException("Credenciales inválidas.");
 
-        var ok = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
-        if (!ok) return null;
+        var token = _jwt.GenerateToken(user);
 
-        var token = _jwt.Create(user.Id, user.Email, user.Role);
-        return new LoginResponse(token);
-    }
-
-    public async Task<List<UserResponse>> GetAllAsync()
-    {
-         var users = await _repo.GetAllAsync();
-
-        return users.Select(u => new UserResponse(
-            u.Id, u.Email, u.Role, u.CreatedAt
-        )).ToList();
-    }
-
-    public async Task<UserResponse?> RegisterAsync(RegisterRequest request)
-    {
-        var email = request.Email.Trim().ToLower();
-
-        var existing = await _repo.FindByEmailAsync(email);
-        if (existing is not null) return null;
-
-        var user = new User
+        return new LoginResponse
         {
-            Id = Guid.NewGuid(),
-            Email = email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-            Role = "User",
-            CreatedAt = DateTime.UtcNow
+            Token = token,
+            UserId = user.Id,
+            Usuario = user.UsuarioNombre,
+            Rol = user.Rol,
+            EmpresaId = user.EmpresaId,
+            DebeCambiarContrasena = user.DebeCambiarContrasena
         };
-
-        await _repo.AddAsync(user);
-        await _repo.SaveChangesAsync();
-
-        return new UserResponse(user.Id, user.Email, user.Role, user.CreatedAt);
     }
 }
