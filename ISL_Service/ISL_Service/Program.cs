@@ -14,7 +14,6 @@ using ISL_Service.Infrastructure.Security;
 using ISL_Service.Infrastructure.Middleware;
 using Microsoft.OpenApi.Models;
 
-
 var builder = WebApplication.CreateBuilder(args);
 
 // -------------------- Services --------------------
@@ -60,9 +59,24 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 
-// DbContext
+// -------------------- DB CONNECTION (AGREGADO) --------------------
+// 1) En Azure vas a configurar "Cadenas de conexión" con nombre: Main
+// 2) Para no romper tu local, si Main no existe, cae a Local.
+var mainCs = builder.Configuration.GetConnectionString("Main");
+var localCs = builder.Configuration.GetConnectionString("Local");
+var effectiveCs = !string.IsNullOrWhiteSpace(mainCs) ? mainCs : localCs;
+
+if (string.IsNullOrWhiteSpace(effectiveCs))
+{
+    throw new InvalidOperationException(
+        "No hay cadena de conexión. Configura ConnectionStrings:Main (recomendado) o ConnectionStrings:Local."
+    );
+}
+
+// DbContext (ANTES: Local fijo; AHORA: Main si existe, si no Local)
 builder.Services.AddDbContext<AppDbContext>(opt =>
-    opt.UseSqlServer(builder.Configuration.GetConnectionString("Local")));
+    opt.UseSqlServer(effectiveCs));
+
 
 // Repositories / Services (YA TENIAS)
 builder.Services.AddScoped<RecaudacionRepository>();
@@ -126,19 +140,40 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+
 // -------------------- CORS --------------------
+// AGREGADO: AllowedOrigins desde configuración (Azure Variables de entorno)
+// - En Azure: AllowedOrigins = https://mactauro.com,https://sacmac.net
+// - Mantengo tus orígenes de dev como fallback.
+var allowedOriginsRaw = builder.Configuration["AllowedOrigins"];
+var allowedOrigins = (allowedOriginsRaw ?? "")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
 // OJO: solo una política. Antes tenías 2 AddCors, y eso confunde/sobrescribe.
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("DevCors", policy =>
-        policy
-            .WithOrigins(
-                "http://127.0.0.1:5501",
-                "http://localhost:5501"
-            )
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-    );
+    {
+        if (allowedOrigins.Length > 0)
+        {
+            policy
+                .WithOrigins(allowedOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
+        }
+        else
+        {
+            // fallback dev (lo que ya tenías)
+            policy
+                .WithOrigins(
+                    "http://127.0.0.1:5501",
+                    "http://localhost:5501"
+                )
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        }
+    });
 });
 
 var app = builder.Build();
@@ -162,6 +197,24 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 // Auth
 app.UseAuthentication();
 app.UseAuthorization();
+
+// AGREGADO: endpoint simple para validar config por empresa
+app.MapGet("/whoami", (IConfiguration config, IWebHostEnvironment env) =>
+{
+    // CompanyId lo configuras en Azure como variable de aplicación por cada Web App
+    var companyId = config["CompanyId"] ?? "missing";
+
+    // Solo para diagnóstico: dice si tomó Main o Local (no imprime la cadena)
+    var usingMain = !string.IsNullOrWhiteSpace(config.GetConnectionString("Main"));
+
+    return Results.Ok(new
+    {
+        companyId,
+        environment = env.EnvironmentName,
+        corsAllowedOrigins = config["AllowedOrigins"] ?? "",
+        db = usingMain ? "Main" : "Local"
+    });
+});
 
 app.MapControllers();
 
