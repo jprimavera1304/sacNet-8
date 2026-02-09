@@ -1,20 +1,69 @@
-# Deploy SOLO para mac-tauro (NO toca sacmac)
-
-name: Build and deploy ASP.NET Core app to Azure Web App - mac-tauro
+name: Build and Deploy ASP.NET Core Apps (multi-branch)
 
 on:
   push:
     branches:
-      - MacProvPagosCheques   # <-- tu rama de pruebas
+      - main
+      - MacProvPagosCheques
   workflow_dispatch:
 
 jobs:
-  build:
+
+  # ========================
+  # BUILD + DEPLOY sac26
+  # ========================
+  sac26:
+    if: github.ref == 'refs/heads/main'
     runs-on: windows-latest
 
+    permissions:
+      id-token: write
+      contents: read
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
+
+      - name: Restore
+        run: dotnet restore ./ISL_Service/ISL_Service.sln
+
+      - name: Build
+        run: dotnet build ./ISL_Service/ISL_Service.sln --configuration Release --no-restore
+
+      - name: Publish
+        run: dotnet publish ./ISL_Service/ISL_Service.sln -c Release -o publish --no-build
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_18E69ED7DD95439BBA315304862E2B4B }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_E93DFBCA6DA644E58902CC07E94E348A }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_B8646A95F3424EA7A2E6EE68A541419D }}
+
+      - name: Deploy sac26
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: sac26
+          slot-name: Production
+          package: publish
+
+  # ========================
+  # BUILD + DEPLOY mac-tauro
+  # ========================
+  mac-tauro:
+    if: github.ref == 'refs/heads/MacProvPagosCheques'
+    runs-on: windows-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -30,35 +79,15 @@ jobs:
       - name: Publish
         run: dotnet publish --configuration Release --no-build --output publish
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app
-          path: publish
-
-  deploy:
-    runs-on: windows-latest
-    needs: build
-
-    permissions:
-      id-token: write   # NECESARIO para OIDC
-      contents: read
-
-    steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: app
-
-      - name: Azure Login (OIDC)
+      - name: Azure Login
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy to Azure Web App
+      - name: Deploy mac-tauro
         uses: azure/webapps-deploy@v3
         with:
           app-name: mac-tauro
-          package: .
+          package: publish
