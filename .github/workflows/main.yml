@@ -1,4 +1,7 @@
-name: Build and Deploy ASP.NET Core Apps (multi-branch)
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+
+name: Build and deploy ASP.Net Core apps to Azure Web Apps (sac26 + mac-tauro)
 
 on:
   push:
@@ -8,86 +11,124 @@ on:
   workflow_dispatch:
 
 jobs:
-
-  # ========================
-  # BUILD + DEPLOY sac26
-  # ========================
-  sac26:
+  # =========================
+  # sac26 (rama main)
+  # =========================
+  build_sac26:
     if: github.ref == 'refs/heads/main'
     runs-on: windows-latest
-
     permissions:
-      id-token: write
       contents: read
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Set up .NET Core
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.x'
 
-      - name: Restore
+      - name: Restore with dotnet
         run: dotnet restore ./ISL_Service/ISL_Service.sln
 
-      - name: Build
+      - name: Build with dotnet
         run: dotnet build ./ISL_Service/ISL_Service.sln --configuration Release --no-restore
 
-      - name: Publish
-        run: dotnet publish ./ISL_Service/ISL_Service.sln -c Release -o publish --no-build
+      - name: dotnet publish
+        run: dotnet publish ./ISL_Service/ISL_Service.sln -c Release -o ./publish --no-build
 
-      - name: Azure Login
+      - name: Upload artifact for deployment job
+        uses: actions/upload-artifact@v4
+        with:
+          name: .net-app-sac26
+          path: ./publish
+
+  deploy_sac26:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    needs: build_sac26
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: .net-app-sac26
+
+      - name: Login to Azure
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_18E69ED7DD95439BBA315304862E2B4B }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_E93DFBCA6DA644E58902CC07E94E348A }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_B8646A95F3424EA7A2E6EE68A541419D }}
 
-      - name: Deploy sac26
+      - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: sac26
-          slot-name: Production
-          package: publish
+          app-name: 'sac26'
+          slot-name: 'Production'
+          package: .
 
-  # ========================
-  # BUILD + DEPLOY mac-tauro
-  # ========================
-  mac-tauro:
+
+  # =========================
+  # mac-tauro (rama MacProvPagosCheques)
+  # =========================
+  build_mac_tauro:
     if: github.ref == 'refs/heads/MacProvPagosCheques'
     runs-on: windows-latest
-
     permissions:
-      id-token: write
       contents: read
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Set up .NET Core
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.x'
 
-      - name: Restore
-        run: dotnet restore
+      # MISMA SOLUCIÓN que sac26 (como me dijiste)
+      - name: Restore with dotnet
+        run: dotnet restore ./ISL_Service/ISL_Service.sln
 
-      - name: Build
-        run: dotnet build --configuration Release --no-restore
+      - name: Build with dotnet
+        run: dotnet build ./ISL_Service/ISL_Service.sln --configuration Release --no-restore
 
-      - name: Publish
-        run: dotnet publish --configuration Release --no-build --output publish
+      - name: dotnet publish
+        run: dotnet publish ./ISL_Service/ISL_Service.sln -c Release -o ./publish --no-build
 
-      - name: Azure Login
+      - name: Upload artifact for deployment job
+        uses: actions/upload-artifact@v4
+        with:
+          name: .net-app-mac-tauro
+          path: ./publish
+
+  deploy_mac_tauro:
+    if: github.ref == 'refs/heads/MacProvPagosCheques'
+    runs-on: windows-latest
+    needs: build_mac_tauro
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: .net-app-mac-tauro
+
+      - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_9E4723E5108B4B93B49EDB6AD2D43BCE }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_0B6FC493A70944FBB07E47B87C31CD05 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_6110C9A8A8C64EA495D5FFAD3FEE630B }}
 
-      - name: Deploy mac-tauro
+      - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: mac-tauro
-          package: publish
+          app-name: 'mac-tauro'
+          slot-name: 'Production'
+          package: .
