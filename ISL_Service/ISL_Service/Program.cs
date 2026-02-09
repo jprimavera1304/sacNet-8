@@ -13,6 +13,7 @@ using ISL_Service.Infrastructure.Repositories;
 using ISL_Service.Infrastructure.Security;
 using ISL_Service.Infrastructure.Middleware;
 using Microsoft.OpenApi.Models;
+using Microsoft.Data.SqlClient;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -232,6 +233,29 @@ app.MapGet("/whoami", (IConfiguration config, IWebHostEnvironment env) =>
         db = usingMain ? "Main" : "Local"
     });
 });
+
+app.MapGet("/dbcheck", async (IConfiguration config) =>
+{
+    var cs = config.GetConnectionString("Main");
+
+    try
+    {
+        using var conn = new SqlConnection(cs);
+        await conn.OpenAsync();
+
+        return Results.Ok(new
+        {
+            connected = true,
+            server = conn.DataSource,
+            database = conn.Database
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+});
+
 
 app.MapControllers();
 
