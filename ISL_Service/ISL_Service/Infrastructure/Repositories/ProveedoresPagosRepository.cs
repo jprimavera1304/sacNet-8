@@ -47,15 +47,10 @@ namespace ISL_Service.Infrastructure.Repositories
 
         private string GetConnectionString()
         {
-            string env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-
-            if (!string.IsNullOrWhiteSpace(env) &&
-                env.Equals("Development", StringComparison.OrdinalIgnoreCase))
-            {
-                return _configuration.GetConnectionString("Local");
-            }
-
-            return _configuration.GetConnectionString("Mac3");
+            var cs = _configuration.GetConnectionString("Main");
+            if (string.IsNullOrWhiteSpace(cs))
+                throw new Exception("ConnectionString 'Main' no encontrada.");
+            return cs;
         }
 
         #endregion

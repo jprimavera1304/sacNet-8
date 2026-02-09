@@ -150,31 +150,48 @@ var allowedOrigins = (allowedOriginsRaw ?? "")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
 // OJO: solo una política. Antes tenías 2 AddCors, y eso confunde/sobrescribe.
+//builder.Services.AddCors(options =>
+//{
+//    options.AddPolicy("DevCors", policy =>
+//    {
+//        if (allowedOrigins.Length > 0)
+//        {
+//            policy
+//                .WithOrigins(allowedOrigins)
+//                .AllowAnyHeader()
+//                .AllowAnyMethod()
+//                .AllowCredentials();
+//        }
+//        else
+//        {
+//            // fallback dev (lo que ya tenías)
+//            policy
+//                .WithOrigins(
+//                    "http://127.0.0.1:5501",
+//                    "http://localhost:5501"
+//                )
+//                .AllowAnyHeader()
+//                .AllowAnyMethod();
+//        }
+//    });
+//});
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("DevCors", policy =>
-    {
-        if (allowedOrigins.Length > 0)
-        {
-            policy
-                .WithOrigins(allowedOrigins)
-                .AllowAnyHeader()
-                .AllowAnyMethod()
-                .AllowCredentials();
-        }
-        else
-        {
-            // fallback dev (lo que ya tenías)
-            policy
-                .WithOrigins(
-                    "http://127.0.0.1:5501",
-                    "http://localhost:5501"
-                )
-                .AllowAnyHeader()
-                .AllowAnyMethod();
-        }
-    });
+        policy
+            .WithOrigins(
+                "http://127.0.0.1:5501",
+                "http://localhost:5501",
+                "https://mactauro.com",
+                "https://sacmac.net"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+    );
 });
+
+
 
 var app = builder.Build();
 

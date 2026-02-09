@@ -16,9 +16,11 @@ namespace ISL_Service.Infrastructure.Repositories
 
         public PersonasRepository(IConfiguration configuration, IHostEnvironment env)
         {
-            var key = env.IsDevelopment() ? "Local" : "Mac3";
-            _connectionString = configuration.GetConnectionString(key) ?? throw new Exception("ConnectionString no encontrada.");
+            _connectionString = configuration.GetConnectionString("Main")
+                ?? throw new Exception("ConnectionString 'Main' no encontrada.");
         }
+
+
 
         public async Task<List<PersonaDTO>> ConsultarAsync(int? idPersona, int? idStatus)
         {
