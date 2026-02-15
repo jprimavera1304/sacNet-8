@@ -7,7 +7,6 @@ on:
   push:
     branches:
       - main
-      - MacProvPagosCheques
   workflow_dispatch:
 
 jobs:
@@ -73,10 +72,10 @@ jobs:
 
 
   # =========================
-  # mac-tauro (rama MacProvPagosCheques)
+  # mac-tauro (rama main)
   # =========================
   build_mac_tauro:
-    if: github.ref == 'refs/heads/MacProvPagosCheques'
+    if: github.ref == 'refs/heads/main'
     runs-on: windows-latest
     permissions:
       contents: read
@@ -106,7 +105,7 @@ jobs:
           path: ./publish
 
   deploy_mac_tauro:
-    if: github.ref == 'refs/heads/MacProvPagosCheques'
+    if: github.ref == 'refs/heads/main'
     runs-on: windows-latest
     needs: build_mac_tauro
     permissions:
