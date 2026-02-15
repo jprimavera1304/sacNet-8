@@ -1,16 +1,16 @@
-﻿using ISL_Service.Application.DTOs.Responses;
-using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
+﻿//using ISL_Service.Application.DTOs.Responses;
+//using Microsoft.AspNetCore.Diagnostics;
+//using Microsoft.AspNetCore.Mvc;
 
-namespace ISL_Service.Controllers;
+//namespace ISL_Service.Controllers;
 
-[ApiController]
-[Route("/error")]
-public class ErrorController : ControllerBase
-{
-    [HttpGet]
-    public IActionResult Error()
-    {
-        return Problem(title: "Error al buscar.");
-    }
-}
+//[ApiController]
+//[Route("/error")]
+//public class ErrorController : ControllerBase
+//{
+//    [HttpGet]
+//    public IActionResult Error()
+//    {
+//        return Problem(title: "Error al buscar.");
+//    }
+//}

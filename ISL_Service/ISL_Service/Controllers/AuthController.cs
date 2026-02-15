@@ -1,34 +1,32 @@
-﻿using ISL_Service.Application.DTOs.Requests;
-using ISL_Service.Application.DTOs.Responses;
-using ISL_Service.Application.Interfaces;
-using Microsoft.AspNetCore.Mvc;
+﻿//using Microsoft.AspNetCore.Mvc;
+//using ISL_Service.Application.DTOs.Requests;
+//using ISL_Service.Application.DTOs.Responses;
+//using ISL_Service.Application.Interfaces;
 
-namespace ISL_Service.Controllers;
+//namespace ISL_Service.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
-public class AuthController : ControllerBase
-{
-    private readonly IUserService _users;
+//[ApiController]
+//[Route("api/auth")]
+//public class AuthController : ControllerBase
+//{
+//    private readonly IUserService _users;
 
-    public AuthController(IUserService users) => _users = users;
+//    public AuthController(IUserService users)
+//    {
+//        _users = users;
+//    }
 
-    [HttpPost("register")]
-    public async Task<IActionResult> Register(RegisterRequest request)
-    {
-        var created = await _users.RegisterAsync(request);
+//    [HttpGet("ping")]
+//    public IActionResult Ping() => Ok("pong");
 
-        if (created is null)
-            return Conflict(new ApiError("Email already exists"));
-
-        return Created("", created);
-    }
-
-    [HttpPost("login")]
-    public async Task<IActionResult> Login(LoginRequest request)
-    {
-        var result = await _users.LoginAsync(request);
-        if (result is null) return Unauthorized(new { message = "Invalid credentials" });
-        return Ok(result);
-    }
-}
+//    [HttpPost("login")]
+//    [Consumes("application/json")]
+//    [Produces("application/json")]
+//    public async Task<ActionResult<LoginResponse>> Login(
+//        [FromBody] LoginRequest request,
+//        CancellationToken ct)
+//    {
+//        var result = await _users.LoginAsync(request, ct);
+//        return Ok(result);
+//    }
+//}

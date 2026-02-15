@@ -1,3 +1,7 @@
 ﻿namespace ISL_Service.Application.DTOs.Requests;
 
-public record LoginRequest(string Email, string Password);
+public class LoginRequest
+{
+    public string Usuario { get; set; } = string.Empty;
+    public string Contrasena { get; set; } = string.Empty;
+}

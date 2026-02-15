@@ -136,9 +136,9 @@ namespace ISL_Service.Infrastructure.Repositories
 
                 return recaudacionDTOList;
             }
-            catch (SqlException ex) // Manejo de errores de conexión y SP
+            catch (SqlException ex) // Manejo de errores de conexion y SP
             {
-                // Aquí podrías registrar el error si es necesario
+                // Aqui podrias registrar el error si es necesario
                 Debug.WriteLine("============= Exception =============");
                 Debug.WriteLine(ex.ToString());
                 msgError = ex.Message;

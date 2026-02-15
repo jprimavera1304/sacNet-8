@@ -5,8 +5,8 @@ namespace ISL_Service.Utils
     public class Encryptacion
     {
 
-        //static public string appPwdUnique = "AquíPuedesPonerElTextoQueDeseesComoClaveUnica";
-        private const string appPwdUnique2 = "AquíPuedesPonerElTextoQueDeseesComoClaveUnica";
+        //static public string appPwdUnique = "AquiPuedesPonerElTextoQueDeseesComoClaveUnica";
+        private const string appPwdUnique2 = "AquiPuedesPonerElTextoQueDeseesComoClaveUnica";
 
         #region "Encrypt"
         private byte[] Encrypt(byte[] clearData, byte[] Key, byte[] IV)
