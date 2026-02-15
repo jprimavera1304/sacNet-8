@@ -64,16 +64,25 @@ builder.Services.AddSwaggerGen(c =>
 
 
 // -------------------- DB CONNECTION (AGREGADO) --------------------
-// 1) En Azure vas a configurar "Cadenas de conexion" con nombre: Main
-// 2) Para no romper tu local, si Main no existe, cae a Local.
-var mainCs = builder.Configuration.GetConnectionString("Main");
-var localCs = builder.Configuration.GetConnectionString("Local");
-var effectiveCs = !string.IsNullOrWhiteSpace(mainCs) ? mainCs : localCs;
+// Compatibilidad total:
+// - Nuevo: Main
+// - Legacy: Mac3 / Local / Default
+var candidateConnections = new (string Name, string? Value)[]
+{
+    ("Main", builder.Configuration.GetConnectionString("Main")),
+    ("Mac3", builder.Configuration.GetConnectionString("Mac3")),
+    ("Local", builder.Configuration.GetConnectionString("Local")),
+    ("Default", builder.Configuration.GetConnectionString("Default"))
+};
+
+var selectedConnection = candidateConnections.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.Value));
+var effectiveCs = selectedConnection.Value;
+var effectiveCsName = selectedConnection.Name;
 
 if (string.IsNullOrWhiteSpace(effectiveCs))
 {
     throw new InvalidOperationException(
-        "No hay cadena de conexion. Configura ConnectionStrings:Main (recomendado) o ConnectionStrings:Local."
+        "No hay cadena de conexion valida. Configura ConnectionStrings:Main, Mac3, Local o Default."
     );
 }
 
@@ -228,30 +237,26 @@ app.MapGet("/whoami", (IConfiguration config, IWebHostEnvironment env) =>
     // CompanyId lo configuras en Azure como variable de aplicacion por cada Web App
     var companyId = config["CompanyId"] ?? "missing";
 
-    // Solo para diagnostico: dice si tomo Main o Local (no imprime la cadena)
-    var usingMain = !string.IsNullOrWhiteSpace(config.GetConnectionString("Main"));
-
     return Results.Ok(new
     {
         companyId,
         environment = env.EnvironmentName,
         corsAllowedOrigins = config["AllowedOrigins"] ?? "",
-        db = usingMain ? "Main" : "Local"
+        db = effectiveCsName
     });
 });
 
-app.MapGet("/dbcheck", async (IConfiguration config) =>
+app.MapGet("/dbcheck", async () =>
 {
-    var cs = config.GetConnectionString("Main");
-
     try
     {
-        using var conn = new SqlConnection(cs);
+        using var conn = new SqlConnection(effectiveCs);
         await conn.OpenAsync();
 
         return Results.Ok(new
         {
             connected = true,
+            connection = effectiveCsName,
             server = conn.DataSource,
             database = conn.Database
         });
