@@ -2,15 +2,14 @@
 using ISL_Service.Infrastructure.Data;
 using ISL_Service.Utils;
 using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Logging;
 using System.Data;
+using System.Diagnostics;
 
 namespace ISL_Service.Infrastructure.Repositories
 {
     public class RecaudacionRepository
     {
         private readonly AppDbContext _dbContext;
-        private readonly ILogger<RecaudacionRepository> _logger;
 
         public DataTable dtRecaudaciones;
         public List<RecaudacionDTO> recaudacionDTOList = new List<RecaudacionDTO>();
@@ -36,10 +35,9 @@ namespace ISL_Service.Infrastructure.Repositories
         ////private readonly string spActualizarRecaudacion = "sp_n_ActualizarEconomico";
         private readonly string spCancelarRecaudacion = "sp_n_CancelarRecaudacion";
 
-        public RecaudacionRepository(AppDbContext _dbContext, ILogger<RecaudacionRepository> logger)
+        public RecaudacionRepository(AppDbContext _dbContext)
         {
             this._dbContext = _dbContext;
-            _logger = logger;
         }
 
 
@@ -132,31 +130,25 @@ namespace ISL_Service.Infrastructure.Repositories
                 da = new SqlDataAdapter(command);
                 da.Fill(ds);
 
-                if (ds.Tables.Count == 0)
-                {
-                    _logger.LogWarning(
-                        "SP {StoredProcedure} no regreso resultset. debug={DebugPayload}",
-                        sp,
-                        debug);
-                    return new List<RecaudacionDTO>();
-                }
-
                 // Recaudacion Resultado
                 recaudacionDTOList = Funciones.DataTableToList<RecaudacionDTO>(ds.Tables[0]);
                 dtRecaudaciones = ds.Tables[0];
 
                 return recaudacionDTOList;
             }
-            catch (SqlException ex) // Manejo de errores de conexion y SP
+            catch (SqlException ex) // Manejo de errores de conexión y SP
             {
+                // Aquí podrías registrar el error si es necesario
+                Debug.WriteLine("============= Exception =============");
+                Debug.WriteLine(ex.ToString());
                 msgError = ex.Message;
-                _logger.LogError(ex, "Error SQL ejecutando {StoredProcedure}. debug={DebugPayload}", sp, debug);
                 throw new Exception("[No se pudo procesar " + debug + "] - " + ex.Message);
             }
             catch (Exception ex)
             {
+                Debug.WriteLine("============= Exception =============");
+                Debug.WriteLine(ex.ToString());
                 msgError = ex.Message;
-                _logger.LogError(ex, "Error general ejecutando {StoredProcedure}. debug={DebugPayload}", sp, debug);
                 throw new Exception("[No se pudo procesar " + debug + "] - " + ex.Message);
             }
             finally
