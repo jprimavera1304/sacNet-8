@@ -27,4 +27,9 @@
     <Folder Include="Application\DTOs\PagoProveedor\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="ISL_Service.Tests\**\*.cs" />
+    <None Remove="ISL_Service.Tests\**\*" />
+  </ItemGroup>
+
 </Project>

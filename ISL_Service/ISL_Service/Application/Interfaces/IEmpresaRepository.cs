@@ -3,4 +3,5 @@
 public interface IEmpresaRepository
 {
     Task<List<int>> ListEmpresaIdsAsync(CancellationToken ct);
+    Task<string> GetCompanyKeyAsync(CancellationToken ct);
 }

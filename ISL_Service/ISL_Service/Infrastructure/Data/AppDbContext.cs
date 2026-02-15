@@ -21,10 +21,18 @@ public class AppDbContext : DbContext
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
-        _connectionString = Database.GetConnectionString() ?? string.Empty;
+        try
+        {
+            _connectionString = Database.GetConnectionString() ?? string.Empty;
+        }
+        catch
+        {
+            _connectionString = string.Empty;
+        }
     }
 
     public DbSet<Usuario> Usuarios => Set<Usuario>();
+    public DbSet<EmpresaWeb> EmpresasWeb => Set<EmpresaWeb>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -32,7 +40,7 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<Usuario>(entity =>
         {
-            entity.ToTable("Usuarios", "dbo");
+            entity.ToTable("UsuarioWeb", "dbo");
             entity.HasKey(x => x.Id);
 
             entity.Property(x => x.UsuarioNombre).HasColumnName("Usuario").IsRequired();
@@ -43,6 +51,17 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Estado).HasColumnName("Estado").IsRequired();
             entity.Property(x => x.FechaCreacion).HasColumnName("FechaCreacion");
             entity.Property(x => x.FechaActualizacion).HasColumnName("FechaActualizacion");
+        });
+
+        modelBuilder.Entity<EmpresaWeb>(entity =>
+        {
+            entity.ToTable("EmpresaWeb", "dbo");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Id).HasColumnName("Id");
+            entity.Property(x => x.Clave).HasColumnName("Clave").IsRequired();
+            entity.Property(x => x.Nombre).HasColumnName("Nombre").IsRequired();
+            entity.Property(x => x.Estado).HasColumnName("Estado").IsRequired();
         });
     }
 }

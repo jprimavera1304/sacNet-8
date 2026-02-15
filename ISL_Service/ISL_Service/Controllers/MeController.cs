@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using ISL_Service.Application.DTOs.Requests;
+using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
 
 namespace ISL_Service.Controllers;
@@ -12,11 +13,13 @@ public class MeController : ControllerBase
 {
     private readonly IUserRepository _users;
     private readonly IUserAdminService _userAdminService;
+    private readonly IEmpresaRepository _empresas;
 
-    public MeController(IUserRepository users, IUserAdminService userAdminService)
+    public MeController(IUserRepository users, IUserAdminService userAdminService, IEmpresaRepository empresas)
     {
         _users = users;
         _userAdminService = userAdminService;
+        _empresas = empresas;
     }
 
     [Authorize]
@@ -26,20 +29,25 @@ public class MeController : ControllerBase
         var sub = User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
 
         if (string.IsNullOrWhiteSpace(sub) || !Guid.TryParse(sub, out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invalido." });
 
         var user = await _users.GetByIdAsync(userId, ct);
         if (user is null)
             return NotFound(new { message = "Usuario no encontrado." });
 
-        return Ok(new
+        var companyKey = await _empresas.GetCompanyKeyAsync(ct);
+
+        var response = new MeResponse
         {
-            id = user.Id,
-            usuario = user.UsuarioNombre,
-            rol = user.Rol,
-            empresaId = user.EmpresaId,
-            debeCambiarContrasena = user.DebeCambiarContrasena
-        });
+            Id = user.Id,
+            Usuario = user.UsuarioNombre,
+            Rol = user.Rol,
+            EmpresaId = user.EmpresaId,
+            CompanyKey = companyKey,
+            DebeCambiarContrasena = user.DebeCambiarContrasena
+        };
+
+        return Ok(response);
     }
 
     [Authorize]

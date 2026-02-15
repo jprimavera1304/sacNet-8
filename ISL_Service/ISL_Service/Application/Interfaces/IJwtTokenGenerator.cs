@@ -4,5 +4,5 @@ namespace ISL_Service.Application.Interfaces;
 
 public interface IJwtTokenGenerator
 {
-    string GenerateToken(Usuario user);
+    string GenerateToken(Usuario user, string companyKey);
 }

@@ -8,5 +8,6 @@ public class MeResponse
     public string Usuario { get; set; } = string.Empty;
     public string Rol { get; set; } = string.Empty;
     public int EmpresaId { get; set; }
+    public string CompanyKey { get; set; } = string.Empty;
     public bool DebeCambiarContrasena { get; set; }
 }
