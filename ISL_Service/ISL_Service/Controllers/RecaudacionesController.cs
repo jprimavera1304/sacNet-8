@@ -12,11 +12,13 @@ namespace ISL_Service.Controllers
     {
 
         private readonly RecaudacionService _recaudacionService;
+        private readonly ILogger<RecaudacionesController> _logger;
 
         // Inyección del servicio a través del constructor
-        public RecaudacionesController(RecaudacionService recaudacionService)
+        public RecaudacionesController(RecaudacionService recaudacionService, ILogger<RecaudacionesController> logger)
         {
             _recaudacionService = recaudacionService;
+            _logger = logger;
         }
 
 
@@ -40,8 +42,15 @@ namespace ISL_Service.Controllers
 
             try
             {
+                if (string.IsNullOrWhiteSpace(qr))
+                {
+                    return BadRequest(new { message = "Ticket invalido.", traceId = HttpContext.TraceIdentifier });
+                }
+
                 Encryptacion encryptacion = new Encryptacion();
 
+                // Compatibilidad con formatos viejo y nuevo.
+                qr = qr.Replace("@", "/");
                 qr = qr.Replace("CBA-_ABC", "/");
                 qr = qr.Replace("_", "=");
                 qr = qr.Replace("-", "+");
@@ -49,18 +58,26 @@ namespace ISL_Service.Controllers
 
                 // IDRecaudacion + | + IDCaja + | + Dv1
                 cadenaDesencriptada = encryptacion.Decrypt(qr);
-
-                IDRecaudacion = int.Parse(cadenaDesencriptada.Split("|")[0].ToString());
-                IDCaja = int.Parse(cadenaDesencriptada.Split("|")[1].ToString());
-                Dv1 = int.Parse(cadenaDesencriptada.Split("|")[2].ToString());
+                var partes = cadenaDesencriptada.Split('|');
+                if (partes.Length < 3 ||
+                    !int.TryParse(partes[0], out IDRecaudacion) ||
+                    !int.TryParse(partes[1], out IDCaja) ||
+                    !int.TryParse(partes[2], out Dv1))
+                {
+                    _logger.LogWarning("QR invalido en Recaudaciones. rawLen={RawLen}, traceId={TraceId}",
+                        qr.Length, HttpContext.TraceIdentifier);
+                    return BadRequest(new { message = "Ticket invalido.", traceId = HttpContext.TraceIdentifier });
+                }
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Ticket Inválido");
+                _logger.LogWarning(ex, "Error al desencriptar QR en Recaudaciones. traceId={TraceId}",
+                    HttpContext.TraceIdentifier);
+                return BadRequest(new { message = "Ticket invalido.", traceId = HttpContext.TraceIdentifier });
             }
 
             try
-                {
+            {
                 RecaudacionInputDTO recaudacionInputDTO = new RecaudacionInputDTO();
 
                 // IDRecaudacion + | + IDCaja + | + Dv1
@@ -75,12 +92,9 @@ namespace ISL_Service.Controllers
             }
             catch (Exception ex)
             {
-                //if (ex.Message.Contains("Error al ejecutar el procedimiento almacenado"))
-                //{
-                //    return StatusCode(500, "Error en la conexión o al ejecutar el procedimiento almacenado: " + ex.Message);
-                //}
-
-                return StatusCode(500, "Error en la aplicación: " + ex.Message);
+                _logger.LogError(ex, "Error consultando recaudacion. id={IDRecaudacion}, caja={IDCaja}, traceId={TraceId}",
+                    IDRecaudacion, IDCaja, HttpContext.TraceIdentifier);
+                return StatusCode(500, new { message = "Error interno al consultar ticket.", traceId = HttpContext.TraceIdentifier });
             }
         }
 
