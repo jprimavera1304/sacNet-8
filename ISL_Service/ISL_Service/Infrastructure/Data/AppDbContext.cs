@@ -1,13 +1,12 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using ISL_Service.Domain.Entities;
 using Microsoft.Data.SqlClient;
 using System.Data;
+using ISL_Service.Domain.Entities;
 
 namespace ISL_Service.Infrastructure.Data;
 
 public class AppDbContext : DbContext
 {
-
     public readonly string _connectionString;
 
     public AppDbContext(string connectionString)
@@ -20,35 +19,49 @@ public class AppDbContext : DbContext
         return new SqlConnection(_connectionString);
     }
 
-
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
+        try
+        {
+            _connectionString = Database.GetConnectionString() ?? string.Empty;
+        }
+        catch
+        {
+            _connectionString = string.Empty;
+        }
     }
-    public DbSet<User> Users => Set<User>();
+
+    public DbSet<Usuario> Usuarios => Set<Usuario>();
+    public DbSet<EmpresaWeb> EmpresasWeb => Set<EmpresaWeb>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Email único
-        modelBuilder.Entity<User>()
-            .HasIndex(u => u.Email)
-            .IsUnique();
-
-        // Reglas básicas de columnas (opcional, pero recomendado)
-        modelBuilder.Entity<User>()
-            .Property(u => u.Email)
-            .HasMaxLength(320)
-            .IsRequired();
-
-        modelBuilder.Entity<User>()
-            .Property(u => u.PasswordHash)
-            .HasMaxLength(500)
-            .IsRequired();
-
-        modelBuilder.Entity<User>()
-            .Property(u => u.Role)
-            .HasMaxLength(50)
-            .IsRequired();
-
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<Usuario>(entity =>
+        {
+            entity.ToTable("UsuarioWeb", "dbo");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.UsuarioNombre).HasColumnName("Usuario").IsRequired();
+            entity.Property(x => x.ContrasenaHash).HasColumnName("ContrasenaHash").IsRequired();
+            entity.Property(x => x.Rol).HasColumnName("Rol").IsRequired();
+            entity.Property(x => x.EmpresaId).HasColumnName("EmpresaId").IsRequired();
+            entity.Property(x => x.DebeCambiarContrasena).HasColumnName("DebeCambiarContrasena").IsRequired();
+            entity.Property(x => x.Estado).HasColumnName("Estado").IsRequired();
+            entity.Property(x => x.FechaCreacion).HasColumnName("FechaCreacion");
+            entity.Property(x => x.FechaActualizacion).HasColumnName("FechaActualizacion");
+        });
+
+        modelBuilder.Entity<EmpresaWeb>(entity =>
+        {
+            entity.ToTable("EmpresaWeb", "dbo");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Id).HasColumnName("Id");
+            entity.Property(x => x.Clave).HasColumnName("Clave").IsRequired();
+            entity.Property(x => x.Nombre).HasColumnName("Nombre").IsRequired();
+            entity.Property(x => x.Estado).HasColumnName("Estado").IsRequired();
+        });
     }
 }

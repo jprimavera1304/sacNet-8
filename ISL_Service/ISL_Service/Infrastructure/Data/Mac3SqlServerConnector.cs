@@ -21,6 +21,9 @@ namespace ISL_Service.Infrastructure.Data
 
         public Mac3SqlServerConnector(string connectionString)
         {
+            if (string.IsNullOrWhiteSpace(connectionString))
+                throw new Exception("ConnectionString viene null/vacia. Revisa que exista ConnectionStrings:Main (recomendado).");
+
 
             if (connectionString.Contains("Aviacion"))
             {
