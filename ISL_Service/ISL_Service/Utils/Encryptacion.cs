@@ -7,6 +7,7 @@ namespace ISL_Service.Utils
 
         //static public string appPwdUnique = "AquiPuedesPonerElTextoQueDeseesComoClaveUnica";
         private const string appPwdUnique2 = "AquiPuedesPonerElTextoQueDeseesComoClaveUnica";
+        private const string appPwdUniqueAccent = "AquíPuedesPonerElTextoQueDeseesComoClaveUnica";
 
         #region "Encrypt"
         private byte[] Encrypt(byte[] clearData, byte[] Key, byte[] IV)
@@ -69,37 +70,63 @@ namespace ISL_Service.Utils
         #region "Decrypt"
         public string Decrypt(string Data, string Password = appPwdUnique2, int Bits = 256)
         {
+            var passwords = new List<string>();
+            if (!string.IsNullOrWhiteSpace(Password))
+            {
+                passwords.Add(Password);
+            }
+
+            // Compatibilidad permanente con ambos esquemas históricos de clave.
+            if (!passwords.Contains(appPwdUniqueAccent)) passwords.Add(appPwdUniqueAccent);
+            if (!passwords.Contains(appPwdUnique2)) passwords.Add(appPwdUnique2);
+
+            foreach (var candidate in passwords)
+            {
+                if (TryDecryptWithPassword(Data, candidate, Bits, out var decrypted))
+                {
+                    return decrypted;
+                }
+            }
+
+            return "";
+        }
+        #endregion
+
+        private bool TryDecryptWithPassword(string data, string password, int bits, out string result)
+        {
+            result = "";
             try
             {
-                byte[] cipherBytes = Convert.FromBase64String(Data);
-                PasswordDeriveBytes pdb = new PasswordDeriveBytes(Password, new byte[] { 0x0, 0x1, 0x2, 0x1C, 0x1D, 0x1E, 0x3, 0x4, 0x5, 0xF, 0x20, 0x21, 0xAD, 0xAF, 0xA4 });
-                if (Bits == 128)
+                byte[] cipherBytes = Convert.FromBase64String(data);
+                PasswordDeriveBytes pdb = new PasswordDeriveBytes(password, new byte[] { 0x0, 0x1, 0x2, 0x1C, 0x1D, 0x1E, 0x3, 0x4, 0x5, 0xF, 0x20, 0x21, 0xAD, 0xAF, 0xA4 });
+
+                byte[] decryptedData;
+                if (bits == 128)
                 {
-                    byte[] decryptedData = Decrypt(cipherBytes, pdb.GetBytes(16), pdb.GetBytes(16));
-                    return System.Text.Encoding.Unicode.GetString(decryptedData);
+                    decryptedData = Decrypt(cipherBytes, pdb.GetBytes(16), pdb.GetBytes(16));
                 }
-                else if (Bits == 192)
+                else if (bits == 192)
                 {
-                    byte[] decryptedData = Decrypt(cipherBytes, pdb.GetBytes(24), pdb.GetBytes(16));
-                    return System.Text.Encoding.Unicode.GetString(decryptedData);
+                    decryptedData = Decrypt(cipherBytes, pdb.GetBytes(24), pdb.GetBytes(16));
                 }
-                else if (Bits == 256)
+                else if (bits == 256)
                 {
-                    byte[] decryptedData = Decrypt(cipherBytes, pdb.GetBytes(32), pdb.GetBytes(16));
-                    return System.Text.Encoding.Unicode.GetString(decryptedData);
+                    decryptedData = Decrypt(cipherBytes, pdb.GetBytes(32), pdb.GetBytes(16));
                 }
                 else
                 {
-                    return String.Concat(Bits);
+                    result = String.Concat(bits);
+                    return true;
                 }
+
+                result = System.Text.Encoding.Unicode.GetString(decryptedData);
+                return true;
             }
-            catch (Exception ex)
+            catch
             {
-                string err = ex.Message;
-                return "";
+                return false;
             }
         }
-        #endregion
 
     }
 }
