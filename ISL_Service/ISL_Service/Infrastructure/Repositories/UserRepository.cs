@@ -140,6 +140,155 @@ public class UserRepository : IUserRepository
         };
     }
 
+    public async Task<Usuario> UpdateUsuarioAndRolAsync(Guid userId, string usuarioNuevo, string rolNuevo, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(_db.Database.GetConnectionString());
+        await conn.OpenAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        try
+        {
+            var currentCmd = new SqlCommand(@"
+SELECT TOP 1 Usuario, DebeCambiarContrasena, Estado, FechaCreacion, FechaActualizacion
+FROM dbo.UsuarioWeb
+WHERE Id = @Id AND EmpresaId = 1;", conn, (SqlTransaction)tx);
+            currentCmd.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier) { Value = userId });
+
+            string? usuarioActual = null;
+            bool debeCambiarContrasena = false;
+            int estado = 1;
+            DateTime fechaCreacion = DateTime.UtcNow;
+            DateTime fechaActualizacion = DateTime.UtcNow;
+
+            await using (var reader = await currentCmd.ExecuteReaderAsync(ct))
+            {
+                if (!await reader.ReadAsync(ct))
+                    throw new KeyNotFoundException("Usuario no encontrado.");
+
+                usuarioActual = reader.GetString(reader.GetOrdinal("Usuario"));
+                debeCambiarContrasena = reader.GetBoolean(reader.GetOrdinal("DebeCambiarContrasena"));
+                estado = reader.GetInt32(reader.GetOrdinal("Estado"));
+                fechaCreacion = reader.GetDateTime(reader.GetOrdinal("FechaCreacion"));
+                fechaActualizacion = reader.GetDateTime(reader.GetOrdinal("FechaActualizacion"));
+            }
+
+            var updateWeb = new SqlCommand(@"
+UPDATE dbo.UsuarioWeb
+SET Usuario = @UsuarioNuevo,
+    Rol = @RolNuevo,
+    FechaActualizacion = SYSUTCDATETIME()
+WHERE Id = @Id AND EmpresaId = 1;", conn, (SqlTransaction)tx);
+            updateWeb.Parameters.Add(new SqlParameter("@UsuarioNuevo", SqlDbType.NVarChar, 80) { Value = usuarioNuevo });
+            updateWeb.Parameters.Add(new SqlParameter("@RolNuevo", SqlDbType.NVarChar, 30) { Value = rolNuevo });
+            updateWeb.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier) { Value = userId });
+            await updateWeb.ExecuteNonQueryAsync(ct);
+
+            if (!string.IsNullOrWhiteSpace(usuarioActual))
+            {
+                var updateLegacy = new SqlCommand(@"
+UPDATE dbo.Usuarios
+SET Usuario = @UsuarioNuevo,
+    Nombre = @UsuarioNuevo
+WHERE UPPER(LTRIM(RTRIM(Usuario))) = UPPER(LTRIM(RTRIM(@UsuarioActual)));", conn, (SqlTransaction)tx);
+                updateLegacy.Parameters.Add(new SqlParameter("@UsuarioNuevo", SqlDbType.VarChar, 150) { Value = usuarioNuevo });
+                updateLegacy.Parameters.Add(new SqlParameter("@UsuarioActual", SqlDbType.VarChar, 150) { Value = usuarioActual });
+                await updateLegacy.ExecuteNonQueryAsync(ct);
+            }
+
+            await tx.CommitAsync(ct);
+
+            return new Usuario
+            {
+                Id = userId,
+                UsuarioNombre = usuarioNuevo,
+                Rol = rolNuevo,
+                EmpresaId = EMPRESA_ID_UNICA,
+                DebeCambiarContrasena = debeCambiarContrasena,
+                Estado = estado,
+                FechaCreacion = fechaCreacion,
+                FechaActualizacion = fechaActualizacion
+            };
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    public async Task<Usuario> UpdateEstadoWithLegacyAsync(Guid userId, int estado, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(_db.Database.GetConnectionString());
+        await conn.OpenAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        try
+        {
+            var currentCmd = new SqlCommand(@"
+SELECT TOP 1 Usuario, Rol, DebeCambiarContrasena, FechaCreacion, FechaActualizacion
+FROM dbo.UsuarioWeb
+WHERE Id = @Id AND EmpresaId = 1;", conn, (SqlTransaction)tx);
+            currentCmd.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier) { Value = userId });
+
+            string? usuario = null;
+            string rol = "User";
+            bool debeCambiarContrasena = false;
+            DateTime fechaCreacion = DateTime.UtcNow;
+            DateTime fechaActualizacion = DateTime.UtcNow;
+
+            await using (var reader = await currentCmd.ExecuteReaderAsync(ct))
+            {
+                if (!await reader.ReadAsync(ct))
+                    throw new KeyNotFoundException("Usuario no encontrado.");
+
+                usuario = reader.GetString(reader.GetOrdinal("Usuario"));
+                rol = reader.GetString(reader.GetOrdinal("Rol"));
+                debeCambiarContrasena = reader.GetBoolean(reader.GetOrdinal("DebeCambiarContrasena"));
+                fechaCreacion = reader.GetDateTime(reader.GetOrdinal("FechaCreacion"));
+                fechaActualizacion = reader.GetDateTime(reader.GetOrdinal("FechaActualizacion"));
+            }
+
+            var updateWeb = new SqlCommand(@"
+UPDATE dbo.UsuarioWeb
+SET Estado = @Estado,
+    FechaActualizacion = SYSUTCDATETIME()
+WHERE Id = @Id AND EmpresaId = 1;", conn, (SqlTransaction)tx);
+            updateWeb.Parameters.Add(new SqlParameter("@Estado", SqlDbType.Int) { Value = estado });
+            updateWeb.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier) { Value = userId });
+            await updateWeb.ExecuteNonQueryAsync(ct);
+
+            if (!string.IsNullOrWhiteSpace(usuario))
+            {
+                var updateLegacy = new SqlCommand(@"
+UPDATE dbo.Usuarios
+SET IDStatus = @Estado
+WHERE UPPER(LTRIM(RTRIM(Usuario))) = UPPER(LTRIM(RTRIM(@Usuario)));", conn, (SqlTransaction)tx);
+                updateLegacy.Parameters.Add(new SqlParameter("@Estado", SqlDbType.Int) { Value = estado });
+                updateLegacy.Parameters.Add(new SqlParameter("@Usuario", SqlDbType.VarChar, 150) { Value = usuario });
+                await updateLegacy.ExecuteNonQueryAsync(ct);
+            }
+
+            await tx.CommitAsync(ct);
+
+            return new Usuario
+            {
+                Id = userId,
+                UsuarioNombre = usuario ?? string.Empty,
+                Rol = rol,
+                EmpresaId = EMPRESA_ID_UNICA,
+                DebeCambiarContrasena = debeCambiarContrasena,
+                Estado = estado,
+                FechaCreacion = fechaCreacion,
+                FechaActualizacion = fechaActualizacion
+            };
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
+    }
+
     public Task SaveChangesAsync(CancellationToken ct)
         => _db.SaveChangesAsync(ct);
 }

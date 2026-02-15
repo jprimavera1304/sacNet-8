@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.DTOs.Responses;
+using ISL_Service.Application.Exceptions;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
 using ISL_Service.Domain.Entities;
@@ -26,16 +27,11 @@ public class UserAdminService : IUserAdminService
 
     public async Task<CreateUserResponse> CreateUserAsync(CreateUserRequest req, ClaimsPrincipal actor, CancellationToken ct)
     {
-        var isSuper = CurrentUser.IsSuperAdmin(actor);
-
-        // Admin normal no puede crear SuperAdmin
-        if (!isSuper && string.Equals(req.Rol, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
-            throw new UnauthorizedAccessException("No puedes crear usuarios SuperAdmin.");
-
-        var usuarioNombre = req.Usuario.Trim();
+        var usuarioNombre = NormalizeUsuario(req.Usuario);
+        var rol = NormalizeRol(req.Rol);
 
         if (await _repo.ExistsByUsuarioAsync(usuarioNombre, ct))
-            throw new InvalidOperationException("El usuario ya existe.");
+            throw new ConflictException("El usuario ya existe.");
 
         var hash = BCrypt.Net.BCrypt.HashPassword(req.PasswordTemporal);
         var entity = await _repo.UpsertWebAndLegacyAsync(
@@ -43,7 +39,7 @@ public class UserAdminService : IUserAdminService
             req.PasswordTemporal,
             hash,
             usuarioNombre,
-            req.Rol.Trim(),
+            rol,
             debeCambiarContrasena: true,
             estado: ESTADO_ACTIVO,
             ct);
@@ -55,30 +51,41 @@ public class UserAdminService : IUserAdminService
         };
     }
 
-    public async Task<List<UserResponse>> ListUsersAsync(int? empresaId, ClaimsPrincipal actor, CancellationToken ct)
+    public async Task<List<UserResponse>> ListUsersAsync(ClaimsPrincipal actor, CancellationToken ct)
     {
         var list = await _repo.ListAsync(EMPRESA_FIJA, ct);
         return list.Select(Map).ToList();
     }
 
-    public async Task<UserResponse> UpdateEstadoAsync(Guid userId, UpdateUserEstadoRequest req, ClaimsPrincipal actor, CancellationToken ct)
+    public async Task<UserResponse> UpdateUserAsync(Guid userId, UpdateUserRequest req, ClaimsPrincipal actor, CancellationToken ct)
     {
-        var user = await _repo.GetByIdAsync(userId, ct) ?? throw new KeyNotFoundException("Usuario no encontrado.");
+        var user = await _repo.GetByIdAsync(userId, ct) ?? throw new NotFoundException("Usuario no encontrado.");
 
         EnsureActorCanManageTarget(actor, user);
 
-        user.Estado = req.Estado;
-        user.FechaActualizacion = DateTime.UtcNow;
+        var usuarioNuevo = NormalizeUsuario(req.Usuario);
+        var rolNuevo = NormalizeRol(req.Rol);
 
-        await _repo.UpdateAsync(user, ct);
-        await _repo.SaveChangesAsync(ct);
+        var existing = await _repo.GetByUsuarioAsync(usuarioNuevo, ct);
+        if (existing is not null && existing.Id != userId)
+            throw new ConflictException("El usuario ya existe.");
 
-        return Map(user);
+        var updated = await _repo.UpdateUsuarioAndRolAsync(userId, usuarioNuevo, rolNuevo, ct);
+        return Map(updated);
+    }
+
+    public async Task<UserResponse> UpdateEstadoAsync(Guid userId, UpdateUserEstadoRequest req, ClaimsPrincipal actor, CancellationToken ct)
+    {
+        var user = await _repo.GetByIdAsync(userId, ct) ?? throw new NotFoundException("Usuario no encontrado.");
+
+        EnsureActorCanManageTarget(actor, user);
+        var updated = await _repo.UpdateEstadoWithLegacyAsync(userId, req.Estado, ct);
+        return Map(updated);
     }
 
     public async Task<ResetPasswordResponse> ResetPasswordAsync(Guid userId, ClaimsPrincipal actor, CancellationToken ct)
     {
-        var user = await _repo.GetByIdAsync(userId, ct) ?? throw new KeyNotFoundException("Usuario no encontrado.");
+        var user = await _repo.GetByIdAsync(userId, ct) ?? throw new NotFoundException("Usuario no encontrado.");
 
         EnsureActorCanManageTarget(actor, user);
 
@@ -112,7 +119,7 @@ public class UserAdminService : IUserAdminService
     public async Task ChangeMyPasswordAsync(ChangePasswordRequest req, ClaimsPrincipal actor, CancellationToken ct)
     {
         var myId = CurrentUser.GetUserId(actor);
-        var user = await _repo.GetByIdAsync(myId, ct) ?? throw new KeyNotFoundException("Usuario no encontrado.");
+        var user = await _repo.GetByIdAsync(myId, ct) ?? throw new NotFoundException("Usuario no encontrado.");
 
         if (user.Estado != ESTADO_ACTIVO)
         {
@@ -165,10 +172,36 @@ public class UserAdminService : IUserAdminService
 
     public async Task<UserResponse> GetUserByIdAsync(Guid userId, ClaimsPrincipal actor, CancellationToken ct)
     {
-        var user = await _repo.GetByIdAsync(userId, ct) ?? throw new KeyNotFoundException("Usuario no encontrado.");
+        var user = await _repo.GetByIdAsync(userId, ct) ?? throw new NotFoundException("Usuario no encontrado.");
 
         EnsureActorCanManageTarget(actor, user);
 
         return Map(user);
+    }
+
+    private static string NormalizeUsuario(string usuario)
+    {
+        var normalized = (usuario ?? string.Empty).Trim().ToUpperInvariant();
+        if (normalized.Length < 4 || normalized.Length > 60)
+            throw new ArgumentException("Usuario invalido. Longitud permitida: 4 a 60.");
+
+        foreach (var ch in normalized)
+        {
+            var isValid = (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_';
+            if (!isValid)
+                throw new ArgumentException("Usuario invalido. Usa A-Z, 0-9 y _.");
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizeRol(string rol)
+    {
+        var normalized = (rol ?? string.Empty).Trim();
+        if (string.Equals(normalized, "User", StringComparison.OrdinalIgnoreCase)) return "User";
+        if (string.Equals(normalized, "Admin", StringComparison.OrdinalIgnoreCase)) return "Admin";
+        if (string.Equals(normalized, "SuperAdmin", StringComparison.OrdinalIgnoreCase)) return "SuperAdmin";
+
+        throw new ArgumentException("Rol invalido. Valores permitidos: User, Admin, SuperAdmin.");
     }
 }

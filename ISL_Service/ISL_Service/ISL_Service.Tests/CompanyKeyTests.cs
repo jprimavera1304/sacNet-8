@@ -157,6 +157,8 @@ public class CompanyKeyTests
         public Task AddAsync(Usuario user, CancellationToken ct) => Task.CompletedTask;
         public Task UpdateAsync(Usuario user, CancellationToken ct) => Task.CompletedTask;
         public Task<Usuario> UpsertWebAndLegacyAsync(string usuario, string contrasenaPlano, string contrasenaHashWeb, string nombre, string rol, bool debeCambiarContrasena, int estado, CancellationToken ct) => Task.FromResult(new Usuario());
+        public Task<Usuario> UpdateUsuarioAndRolAsync(Guid userId, string usuarioNuevo, string rolNuevo, CancellationToken ct) => Task.FromResult(new Usuario());
+        public Task<Usuario> UpdateEstadoWithLegacyAsync(Guid userId, int estado, CancellationToken ct) => Task.FromResult(new Usuario());
         public Task SaveChangesAsync(CancellationToken ct) => Task.CompletedTask;
     }
 
@@ -187,8 +189,9 @@ public class CompanyKeyTests
     private sealed class FakeUserAdminService : IUserAdminService
     {
         public Task<CreateUserResponse> CreateUserAsync(CreateUserRequest req, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
-        public Task<List<UserResponse>> ListUsersAsync(int? empresaId, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
+        public Task<List<UserResponse>> ListUsersAsync(ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
         public Task<UserResponse> GetUserByIdAsync(Guid userId, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
+        public Task<UserResponse> UpdateUserAsync(Guid userId, UpdateUserRequest req, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
         public Task<UserResponse> UpdateEstadoAsync(Guid userId, UpdateUserEstadoRequest req, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
         public Task<ResetPasswordResponse> ResetPasswordAsync(Guid userId, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
         public Task<UserResponse> UpdateEmpresaAsync(Guid userId, UpdateUserEmpresaRequest req, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
