@@ -38,18 +38,11 @@ namespace ISL_Service.Controllers
             }
 
             var tokenRaw = qr;
-            var tokenNormalized = tokenRaw.Contains('%') ? Uri.UnescapeDataString(tokenRaw) : tokenRaw;
-            tokenNormalized = tokenNormalized.Replace("CBA-_ABC", "/")
-                                             .Replace("_", "=")
-                                             .Replace("-", "+")
-                                             .Replace("*", "&");
-
-            if (!TryParseQrPayload(tokenNormalized, out var idRecaudacion, out var idCaja, out var dv1))
+            if (!TryParseQrPayload(tokenRaw, out var idRecaudacion, out var idCaja, out var dv1, out var parseMode))
             {
                 _logger.LogWarning(
-                    "QR invalido en Recaudaciones. rawLen={RawLength}, normLen={NormalizedLength}, traceId={TraceId}",
+                    "QR invalido en Recaudaciones. rawLen={RawLength}, traceId={TraceId}",
                     tokenRaw.Length,
-                    tokenNormalized.Length,
                     HttpContext.TraceIdentifier);
 
                 return BadRequest(new
@@ -81,10 +74,11 @@ namespace ISL_Service.Controllers
             {
                 _logger.LogError(
                     ex,
-                    "Error SQL en /api/Recaudaciones/{Qr}. idRecaudacion={IdRecaudacion}, idCaja={IdCaja}, traceId={TraceId}",
+                    "Error SQL en /api/Recaudaciones/{Qr}. idRecaudacion={IdRecaudacion}, idCaja={IdCaja}, parseMode={ParseMode}, traceId={TraceId}",
                     tokenRaw,
                     idRecaudacion,
                     idCaja,
+                    parseMode,
                     HttpContext.TraceIdentifier);
 
                 return StatusCode(500, new
@@ -97,10 +91,11 @@ namespace ISL_Service.Controllers
             {
                 _logger.LogError(
                     ex,
-                    "Error no controlado en /api/Recaudaciones/{Qr}. idRecaudacion={IdRecaudacion}, idCaja={IdCaja}, traceId={TraceId}",
+                    "Error no controlado en /api/Recaudaciones/{Qr}. idRecaudacion={IdRecaudacion}, idCaja={IdCaja}, parseMode={ParseMode}, traceId={TraceId}",
                     tokenRaw,
                     idRecaudacion,
                     idCaja,
+                    parseMode,
                     HttpContext.TraceIdentifier);
 
                 return StatusCode(500, new
@@ -129,19 +124,56 @@ namespace ISL_Service.Controllers
         {
         }
 
-        private static bool TryParseQrPayload(string token, out int idRecaudacion, out int idCaja, out int dv1)
+        private static bool TryParseQrPayload(
+            string token,
+            out int idRecaudacion,
+            out int idCaja,
+            out int dv1,
+            out string parseMode)
+        {
+            idRecaudacion = 0;
+            idCaja = 0;
+            dv1 = 0;
+            parseMode = "none";
+
+            // 1) Soporte directo para payload plano "id|caja|dv1"
+            if (TryParsePayloadParts(token, out idRecaudacion, out idCaja, out dv1))
+            {
+                parseMode = "plain";
+                return true;
+            }
+
+            // 2) Soporte para id simple (fallback extremo para no bloquear consulta)
+            if (int.TryParse(token, out idRecaudacion) && idRecaudacion > 0)
+            {
+                idCaja = 0;
+                dv1 = 0;
+                parseMode = "id_only";
+                return true;
+            }
+
+            // 3) Intentar con varias normalizaciones + decrypt (compatibilidad legacy/multi)
+            foreach (var candidate in BuildTokenCandidates(token))
+            {
+                var decrypt = new Encryptacion().Decrypt(candidate);
+                if (!string.IsNullOrWhiteSpace(decrypt) &&
+                    TryParsePayloadParts(decrypt, out idRecaudacion, out idCaja, out dv1))
+                {
+                    parseMode = "decrypt";
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryParsePayloadParts(string payload, out int idRecaudacion, out int idCaja, out int dv1)
         {
             idRecaudacion = 0;
             idCaja = 0;
             dv1 = 0;
 
-            var decrypt = new Encryptacion().Decrypt(token);
-            if (string.IsNullOrWhiteSpace(decrypt))
-            {
-                return false;
-            }
-
-            var parts = decrypt.Split('|');
+            var parts = payload.Split('|');
             if (parts.Length < 3)
             {
                 return false;
@@ -150,6 +182,45 @@ namespace ISL_Service.Controllers
             return int.TryParse(parts[0], out idRecaudacion)
                 && int.TryParse(parts[1], out idCaja)
                 && int.TryParse(parts[2], out dv1);
+        }
+
+        private static IEnumerable<string> BuildTokenCandidates(string tokenRaw)
+        {
+            var candidates = new List<string>();
+            if (string.IsNullOrWhiteSpace(tokenRaw))
+            {
+                return candidates;
+            }
+
+            void AddIfMissing(string value)
+            {
+                if (!string.IsNullOrWhiteSpace(value) && !candidates.Contains(value))
+                {
+                    candidates.Add(value);
+                }
+            }
+
+            AddIfMissing(tokenRaw);
+
+            var unescaped = tokenRaw.Contains('%') ? Uri.UnescapeDataString(tokenRaw) : tokenRaw;
+            AddIfMissing(unescaped);
+
+            var legacy = unescaped.Replace("CBA-_ABC", "/")
+                                  .Replace("_", "=")
+                                  .Replace("-", "+")
+                                  .Replace("*", "&");
+            AddIfMissing(legacy);
+
+            // Base64Url estandar (por si llega con formato url-safe)
+            var base64Url = unescaped.Replace('-', '+').Replace('_', '/');
+            var mod4 = base64Url.Length % 4;
+            if (mod4 > 0)
+            {
+                base64Url = base64Url.PadRight(base64Url.Length + (4 - mod4), '=');
+            }
+            AddIfMissing(base64Url);
+
+            return candidates;
         }
     }
 }
