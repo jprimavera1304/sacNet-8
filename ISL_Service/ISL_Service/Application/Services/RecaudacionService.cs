@@ -74,9 +74,9 @@ namespace ISL_Service.Application.Services
 
                 return recaudacionRepository.GetById(recaudacionInputDTO);
             }
-            catch (SqlException ex) // Manejo de errores de conexión y SP
+            catch (SqlException ex) // Manejo de errores de conexion y SP
             {
-                // Aquí podrías registrar el error si es necesario
+                // Aqui podrias registrar el error si es necesario
                 throw new Exception(ex.Message);
             }
             catch (Exception ex)

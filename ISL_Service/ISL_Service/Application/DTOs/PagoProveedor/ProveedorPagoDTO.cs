@@ -19,17 +19,17 @@ namespace ISL_Service.Application.DTOs.ProveedoresPagos
         public string Observaciones { get; set; }
         public string MotivoCancelacion { get; set; }
 
-        // ===== Auditoría Alta =====
+        // ===== Auditoria Alta =====
         public int IDUsuario { get; set; }
         public DateTime Fecha { get; set; }
         public string Equipo { get; set; }
 
-        // ===== Auditoría Actualización =====
+        // ===== Auditoria Actualizacion =====
         public int? IDUsuarioModificacion { get; set; }
         public DateTime? FechaModificacion { get; set; }
         public string EquipoModificacion { get; set; }
 
-        // ===== Auditoría Cancelación =====
+        // ===== Auditoria Cancelacion =====
         public int? IDUsuarioCancelacion { get; set; }
         public DateTime? FechaCancelacion { get; set; }
         public string EquipoCancelacion { get; set; }

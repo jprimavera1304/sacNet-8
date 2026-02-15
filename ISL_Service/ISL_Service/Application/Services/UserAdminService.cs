@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
@@ -9,9 +9,9 @@ namespace ISL_Service.Application.Services;
 
 public class UserAdminService : IUserAdminService
 {
-    private const int EMPRESA_SISTEMA = 5;
+    private const int EMPRESA_FIJA = 1;
 
-    // Estados según tu regla:
+    // Estados segun regla:
     // 1 = Activo, 2 = Inactivo, 3 = Bloqueado
     private const int ESTADO_ACTIVO = 1;
     private const int ESTADO_INACTIVO = 2;
@@ -26,43 +26,27 @@ public class UserAdminService : IUserAdminService
 
     public async Task<CreateUserResponse> CreateUserAsync(CreateUserRequest req, ClaimsPrincipal actor, CancellationToken ct)
     {
-        var actorEmpresaId = CurrentUser.GetEmpresaId(actor);
         var isSuper = CurrentUser.IsSuperAdmin(actor);
-
-        // Admin normal solo puede crear en su empresa
-        if (!isSuper && actorEmpresaId != req.EmpresaId)
-            throw new UnauthorizedAccessException("No puedes crear usuarios fuera de tu empresa.");
 
         // Admin normal no puede crear SuperAdmin
         if (!isSuper && string.Equals(req.Rol, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
             throw new UnauthorizedAccessException("No puedes crear usuarios SuperAdmin.");
-
-        // (Recomendado) Solo SuperAdmin puede crear en EmpresaId=5
-        if (!isSuper && req.EmpresaId == EMPRESA_SISTEMA)
-            throw new UnauthorizedAccessException("No puedes crear usuarios para el sistema.");
 
         var usuarioNombre = req.Usuario.Trim();
 
         if (await _repo.ExistsByUsuarioAsync(usuarioNombre, ct))
             throw new InvalidOperationException("El usuario ya existe.");
 
-        var now = DateTime.UtcNow;
-
-        var entity = new Usuario
-        {
-            Id = Guid.NewGuid(),
-            UsuarioNombre = usuarioNombre,
-            ContrasenaHash = BCrypt.Net.BCrypt.HashPassword(req.PasswordTemporal),
-            Rol = req.Rol.Trim(),
-            EmpresaId = req.EmpresaId,
-            DebeCambiarContrasena = true,
-            Estado = ESTADO_ACTIVO,
-            FechaCreacion = now,
-            FechaActualizacion = now
-        };
-
-        await _repo.AddAsync(entity, ct);
-        await _repo.SaveChangesAsync(ct);
+        var hash = BCrypt.Net.BCrypt.HashPassword(req.PasswordTemporal);
+        var entity = await _repo.UpsertWebAndLegacyAsync(
+            usuarioNombre,
+            req.PasswordTemporal,
+            hash,
+            usuarioNombre,
+            req.Rol.Trim(),
+            debeCambiarContrasena: true,
+            estado: ESTADO_ACTIVO,
+            ct);
 
         return new CreateUserResponse
         {
@@ -73,14 +57,7 @@ public class UserAdminService : IUserAdminService
 
     public async Task<List<UserResponse>> ListUsersAsync(int? empresaId, ClaimsPrincipal actor, CancellationToken ct)
     {
-        var actorEmpresaId = CurrentUser.GetEmpresaId(actor);
-        var isSuper = CurrentUser.IsSuperAdmin(actor);
-
-        // SuperAdmin: puede ver todo o filtrar por empresaId
-        // Admin: ignora query param y solo ve su empresa
-        int? effectiveEmpresaId = isSuper ? empresaId : actorEmpresaId;
-
-        var list = await _repo.ListAsync(effectiveEmpresaId, ct);
+        var list = await _repo.ListAsync(EMPRESA_FIJA, ct);
         return list.Select(Map).ToList();
     }
 
@@ -106,40 +83,30 @@ public class UserAdminService : IUserAdminService
         EnsureActorCanManageTarget(actor, user);
 
         var temp = PasswordGenerator.Generate(12);
+        var hash = BCrypt.Net.BCrypt.HashPassword(temp);
 
-        user.ContrasenaHash = BCrypt.Net.BCrypt.HashPassword(temp);
-        user.DebeCambiarContrasena = true;
-        user.FechaActualizacion = DateTime.UtcNow;
-
-        await _repo.UpdateAsync(user, ct);
-        await _repo.SaveChangesAsync(ct);
+        var updated = await _repo.UpsertWebAndLegacyAsync(
+            user.UsuarioNombre,
+            temp,
+            hash,
+            user.UsuarioNombre,
+            user.Rol,
+            debeCambiarContrasena: true,
+            estado: user.Estado,
+            ct);
 
         return new ResetPasswordResponse
         {
-            UserId = user.Id,
+            UserId = updated.Id,
             PasswordTemporal = temp,
             DebeCambiarContrasena = true
         };
     }
 
-    public async Task<UserResponse> UpdateEmpresaAsync(Guid userId, UpdateUserEmpresaRequest req, ClaimsPrincipal actor, CancellationToken ct)
+    public Task<UserResponse> UpdateEmpresaAsync(Guid userId, UpdateUserEmpresaRequest req, ClaimsPrincipal actor, CancellationToken ct)
     {
-        if (!CurrentUser.IsSuperAdmin(actor))
-            throw new UnauthorizedAccessException("Solo SuperAdmin puede cambiar empresa.");
-
-        var user = await _repo.GetByIdAsync(userId, ct) ?? throw new KeyNotFoundException("Usuario no encontrado.");
-
-        // Evita mover al SuperAdmin global (si lo quieres fijo)
-        if (string.Equals(user.Rol, "SuperAdmin", StringComparison.OrdinalIgnoreCase) && user.EmpresaId == EMPRESA_SISTEMA)
-            throw new InvalidOperationException("No se puede cambiar la empresa del SuperAdmin global.");
-
-        user.EmpresaId = req.EmpresaId;
-        user.FechaActualizacion = DateTime.UtcNow;
-
-        await _repo.UpdateAsync(user, ct);
-        await _repo.SaveChangesAsync(ct);
-
-        return Map(user);
+        return Task.FromException<UserResponse>(
+            new InvalidOperationException("En este modelo por base de datos, EmpresaId siempre es 1."));
     }
 
     public async Task ChangeMyPasswordAsync(ChangePasswordRequest req, ClaimsPrincipal actor, CancellationToken ct)
@@ -155,14 +122,19 @@ public class UserAdminService : IUserAdminService
         }
 
         if (!BCrypt.Net.BCrypt.Verify(req.ContrasenaActual, user.ContrasenaHash))
-            throw new InvalidOperationException("Contraseña actual incorrecta.");
+            throw new InvalidOperationException("Contrasena actual incorrecta.");
 
-        user.ContrasenaHash = BCrypt.Net.BCrypt.HashPassword(req.NuevaContrasena);
-        user.DebeCambiarContrasena = false;
-        user.FechaActualizacion = DateTime.UtcNow;
+        var hashNueva = BCrypt.Net.BCrypt.HashPassword(req.NuevaContrasena);
 
-        await _repo.UpdateAsync(user, ct);
-        await _repo.SaveChangesAsync(ct);
+        await _repo.UpsertWebAndLegacyAsync(
+            user.UsuarioNombre,
+            req.NuevaContrasena,
+            hashNueva,
+            user.UsuarioNombre,
+            user.Rol,
+            debeCambiarContrasena: false,
+            estado: user.Estado,
+            ct);
     }
 
     private static void EnsureActorCanManageTarget(ClaimsPrincipal actor, Usuario target)
@@ -199,5 +171,4 @@ public class UserAdminService : IUserAdminService
 
         return Map(user);
     }
-
 }

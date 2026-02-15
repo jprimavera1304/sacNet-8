@@ -1,4 +1,4 @@
-@ISL_Service_HostAddress = http://localhost:5037
+@ISL_Service_HostAddress = http://localhost:5041
 
 GET {{ISL_Service_HostAddress}}/weatherforecast/
 Accept: application/json

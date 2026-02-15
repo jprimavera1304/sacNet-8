@@ -5,7 +5,7 @@ namespace ISL_Service.Domain.Entities;
 public class Usuario
 {
     public Guid Id { get; set; }
-    public string UsuarioNombre { get; set; } = string.Empty; // columna dbo.Usuarios.Usuario
+    public string UsuarioNombre { get; set; } = string.Empty; // columna dbo.UsuarioWeb.Usuario
     public string ContrasenaHash { get; set; } = string.Empty;
     public string Rol { get; set; } = "User";
     public int EmpresaId { get; set; }

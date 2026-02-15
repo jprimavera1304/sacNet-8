@@ -8,7 +8,7 @@ public static class CurrentUser
     {
         var id = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.FindFirstValue("sub");
         if (string.IsNullOrWhiteSpace(id))
-            throw new UnauthorizedAccessException("Token inválido: falta sub/nameid.");
+            throw new UnauthorizedAccessException("Token invalido: falta sub/nameid.");
 
         return Guid.Parse(id);
     }
@@ -18,7 +18,7 @@ public static class CurrentUser
 
     public static int GetEmpresaId(ClaimsPrincipal user)
     {
-        var val = user.FindFirstValue("empresaId");
+        var val = user.FindFirstValue("empresaId") ?? user.FindFirstValue("companyId");
         if (string.IsNullOrWhiteSpace(val))
             return 0;
 

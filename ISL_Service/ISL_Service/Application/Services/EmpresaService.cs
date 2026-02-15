@@ -34,7 +34,7 @@ public class EmpresaService : IEmpresaService
             };
         }
 
-        // SuperAdmin: todas (según exista en Usuarios)
+        // SuperAdmin: todas (segun exista en Usuarios)
         var ids = await _repo.ListEmpresaIdsAsync(ct);
 
         // Si quieres asegurar que siempre aparezca "Sistema"

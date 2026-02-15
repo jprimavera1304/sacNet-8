@@ -30,15 +30,15 @@ namespace ISL_Service.Application.DTOs.ProveedoresPagos
         // ===== Cancelar =====
         public string MotivoCancelacion { get; set; }
 
-        // Auditoría (alta)
+        // Auditoria (alta)
         public int IDUsuario { get; set; }
         public string Equipo { get; set; }
 
-        // Auditoría (actualización)
+        // Auditoria (actualizacion)
         public int IDUsuarioModificacion { get; set; }
         public string EquipoModificacion { get; set; }
 
-        // Auditoría (cancelación)
+        // Auditoria (cancelacion)
         public int IDUsuarioCancelacion { get; set; }
         public string EquipoCancelacion { get; set; }
 

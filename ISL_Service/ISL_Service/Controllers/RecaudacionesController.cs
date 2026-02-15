@@ -13,7 +13,7 @@ namespace ISL_Service.Controllers
 
         private readonly RecaudacionService _recaudacionService;
 
-        // Inyección del servicio a través del constructor
+        // Inyeccion del servicio a traves del constructor
         public RecaudacionesController(RecaudacionService recaudacionService)
         {
             _recaudacionService = recaudacionService;
@@ -56,7 +56,7 @@ namespace ISL_Service.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Ticket Inválido");
+                return StatusCode(500, "Ticket Invalido");
             }
 
             try
@@ -77,10 +77,10 @@ namespace ISL_Service.Controllers
             {
                 //if (ex.Message.Contains("Error al ejecutar el procedimiento almacenado"))
                 //{
-                //    return StatusCode(500, "Error en la conexión o al ejecutar el procedimiento almacenado: " + ex.Message);
+                //    return StatusCode(500, "Error en la conexion o al ejecutar el procedimiento almacenado: " + ex.Message);
                 //}
 
-                return StatusCode(500, "Error en la aplicación: " + ex.Message);
+                return StatusCode(500, "Error en la aplicacion: " + ex.Message);
             }
         }
 

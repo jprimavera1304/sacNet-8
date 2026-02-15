@@ -20,6 +20,8 @@ var builder = WebApplication.CreateBuilder(args);
 // -------------------- Services --------------------
 
 // Controllers + Swagger (lo dejo porque dijiste "sin borrar")
+//Prueba desde vs code para ver en vs studio
+//puedes borrar esto si quieres, no afecta nada, es solo para probar el despliegue desde vs code
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
@@ -31,7 +33,7 @@ builder.Services.AddSwaggerGen(c =>
         Version = "v1"
     });
 
-    // Definición de seguridad JWT
+    // Definicion de seguridad JWT
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -61,7 +63,7 @@ builder.Services.AddSwaggerGen(c =>
 
 
 // -------------------- DB CONNECTION (AGREGADO) --------------------
-// 1) En Azure vas a configurar "Cadenas de conexión" con nombre: Main
+// 1) En Azure vas a configurar "Cadenas de conexion" con nombre: Main
 // 2) Para no romper tu local, si Main no existe, cae a Local.
 var mainCs = builder.Configuration.GetConnectionString("Main");
 var localCs = builder.Configuration.GetConnectionString("Local");
@@ -70,7 +72,7 @@ var effectiveCs = !string.IsNullOrWhiteSpace(mainCs) ? mainCs : localCs;
 if (string.IsNullOrWhiteSpace(effectiveCs))
 {
     throw new InvalidOperationException(
-        "No hay cadena de conexión. Configura ConnectionStrings:Main (recomendado) o ConnectionStrings:Local."
+        "No hay cadena de conexion. Configura ConnectionStrings:Main (recomendado) o ConnectionStrings:Local."
     );
 }
 
@@ -132,7 +134,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             // Para que tu MeController pueda leer sub como Id
             NameClaimType = "sub",
 
-            // Si tu token mete "rol" en vez de ClaimTypes.Role, descomenta esta línea:
+            // Si tu token mete "rol" en vez de ClaimTypes.Role, descomenta esta linea:
             // RoleClaimType = "rol",
 
             ClockSkew = TimeSpan.FromMinutes(1)
@@ -143,14 +145,14 @@ builder.Services.AddAuthorization();
 
 
 // -------------------- CORS --------------------
-// AGREGADO: AllowedOrigins desde configuración (Azure Variables de entorno)
+// AGREGADO: AllowedOrigins desde configuracion (Azure Variables de entorno)
 // - En Azure: AllowedOrigins = https://mactauro.com,https://sacmac.net
-// - Mantengo tus orígenes de dev como fallback.
+// - Mantengo tus origenes de dev como fallback.
 var allowedOriginsRaw = builder.Configuration["AllowedOrigins"];
 var allowedOrigins = (allowedOriginsRaw ?? "")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-// OJO: solo una política. Antes tenías 2 AddCors, y eso confunde/sobrescribe.
+// OJO: solo una politica. Antes tenias 2 AddCors, y eso confunde/sobrescribe.
 //builder.Services.AddCors(options =>
 //{
 //    options.AddPolicy("DevCors", policy =>
@@ -165,7 +167,7 @@ var allowedOrigins = (allowedOriginsRaw ?? "")
 //        }
 //        else
 //        {
-//            // fallback dev (lo que ya tenías)
+//            // fallback dev (lo que ya tenias)
 //            policy
 //                .WithOrigins(
 //                    "http://127.0.0.1:5501",
@@ -204,7 +206,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 // CORS
 app.UseCors("DevCors");
@@ -219,10 +224,10 @@ app.UseAuthorization();
 // AGREGADO: endpoint simple para validar config por empresa
 app.MapGet("/whoami", (IConfiguration config, IWebHostEnvironment env) =>
 {
-    // CompanyId lo configuras en Azure como variable de aplicación por cada Web App
+    // CompanyId lo configuras en Azure como variable de aplicacion por cada Web App
     var companyId = config["CompanyId"] ?? "missing";
 
-    // Solo para diagnóstico: dice si tomó Main o Local (no imprime la cadena)
+    // Solo para diagnostico: dice si tomo Main o Local (no imprime la cadena)
     var usingMain = !string.IsNullOrWhiteSpace(config.GetConnectionString("Main"));
 
     return Results.Ok(new

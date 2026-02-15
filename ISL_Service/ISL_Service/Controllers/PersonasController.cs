@@ -58,7 +58,7 @@ namespace ISL_Service.Controllers
         /// <summary>
         /// Cancela una persona.
         /// Cambia IDStatus a 2.
-        /// No permite cancelar si ya está cancelada.
+        /// No permite cancelar si ya esta cancelada.
         /// </summary>
         [HttpPut("cancelar")]
         public async Task<IActionResult> Cancelar(

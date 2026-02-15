@@ -12,8 +12,8 @@ namespace ISL_Service.Infrastructure.Repositories
 {
     /// <summary>
     /// Repository de ProveedoresPagos
-    /// Cambia automáticamente entre ConnectionString Local y Mac3
-    /// según el ambiente (ASPNETCORE_ENVIRONMENT).
+    /// Cambia automaticamente entre ConnectionString Local y Mac3
+    /// segun el ambiente (ASPNETCORE_ENVIRONMENT).
     /// </summary>
     public class ProveedoresPagosRepository
     {
@@ -237,7 +237,7 @@ namespace ISL_Service.Infrastructure.Repositories
                 throw new Exception($"{fieldName} es obligatoria.");
 
             if (!DateTime.TryParse(value, out var dt))
-                throw new Exception($"{fieldName} tiene formato inválido.");
+                throw new Exception($"{fieldName} tiene formato invalido.");
 
             return dt;
         }

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace ISL_Service.Application.DTOs.Requests;
 
@@ -12,7 +12,4 @@ public class CreateUserRequest
 
     [Required, StringLength(50)]
     public string Rol { get; set; } = default!; // "SuperAdmin" o "Admin"
-
-    [Required]
-    public int EmpresaId { get; set; }
 }
