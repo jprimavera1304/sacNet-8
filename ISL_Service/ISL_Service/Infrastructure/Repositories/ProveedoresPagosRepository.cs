@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
+using System.Linq;
 
 namespace ISL_Service.Infrastructure.Repositories
 {
@@ -88,6 +89,7 @@ namespace ISL_Service.Infrastructure.Repositories
 
                 proveedorPagoDTOList = Funciones.DataTableToList<ProveedorPagoDTO>(ds.Tables[0]);
                 dtProveedoresPagos = ds.Tables[0];
+                EnrichUsuarioCancelacion(Conn, proveedorPagoDTOList, dtProveedoresPagos);
 
                 return proveedorPagoDTOList;
             }
@@ -218,6 +220,131 @@ namespace ISL_Service.Infrastructure.Repositories
         #endregion
 
         #region Helpers
+
+        private static void EnrichUsuarioCancelacion(
+            SqlConnection conn,
+            List<ProveedorPagoDTO> items,
+            DataTable table)
+        {
+            if (items == null || items.Count == 0) return;
+
+            if (!table.Columns.Contains("UsuarioCancelacion"))
+                table.Columns.Add("UsuarioCancelacion", typeof(string));
+
+            var ids = items
+                .Where(x => x.IDUsuarioCancelacion.HasValue && x.IDUsuarioCancelacion.Value > 0)
+                .Select(x => x.IDUsuarioCancelacion!.Value)
+                .Distinct()
+                .ToList();
+
+            var usuarios = GetUsuariosByIds(conn, ids);
+
+            foreach (var item in items)
+            {
+                item.UsuarioCancelacion = ResolveUsuarioCancelacion(item.UsuarioCancelacion, item.IDUsuarioCancelacion, usuarios);
+            }
+
+            foreach (DataRow row in table.Rows)
+            {
+                var existing = row["UsuarioCancelacion"] == DBNull.Value ? "" : row["UsuarioCancelacion"]?.ToString() ?? "";
+                if (!string.IsNullOrWhiteSpace(existing))
+                {
+                    row["UsuarioCancelacion"] = existing.Trim();
+                    continue;
+                }
+
+                int idUsuarioCancelacion = 0;
+                if (table.Columns.Contains("IDUsuarioCancelacion") && row["IDUsuarioCancelacion"] != DBNull.Value)
+                    idUsuarioCancelacion = Convert.ToInt32(row["IDUsuarioCancelacion"]);
+
+                row["UsuarioCancelacion"] = (idUsuarioCancelacion > 0 && usuarios.TryGetValue(idUsuarioCancelacion, out var nombre))
+                    ? nombre
+                    : "";
+            }
+        }
+
+        private static string ResolveUsuarioCancelacion(
+            string? existingUsuarioCancelacion,
+            int? idUsuarioCancelacion,
+            Dictionary<int, string> usuarios)
+        {
+            if (!string.IsNullOrWhiteSpace(existingUsuarioCancelacion))
+                return existingUsuarioCancelacion.Trim();
+
+            if (idUsuarioCancelacion.HasValue &&
+                idUsuarioCancelacion.Value > 0 &&
+                usuarios.TryGetValue(idUsuarioCancelacion.Value, out var usuario))
+                return usuario;
+
+            return "";
+        }
+
+        private static Dictionary<int, string> GetUsuariosByIds(SqlConnection conn, List<int> ids)
+        {
+            var result = new Dictionary<int, string>();
+            if (ids == null || ids.Count == 0) return result;
+
+            // Prioriza UsuarioWeb si existe con schema legacy.
+            if (TryLoadUsuariosFromTable(conn, "dbo", "UsuarioWeb", "IDUsuario", "Usuario", ids, result) && result.Count > 0)
+                return result;
+
+            // Fallback para instalaciones legacy.
+            TryLoadUsuariosFromTable(conn, "dbo", "Usuario", "IDUsuario", "Usuario", ids, result);
+            return result;
+        }
+
+        private static bool TryLoadUsuariosFromTable(
+            SqlConnection conn,
+            string schema,
+            string table,
+            string idColumn,
+            string usuarioColumn,
+            List<int> ids,
+            Dictionary<int, string> result)
+        {
+            if (!TableHasColumn(conn, schema, table, idColumn) || !TableHasColumn(conn, schema, table, usuarioColumn))
+                return false;
+
+            using var cmd = conn.CreateCommand();
+            var paramNames = new List<string>();
+            for (int i = 0; i < ids.Count; i++)
+            {
+                var p = $"@p{i}";
+                paramNames.Add(p);
+                cmd.Parameters.AddWithValue(p, ids[i]);
+            }
+
+            cmd.CommandText = $@"
+SELECT {idColumn}, {usuarioColumn}
+FROM {schema}.{table}
+WHERE {idColumn} IN ({string.Join(",", paramNames)});";
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (reader.IsDBNull(0)) continue;
+                int id = reader.GetInt32(0);
+                var usuario = reader.IsDBNull(1) ? "" : reader.GetString(1).Trim();
+                result[id] = usuario;
+            }
+
+            return true;
+        }
+
+        private static bool TableHasColumn(SqlConnection conn, string schema, string table, string column)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+SELECT 1
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = @schema
+  AND TABLE_NAME = @table
+  AND COLUMN_NAME = @column;";
+            cmd.Parameters.AddWithValue("@schema", schema);
+            cmd.Parameters.AddWithValue("@table", table);
+            cmd.Parameters.AddWithValue("@column", column);
+            return cmd.ExecuteScalar() != null;
+        }
 
         private static string? NullIfEmpty(string? value)
         {

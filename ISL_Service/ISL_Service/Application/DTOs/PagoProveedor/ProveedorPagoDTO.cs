@@ -31,6 +31,7 @@ namespace ISL_Service.Application.DTOs.ProveedoresPagos
 
         // ===== Auditoria Cancelacion =====
         public int? IDUsuarioCancelacion { get; set; }
+        public string UsuarioCancelacion { get; set; } = string.Empty;
         public DateTime? FechaCancelacion { get; set; }
         public string EquipoCancelacion { get; set; }
 

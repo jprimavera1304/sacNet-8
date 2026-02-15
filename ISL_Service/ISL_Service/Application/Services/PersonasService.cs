@@ -231,5 +231,65 @@ namespace ISL_Service.Application.Services
                 return response;
             }
         }
+
+        public async Task<PersonaResponse> ReactivarAsync(int idPersona, PersonaInputDTO input)
+        {
+            var response = new PersonaResponse();
+
+            try
+            {
+                if (input == null)
+                {
+                    response.Success = false;
+                    response.Message = "El cuerpo de la solicitud es requerido.";
+                    return response;
+                }
+
+                if (idPersona <= 0)
+                {
+                    response.Success = false;
+                    response.Message = "IDPersona invalido.";
+                    return response;
+                }
+
+                if (input.IDUsuario <= 0)
+                {
+                    response.Success = false;
+                    response.Message = "IDUsuario es requerido para reactivar.";
+                    return response;
+                }
+
+                input.Equipo = Normaliza(input.Equipo);
+
+                if (EsTextoVacio(input.Equipo))
+                {
+                    response.Success = false;
+                    response.Message = "Equipo es requerido para reactivar.";
+                    return response;
+                }
+
+                await _repository.ReactivarAsync(idPersona, input.IDUsuario, input.Equipo);
+
+                var list = await _repository.ConsultarAsync(idPersona, null);
+
+                response.Success = true;
+                response.Message = "Persona reactivada correctamente.";
+                response.Data = list.FirstOrDefault();
+
+                return response;
+            }
+            catch (SqlException ex)
+            {
+                response.Success = false;
+                response.Message = ex.Message;
+                return response;
+            }
+            catch (Exception)
+            {
+                response.Success = false;
+                response.Message = "Ocurrio un error inesperado al reactivar persona.";
+                return response;
+            }
+        }
     }
 }

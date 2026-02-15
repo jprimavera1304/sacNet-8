@@ -72,5 +72,22 @@ namespace ISL_Service.Controllers
             var result = await _service.CancelarAsync(input.IDPersona.Value, input);
             return Ok(result);
         }
+
+        /// <summary>
+        /// Reactiva una persona.
+        /// Cambia IDStatus a 1.
+        /// </summary>
+        [HttpPut("reactivar")]
+        public async Task<IActionResult> Reactivar(
+            [FromBody] PersonaInputDTO input)
+        {
+            if (!input.IDPersona.HasValue)
+            {
+                return BadRequest("IDPersona es requerido para reactivar.");
+            }
+
+            var result = await _service.ReactivarAsync(input.IDPersona.Value, input);
+            return Ok(result);
+        }
     }
 }

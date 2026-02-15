@@ -120,5 +120,43 @@ namespace ISL_Service.Infrastructure.Repositories
 
             await cmd.ExecuteNonQueryAsync();
         }
+
+        public async Task ReactivarAsync(int idPersona, int idUsuarioModificacion, string equipoModificacion)
+        {
+            using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            try
+            {
+                using var cmd = new SqlCommand("dbo.sp_n_ReactivarPersona", conn);
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.Add(new SqlParameter("@IDPersona", SqlDbType.Int) { Value = idPersona });
+                cmd.Parameters.Add(new SqlParameter("@IDUsuarioModificacion", SqlDbType.Int) { Value = idUsuarioModificacion });
+                cmd.Parameters.Add(new SqlParameter("@EquipoModificacion", SqlDbType.VarChar, 400) { Value = equipoModificacion });
+                await cmd.ExecuteNonQueryAsync();
+                return;
+            }
+            catch (SqlException ex) when (ex.Number == 2812) // Stored procedure not found
+            {
+                // Fallback SQL para instalaciones donde aun no existe sp_n_ReactivarPersona.
+            }
+
+            using var cmdFallback = new SqlCommand(@"
+UPDATE dbo.Personas
+SET IDStatus = 1,
+    IDUsuarioModificacion = @IDUsuarioModificacion,
+    FechaModificacion = GETDATE(),
+    EquipoModificacion = @EquipoModificacion
+WHERE IDPersona = @IDPersona;", conn);
+
+            cmdFallback.CommandType = CommandType.Text;
+            cmdFallback.Parameters.Add(new SqlParameter("@IDPersona", SqlDbType.Int) { Value = idPersona });
+            cmdFallback.Parameters.Add(new SqlParameter("@IDUsuarioModificacion", SqlDbType.Int) { Value = idUsuarioModificacion });
+            cmdFallback.Parameters.Add(new SqlParameter("@EquipoModificacion", SqlDbType.VarChar, 400) { Value = equipoModificacion });
+
+            var affected = await cmdFallback.ExecuteNonQueryAsync();
+            if (affected <= 0)
+                throw new Exception("No se pudo reactivar la persona. Verifica que exista IDPersona y tabla dbo.Personas.");
+        }
     }
 }

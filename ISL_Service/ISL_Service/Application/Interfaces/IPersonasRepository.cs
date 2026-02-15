@@ -10,5 +10,6 @@ namespace ISL_Service.Application.Interfaces
         Task<int> InsertarAsync(PersonaInputDTO input);
         Task ActualizarAsync(PersonaInputDTO input);
         Task CancelarAsync(int idPersona, int idUsuarioModificacion, string equipoModificacion);
+        Task ReactivarAsync(int idPersona, int idUsuarioModificacion, string equipoModificacion);
     }
 }
