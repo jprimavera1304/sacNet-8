@@ -36,27 +36,71 @@ public class UserRepository : IUserRepository
         await using var conn = new SqlConnection(_db.Database.GetConnectionString());
         await conn.OpenAsync(ct);
 
-        await using var cmd = new SqlCommand("dbo.sp_WebLogin_FallbackLegacy", conn)
+        try
         {
-            CommandType = CommandType.StoredProcedure,
+            await using var cmd = new SqlCommand("dbo.sp_WebLogin_FallbackLegacy", conn)
+            {
+                CommandType = CommandType.StoredProcedure,
+                CommandTimeout = 30
+            };
+
+            cmd.Parameters.Add(new SqlParameter("@Usuario", SqlDbType.NVarChar, 80) { Value = usuario.Trim() });
+            cmd.Parameters.Add(new SqlParameter("@ContrasenaPlano", SqlDbType.NVarChar, 250) { Value = contrasenaPlano });
+            cmd.Parameters.Add(new SqlParameter("@ContrasenaHashWeb", SqlDbType.NVarChar, 250) { Value = contrasenaHashWeb });
+
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            if (!await reader.ReadAsync(ct)) return null;
+
+            var resultCode = reader.GetInt32(reader.GetOrdinal("ResultCode"));
+            if (resultCode == 0) return null;
+
+            return new WebLoginFallbackResult
+            {
+                ResultCode = resultCode,
+                Source = reader.GetString(reader.GetOrdinal("Source")),
+                UserId = reader.GetGuid(reader.GetOrdinal("UserId")),
+                Usuario = reader.GetString(reader.GetOrdinal("Usuario")),
+                ContrasenaHash = reader.GetString(reader.GetOrdinal("ContrasenaHash")),
+                Rol = reader.GetString(reader.GetOrdinal("Rol")),
+                EmpresaId = reader.GetInt32(reader.GetOrdinal("EmpresaId")),
+                DebeCambiarContrasena = reader.GetBoolean(reader.GetOrdinal("DebeCambiarContrasena")),
+                Estado = reader.GetInt32(reader.GetOrdinal("Estado"))
+            };
+        }
+        catch (SqlException ex) when (ex.Number is 2812 or 208)
+        {
+            // Fresh databases may not have legacy SP/tables yet; allow WEB-only auth.
+            return await LoginWebOnlyAsync(conn, usuario, ct);
+        }
+    }
+
+    private static async Task<WebLoginFallbackResult?> LoginWebOnlyAsync(SqlConnection conn, string usuario, CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand(@"
+SELECT TOP 1
+    Id,
+    Usuario,
+    ContrasenaHash,
+    Rol,
+    EmpresaId,
+    DebeCambiarContrasena,
+    Estado
+FROM dbo.UsuarioWeb
+WHERE UPPER(LTRIM(RTRIM(Usuario))) = UPPER(LTRIM(RTRIM(@Usuario)));", conn)
+        {
+            CommandType = CommandType.Text,
             CommandTimeout = 30
         };
-
         cmd.Parameters.Add(new SqlParameter("@Usuario", SqlDbType.NVarChar, 80) { Value = usuario.Trim() });
-        cmd.Parameters.Add(new SqlParameter("@ContrasenaPlano", SqlDbType.NVarChar, 250) { Value = contrasenaPlano });
-        cmd.Parameters.Add(new SqlParameter("@ContrasenaHashWeb", SqlDbType.NVarChar, 250) { Value = contrasenaHashWeb });
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         if (!await reader.ReadAsync(ct)) return null;
 
-        var resultCode = reader.GetInt32(reader.GetOrdinal("ResultCode"));
-        if (resultCode == 0) return null;
-
         return new WebLoginFallbackResult
         {
-            ResultCode = resultCode,
-            Source = reader.GetString(reader.GetOrdinal("Source")),
-            UserId = reader.GetGuid(reader.GetOrdinal("UserId")),
+            ResultCode = 1,
+            Source = "WEB",
+            UserId = reader.GetGuid(reader.GetOrdinal("Id")),
             Usuario = reader.GetString(reader.GetOrdinal("Usuario")),
             ContrasenaHash = reader.GetString(reader.GetOrdinal("ContrasenaHash")),
             Rol = reader.GetString(reader.GetOrdinal("Rol")),
