@@ -384,9 +384,9 @@ ORDER BY Clave;", conn);
         await conn.OpenAsync(ct);
 
         if (!await AreCapabilityTablesAvailableAsync(conn, ct))
-            return Array.Empty<ModuloDisponibleResponse>();
+            return includeAllTenants ? BuildAllModulesFallback(companyKey) : Array.Empty<ModuloDisponibleResponse>();
         if (!await TableExistsAsync(conn, "WModulo", ct) || !await TableExistsAsync(conn, "WModuloEmpresa", ct))
-            return Array.Empty<ModuloDisponibleResponse>();
+            return includeAllTenants ? BuildAllModulesFallback(companyKey) : Array.Empty<ModuloDisponibleResponse>();
 
         var normalizedCompanyKey = (companyKey ?? string.Empty).Trim().ToLowerInvariant();
         if (!includeAllTenants && string.IsNullOrWhiteSpace(normalizedCompanyKey))
@@ -447,7 +447,37 @@ ORDER BY CASE WHEN m.ModuloClave = 'inicio' THEN 0 ELSE 1 END, m.ModuloClave;";
             });
         }
 
+        if (includeAllTenants && modules.Count == 0)
+            return BuildAllModulesFallback(companyKey);
+
         return modules;
+    }
+
+    private static IReadOnlyList<ModuloDisponibleResponse> BuildAllModulesFallback(string companyKey)
+    {
+        var empresaClave = (companyKey ?? string.Empty).Trim().ToLowerInvariant();
+        var keys = new[]
+        {
+            "inicio",
+            "cheques",
+            "pagosproveedores",
+            "permisos_modulos",
+            "permisos_roles",
+            "permisos_usuarios",
+            "proveedores",
+            "usuarios"
+        };
+
+        return keys
+            .Select(k => new ModuloDisponibleResponse
+            {
+                ModuloClave = k,
+                Nombre = k,
+                Ruta = ResolveModuleRoute(k),
+                CapabilityVer = $"{k}.ver_modulo",
+                EmpresaClave = empresaClave
+            })
+            .ToList();
     }
 
     public async Task<IReadOnlyList<PermisosWebModuleItem>> GetModuleCatalogAsync(int empresaId, CancellationToken ct)
