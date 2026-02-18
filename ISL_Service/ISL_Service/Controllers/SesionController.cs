@@ -16,6 +16,7 @@ public class SesionController : ControllerBase
     }
 
     // RUTA ABSOLUTA (no choca con api/[controller])
+    [HttpPost("/api/auth/login")]
     [HttpPost("/api/sesion/login")]
     [Consumes("application/json")]
     [Produces("application/json")]

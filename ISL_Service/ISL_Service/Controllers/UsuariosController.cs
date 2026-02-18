@@ -18,7 +18,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Policy = "perm:usuarios.crear")]
     public async Task<IActionResult> Create([FromBody] CreateUserRequest req, CancellationToken ct)
     {
         var result = await _service.CreateUserAsync(req, User, ct);
@@ -26,7 +26,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "perm:usuarios.ver")]
     public async Task<IActionResult> List(CancellationToken ct = default)
     {
         var result = await _service.ListUsersAsync(User, ct);
@@ -34,7 +34,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Policy = "perm:usuarios.editar")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateUserRequest req, CancellationToken ct)
     {
         var result = await _service.UpdateUserAsync(id, req, User, ct);
@@ -42,7 +42,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPatch("{id:guid}")]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Policy = "perm:usuarios.editar")]
     public async Task<IActionResult> PatchUpdate(Guid id, [FromBody] UpdateUserRequest req, CancellationToken ct)
     {
         var result = await _service.UpdateUserAsync(id, req, User, ct);
@@ -50,7 +50,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPut]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Policy = "perm:usuarios.editar")]
     public async Task<IActionResult> UpdateWithBodyId([FromBody] UpdateUserWithIdRequest req, CancellationToken ct)
     {
         var result = await _service.UpdateUserAsync(req.Id, req, User, ct);
@@ -58,7 +58,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/estado")]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Policy = "perm:usuarios.estado.editar")]
     public async Task<IActionResult> UpdateEstado(Guid id, [FromBody] UpdateUserEstadoRequest req, CancellationToken ct)
     {
         var result = await _service.UpdateEstadoAsync(id, req, User, ct);
@@ -66,7 +66,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPut("{id:guid}/estado")]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Policy = "perm:usuarios.estado.editar")]
     public async Task<IActionResult> PutEstado(Guid id, [FromBody] UpdateUserEstadoRequest req, CancellationToken ct)
     {
         var result = await _service.UpdateEstadoAsync(id, req, User, ct);
@@ -74,7 +74,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPut("estado")]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Policy = "perm:usuarios.estado.editar")]
     public async Task<IActionResult> PutEstadoWithBodyId([FromBody] UpdateUserEstadoWithIdRequest req, CancellationToken ct)
     {
         var result = await _service.UpdateEstadoAsync(req.Id, req, User, ct);
@@ -82,7 +82,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPut("{id:guid}/inactivar")]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Policy = "perm:usuarios.estado.editar")]
     public async Task<IActionResult> Inactivar(Guid id, CancellationToken ct)
     {
         var result = await _service.UpdateEstadoAsync(id, new UpdateUserEstadoRequest { Estado = 2 }, User, ct);
@@ -90,7 +90,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPut("{id:guid}/activar")]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Policy = "perm:usuarios.estado.editar")]
     public async Task<IActionResult> Activar(Guid id, CancellationToken ct)
     {
         var result = await _service.UpdateEstadoAsync(id, new UpdateUserEstadoRequest { Estado = 1 }, User, ct);
@@ -98,7 +98,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPost("{id:guid}/reset-password")]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Policy = "perm:usuarios.password.reset")]
     public async Task<IActionResult> ResetPassword(Guid id, CancellationToken ct)
     {
         var result = await _service.ResetPasswordAsync(id, User, ct);
@@ -106,7 +106,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/empresa")]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Policy = "perm:usuarios.empresa.editar")]
     public async Task<IActionResult> UpdateEmpresa(Guid id, [FromBody] UpdateUserEmpresaRequest req, CancellationToken ct)
     {
         var result = await _service.UpdateEmpresaAsync(id, req, User, ct);
@@ -114,7 +114,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "perm:usuarios.ver")]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
     {
         var result = await _service.GetUserByIdAsync(id, User, ct);

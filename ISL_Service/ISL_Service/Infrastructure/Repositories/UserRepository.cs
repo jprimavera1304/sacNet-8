@@ -147,41 +147,94 @@ WHERE UPPER(LTRIM(RTRIM(Usuario))) = UPPER(LTRIM(RTRIM(@Usuario)));", conn)
         int estado,
         CancellationToken ct)
     {
-        await using var conn = new SqlConnection(_db.Database.GetConnectionString());
-        await conn.OpenAsync(ct);
-
-        await using var cmd = new SqlCommand("dbo.sp_WebUsuario_Upsert", conn)
+        try
         {
-            CommandType = CommandType.StoredProcedure,
-            CommandTimeout = 30
-        };
+            await using var conn = new SqlConnection(_db.Database.GetConnectionString());
+            await conn.OpenAsync(ct);
 
-        cmd.Parameters.Add(new SqlParameter("@Usuario", SqlDbType.NVarChar, 80) { Value = usuario.Trim() });
-        cmd.Parameters.Add(new SqlParameter("@ContrasenaPlano", SqlDbType.NVarChar, 250) { Value = contrasenaPlano });
-        cmd.Parameters.Add(new SqlParameter("@ContrasenaHashWeb", SqlDbType.NVarChar, 250) { Value = contrasenaHashWeb });
-        cmd.Parameters.Add(new SqlParameter("@Nombre", SqlDbType.NVarChar, 255) { Value = nombre.Trim() });
-        cmd.Parameters.Add(new SqlParameter("@Rol", SqlDbType.NVarChar, 30) { Value = rol.Trim() });
-        cmd.Parameters.Add(new SqlParameter("@DebeCambiarContrasena", SqlDbType.Bit) { Value = debeCambiarContrasena });
-        cmd.Parameters.Add(new SqlParameter("@Estado", SqlDbType.Int) { Value = estado });
-        cmd.Parameters.Add(new SqlParameter("@IDPerfil", SqlDbType.Int) { Value = DBNull.Value });
-        cmd.Parameters.Add(new SqlParameter("@IDStatusLegacy", SqlDbType.Int) { Value = 1 });
+            await using var cmd = new SqlCommand("dbo.sp_WebUsuario_Upsert", conn)
+            {
+                CommandType = CommandType.StoredProcedure,
+                CommandTimeout = 30
+            };
 
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
-        if (!await reader.ReadAsync(ct))
-            throw new InvalidOperationException("sp_WebUsuario_Upsert no devolvio filas.");
+            cmd.Parameters.Add(new SqlParameter("@Usuario", SqlDbType.NVarChar, 80) { Value = usuario.Trim() });
+            cmd.Parameters.Add(new SqlParameter("@ContrasenaPlano", SqlDbType.NVarChar, 250) { Value = contrasenaPlano });
+            cmd.Parameters.Add(new SqlParameter("@ContrasenaHashWeb", SqlDbType.NVarChar, 250) { Value = contrasenaHashWeb });
+            cmd.Parameters.Add(new SqlParameter("@Nombre", SqlDbType.NVarChar, 255) { Value = nombre.Trim() });
+            cmd.Parameters.Add(new SqlParameter("@Rol", SqlDbType.NVarChar, 30) { Value = rol.Trim() });
+            cmd.Parameters.Add(new SqlParameter("@DebeCambiarContrasena", SqlDbType.Bit) { Value = debeCambiarContrasena });
+            cmd.Parameters.Add(new SqlParameter("@Estado", SqlDbType.Int) { Value = estado });
+            cmd.Parameters.Add(new SqlParameter("@IDPerfil", SqlDbType.Int) { Value = DBNull.Value });
+            cmd.Parameters.Add(new SqlParameter("@IDStatusLegacy", SqlDbType.Int) { Value = 1 });
 
-        return new Usuario
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            if (!await reader.ReadAsync(ct))
+            {
+                return await UpsertWebOnlyAsync(usuario, contrasenaHashWeb, rol, debeCambiarContrasena, estado, ct);
+            }
+
+            return new Usuario
+            {
+                Id = reader.GetGuid(reader.GetOrdinal("Id")),
+                UsuarioNombre = reader.GetString(reader.GetOrdinal("Usuario")),
+                ContrasenaHash = contrasenaHashWeb,
+                Rol = reader.GetString(reader.GetOrdinal("Rol")),
+                EmpresaId = reader.GetInt32(reader.GetOrdinal("EmpresaId")),
+                DebeCambiarContrasena = reader.GetBoolean(reader.GetOrdinal("DebeCambiarContrasena")),
+                Estado = reader.GetInt32(reader.GetOrdinal("Estado")),
+                FechaCreacion = reader.GetDateTime(reader.GetOrdinal("FechaCreacion")),
+                FechaActualizacion = reader.GetDateTime(reader.GetOrdinal("FechaActualizacion"))
+            };
+        }
+        catch (SqlException)
         {
-            Id = reader.GetGuid(reader.GetOrdinal("Id")),
-            UsuarioNombre = reader.GetString(reader.GetOrdinal("Usuario")),
-            ContrasenaHash = contrasenaHashWeb,
-            Rol = reader.GetString(reader.GetOrdinal("Rol")),
-            EmpresaId = reader.GetInt32(reader.GetOrdinal("EmpresaId")),
-            DebeCambiarContrasena = reader.GetBoolean(reader.GetOrdinal("DebeCambiarContrasena")),
-            Estado = reader.GetInt32(reader.GetOrdinal("Estado")),
-            FechaCreacion = reader.GetDateTime(reader.GetOrdinal("FechaCreacion")),
-            FechaActualizacion = reader.GetDateTime(reader.GetOrdinal("FechaActualizacion"))
-        };
+            // Rollout gradual: si SP/tabla legacy no existe o falla, persistir en UsuarioWeb.
+            return await UpsertWebOnlyAsync(usuario, contrasenaHashWeb, rol, debeCambiarContrasena, estado, ct);
+        }
+    }
+
+    private async Task<Usuario> UpsertWebOnlyAsync(
+        string usuario,
+        string contrasenaHashWeb,
+        string rol,
+        bool debeCambiarContrasena,
+        int estado,
+        CancellationToken ct)
+    {
+        var usuarioTrim = usuario.Trim();
+        var now = DateTime.UtcNow;
+
+        var entity = await _db.Usuarios
+            .FirstOrDefaultAsync(x => x.EmpresaId == EMPRESA_ID_UNICA && x.UsuarioNombre == usuarioTrim, ct);
+
+        if (entity is null)
+        {
+            entity = new Usuario
+            {
+                Id = Guid.NewGuid(),
+                UsuarioNombre = usuarioTrim,
+                ContrasenaHash = contrasenaHashWeb,
+                Rol = rol.Trim(),
+                EmpresaId = EMPRESA_ID_UNICA,
+                DebeCambiarContrasena = debeCambiarContrasena,
+                Estado = estado,
+                FechaCreacion = now,
+                FechaActualizacion = now
+            };
+            _db.Usuarios.Add(entity);
+        }
+        else
+        {
+            entity.ContrasenaHash = contrasenaHashWeb;
+            entity.Rol = rol.Trim();
+            entity.DebeCambiarContrasena = debeCambiarContrasena;
+            entity.Estado = estado;
+            entity.FechaActualizacion = now;
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return entity;
     }
 
     public async Task<Usuario> UpdateUsuarioAndRolAsync(Guid userId, string usuarioNuevo, string rolNuevo, CancellationToken ct)

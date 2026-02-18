@@ -98,7 +98,11 @@ public class CompanyKeyTests
             }
         };
 
-        var controller = new MeController(users, new FakeUserAdminService(), new FakeEmpresaRepository("tauro"));
+        var controller = new MeController(
+            users,
+            new FakeUserAdminService(),
+            new FakeEmpresaRepository("tauro"),
+            new FakePermissionService());
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext
@@ -196,5 +200,35 @@ public class CompanyKeyTests
         public Task<ResetPasswordResponse> ResetPasswordAsync(Guid userId, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
         public Task<UserResponse> UpdateEmpresaAsync(Guid userId, UpdateUserEmpresaRequest req, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
         public Task ChangeMyPasswordAsync(ChangePasswordRequest req, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
+    }
+
+    private sealed class FakePermissionService : IPermissionService
+    {
+        public Task<PermissionSnapshot> GetPermissionsAsync(Guid userId, int empresaId, string rolLegacy, CancellationToken ct)
+            => Task.FromResult(new PermissionSnapshot
+            {
+                UserId = userId,
+                EmpresaId = empresaId,
+                RolLegacy = rolLegacy,
+                PermissionsEnabled = false,
+                Permissions = new List<string>(),
+                PermissionsVersion = DateTime.UtcNow.ToString("O")
+            });
+
+        public bool IsAllowedByLegacy(string rolLegacy, string permission) => true;
+        public Task<PermisosWebBootstrapResponse?> GetPermisosWebBootstrapAsync(int empresaId, CancellationToken ct)
+            => Task.FromResult<PermisosWebBootstrapResponse?>(null);
+        public Task<PermisosWebRolesBootstrapResponse?> GetPermisosRolesBootstrapAsync(int empresaId, CancellationToken ct)
+            => Task.FromResult<PermisosWebRolesBootstrapResponse?>(null);
+        public Task<IReadOnlyList<PermisosWebPermissionItem>> GetPermissionCatalogAsync(int empresaId, CancellationToken ct)
+            => Task.FromResult<IReadOnlyList<PermisosWebPermissionItem>>(Array.Empty<PermisosWebPermissionItem>());
+        public Task UpsertRolePermissionsAsync(int empresaId, string roleCode, IReadOnlyCollection<string> permissions, CancellationToken ct)
+            => Task.CompletedTask;
+        public Task UpsertUserOverridesAsync(int empresaId, Guid userId, IReadOnlyCollection<string> allow, IReadOnlyCollection<string> deny, CancellationToken ct)
+            => Task.CompletedTask;
+        public Task<PermisosWebSyncCatalogResponse> SyncPermissionCatalogAsync(int empresaId, IReadOnlyCollection<string>? modules, CancellationToken ct)
+            => Task.FromResult(new PermisosWebSyncCatalogResponse());
+        public Task<bool> CreatePermissionAsync(int empresaId, string key, string name, string? description, CancellationToken ct)
+            => Task.FromResult(false);
     }
 }

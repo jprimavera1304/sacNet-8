@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,6 +26,7 @@ var builder = WebApplication.CreateBuilder(args);
 //puedes borrar esto si quieres, no afecta nada, es solo para probar el despliegue desde vs code
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddMemoryCache();
 
 builder.Services.AddSwaggerGen(c =>
 {
@@ -105,6 +107,9 @@ builder.Services.AddScoped<IPersonasService, PersonasService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+builder.Services.AddScoped<IPermissionService, PermissionService>();
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
 // -------------------- USER ADMIN (NUEVO) --------------------
 builder.Services.AddScoped<IUserAdminService, UserAdminService>();
@@ -155,50 +160,37 @@ builder.Services.AddAuthorization();
 
 
 // -------------------- CORS --------------------
-// AGREGADO: AllowedOrigins desde configuracion (Azure Variables de entorno)
-// - En Azure: AllowedOrigins = https://mactauro.com,https://sacmac.net
-// - Mantengo tus origenes de dev como fallback.
+// AllowedOrigins desde configuracion (Azure Variables de entorno)
+// Ejemplo Azure:
+// AllowedOrigins=https://mactauro.com,https://www.mactauro.com,https://sacmac.net,https://www.sacmac.net,https://integralsportsleague.net,https://www.integralsportsleague.net
 var allowedOriginsRaw = builder.Configuration["AllowedOrigins"];
-var allowedOrigins = (allowedOriginsRaw ?? "")
+var configuredOrigins = (allowedOriginsRaw ?? "")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-// OJO: solo una politica. Antes tenias 2 AddCors, y eso confunde/sobrescribe.
-//builder.Services.AddCors(options =>
-//{
-//    options.AddPolicy("DevCors", policy =>
-//    {
-//        if (allowedOrigins.Length > 0)
-//        {
-//            policy
-//                .WithOrigins(allowedOrigins)
-//                .AllowAnyHeader()
-//                .AllowAnyMethod()
-//                .AllowCredentials();
-//        }
-//        else
-//        {
-//            // fallback dev (lo que ya tenias)
-//            policy
-//                .WithOrigins(
-//                    "http://127.0.0.1:5501",
-//                    "http://localhost:5501"
-//                )
-//                .AllowAnyHeader()
-//                .AllowAnyMethod();
-//        }
-//    });
-//});
+var defaultOrigins = new[]
+{
+    "http://127.0.0.1:5501",
+    "http://localhost:5501",
+    "http://localhost:5173",
+    "https://mactauro.com",
+    "https://www.mactauro.com",
+    "https://sacmac.net",
+    "https://www.sacmac.net",
+    "https://integralsportsleague.net",
+    "https://www.integralsportsleague.net"
+};
+
+var allowedOrigins = configuredOrigins
+    .Concat(defaultOrigins)
+    .Where(x => !string.IsNullOrWhiteSpace(x))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("DevCors", policy =>
         policy
-            .WithOrigins(
-                "http://127.0.0.1:5501",
-                "http://localhost:5501",
-                "https://mactauro.com",
-                "https://sacmac.net"
-            )
+            .WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
     );
