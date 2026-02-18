@@ -47,12 +47,21 @@ public class ModulosController : ControllerBase
         var snapshot = await _permissions.GetPermissionsAsync(userId, empresaId, rolLegacy, ct);
         var modules = await _permissions.GetAvailableModulesAsync(empresaId, companyKey, includeAll, ct);
 
-        if (!includeAll)
+        if (!includeAll && !isSuperAdmin)
         {
-            var permissionSet = new HashSet<string>(snapshot.Permissions ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
-            modules = modules
-                .Where(m => permissionSet.Contains(m.CapabilityVer))
-                .ToList();
+            if (snapshot.PermissionsEnabled)
+            {
+                var permissionSet = new HashSet<string>(snapshot.Permissions ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+                modules = modules
+                    .Where(m => permissionSet.Contains(m.CapabilityVer))
+                    .ToList();
+            }
+            else
+            {
+                modules = modules
+                    .Where(m => _permissions.IsAllowedByLegacy(rolLegacy, m.CapabilityVer))
+                    .ToList();
+            }
         }
 
         return Ok(new

@@ -404,8 +404,6 @@ INNER JOIN dbo.WModuloEmpresa me
     ON me.EmpresaId = m.EmpresaId
    AND me.ModuloClave = m.ModuloClave
 WHERE m.EmpresaId = @EmpresaId
-  AND m.IdStatus = 1
-  AND me.Activo = 1
 ORDER BY me.EmpresaClave, CASE WHEN m.ModuloClave = 'inicio' THEN 0 ELSE 1 END, m.ModuloClave;"
             : @"
 SELECT
@@ -420,6 +418,12 @@ WHERE m.EmpresaId = @EmpresaId
   AND m.IdStatus = 1
   AND me.Activo = 1
   AND LOWER(me.EmpresaClave) = @EmpresaClave
+  AND EXISTS (
+      SELECT 1
+      FROM dbo.WPermiso p
+      WHERE p.EmpresaId = m.EmpresaId
+        AND LOWER(p.Clave) = LOWER(CONCAT(m.ModuloClave, '.ver_modulo'))
+  )
 ORDER BY CASE WHEN m.ModuloClave = 'inicio' THEN 0 ELSE 1 END, m.ModuloClave;";
 
         await using var cmd = new SqlCommand(sql, conn);
