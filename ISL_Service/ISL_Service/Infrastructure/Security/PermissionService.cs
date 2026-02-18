@@ -385,8 +385,13 @@ ORDER BY Clave;", conn);
 
         if (!await AreCapabilityTablesAvailableAsync(conn, ct))
             return includeAllTenants ? BuildAllModulesFallback(companyKey) : Array.Empty<ModuloDisponibleResponse>();
-        if (!await TableExistsAsync(conn, "WModulo", ct) || !await TableExistsAsync(conn, "WModuloEmpresa", ct))
+
+        var hasWModulo = await TableExistsAsync(conn, "WModulo", ct);
+        var hasWModuloEmpresa = await TableExistsAsync(conn, "WModuloEmpresa", ct);
+        if (!hasWModulo)
             return includeAllTenants ? BuildAllModulesFallback(companyKey) : Array.Empty<ModuloDisponibleResponse>();
+        if (!includeAllTenants && !hasWModuloEmpresa)
+            return Array.Empty<ModuloDisponibleResponse>();
 
         var normalizedCompanyKey = (companyKey ?? string.Empty).Trim().ToLowerInvariant();
         if (!includeAllTenants && string.IsNullOrWhiteSpace(normalizedCompanyKey))
@@ -394,17 +399,26 @@ ORDER BY Clave;", conn);
 
         var modules = new List<ModuloDisponibleResponse>();
         var sql = includeAllTenants
-            ? @"
+            ? hasWModuloEmpresa
+                ? @"
 SELECT
     m.ModuloClave,
     COALESCE(NULLIF(m.Nombre,''), m.ModuloClave) AS Nombre,
-    me.EmpresaClave
+    COALESCE(me.EmpresaClave, @EmpresaClave) AS EmpresaClave
 FROM dbo.WModulo m
-INNER JOIN dbo.WModuloEmpresa me
+LEFT JOIN dbo.WModuloEmpresa me
     ON me.EmpresaId = m.EmpresaId
    AND me.ModuloClave = m.ModuloClave
 WHERE m.EmpresaId = @EmpresaId
 ORDER BY me.EmpresaClave, CASE WHEN m.ModuloClave = 'inicio' THEN 0 ELSE 1 END, m.ModuloClave;"
+                : @"
+SELECT
+    m.ModuloClave,
+    COALESCE(NULLIF(m.Nombre,''), m.ModuloClave) AS Nombre,
+    @EmpresaClave AS EmpresaClave
+FROM dbo.WModulo m
+WHERE m.EmpresaId = @EmpresaId
+ORDER BY CASE WHEN m.ModuloClave = 'inicio' THEN 0 ELSE 1 END, m.ModuloClave;"
             : @"
 SELECT
     m.ModuloClave,
@@ -428,15 +442,17 @@ ORDER BY CASE WHEN m.ModuloClave = 'inicio' THEN 0 ELSE 1 END, m.ModuloClave;";
 
         await using var cmd = new SqlCommand(sql, conn);
         cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
-        if (!includeAllTenants)
-            cmd.Parameters.Add(new SqlParameter("@EmpresaClave", SqlDbType.NVarChar, 200) { Value = normalizedCompanyKey });
+        cmd.Parameters.Add(new SqlParameter("@EmpresaClave", SqlDbType.NVarChar, 200) { Value = normalizedCompanyKey });
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct))
         {
             var moduleKey = NormalizeModuleKey(reader.GetString(reader.GetOrdinal("ModuloClave")));
             if (string.IsNullOrWhiteSpace(moduleKey)) continue;
-            var empresaClave = reader.GetString(reader.GetOrdinal("EmpresaClave"));
+            var empresaClaveOrdinal = reader.GetOrdinal("EmpresaClave");
+            var empresaClave = reader.IsDBNull(empresaClaveOrdinal)
+                ? normalizedCompanyKey
+                : reader.GetString(empresaClaveOrdinal);
             modules.Add(new ModuloDisponibleResponse
             {
                 ModuloClave = moduleKey,
