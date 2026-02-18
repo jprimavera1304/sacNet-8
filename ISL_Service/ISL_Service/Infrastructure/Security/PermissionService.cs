@@ -378,6 +378,74 @@ ORDER BY Clave;", conn);
         return response;
     }
 
+    public async Task<IReadOnlyList<ModuloDisponibleResponse>> GetAvailableModulesAsync(int empresaId, string companyKey, bool includeAllTenants, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(_db.Database.GetConnectionString());
+        await conn.OpenAsync(ct);
+
+        if (!await AreCapabilityTablesAvailableAsync(conn, ct))
+            return Array.Empty<ModuloDisponibleResponse>();
+        if (!await TableExistsAsync(conn, "WModulo", ct) || !await TableExistsAsync(conn, "WModuloEmpresa", ct))
+            return Array.Empty<ModuloDisponibleResponse>();
+
+        var normalizedCompanyKey = (companyKey ?? string.Empty).Trim().ToLowerInvariant();
+        if (!includeAllTenants && string.IsNullOrWhiteSpace(normalizedCompanyKey))
+            return Array.Empty<ModuloDisponibleResponse>();
+
+        var modules = new List<ModuloDisponibleResponse>();
+        var sql = includeAllTenants
+            ? @"
+SELECT
+    m.ModuloClave,
+    COALESCE(NULLIF(m.Nombre,''), m.ModuloClave) AS Nombre,
+    me.EmpresaClave
+FROM dbo.WModulo m
+INNER JOIN dbo.WModuloEmpresa me
+    ON me.EmpresaId = m.EmpresaId
+   AND me.ModuloClave = m.ModuloClave
+WHERE m.EmpresaId = @EmpresaId
+  AND m.IdStatus = 1
+  AND me.Activo = 1
+ORDER BY me.EmpresaClave, CASE WHEN m.ModuloClave = 'inicio' THEN 0 ELSE 1 END, m.ModuloClave;"
+            : @"
+SELECT
+    m.ModuloClave,
+    COALESCE(NULLIF(m.Nombre,''), m.ModuloClave) AS Nombre,
+    me.EmpresaClave
+FROM dbo.WModulo m
+INNER JOIN dbo.WModuloEmpresa me
+    ON me.EmpresaId = m.EmpresaId
+   AND me.ModuloClave = m.ModuloClave
+WHERE m.EmpresaId = @EmpresaId
+  AND m.IdStatus = 1
+  AND me.Activo = 1
+  AND LOWER(me.EmpresaClave) = @EmpresaClave
+ORDER BY CASE WHEN m.ModuloClave = 'inicio' THEN 0 ELSE 1 END, m.ModuloClave;";
+
+        await using var cmd = new SqlCommand(sql, conn);
+        cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+        if (!includeAllTenants)
+            cmd.Parameters.Add(new SqlParameter("@EmpresaClave", SqlDbType.NVarChar, 200) { Value = normalizedCompanyKey });
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            var moduleKey = NormalizeModuleKey(reader.GetString(reader.GetOrdinal("ModuloClave")));
+            if (string.IsNullOrWhiteSpace(moduleKey)) continue;
+            var empresaClave = reader.GetString(reader.GetOrdinal("EmpresaClave"));
+            modules.Add(new ModuloDisponibleResponse
+            {
+                ModuloClave = moduleKey,
+                Nombre = reader.GetString(reader.GetOrdinal("Nombre")),
+                Ruta = ResolveModuleRoute(moduleKey),
+                CapabilityVer = $"{moduleKey}.ver_modulo",
+                EmpresaClave = empresaClave
+            });
+        }
+
+        return modules;
+    }
+
     public async Task<IReadOnlyList<PermisosWebModuleItem>> GetModuleCatalogAsync(int empresaId, CancellationToken ct)
     {
         await using var conn = new SqlConnection(_db.Database.GetConnectionString());
@@ -657,9 +725,6 @@ VALUES ({string.Join(", ", insertValues)});";
         var schema = await GetSchemaAsync(conn, ct);
         var overrideTypes = await GetOverrideTypeTokensAsync(conn, ct);
         var userPermCols = await GetUserPermColumnsAsync(conn, null, ct);
-        await using var tx = await conn.BeginTransactionAsync(ct);
-
-        await EnsureUserExistsAsync(conn, (SqlTransaction)tx, empresaId, userId, ct);
 
         var allowSet = allow.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -668,6 +733,10 @@ VALUES ({string.Join(", ", insertValues)});";
         var activeModules = await GetActiveModulesAsync(conn, empresaId, ct);
         EnsurePermissionsInActiveModules(allowSet, activeModules);
         EnsurePermissionsInActiveModules(denySet, activeModules);
+
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        await EnsureUserExistsAsync(conn, (SqlTransaction)tx, empresaId, userId, ct);
 
         var duplicated = allowSet.Intersect(denySet, StringComparer.OrdinalIgnoreCase).ToList();
         if (duplicated.Count > 0)
@@ -1509,6 +1578,22 @@ WHERE EmpresaId = @EmpresaId
     {
         var idx = key.IndexOf('.');
         return idx > 0 ? key.Substring(0, idx) : "general";
+    }
+
+    private static string ResolveModuleRoute(string moduleKey)
+    {
+        return moduleKey switch
+        {
+            "inicio" => "/inicio/index.html",
+            "usuarios" => "/usuarios-internos/index.html",
+            "proveedores" => "/proveedores/index.html",
+            "pagosproveedores" => "/pagos-proveedores/index.html",
+            "cheques" => "/cheques/index.html",
+            "permisos_modulos" => "/permisos-modulos/index.html",
+            "permisos_roles" => "/permisos-roles/index.html",
+            "permisos_usuarios" => "/permisos-usuarios/index.html",
+            _ => $"/{moduleKey}/index.html"
+        };
     }
 
     private static string Q(string identifier) => $"[{identifier}]";

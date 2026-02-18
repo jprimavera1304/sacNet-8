@@ -224,6 +224,8 @@ public class CompanyKeyTests
             => Task.FromResult<PermisosWebRolesBootstrapResponse?>(null);
         public Task<IReadOnlyList<PermisosWebPermissionItem>> GetPermissionCatalogAsync(int empresaId, CancellationToken ct)
             => Task.FromResult<IReadOnlyList<PermisosWebPermissionItem>>(Array.Empty<PermisosWebPermissionItem>());
+        public Task<IReadOnlyList<ModuloDisponibleResponse>> GetAvailableModulesAsync(int empresaId, string companyKey, bool includeAllTenants, CancellationToken ct)
+            => Task.FromResult<IReadOnlyList<ModuloDisponibleResponse>>(Array.Empty<ModuloDisponibleResponse>());
         public Task<IReadOnlyList<PermisosWebModuleItem>> GetModuleCatalogAsync(int empresaId, CancellationToken ct)
             => Task.FromResult<IReadOnlyList<PermisosWebModuleItem>>(Array.Empty<PermisosWebModuleItem>());
         public Task<PermisosWebModuleItem> SetModuleStatusAsync(int empresaId, string moduleKey, int idStatus, CancellationToken ct)
