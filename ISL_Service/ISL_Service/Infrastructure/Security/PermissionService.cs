@@ -360,6 +360,64 @@ ORDER BY Clave;", conn);
         return response;
     }
 
+    public async Task<PermisosWebRoleItem> CreateRoleAsync(int empresaId, string roleCode, string name, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(_db.Database.GetConnectionString());
+        await conn.OpenAsync(ct);
+
+        if (!await AreCapabilityTablesAvailableAsync(conn, ct))
+            throw new KeyNotFoundException("Capacidades no disponibles para este tenant/base.");
+
+        var code = NormalizeRoleCodeForCreate(roleCode);
+        var displayName = NormalizeRoleNameForCreate(name, code);
+
+        var existsSql = @"
+SELECT TOP 1 1
+FROM dbo.WRol
+WHERE EmpresaId = @EmpresaId
+  AND UPPER(Codigo) = UPPER(@Codigo);";
+        await using (var existsCmd = new SqlCommand(existsSql, conn))
+        {
+            existsCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+            existsCmd.Parameters.Add(new SqlParameter("@Codigo", SqlDbType.NVarChar, 80) { Value = code });
+            var exists = await existsCmd.ExecuteScalarAsync(ct);
+            if (exists is not null)
+                throw new ArgumentException($"El rol ya existe: {code}");
+        }
+
+        var roleColumns = await GetTableColumnsAsync(conn, "WRol", ct);
+        var insertColumns = new List<string> { "EmpresaId", "Codigo", "Nombre" };
+        var insertValues = new List<string> { "@EmpresaId", "@Codigo", "@Nombre" };
+
+        if (roleColumns.Contains("EsSistema"))
+        {
+            insertColumns.Add("EsSistema");
+            insertValues.Add("0");
+        }
+        if (roleColumns.Contains("FechaCreacion"))
+        {
+            insertColumns.Add("FechaCreacion");
+            insertValues.Add("SYSUTCDATETIME()");
+        }
+
+        var insertSql = $@"
+INSERT INTO dbo.WRol ({string.Join(", ", insertColumns.Select(Q))})
+VALUES ({string.Join(", ", insertValues)});";
+        await using (var insertCmd = new SqlCommand(insertSql, conn))
+        {
+            insertCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+            insertCmd.Parameters.Add(new SqlParameter("@Codigo", SqlDbType.NVarChar, 80) { Value = code });
+            insertCmd.Parameters.Add(new SqlParameter("@Nombre", SqlDbType.NVarChar, 120) { Value = displayName });
+            await insertCmd.ExecuteNonQueryAsync(ct);
+        }
+
+        return new PermisosWebRoleItem
+        {
+            Code = code,
+            Name = displayName
+        };
+    }
+
     public async Task UpsertRolePermissionsAsync(int empresaId, string roleCode, IReadOnlyCollection<string> permissions, CancellationToken ct)
     {
         await using var conn = new SqlConnection(_db.Database.GetConnectionString());
@@ -844,7 +902,54 @@ WHERE t.name IN ('WRol','WPermiso','WRolPermiso','WUsuarioPermiso');", conn);
             return "SUPER_ADMIN";
         if (string.Equals(rolLegacy, "Admin", StringComparison.OrdinalIgnoreCase))
             return "ADMIN";
-        return "USER";
+        return NormalizeRoleCode(rolLegacy, fallback: "USER");
+    }
+
+    private static string NormalizeRoleCodeForCreate(string? roleCode)
+    {
+        var normalized = NormalizeRoleCode(roleCode, fallback: string.Empty);
+        if (string.IsNullOrWhiteSpace(normalized))
+            throw new ArgumentException("Codigo de rol requerido.");
+        if (normalized.Length < 3 || normalized.Length > 30)
+            throw new ArgumentException("Codigo de rol invalido. Longitud permitida: 3 a 30.");
+        return normalized;
+    }
+
+    private static string NormalizeRoleNameForCreate(string? name, string code)
+    {
+        var trimmed = (name ?? string.Empty).Trim();
+        if (trimmed.Length > 80)
+            trimmed = trimmed[..80];
+        if (!string.IsNullOrWhiteSpace(trimmed))
+            return trimmed;
+
+        return string.Join(" ",
+            code.Split('_', StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => x[..1] + x[1..].ToLowerInvariant()));
+    }
+
+    private static string NormalizeRoleCode(string? raw, string fallback)
+    {
+        var value = (raw ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(value))
+            return fallback;
+
+        var normalizedChars = value
+            .Select(ch =>
+            {
+                if (char.IsLetterOrDigit(ch)) return ch;
+                if (ch == '_' || ch == '-' || char.IsWhiteSpace(ch)) return '_';
+                return '\0';
+            })
+            .Where(ch => ch != '\0')
+            .ToArray();
+
+        var compact = new string(normalizedChars);
+        while (compact.Contains("__", StringComparison.Ordinal))
+            compact = compact.Replace("__", "_", StringComparison.Ordinal);
+        compact = compact.Trim('_').ToUpperInvariant();
+
+        return string.IsNullOrWhiteSpace(compact) ? fallback : compact;
     }
 
     private static PermissionSnapshot BuildLegacyFallback(Guid userId, int empresaId, string rolLegacy, string? version = null)
@@ -875,10 +980,10 @@ WHERE t.name IN ('WRol','WPermiso','WRolPermiso','WUsuarioPermiso');", conn);
 SELECT TOP 1 {Q(schema.RoleIdColumn)}
 FROM dbo.WRol
 WHERE EmpresaId = @EmpresaId
-  AND Codigo = @Codigo;";
+  AND UPPER(Codigo) = UPPER(@Codigo);";
         await using var cmd = new SqlCommand(sql, conn, tx);
         cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
-        cmd.Parameters.Add(new SqlParameter("@Codigo", SqlDbType.NVarChar, 30) { Value = roleCode.Trim().ToUpperInvariant() });
+        cmd.Parameters.Add(new SqlParameter("@Codigo", SqlDbType.NVarChar, 30) { Value = roleCode.Trim() });
         var value = await cmd.ExecuteScalarAsync(ct);
         return value is DBNull ? null : value;
     }

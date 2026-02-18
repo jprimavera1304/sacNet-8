@@ -10,6 +10,7 @@ public interface IUserRepository
     Task<WebLoginFallbackResult?> LoginWithFallbackAsync(string usuario, string contrasenaPlano, string contrasenaHashWeb, CancellationToken ct);
 
     Task<bool> ExistsByUsuarioAsync(string usuario, CancellationToken ct);
+    Task<List<RoleCatalogItem>> ListRolesCatalogAsync(int empresaId, CancellationToken ct);
 
     // empresaId se ignora: en este modelo por base EmpresaId siempre es 1.
     Task<List<Usuario>> ListAsync(int? empresaId, CancellationToken ct);

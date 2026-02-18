@@ -116,6 +116,45 @@ WHERE UPPER(LTRIM(RTRIM(Usuario))) = UPPER(LTRIM(RTRIM(@Usuario)));", conn)
         return _db.Usuarios.AnyAsync(x => x.EmpresaId == EMPRESA_ID_UNICA && x.UsuarioNombre == usuarioTrim, ct);
     }
 
+    public async Task<List<RoleCatalogItem>> ListRolesCatalogAsync(int empresaId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(_db.Database.GetConnectionString());
+        await conn.OpenAsync(ct);
+
+        var roles = new List<RoleCatalogItem>();
+        try
+        {
+            await using var cmd = new SqlCommand(@"
+SELECT Codigo, Nombre
+FROM dbo.WRol
+WHERE EmpresaId = @EmpresaId
+ORDER BY Codigo;", conn);
+            cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = EMPRESA_ID_UNICA });
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                roles.Add(new RoleCatalogItem
+                {
+                    Code = reader.GetString(reader.GetOrdinal("Codigo")),
+                    Name = reader.GetString(reader.GetOrdinal("Nombre"))
+                });
+            }
+        }
+        catch (SqlException ex) when (ex.Number is 208 or 207)
+        {
+            // WRol no existe en bases antiguas.
+        }
+
+        if (roles.Count == 0)
+        {
+            roles.Add(new RoleCatalogItem { Code = "SUPER_ADMIN", Name = "SuperAdmin" });
+            roles.Add(new RoleCatalogItem { Code = "ADMIN", Name = "Admin" });
+            roles.Add(new RoleCatalogItem { Code = "USER", Name = "User" });
+        }
+
+        return roles;
+    }
+
     public Task<List<Usuario>> ListAsync(int? empresaId, CancellationToken ct)
     {
         return _db.Usuarios.AsNoTracking()

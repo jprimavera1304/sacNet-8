@@ -28,7 +28,7 @@ public class UserAdminService : IUserAdminService
     public async Task<CreateUserResponse> CreateUserAsync(CreateUserRequest req, ClaimsPrincipal actor, CancellationToken ct)
     {
         var usuarioNombre = NormalizeUsuario(req.Usuario);
-        var rol = NormalizeRol(req.Rol);
+        var rol = await NormalizeRolAsync(req.Rol, ct);
 
         if (await _repo.ExistsByUsuarioAsync(usuarioNombre, ct))
             throw new ConflictException("El usuario ya existe.");
@@ -57,6 +57,27 @@ public class UserAdminService : IUserAdminService
         return list.Select(Map).ToList();
     }
 
+    public async Task<List<UserRoleOptionResponse>> ListRolesCatalogAsync(ClaimsPrincipal actor, CancellationToken ct)
+    {
+        var roles = await _repo.ListRolesCatalogAsync(EMPRESA_FIJA, ct);
+        return roles
+            .Select(r =>
+            {
+                var code = NormalizeRoleCode(r.Code);
+                return new UserRoleOptionResponse
+                {
+                    Code = code,
+                    Name = string.IsNullOrWhiteSpace(r.Name) ? code : r.Name.Trim(),
+                    Value = ToStoredRolValue(code)
+                };
+            })
+            .Where(r => !string.IsNullOrWhiteSpace(r.Code))
+            .GroupBy(r => r.Code, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .OrderBy(r => r.Code, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     public async Task<UserResponse> UpdateUserAsync(Guid userId, UpdateUserRequest req, ClaimsPrincipal actor, CancellationToken ct)
     {
         var user = await _repo.GetByIdAsync(userId, ct) ?? throw new NotFoundException("Usuario no encontrado.");
@@ -64,7 +85,7 @@ public class UserAdminService : IUserAdminService
         EnsureActorCanManageTarget(actor, user);
 
         var usuarioNuevo = NormalizeUsuario(req.Usuario);
-        var rolNuevo = NormalizeRol(req.Rol);
+        var rolNuevo = await NormalizeRolAsync(req.Rol, ct);
 
         var existing = await _repo.GetByUsuarioAsync(usuarioNuevo, ct);
         if (existing is not null && existing.Id != userId)
@@ -195,13 +216,44 @@ public class UserAdminService : IUserAdminService
         return normalized;
     }
 
-    private static string NormalizeRol(string rol)
+    private async Task<string> NormalizeRolAsync(string rol, CancellationToken ct)
     {
-        var normalized = (rol ?? string.Empty).Trim();
-        if (string.Equals(normalized, "User", StringComparison.OrdinalIgnoreCase)) return "User";
-        if (string.Equals(normalized, "Admin", StringComparison.OrdinalIgnoreCase)) return "Admin";
-        if (string.Equals(normalized, "SuperAdmin", StringComparison.OrdinalIgnoreCase)) return "SuperAdmin";
+        var input = (rol ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(input))
+            throw new ArgumentException("Rol invalido. Seleccione un rol.");
 
-        throw new ArgumentException("Rol invalido. Valores permitidos: User, Admin, SuperAdmin.");
+        var inputCode = NormalizeRoleCode(input);
+        var roles = await _repo.ListRolesCatalogAsync(EMPRESA_FIJA, ct);
+        var match = roles.FirstOrDefault(r =>
+            string.Equals(NormalizeRoleCode(r.Code), inputCode, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals((r.Name ?? string.Empty).Trim(), input, StringComparison.OrdinalIgnoreCase));
+
+        if (match is null)
+            throw new ArgumentException("Rol invalido. No existe en catalogo de roles.");
+
+        return ToStoredRolValue(NormalizeRoleCode(match.Code));
+    }
+
+    private static string NormalizeRoleCode(string roleCode)
+    {
+        return string.Concat((roleCode ?? string.Empty)
+                .Trim()
+                .ToUpperInvariant()
+                .Select(ch =>
+                {
+                    if ((ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')) return ch;
+                    if (ch == '_' || ch == '-' || char.IsWhiteSpace(ch)) return '_';
+                    return '\0';
+                })
+                .Where(ch => ch != '\0'))
+            .Trim('_');
+    }
+
+    private static string ToStoredRolValue(string roleCode)
+    {
+        if (string.Equals(roleCode, "SUPER_ADMIN", StringComparison.OrdinalIgnoreCase)) return "SuperAdmin";
+        if (string.Equals(roleCode, "ADMIN", StringComparison.OrdinalIgnoreCase)) return "Admin";
+        if (string.Equals(roleCode, "USER", StringComparison.OrdinalIgnoreCase)) return "User";
+        return roleCode;
     }
 }

@@ -33,6 +33,14 @@ public class UsuariosController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("roles")]
+    [Authorize(Policy = "perm:usuarios.ver_modulo")]
+    public async Task<IActionResult> ListRoles(CancellationToken ct = default)
+    {
+        var result = await _service.ListRolesCatalogAsync(User, ct);
+        return Ok(result);
+    }
+
     [HttpPut("{id:guid}")]
     [Authorize(Policy = "perm:usuarios.editar")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateUserRequest req, CancellationToken ct)

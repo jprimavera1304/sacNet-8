@@ -28,7 +28,16 @@ public class PermisosWebController : ControllerBase
 
         var payload = await _permissions.GetPermisosWebBootstrapAsync(empresaId, ct);
         if (payload is null)
-            return NotFound(new { message = "Capacidades no disponibles para este tenant/base." });
+            return Ok(new
+            {
+                permissionsEnabled = false,
+                roles = Array.Empty<object>(),
+                permissions = Array.Empty<object>(),
+                rolePermissions = Array.Empty<object>(),
+                users = Array.Empty<object>(),
+                userOverrides = Array.Empty<object>(),
+                message = "Capacidades no disponibles para este tenant/base."
+            });
 
         return Ok(payload);
     }
@@ -42,7 +51,14 @@ public class PermisosWebController : ControllerBase
 
         var payload = await _permissions.GetPermisosRolesBootstrapAsync(empresaId, ct);
         if (payload is null)
-            return NotFound(new { message = "Capacidades no disponibles para este tenant/base." });
+            return Ok(new
+            {
+                permissionsEnabled = false,
+                roles = Array.Empty<object>(),
+                permissions = Array.Empty<object>(),
+                rolePermissions = Array.Empty<object>(),
+                message = "Capacidades no disponibles para este tenant/base."
+            });
 
         return Ok(payload);
     }
@@ -93,6 +109,33 @@ public class PermisosWebController : ControllerBase
         }
 
         return Ok(new { ok = true });
+    }
+
+    [HttpPost("roles")]
+    [Authorize(Policy = "perm:permisosweb.roles.editar")]
+    public async Task<IActionResult> CreateRole(
+        [FromBody] PermisosWebCreateRoleRequest request,
+        CancellationToken ct)
+    {
+        if (!TryGetEmpresaId(User, out var empresaId))
+            return Unauthorized(new { message = "Token invalido." });
+
+        if (request is null)
+            return UnprocessableEntity(new { message = "Payload invalido." });
+
+        try
+        {
+            var created = await _permissions.CreateRoleAsync(empresaId, request.RoleCode, request.Name, ct);
+            return Ok(new { ok = true, created });
+        }
+        catch (ArgumentException ex)
+        {
+            return UnprocessableEntity(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
     }
 
     [HttpPut("usuarios/{userId:guid}/overrides")]
