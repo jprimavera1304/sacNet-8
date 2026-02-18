@@ -10,7 +10,6 @@ namespace ISL_Service.Infrastructure.Repositories;
 
 public class UserRepository : IUserRepository
 {
-    private const int EMPRESA_ID_UNICA = 1;
     private readonly AppDbContext _db;
 
     public UserRepository(AppDbContext db)
@@ -18,17 +17,19 @@ public class UserRepository : IUserRepository
         _db = db;
     }
 
-    public Task<Usuario?> GetByUsuarioAsync(string usuario, CancellationToken ct)
+    public async Task<Usuario?> GetByUsuarioAsync(string usuario, CancellationToken ct)
     {
+        var empresaId = await ResolveEmpresaIdAsync(ct);
         var usuarioTrim = usuario.Trim();
-        return _db.Usuarios.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.EmpresaId == EMPRESA_ID_UNICA && x.UsuarioNombre == usuarioTrim, ct);
+        return await _db.Usuarios.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.EmpresaId == empresaId && x.UsuarioNombre == usuarioTrim, ct);
     }
 
-    public Task<Usuario?> GetByIdAsync(Guid id, CancellationToken ct)
+    public async Task<Usuario?> GetByIdAsync(Guid id, CancellationToken ct)
     {
-        return _db.Usuarios
-            .FirstOrDefaultAsync(x => x.Id == id && x.EmpresaId == EMPRESA_ID_UNICA, ct);
+        var empresaId = await ResolveEmpresaIdAsync(ct);
+        return await _db.Usuarios
+            .FirstOrDefaultAsync(x => x.Id == id && x.EmpresaId == empresaId, ct);
     }
 
     public async Task<WebLoginFallbackResult?> LoginWithFallbackAsync(string usuario, string contrasenaPlano, string contrasenaHashWeb, CancellationToken ct)
@@ -110,10 +111,11 @@ WHERE UPPER(LTRIM(RTRIM(Usuario))) = UPPER(LTRIM(RTRIM(@Usuario)));", conn)
         };
     }
 
-    public Task<bool> ExistsByUsuarioAsync(string usuario, CancellationToken ct)
+    public async Task<bool> ExistsByUsuarioAsync(string usuario, CancellationToken ct)
     {
+        var empresaId = await ResolveEmpresaIdAsync(ct);
         var usuarioTrim = usuario.Trim();
-        return _db.Usuarios.AnyAsync(x => x.EmpresaId == EMPRESA_ID_UNICA && x.UsuarioNombre == usuarioTrim, ct);
+        return await _db.Usuarios.AnyAsync(x => x.EmpresaId == empresaId && x.UsuarioNombre == usuarioTrim, ct);
     }
 
     public async Task<List<RoleCatalogItem>> ListRolesCatalogAsync(int empresaId, CancellationToken ct)
@@ -129,7 +131,8 @@ SELECT Codigo, Nombre
 FROM dbo.WRol
 WHERE EmpresaId = @EmpresaId
 ORDER BY Codigo;", conn);
-            cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = EMPRESA_ID_UNICA });
+            var effectiveEmpresaId = empresaId > 0 ? empresaId : await ResolveEmpresaIdAsync(ct);
+            cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = effectiveEmpresaId });
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
@@ -155,25 +158,25 @@ ORDER BY Codigo;", conn);
         return roles;
     }
 
-    public Task<List<Usuario>> ListAsync(int? empresaId, CancellationToken ct)
+    public async Task<List<Usuario>> ListAsync(int? empresaId, CancellationToken ct)
     {
-        return _db.Usuarios.AsNoTracking()
-            .Where(x => x.EmpresaId == EMPRESA_ID_UNICA)
+        var effectiveEmpresaId = (empresaId.HasValue && empresaId.Value > 0) ? empresaId.Value : await ResolveEmpresaIdAsync(ct);
+        return await _db.Usuarios.AsNoTracking()
+            .Where(x => x.EmpresaId == effectiveEmpresaId)
             .OrderBy(x => x.UsuarioNombre)
             .ToListAsync(ct);
     }
 
-    public Task AddAsync(Usuario user, CancellationToken ct)
+    public async Task AddAsync(Usuario user, CancellationToken ct)
     {
-        user.EmpresaId = EMPRESA_ID_UNICA;
-        return _db.Usuarios.AddAsync(user, ct).AsTask();
+        user.EmpresaId = await ResolveEmpresaIdAsync(ct);
+        await _db.Usuarios.AddAsync(user, ct);
     }
 
-    public Task UpdateAsync(Usuario user, CancellationToken ct)
+    public async Task UpdateAsync(Usuario user, CancellationToken ct)
     {
-        user.EmpresaId = EMPRESA_ID_UNICA;
+        user.EmpresaId = await ResolveEmpresaIdAsync(ct);
         _db.Usuarios.Update(user);
-        return Task.CompletedTask;
     }
 
     public async Task<Usuario> UpsertWebAndLegacyAsync(
@@ -213,17 +216,33 @@ ORDER BY Codigo;", conn);
                 return await UpsertWebOnlyAsync(usuario, contrasenaHashWeb, rol, debeCambiarContrasena, estado, ct);
             }
 
+            var resultId = reader.GetGuid(reader.GetOrdinal("Id"));
+            var resultUsuario = reader.GetString(reader.GetOrdinal("Usuario"));
+            var resultEmpresaId = reader.GetInt32(reader.GetOrdinal("EmpresaId"));
+            var resultRol = reader.GetString(reader.GetOrdinal("Rol"));
+            var resultDebeCambiarContrasena = reader.GetBoolean(reader.GetOrdinal("DebeCambiarContrasena"));
+            var resultEstado = reader.GetInt32(reader.GetOrdinal("Estado"));
+            var resultFechaCreacion = reader.GetDateTime(reader.GetOrdinal("FechaCreacion"));
+            var resultFechaActualizacion = reader.GetDateTime(reader.GetOrdinal("FechaActualizacion"));
+            var rolSolicitado = rol.Trim();
+
+            if (!string.Equals(resultRol, rolSolicitado, StringComparison.OrdinalIgnoreCase))
+            {
+                await EnsureRolPersistedAsync(conn, resultId, resultEmpresaId, rolSolicitado, ct);
+                resultRol = rolSolicitado;
+            }
+
             return new Usuario
             {
-                Id = reader.GetGuid(reader.GetOrdinal("Id")),
-                UsuarioNombre = reader.GetString(reader.GetOrdinal("Usuario")),
+                Id = resultId,
+                UsuarioNombre = resultUsuario,
                 ContrasenaHash = contrasenaHashWeb,
-                Rol = reader.GetString(reader.GetOrdinal("Rol")),
-                EmpresaId = reader.GetInt32(reader.GetOrdinal("EmpresaId")),
-                DebeCambiarContrasena = reader.GetBoolean(reader.GetOrdinal("DebeCambiarContrasena")),
-                Estado = reader.GetInt32(reader.GetOrdinal("Estado")),
-                FechaCreacion = reader.GetDateTime(reader.GetOrdinal("FechaCreacion")),
-                FechaActualizacion = reader.GetDateTime(reader.GetOrdinal("FechaActualizacion"))
+                Rol = resultRol,
+                EmpresaId = resultEmpresaId,
+                DebeCambiarContrasena = resultDebeCambiarContrasena,
+                Estado = resultEstado,
+                FechaCreacion = resultFechaCreacion,
+                FechaActualizacion = resultFechaActualizacion
             };
         }
         catch (SqlException)
@@ -241,11 +260,12 @@ ORDER BY Codigo;", conn);
         int estado,
         CancellationToken ct)
     {
+        var empresaId = await ResolveEmpresaIdAsync(ct);
         var usuarioTrim = usuario.Trim();
         var now = DateTime.UtcNow;
 
         var entity = await _db.Usuarios
-            .FirstOrDefaultAsync(x => x.EmpresaId == EMPRESA_ID_UNICA && x.UsuarioNombre == usuarioTrim, ct);
+            .FirstOrDefaultAsync(x => x.EmpresaId == empresaId && x.UsuarioNombre == usuarioTrim, ct);
 
         if (entity is null)
         {
@@ -255,7 +275,7 @@ ORDER BY Codigo;", conn);
                 UsuarioNombre = usuarioTrim,
                 ContrasenaHash = contrasenaHashWeb,
                 Rol = rol.Trim(),
-                EmpresaId = EMPRESA_ID_UNICA,
+                EmpresaId = empresaId,
                 DebeCambiarContrasena = debeCambiarContrasena,
                 Estado = estado,
                 FechaCreacion = now,
@@ -276,8 +296,29 @@ ORDER BY Codigo;", conn);
         return entity;
     }
 
+    private static async Task EnsureRolPersistedAsync(
+        SqlConnection conn,
+        Guid userId,
+        int empresaId,
+        string rol,
+        CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand(@"
+UPDATE dbo.UsuarioWeb
+SET Rol = @Rol,
+    FechaActualizacion = SYSUTCDATETIME()
+WHERE Id = @Id
+  AND EmpresaId = @EmpresaId;", conn);
+
+        cmd.Parameters.Add(new SqlParameter("@Rol", SqlDbType.NVarChar, 30) { Value = rol });
+        cmd.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier) { Value = userId });
+        cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
     public async Task<Usuario> UpdateUsuarioAndRolAsync(Guid userId, string usuarioNuevo, string rolNuevo, CancellationToken ct)
     {
+        var empresaId = await ResolveEmpresaIdAsync(ct);
         await using var conn = new SqlConnection(_db.Database.GetConnectionString());
         await conn.OpenAsync(ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
@@ -287,8 +328,9 @@ ORDER BY Codigo;", conn);
             var currentCmd = new SqlCommand(@"
 SELECT TOP 1 Usuario, DebeCambiarContrasena, Estado, FechaCreacion, FechaActualizacion
 FROM dbo.UsuarioWeb
-WHERE Id = @Id AND EmpresaId = 1;", conn, (SqlTransaction)tx);
+WHERE Id = @Id AND EmpresaId = @EmpresaId;", conn, (SqlTransaction)tx);
             currentCmd.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier) { Value = userId });
+            currentCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
 
             string? usuarioActual = null;
             bool debeCambiarContrasena = false;
@@ -313,10 +355,11 @@ UPDATE dbo.UsuarioWeb
 SET Usuario = @UsuarioNuevo,
     Rol = @RolNuevo,
     FechaActualizacion = SYSUTCDATETIME()
-WHERE Id = @Id AND EmpresaId = 1;", conn, (SqlTransaction)tx);
+WHERE Id = @Id AND EmpresaId = @EmpresaId;", conn, (SqlTransaction)tx);
             updateWeb.Parameters.Add(new SqlParameter("@UsuarioNuevo", SqlDbType.NVarChar, 80) { Value = usuarioNuevo });
             updateWeb.Parameters.Add(new SqlParameter("@RolNuevo", SqlDbType.NVarChar, 30) { Value = rolNuevo });
             updateWeb.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier) { Value = userId });
+            updateWeb.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
             await updateWeb.ExecuteNonQueryAsync(ct);
 
             if (!string.IsNullOrWhiteSpace(usuarioActual))
@@ -338,7 +381,7 @@ WHERE UPPER(LTRIM(RTRIM(Usuario))) = UPPER(LTRIM(RTRIM(@UsuarioActual)));", conn
                 Id = userId,
                 UsuarioNombre = usuarioNuevo,
                 Rol = rolNuevo,
-                EmpresaId = EMPRESA_ID_UNICA,
+                EmpresaId = empresaId,
                 DebeCambiarContrasena = debeCambiarContrasena,
                 Estado = estado,
                 FechaCreacion = fechaCreacion,
@@ -354,6 +397,7 @@ WHERE UPPER(LTRIM(RTRIM(Usuario))) = UPPER(LTRIM(RTRIM(@UsuarioActual)));", conn
 
     public async Task<Usuario> UpdateEstadoWithLegacyAsync(Guid userId, int estado, CancellationToken ct)
     {
+        var empresaId = await ResolveEmpresaIdAsync(ct);
         await using var conn = new SqlConnection(_db.Database.GetConnectionString());
         await conn.OpenAsync(ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
@@ -363,8 +407,9 @@ WHERE UPPER(LTRIM(RTRIM(Usuario))) = UPPER(LTRIM(RTRIM(@UsuarioActual)));", conn
             var currentCmd = new SqlCommand(@"
 SELECT TOP 1 Usuario, Rol, DebeCambiarContrasena, FechaCreacion, FechaActualizacion
 FROM dbo.UsuarioWeb
-WHERE Id = @Id AND EmpresaId = 1;", conn, (SqlTransaction)tx);
+WHERE Id = @Id AND EmpresaId = @EmpresaId;", conn, (SqlTransaction)tx);
             currentCmd.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier) { Value = userId });
+            currentCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
 
             string? usuario = null;
             string rol = "User";
@@ -388,9 +433,10 @@ WHERE Id = @Id AND EmpresaId = 1;", conn, (SqlTransaction)tx);
 UPDATE dbo.UsuarioWeb
 SET Estado = @Estado,
     FechaActualizacion = SYSUTCDATETIME()
-WHERE Id = @Id AND EmpresaId = 1;", conn, (SqlTransaction)tx);
+WHERE Id = @Id AND EmpresaId = @EmpresaId;", conn, (SqlTransaction)tx);
             updateWeb.Parameters.Add(new SqlParameter("@Estado", SqlDbType.Int) { Value = estado });
             updateWeb.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier) { Value = userId });
+            updateWeb.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
             await updateWeb.ExecuteNonQueryAsync(ct);
 
             if (!string.IsNullOrWhiteSpace(usuario))
@@ -411,7 +457,7 @@ WHERE UPPER(LTRIM(RTRIM(Usuario))) = UPPER(LTRIM(RTRIM(@Usuario)));", conn, (Sql
                 Id = userId,
                 UsuarioNombre = usuario ?? string.Empty,
                 Rol = rol,
-                EmpresaId = EMPRESA_ID_UNICA,
+                EmpresaId = empresaId,
                 DebeCambiarContrasena = debeCambiarContrasena,
                 Estado = estado,
                 FechaCreacion = fechaCreacion,
@@ -427,4 +473,24 @@ WHERE UPPER(LTRIM(RTRIM(Usuario))) = UPPER(LTRIM(RTRIM(@Usuario)));", conn, (Sql
 
     public Task SaveChangesAsync(CancellationToken ct)
         => _db.SaveChangesAsync(ct);
+
+    private async Task<int> ResolveEmpresaIdAsync(CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(_db.Database.GetConnectionString());
+        await conn.OpenAsync(ct);
+
+        await using var countCmd = new SqlCommand("SELECT COUNT(1) FROM dbo.EmpresaWeb;", conn);
+        var countObj = await countCmd.ExecuteScalarAsync(ct);
+        var count = (countObj is null || countObj is DBNull) ? 0 : Convert.ToInt32(countObj);
+        if (count == 0)
+            throw new InvalidOperationException("No existe empresa en dbo.EmpresaWeb.");
+        if (count > 1)
+            throw new InvalidOperationException("dbo.EmpresaWeb tiene mas de una fila. Debe existir exactamente una.");
+
+        await using var idCmd = new SqlCommand("SELECT TOP 1 Id FROM dbo.EmpresaWeb ORDER BY Id;", conn);
+        var idObj = await idCmd.ExecuteScalarAsync(ct);
+        if (idObj is null || idObj is DBNull)
+            throw new InvalidOperationException("No se pudo resolver EmpresaWeb.Id.");
+        return Convert.ToInt32(idObj);
+    }
 }

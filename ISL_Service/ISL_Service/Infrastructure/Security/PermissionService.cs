@@ -6,6 +6,7 @@ using ISL_Service.Infrastructure.Data;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using System.Collections.Concurrent;
 
 namespace ISL_Service.Infrastructure.Security;
 
@@ -42,6 +43,7 @@ public sealed class PermissionService : IPermissionService
     private readonly AppDbContext _db;
     private readonly IMemoryCache _cache;
     private readonly ILogger<PermissionService> _logger;
+    private readonly ConcurrentDictionary<string, byte> _observedUserCacheKeys = new(StringComparer.Ordinal);
 
     public PermissionService(AppDbContext db, IMemoryCache cache, ILogger<PermissionService> logger)
     {
@@ -95,6 +97,7 @@ public sealed class PermissionService : IPermissionService
     {
         var cacheKey = BuildCacheKey(userId, empresaId, rolLegacy);
         var staleCacheKey = $"{cacheKey}:stale";
+        TrackObservedUserCacheKey(cacheKey);
 
         if (_cache.TryGetValue<PermissionSnapshot>(cacheKey, out var cached) && cached is not null)
             return cached;
@@ -551,13 +554,27 @@ WHERE EmpresaId = @EmpresaId
 
     private void InvalidateUserPermissionCache(Guid userId, int empresaId)
     {
+        var prefix = $"perm:{empresaId}:{userId:N}:";
+        foreach (var key in _observedUserCacheKeys.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)))
+        {
+            _cache.Remove(key);
+            _cache.Remove($"{key}:stale");
+            _observedUserCacheKeys.TryRemove(key, out _);
+        }
+
         var roleCandidates = new[] { "SuperAdmin", "Admin", "User", "SUPER_ADMIN", "ADMIN", "USER" };
         foreach (var role in roleCandidates)
         {
             var key = BuildCacheKey(userId, empresaId, role);
             _cache.Remove(key);
             _cache.Remove($"{key}:stale");
+            _observedUserCacheKeys.TryRemove(key, out _);
         }
+    }
+
+    private void TrackObservedUserCacheKey(string cacheKey)
+    {
+        _observedUserCacheKeys.TryAdd(cacheKey, 1);
     }
 
     private async Task<OverrideTypeTokens> GetOverrideTypeTokensAsync(SqlConnection conn, CancellationToken ct)

@@ -10,8 +10,6 @@ namespace ISL_Service.Application.Services;
 
 public class UserAdminService : IUserAdminService
 {
-    private const int EMPRESA_FIJA = 1;
-
     // Estados segun regla:
     // 1 = Activo, 2 = Inactivo, 3 = Bloqueado
     private const int ESTADO_ACTIVO = 1;
@@ -19,16 +17,18 @@ public class UserAdminService : IUserAdminService
     private const int ESTADO_BLOQUEADO = 3;
 
     private readonly IUserRepository _repo;
+    private readonly IPermissionService _permissionService;
 
-    public UserAdminService(IUserRepository repo)
+    public UserAdminService(IUserRepository repo, IPermissionService permissionService)
     {
         _repo = repo;
+        _permissionService = permissionService;
     }
 
     public async Task<CreateUserResponse> CreateUserAsync(CreateUserRequest req, ClaimsPrincipal actor, CancellationToken ct)
     {
         var usuarioNombre = NormalizeUsuario(req.Usuario);
-        var rol = await NormalizeRolAsync(req.Rol, ct);
+        var rol = await NormalizeRolAsync(req.Rol, actor, ct);
 
         if (await _repo.ExistsByUsuarioAsync(usuarioNombre, ct))
             throw new ConflictException("El usuario ya existe.");
@@ -44,6 +44,21 @@ public class UserAdminService : IUserAdminService
             estado: ESTADO_ACTIVO,
             ct);
 
+        // Usuario nuevo debe iniciar con permisos efectivos del rol (sin overrides heredados/previos).
+        try
+        {
+            await _permissionService.UpsertUserOverridesAsync(
+                entity.EmpresaId,
+                entity.Id,
+                Array.Empty<string>(),
+                Array.Empty<string>(),
+                ct);
+        }
+        catch
+        {
+            // Si el esquema de capacidades aun no existe, no bloquea la creacion de usuario.
+        }
+
         return new CreateUserResponse
         {
             User = Map(entity),
@@ -53,13 +68,15 @@ public class UserAdminService : IUserAdminService
 
     public async Task<List<UserResponse>> ListUsersAsync(ClaimsPrincipal actor, CancellationToken ct)
     {
-        var list = await _repo.ListAsync(EMPRESA_FIJA, ct);
+        var empresaId = ResolveEmpresaId(actor);
+        var list = await _repo.ListAsync(empresaId, ct);
         return list.Select(Map).ToList();
     }
 
     public async Task<List<UserRoleOptionResponse>> ListRolesCatalogAsync(ClaimsPrincipal actor, CancellationToken ct)
     {
-        var roles = await _repo.ListRolesCatalogAsync(EMPRESA_FIJA, ct);
+        var empresaId = ResolveEmpresaId(actor);
+        var roles = await _repo.ListRolesCatalogAsync(empresaId, ct);
         return roles
             .Select(r =>
             {
@@ -85,7 +102,7 @@ public class UserAdminService : IUserAdminService
         EnsureActorCanManageTarget(actor, user);
 
         var usuarioNuevo = NormalizeUsuario(req.Usuario);
-        var rolNuevo = await NormalizeRolAsync(req.Rol, ct);
+        var rolNuevo = await NormalizeRolAsync(req.Rol, actor, ct);
 
         var existing = await _repo.GetByUsuarioAsync(usuarioNuevo, ct);
         if (existing is not null && existing.Id != userId)
@@ -134,7 +151,7 @@ public class UserAdminService : IUserAdminService
     public Task<UserResponse> UpdateEmpresaAsync(Guid userId, UpdateUserEmpresaRequest req, ClaimsPrincipal actor, CancellationToken ct)
     {
         return Task.FromException<UserResponse>(
-            new InvalidOperationException("En este modelo por base de datos, EmpresaId siempre es 1."));
+            new InvalidOperationException("En este modelo por base de datos, cada base maneja una sola empresa."));
     }
 
     public async Task ChangeMyPasswordAsync(ChangePasswordRequest req, ClaimsPrincipal actor, CancellationToken ct)
@@ -216,14 +233,14 @@ public class UserAdminService : IUserAdminService
         return normalized;
     }
 
-    private async Task<string> NormalizeRolAsync(string rol, CancellationToken ct)
+    private async Task<string> NormalizeRolAsync(string rol, ClaimsPrincipal actor, CancellationToken ct)
     {
         var input = (rol ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(input))
             throw new ArgumentException("Rol invalido. Seleccione un rol.");
 
         var inputCode = NormalizeRoleCode(input);
-        var roles = await _repo.ListRolesCatalogAsync(EMPRESA_FIJA, ct);
+        var roles = await _repo.ListRolesCatalogAsync(ResolveEmpresaId(actor), ct);
         var match = roles.FirstOrDefault(r =>
             string.Equals(NormalizeRoleCode(r.Code), inputCode, StringComparison.OrdinalIgnoreCase) ||
             string.Equals((r.Name ?? string.Empty).Trim(), input, StringComparison.OrdinalIgnoreCase));
@@ -255,5 +272,11 @@ public class UserAdminService : IUserAdminService
         if (string.Equals(roleCode, "ADMIN", StringComparison.OrdinalIgnoreCase)) return "Admin";
         if (string.Equals(roleCode, "USER", StringComparison.OrdinalIgnoreCase)) return "User";
         return roleCode;
+    }
+
+    private static int ResolveEmpresaId(ClaimsPrincipal? actor = null)
+    {
+        var id = actor is null ? 0 : CurrentUser.GetEmpresaId(actor);
+        return id > 0 ? id : 1;
     }
 }
