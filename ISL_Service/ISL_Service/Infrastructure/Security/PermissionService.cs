@@ -21,6 +21,7 @@ public sealed class PermissionService : IPermissionService
 
     private static readonly Dictionary<string, HashSet<string>> LegacyPolicyMap = new(StringComparer.OrdinalIgnoreCase)
     {
+        ["usuarios.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
         ["usuarios.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
         ["usuarios.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin" },
         ["usuarios.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin" },
@@ -51,6 +52,7 @@ public sealed class PermissionService : IPermissionService
 
     private static readonly List<PermissionSeed> PermissionCatalogSeeds = new()
     {
+        new("usuarios.ver_modulo", "Usuarios - Ver modulo", "usuarios"),
         new("usuarios.ver", "Usuarios - Ver", "usuarios"),
         new("usuarios.crear", "Usuarios - Crear", "usuarios"),
         new("usuarios.editar", "Usuarios - Editar", "usuarios"),

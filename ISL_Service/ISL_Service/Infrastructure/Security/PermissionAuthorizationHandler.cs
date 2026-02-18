@@ -46,10 +46,22 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
         {
             if (snapshot.Permissions.Any(p => string.Equals(p, requirement.Permission, StringComparison.OrdinalIgnoreCase)))
                 context.Succeed(requirement);
+            else if (CanUseLegacyVerAsModuleView(snapshot.Permissions, requirement.Permission))
+                context.Succeed(requirement);
             return;
         }
 
         if (_permissionService.IsAllowedByLegacy(rolLegacy, requirement.Permission))
             context.Succeed(requirement);
+    }
+
+    private static bool CanUseLegacyVerAsModuleView(IReadOnlyCollection<string> permissions, string requiredPermission)
+    {
+        var required = (requiredPermission ?? string.Empty).Trim().ToLowerInvariant();
+        if (!required.EndsWith(".ver_modulo", StringComparison.Ordinal))
+            return false;
+
+        var legacyEquivalent = required[..^("_modulo".Length)];
+        return permissions.Any(p => string.Equals((p ?? string.Empty).Trim(), legacyEquivalent, StringComparison.OrdinalIgnoreCase));
     }
 }

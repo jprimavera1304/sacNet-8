@@ -34,7 +34,7 @@ public class PermisosWebController : ControllerBase
     }
 
     [HttpGet("roles/bootstrap")]
-    [Authorize(Policy = "perm:permisos_roles.ver")]
+    [Authorize(Policy = "perm:permisos_roles.ver_modulo")]
     public async Task<IActionResult> RolesBootstrap(CancellationToken ct)
     {
         if (!TryGetEmpresaId(User, out var empresaId))
@@ -48,7 +48,7 @@ public class PermisosWebController : ControllerBase
     }
 
     [HttpGet("catalogo")]
-    [Authorize(Policy = "perm:permisos_modulos.ver")]
+    [Authorize(Policy = "perm:permisos_modulos.ver_modulo")]
     public async Task<IActionResult> Catalog(CancellationToken ct)
     {
         if (!TryGetEmpresaId(User, out var empresaId))

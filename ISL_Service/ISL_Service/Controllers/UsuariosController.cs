@@ -26,7 +26,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Policy = "perm:usuarios.ver")]
+    [Authorize(Policy = "perm:usuarios.ver_modulo")]
     public async Task<IActionResult> List(CancellationToken ct = default)
     {
         var result = await _service.ListUsersAsync(User, ct);
