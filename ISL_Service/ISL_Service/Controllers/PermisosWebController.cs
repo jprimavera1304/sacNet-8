@@ -71,7 +71,68 @@ public class PermisosWebController : ControllerBase
             return Unauthorized(new { message = "Token invalido." });
 
         var items = await _permissions.GetPermissionCatalogAsync(empresaId, ct);
-        return Ok(new { permissionsEnabled = true, permissions = items });
+        var modules = await _permissions.GetModuleCatalogAsync(empresaId, ct);
+        return Ok(new { permissionsEnabled = true, permissions = items, modules });
+    }
+
+    [HttpPut("modulos/{moduleKey}/status")]
+    [HttpPut("catalogo/modulos/{moduleKey}/status")]
+    [Authorize(Policy = "perm:permisos_modulos.activar")]
+    public async Task<IActionResult> SetModuleStatusByRoute(
+        [FromRoute] string moduleKey,
+        [FromBody] PermisosWebSetModuleStatusRequest request,
+        CancellationToken ct)
+    {
+        if (!TryGetEmpresaId(User, out var empresaId))
+            return Unauthorized(new { message = "Token invalido." });
+
+        var bodyKey = request?.ModuloClave?.Trim() ?? string.Empty;
+        var routeKey = moduleKey?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(routeKey))
+            return UnprocessableEntity(new { message = "Modulo invalido." });
+        if (!string.IsNullOrWhiteSpace(bodyKey) && !string.Equals(bodyKey, routeKey, StringComparison.OrdinalIgnoreCase))
+            return UnprocessableEntity(new { message = "Modulo de ruta y body no coinciden." });
+
+        try
+        {
+            var updated = await _permissions.SetModuleStatusAsync(empresaId, routeKey, request?.IdStatus ?? 0, ct);
+            return Ok(new { ok = true, updated });
+        }
+        catch (ArgumentException ex)
+        {
+            return UnprocessableEntity(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("modulos/status")]
+    [Authorize(Policy = "perm:permisos_modulos.activar")]
+    public async Task<IActionResult> SetModuleStatus(
+        [FromBody] PermisosWebSetModuleStatusRequest request,
+        CancellationToken ct)
+    {
+        if (!TryGetEmpresaId(User, out var empresaId))
+            return Unauthorized(new { message = "Token invalido." });
+
+        if (request is null || string.IsNullOrWhiteSpace(request.ModuloClave))
+            return UnprocessableEntity(new { message = "Payload invalido." });
+
+        try
+        {
+            var updated = await _permissions.SetModuleStatusAsync(empresaId, request.ModuloClave, request.IdStatus, ct);
+            return Ok(new { ok = true, updated });
+        }
+        catch (ArgumentException ex)
+        {
+            return UnprocessableEntity(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
     }
 
     [HttpPut("roles/{roleCode}/permissions")]

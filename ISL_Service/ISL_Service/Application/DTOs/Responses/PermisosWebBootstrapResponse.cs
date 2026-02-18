@@ -30,6 +30,13 @@ public class PermisosWebPermissionItem
     public string Name { get; set; } = string.Empty;
 }
 
+public class PermisosWebModuleItem
+{
+    public string ModuloClave { get; set; } = string.Empty;
+    public string Nombre { get; set; } = string.Empty;
+    public int IdStatus { get; set; } = 1;
+}
+
 public class PermisosWebRolePermissionItem
 {
     public string RoleCode { get; set; } = string.Empty;

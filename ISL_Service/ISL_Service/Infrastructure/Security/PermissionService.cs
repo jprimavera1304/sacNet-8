@@ -130,6 +130,7 @@ public sealed class PermissionService : IPermissionService
         var schema = await GetSchemaAsync(conn, ct);
 
         var response = new PermisosWebBootstrapResponse { PermissionsEnabled = true };
+        var activeModules = await GetActiveModulesAsync(conn, empresaId, ct);
 
         await using (var rolesCmd = new SqlCommand(@"
 SELECT Codigo, Nombre
@@ -159,13 +160,17 @@ ORDER BY Clave;", conn))
             await using var reader = await permsCmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
+                var code = reader.GetString(reader.GetOrdinal("Clave"));
+                if (!IsPermissionInActiveModule(code, activeModules)) continue;
                 response.Permissions.Add(new PermisosWebPermissionItem
                 {
-                    Code = reader.GetString(reader.GetOrdinal("Clave")),
+                    Code = code,
                     Name = reader.GetString(reader.GetOrdinal("Nombre"))
                 });
             }
         }
+
+        var allowedCodes = new HashSet<string>(response.Permissions.Select(p => p.Code), StringComparer.OrdinalIgnoreCase);
 
         var rolePermsSql = $@"
 SELECT r.Codigo AS RoleCode, p.Clave AS Permission
@@ -185,10 +190,12 @@ ORDER BY r.Codigo, p.Clave;";
             await using var reader = await rolePermsCmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
+                var permission = reader.GetString(reader.GetOrdinal("Permission"));
+                if (!allowedCodes.Contains(permission)) continue;
                 response.RolePermissions.Add(new PermisosWebRolePermissionItem
                 {
                     RoleCode = reader.GetString(reader.GetOrdinal("RoleCode")),
-                    Permission = reader.GetString(reader.GetOrdinal("Permission"))
+                    Permission = permission
                 });
             }
         }
@@ -233,6 +240,7 @@ WHERE up.EmpresaId = @EmpresaId;";
 
                 var tipo = reader.GetString(reader.GetOrdinal("Tipo"));
                 var clave = reader.GetString(reader.GetOrdinal("Clave"));
+                if (!allowedCodes.Contains(clave)) continue;
 
                 if (!overrides.TryGetValue(userId, out var row))
                 {
@@ -269,6 +277,7 @@ WHERE up.EmpresaId = @EmpresaId;";
 
         var schema = await GetSchemaAsync(conn, ct);
         var response = new PermisosWebRolesBootstrapResponse { PermissionsEnabled = true };
+        var activeModules = await GetActiveModulesAsync(conn, empresaId, ct);
 
         await using (var rolesCmd = new SqlCommand(@"
 SELECT Codigo, Nombre
@@ -298,13 +307,17 @@ ORDER BY Clave;", conn))
             await using var reader = await permsCmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
+                var code = reader.GetString(reader.GetOrdinal("Clave"));
+                if (!IsPermissionInActiveModule(code, activeModules)) continue;
                 response.Permissions.Add(new PermisosWebPermissionItem
                 {
-                    Code = reader.GetString(reader.GetOrdinal("Clave")),
+                    Code = code,
                     Name = reader.GetString(reader.GetOrdinal("Nombre"))
                 });
             }
         }
+
+        var allowedCodes = new HashSet<string>(response.Permissions.Select(p => p.Code), StringComparer.OrdinalIgnoreCase);
 
         var rolePermsSql = $@"
 SELECT r.Codigo AS RoleCode, p.Clave AS Permission
@@ -324,10 +337,12 @@ ORDER BY r.Codigo, p.Clave;";
             await using var reader = await rolePermsCmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
+                var permission = reader.GetString(reader.GetOrdinal("Permission"));
+                if (!allowedCodes.Contains(permission)) continue;
                 response.RolePermissions.Add(new PermisosWebRolePermissionItem
                 {
                     RoleCode = reader.GetString(reader.GetOrdinal("RoleCode")),
-                    Permission = reader.GetString(reader.GetOrdinal("Permission"))
+                    Permission = permission
                 });
             }
         }
@@ -361,6 +376,137 @@ ORDER BY Clave;", conn);
         }
 
         return response;
+    }
+
+    public async Task<IReadOnlyList<PermisosWebModuleItem>> GetModuleCatalogAsync(int empresaId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(_db.Database.GetConnectionString());
+        await conn.OpenAsync(ct);
+
+        if (!await AreCapabilityTablesAvailableAsync(conn, ct))
+            return Array.Empty<PermisosWebModuleItem>();
+
+        if (!await TableExistsAsync(conn, "WModulo", ct))
+            return Array.Empty<PermisosWebModuleItem>();
+
+        try
+        {
+            await using var syncCmd = new SqlCommand("dbo.sp_w_Modulo_SincronizarDesdePermiso", conn)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+            syncCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+            await syncCmd.ExecuteNonQueryAsync(ct);
+        }
+        catch (SqlException ex) when (ex.Number == 2812)
+        {
+            // SP no disponible en algunas bases; se lee estado directo.
+        }
+
+        var modules = new List<PermisosWebModuleItem>();
+        await using var cmd = new SqlCommand(@"
+SELECT ModuloClave, COALESCE(NULLIF(Nombre,''), ModuloClave) AS Nombre, IdStatus
+FROM dbo.WModulo
+WHERE EmpresaId = @EmpresaId
+ORDER BY CASE WHEN ModuloClave = 'inicio' THEN 0 ELSE 1 END, ModuloClave;", conn);
+        cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            modules.Add(new PermisosWebModuleItem
+            {
+                ModuloClave = reader.GetString(reader.GetOrdinal("ModuloClave")),
+                Nombre = reader.GetString(reader.GetOrdinal("Nombre")),
+                IdStatus = reader.GetInt32(reader.GetOrdinal("IdStatus")) == 2 ? 2 : 1
+            });
+        }
+
+        return modules;
+    }
+
+    public async Task<PermisosWebModuleItem> SetModuleStatusAsync(int empresaId, string moduleKey, int idStatus, CancellationToken ct)
+    {
+        var key = NormalizeModuleKey(moduleKey);
+        if (idStatus is not (1 or 2))
+            throw new ArgumentException("IdStatus invalido. Use 1 (Activo) o 2 (Inactivo).");
+
+        await using var conn = new SqlConnection(_db.Database.GetConnectionString());
+        await conn.OpenAsync(ct);
+
+        if (!await AreCapabilityTablesAvailableAsync(conn, ct))
+            throw new KeyNotFoundException("Capacidades no disponibles para este tenant/base.");
+        if (!await TableExistsAsync(conn, "WModulo", ct))
+            throw new KeyNotFoundException("Falta dbo.WModulo. Ejecuta 02_Modulos_EmpresaClave_Idempotente.sql.");
+
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        await using (var updateCmd = new SqlCommand(@"
+UPDATE dbo.WModulo
+SET IdStatus = @IdStatus,
+    FechaActualizacion = SYSUTCDATETIME()
+WHERE EmpresaId = @EmpresaId
+  AND ModuloClave = @ModuloClave;", conn, (SqlTransaction)tx))
+        {
+            updateCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+            updateCmd.Parameters.Add(new SqlParameter("@ModuloClave", SqlDbType.NVarChar, 120) { Value = key });
+            updateCmd.Parameters.Add(new SqlParameter("@IdStatus", SqlDbType.Int) { Value = idStatus });
+            var rows = await updateCmd.ExecuteNonQueryAsync(ct);
+            if (rows == 0)
+                throw new KeyNotFoundException($"Modulo no encontrado: {key}");
+        }
+
+        if (idStatus == 2)
+        {
+            var schema = await GetSchemaAsync(conn, ct);
+            await using (var clearRolePermsCmd = new SqlCommand($@"
+DELETE rp
+FROM dbo.WRolPermiso rp
+INNER JOIN dbo.WPermiso p
+    ON p.EmpresaId = rp.EmpresaId
+   AND p.{Q(schema.PermissionIdColumn)} = rp.{Q(schema.RolePermPermissionIdColumn)}
+WHERE rp.EmpresaId = @EmpresaId
+  AND p.Clave LIKE @Prefix;", conn, (SqlTransaction)tx))
+            {
+                clearRolePermsCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+                clearRolePermsCmd.Parameters.Add(new SqlParameter("@Prefix", SqlDbType.NVarChar, 200) { Value = $"{key}.%" });
+                await clearRolePermsCmd.ExecuteNonQueryAsync(ct);
+            }
+
+            await using (var clearUserOverridesCmd = new SqlCommand($@"
+DELETE up
+FROM dbo.WUsuarioPermiso up
+INNER JOIN dbo.WPermiso p
+    ON p.EmpresaId = up.EmpresaId
+   AND p.{Q(schema.PermissionIdColumn)} = up.{Q(schema.UserPermPermissionIdColumn)}
+WHERE up.EmpresaId = @EmpresaId
+  AND p.Clave LIKE @Prefix;", conn, (SqlTransaction)tx))
+            {
+                clearUserOverridesCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+                clearUserOverridesCmd.Parameters.Add(new SqlParameter("@Prefix", SqlDbType.NVarChar, 200) { Value = $"{key}.%" });
+                await clearUserOverridesCmd.ExecuteNonQueryAsync(ct);
+            }
+        }
+
+        await using var readCmd = new SqlCommand(@"
+SELECT TOP 1 ModuloClave, COALESCE(NULLIF(Nombre,''), ModuloClave) AS Nombre, IdStatus
+FROM dbo.WModulo
+WHERE EmpresaId = @EmpresaId
+  AND ModuloClave = @ModuloClave;", conn, (SqlTransaction)tx);
+        readCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+        readCmd.Parameters.Add(new SqlParameter("@ModuloClave", SqlDbType.NVarChar, 120) { Value = key });
+        await using var r = await readCmd.ExecuteReaderAsync(ct);
+        if (!await r.ReadAsync(ct))
+            throw new KeyNotFoundException($"Modulo no encontrado: {key}");
+
+        var updated = new PermisosWebModuleItem
+        {
+            ModuloClave = r.GetString(r.GetOrdinal("ModuloClave")),
+            Nombre = r.GetString(r.GetOrdinal("Nombre")),
+            IdStatus = r.GetInt32(r.GetOrdinal("IdStatus")) == 2 ? 2 : 1
+        };
+        await r.DisposeAsync();
+        await tx.CommitAsync(ct);
+        return updated;
     }
 
     public async Task<PermisosWebRoleItem> CreateRoleAsync(int empresaId, string roleCode, string name, CancellationToken ct)
@@ -434,6 +580,7 @@ VALUES ({string.Join(", ", insertValues)});";
             .Select(p => p.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+        EnsurePermissionsInActiveModules(normalizedPermissions, await GetActiveModulesAsync(conn, empresaId, ct));
 
         try
         {
@@ -518,6 +665,9 @@ VALUES ({string.Join(", ", insertValues)});";
             .Distinct(StringComparer.OrdinalIgnoreCase).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var denySet = deny.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var activeModules = await GetActiveModulesAsync(conn, empresaId, ct);
+        EnsurePermissionsInActiveModules(allowSet, activeModules);
+        EnsurePermissionsInActiveModules(denySet, activeModules);
 
         var duplicated = allowSet.Intersect(denySet, StringComparer.OrdinalIgnoreCase).ToList();
         if (duplicated.Count > 0)
@@ -1195,6 +1345,15 @@ WHERE EmpresaId = @EmpresaId
         return exists is not null;
     }
 
+    private static async Task<bool> TableExistsAsync(SqlConnection conn, string tableName, CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand(@"
+SELECT CASE WHEN OBJECT_ID(@TableName, 'U') IS NOT NULL THEN 1 ELSE 0 END;", conn);
+        cmd.Parameters.Add(new SqlParameter("@TableName", SqlDbType.NVarChar, 260) { Value = $"dbo.{tableName}" });
+        var value = await cmd.ExecuteScalarAsync(ct);
+        return value is not null && Convert.ToInt32(value) == 1;
+    }
+
     private static async Task InsertPermissionSeedAsync(
         SqlConnection conn,
         SqlTransaction tx,
@@ -1247,6 +1406,66 @@ VALUES ({string.Join(", ", insertValues)});";
         return false;
     }
 
+    private static async Task<HashSet<string>?> GetActiveModulesAsync(SqlConnection conn, int empresaId, CancellationToken ct)
+    {
+        if (!await TableExistsAsync(conn, "WModulo", ct))
+            return null;
+
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await using var cmd = new SqlCommand(@"
+SELECT ModuloClave
+FROM dbo.WModulo
+WHERE EmpresaId = @EmpresaId
+  AND IdStatus = 1;", conn);
+        cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            var key = NormalizeModuleKey(reader.GetString(0));
+            if (!string.IsNullOrWhiteSpace(key))
+                result.Add(key);
+        }
+        return result;
+    }
+
+    private static bool IsPermissionInActiveModule(string permissionKey, HashSet<string>? activeModules)
+    {
+        if (activeModules is null)
+            return true;
+        if (activeModules.Count == 0)
+            return false;
+        var module = ExtractModuleFromPermissionKey(permissionKey);
+        if (string.IsNullOrWhiteSpace(module))
+            return false;
+        return activeModules.Contains(module);
+    }
+
+    private static void EnsurePermissionsInActiveModules(IEnumerable<string> permissions, HashSet<string>? activeModules)
+    {
+        if (activeModules is null) return;
+        var invalid = permissions
+            .Where(p => !IsPermissionInActiveModule(p, activeModules))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (invalid.Count > 0)
+            throw new ArgumentException($"Permisos en modulos inactivos: {string.Join(", ", invalid)}");
+    }
+
+    private static string ExtractModuleFromPermissionKey(string key)
+    {
+        var normalized = (key ?? string.Empty).Trim().ToLowerInvariant();
+        var idx = normalized.IndexOf('.');
+        var module = idx > 0 ? normalized[..idx] : normalized;
+        try
+        {
+            return NormalizeModuleKey(module);
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
     private static string NormalizePermissionKey(string key)
     {
         var value = (key ?? string.Empty).Trim().ToLowerInvariant();
@@ -1264,6 +1483,24 @@ VALUES ({string.Join(", ", insertValues)});";
 
         if (!value.Contains('.', StringComparison.Ordinal))
             throw new ArgumentException("La clave debe tener formato modulo.accion");
+
+        return value;
+    }
+
+    private static string NormalizeModuleKey(string key)
+    {
+        var value = (key ?? string.Empty).Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException("ModuloClave es obligatorio.");
+        if (value.Length > 120)
+            throw new ArgumentException("ModuloClave excede el maximo permitido.");
+
+        foreach (var ch in value)
+        {
+            var valid = (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '_';
+            if (!valid)
+                throw new ArgumentException("ModuloClave solo permite a-z, 0-9 y guion bajo.");
+        }
 
         return value;
     }
