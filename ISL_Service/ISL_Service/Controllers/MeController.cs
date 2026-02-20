@@ -52,6 +52,7 @@ public class MeController : ControllerBase
         var response = new MeResponse
         {
             UserId = user.Id,
+            IdUsuario = ParseLegacyUserIdClaim(User),
             Id = user.Id,
             Usuario = user.UsuarioNombre,
             RolLegacy = user.Rol,
@@ -65,6 +66,12 @@ public class MeController : ControllerBase
         };
 
         return Ok(response);
+    }
+
+    private static int ParseLegacyUserIdClaim(ClaimsPrincipal principal)
+    {
+        var raw = principal.FindFirstValue("idUsuario");
+        return int.TryParse(raw, out var idUsuario) && idUsuario > 0 ? idUsuario : 0;
     }
 
     [Authorize]

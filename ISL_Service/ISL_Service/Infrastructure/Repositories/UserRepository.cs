@@ -55,17 +55,35 @@ public class UserRepository : IUserRepository
             var resultCode = reader.GetInt32(reader.GetOrdinal("ResultCode"));
             if (resultCode == 0) return null;
 
+            var source = reader.GetString(reader.GetOrdinal("Source"));
+            var userId = reader.GetGuid(reader.GetOrdinal("UserId"));
+            var usuarioDb = reader.GetString(reader.GetOrdinal("Usuario"));
+            var contrasenaHash = reader.GetString(reader.GetOrdinal("ContrasenaHash"));
+            var rol = reader.GetString(reader.GetOrdinal("Rol"));
+            var empresaId = reader.GetInt32(reader.GetOrdinal("EmpresaId"));
+            var debeCambiarContrasena = reader.GetBoolean(reader.GetOrdinal("DebeCambiarContrasena"));
+            var estado = reader.GetInt32(reader.GetOrdinal("Estado"));
+            var legacyUserId = ReadLegacyUserIdOrDefault(reader);
+
+            await reader.DisposeAsync();
+
+            if (legacyUserId <= 0)
+            {
+                legacyUserId = await ResolveLegacyUserIdAsync(conn, usuarioDb, ct);
+            }
+
             return new WebLoginFallbackResult
             {
                 ResultCode = resultCode,
-                Source = reader.GetString(reader.GetOrdinal("Source")),
-                UserId = reader.GetGuid(reader.GetOrdinal("UserId")),
-                Usuario = reader.GetString(reader.GetOrdinal("Usuario")),
-                ContrasenaHash = reader.GetString(reader.GetOrdinal("ContrasenaHash")),
-                Rol = reader.GetString(reader.GetOrdinal("Rol")),
-                EmpresaId = reader.GetInt32(reader.GetOrdinal("EmpresaId")),
-                DebeCambiarContrasena = reader.GetBoolean(reader.GetOrdinal("DebeCambiarContrasena")),
-                Estado = reader.GetInt32(reader.GetOrdinal("Estado"))
+                Source = source,
+                UserId = userId,
+                LegacyUserId = legacyUserId,
+                Usuario = usuarioDb,
+                ContrasenaHash = contrasenaHash,
+                Rol = rol,
+                EmpresaId = empresaId,
+                DebeCambiarContrasena = debeCambiarContrasena,
+                Estado = estado
             };
         }
         catch (SqlException ex) when (ex.Number is 2812 or 208)
@@ -97,17 +115,30 @@ WHERE UPPER(LTRIM(RTRIM(Usuario))) = UPPER(LTRIM(RTRIM(@Usuario)));", conn)
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         if (!await reader.ReadAsync(ct)) return null;
 
+        var userId = reader.GetGuid(reader.GetOrdinal("Id"));
+        var usuarioDb = reader.GetString(reader.GetOrdinal("Usuario"));
+        var contrasenaHash = reader.GetString(reader.GetOrdinal("ContrasenaHash"));
+        var rol = reader.GetString(reader.GetOrdinal("Rol"));
+        var empresaId = reader.GetInt32(reader.GetOrdinal("EmpresaId"));
+        var debeCambiarContrasena = reader.GetBoolean(reader.GetOrdinal("DebeCambiarContrasena"));
+        var estado = reader.GetInt32(reader.GetOrdinal("Estado"));
+
+        await reader.DisposeAsync();
+
+        var legacyUserId = await ResolveLegacyUserIdAsync(conn, usuarioDb, ct);
+
         return new WebLoginFallbackResult
         {
             ResultCode = 1,
             Source = "WEB",
-            UserId = reader.GetGuid(reader.GetOrdinal("Id")),
-            Usuario = reader.GetString(reader.GetOrdinal("Usuario")),
-            ContrasenaHash = reader.GetString(reader.GetOrdinal("ContrasenaHash")),
-            Rol = reader.GetString(reader.GetOrdinal("Rol")),
-            EmpresaId = reader.GetInt32(reader.GetOrdinal("EmpresaId")),
-            DebeCambiarContrasena = reader.GetBoolean(reader.GetOrdinal("DebeCambiarContrasena")),
-            Estado = reader.GetInt32(reader.GetOrdinal("Estado"))
+            UserId = userId,
+            LegacyUserId = legacyUserId,
+            Usuario = usuarioDb,
+            ContrasenaHash = contrasenaHash,
+            Rol = rol,
+            EmpresaId = empresaId,
+            DebeCambiarContrasena = debeCambiarContrasena,
+            Estado = estado
         };
     }
 
@@ -473,6 +504,98 @@ WHERE UPPER(LTRIM(RTRIM(Usuario))) = UPPER(LTRIM(RTRIM(@Usuario)));", conn, (Sql
 
     public Task SaveChangesAsync(CancellationToken ct)
         => _db.SaveChangesAsync(ct);
+
+    private static int ReadLegacyUserIdOrDefault(SqlDataReader reader)
+    {
+        var byLegacyId = TryReadInt(reader, "LegacyId");
+        if (byLegacyId > 0) return byLegacyId;
+
+        var byIdUsuario = TryReadInt(reader, "IDUsuario");
+        if (byIdUsuario > 0) return byIdUsuario;
+
+        return 0;
+    }
+
+    private static int TryReadInt(SqlDataReader reader, string column)
+    {
+        var ordinal = TryGetOrdinal(reader, column);
+        if (ordinal < 0 || reader.IsDBNull(ordinal)) return 0;
+        return int.TryParse(reader.GetValue(ordinal)?.ToString(), out var value) ? value : 0;
+    }
+
+    private static int TryGetOrdinal(SqlDataReader reader, string column)
+    {
+        for (var i = 0; i < reader.FieldCount; i++)
+        {
+            if (string.Equals(reader.GetName(i), column, StringComparison.OrdinalIgnoreCase))
+                return i;
+        }
+        return -1;
+    }
+
+    private static async Task<int> ResolveLegacyUserIdAsync(SqlConnection conn, string usuario, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(usuario)) return 0;
+        var usuarioNorm = usuario.Trim();
+
+        var idFromUsuarios = await TryResolveLegacyFromTableAsync(conn, "dbo", "Usuarios", "IDUsuario", "Usuario", "IDStatus", usuarioNorm, ct);
+        if (idFromUsuarios > 0) return idFromUsuarios;
+
+        var idFromUsuario = await TryResolveLegacyFromTableAsync(conn, "dbo", "Usuario", "IDUsuario", "Usuario", "IDStatus", usuarioNorm, ct);
+        return idFromUsuario;
+    }
+
+    private static async Task<int> TryResolveLegacyFromTableAsync(
+        SqlConnection conn,
+        string schema,
+        string table,
+        string idColumn,
+        string usuarioColumn,
+        string? statusColumn,
+        string usuario,
+        CancellationToken ct)
+    {
+        if (!await TableHasColumnAsync(conn, schema, table, idColumn, ct)) return 0;
+        if (!await TableHasColumnAsync(conn, schema, table, usuarioColumn, ct)) return 0;
+
+        var hasStatusColumn = !string.IsNullOrWhiteSpace(statusColumn) &&
+            await TableHasColumnAsync(conn, schema, table, statusColumn!, ct);
+
+        var whereStatus = hasStatusColumn ? $" AND {statusColumn} = 1" : "";
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = $@"
+SELECT TOP 1 {idColumn}
+FROM {schema}.{table}
+WHERE UPPER(LTRIM(RTRIM(CAST({usuarioColumn} AS NVARCHAR(150))))) = UPPER(LTRIM(RTRIM(@Usuario)))
+{whereStatus}
+ORDER BY {idColumn};";
+        cmd.Parameters.Add(new SqlParameter("@Usuario", SqlDbType.NVarChar, 150) { Value = usuario });
+
+        var raw = await cmd.ExecuteScalarAsync(ct);
+        return (raw is null || raw is DBNull) ? 0 : Convert.ToInt32(raw);
+    }
+
+    private static async Task<bool> TableHasColumnAsync(
+        SqlConnection conn,
+        string schema,
+        string table,
+        string column,
+        CancellationToken ct)
+    {
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+SELECT 1
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = @schema
+  AND TABLE_NAME = @table
+  AND COLUMN_NAME = @column;";
+        cmd.Parameters.Add(new SqlParameter("@schema", SqlDbType.NVarChar, 128) { Value = schema });
+        cmd.Parameters.Add(new SqlParameter("@table", SqlDbType.NVarChar, 128) { Value = table });
+        cmd.Parameters.Add(new SqlParameter("@column", SqlDbType.NVarChar, 128) { Value = column });
+        var exists = await cmd.ExecuteScalarAsync(ct);
+        return exists is not null;
+    }
 
     private async Task<int> ResolveEmpresaIdAsync(CancellationToken ct)
     {

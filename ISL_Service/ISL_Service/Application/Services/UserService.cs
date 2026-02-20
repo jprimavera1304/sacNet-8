@@ -49,6 +49,7 @@ public class UserService : IUserService
         var user = new Usuario
         {
             Id = login.UserId,
+            LegacyUserId = login.LegacyUserId,
             UsuarioNombre = login.Usuario,
             ContrasenaHash = login.ContrasenaHash,
             Rol = login.Rol,
@@ -64,6 +65,7 @@ public class UserService : IUserService
         {
             Token = token,
             UserId = user.Id,
+            IdUsuario = login.LegacyUserId,
             Usuario = user.UsuarioNombre,
             Rol = user.Rol,
             EmpresaId = user.EmpresaId,

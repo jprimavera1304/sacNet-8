@@ -37,7 +37,12 @@ public sealed class PermissionService : IPermissionService
         ["proveedores.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
         ["proveedores.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
         ["proveedores.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
-        ["proveedores.estado.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" }
+        ["proveedores.estado.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["categorias.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["categorias.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["categorias.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["categorias.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["categorias.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" }
     };
 
     private readonly AppDbContext _db;
@@ -73,6 +78,12 @@ public sealed class PermissionService : IPermissionService
         new("proveedores.crear", "Proveedores - Crear", "proveedores"),
         new("proveedores.editar", "Proveedores - Editar", "proveedores"),
         new("proveedores.estado.editar", "Proveedores - Activar/Inactivar", "proveedores"),
+
+        new("categorias.ver_modulo", "Categorias - Ver modulo", "categorias"),
+        new("categorias.ver", "Categorias - Ver", "categorias"),
+        new("categorias.crear", "Categorias - Crear", "categorias"),
+        new("categorias.editar", "Categorias - Editar", "categorias"),
+        new("categorias.activar", "Categorias - Activar/Inactivar", "categorias"),
 
         new("pagosproveedores.ver", "Pagos Proveedores - Ver", "pagosproveedores"),
         new("pagosproveedores.crear", "Pagos Proveedores - Crear", "pagosproveedores"),
