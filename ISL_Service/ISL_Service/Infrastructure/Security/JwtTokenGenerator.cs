@@ -31,9 +31,14 @@ public class JwtTokenGenerator : IJwtTokenGenerator
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new("username", user.UsuarioNombre),
             new(ClaimTypes.Role, user.Rol),
+            new("rolLegacy", user.Rol),
             new("empresaId", user.EmpresaId.ToString()),
             new("companyKey", normalizedCompanyKey)
         };
+        if (user.LegacyUserId > 0)
+        {
+            claims.Add(new Claim("idUsuario", user.LegacyUserId.ToString()));
+        }
 
         var token = new JwtSecurityToken(issuer, audience, claims,
             expires: DateTime.UtcNow.AddHours(4),

@@ -21,6 +21,7 @@ namespace ISL_Service.Application.DTOs.ProveedoresPagos
 
         // ===== Auditoria Alta =====
         public int IDUsuario { get; set; }
+        public string UsuarioCreacion { get; set; } = string.Empty;
         public DateTime Fecha { get; set; }
         public string Equipo { get; set; }
 

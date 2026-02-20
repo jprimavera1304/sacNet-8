@@ -6,7 +6,7 @@ namespace ISL_Service.Controllers;
 
 [ApiController]
 [Route("api/empresas")]
-[Authorize(Roles = "SuperAdmin,Admin")]
+[Authorize(Policy = "perm:empresas.ver")]
 public class EmpresasController : ControllerBase
 {
     private readonly IEmpresaService _service;

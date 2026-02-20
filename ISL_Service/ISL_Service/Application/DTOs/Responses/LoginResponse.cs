@@ -6,6 +6,7 @@ public class LoginResponse
 {
     public string Token { get; set; } = string.Empty;
     public Guid UserId { get; set; }
+    public int IdUsuario { get; set; }
     public string Usuario { get; set; } = string.Empty;
     public string Rol { get; set; } = string.Empty;
     public int EmpresaId { get; set; }

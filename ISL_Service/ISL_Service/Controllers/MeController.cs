@@ -14,12 +14,18 @@ public class MeController : ControllerBase
     private readonly IUserRepository _users;
     private readonly IUserAdminService _userAdminService;
     private readonly IEmpresaRepository _empresas;
+    private readonly IPermissionService _permissionService;
 
-    public MeController(IUserRepository users, IUserAdminService userAdminService, IEmpresaRepository empresas)
+    public MeController(
+        IUserRepository users,
+        IUserAdminService userAdminService,
+        IEmpresaRepository empresas,
+        IPermissionService permissionService)
     {
         _users = users;
         _userAdminService = userAdminService;
         _empresas = empresas;
+        _permissionService = permissionService;
     }
 
     [Authorize]
@@ -35,19 +41,37 @@ public class MeController : ControllerBase
         if (user is null)
             return NotFound(new { message = "Usuario no encontrado." });
 
+        var permissionSnapshot = await _permissionService.GetPermissionsAsync(
+            user.Id,
+            user.EmpresaId,
+            user.Rol,
+            ct);
+
         var companyKey = await _empresas.GetCompanyKeyAsync(ct);
 
         var response = new MeResponse
         {
+            UserId = user.Id,
+            IdUsuario = ParseLegacyUserIdClaim(User),
             Id = user.Id,
             Usuario = user.UsuarioNombre,
+            RolLegacy = user.Rol,
             Rol = user.Rol,
             EmpresaId = user.EmpresaId,
+            PermissionsEnabled = permissionSnapshot.PermissionsEnabled,
+            Permissions = permissionSnapshot.Permissions,
+            PermissionsVersion = permissionSnapshot.PermissionsVersion,
             CompanyKey = companyKey,
             DebeCambiarContrasena = user.DebeCambiarContrasena
         };
 
         return Ok(response);
+    }
+
+    private static int ParseLegacyUserIdClaim(ClaimsPrincipal principal)
+    {
+        var raw = principal.FindFirstValue("idUsuario");
+        return int.TryParse(raw, out var idUsuario) && idUsuario > 0 ? idUsuario : 0;
     }
 
     [Authorize]

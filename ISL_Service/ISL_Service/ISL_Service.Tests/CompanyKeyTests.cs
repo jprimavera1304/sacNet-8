@@ -98,7 +98,11 @@ public class CompanyKeyTests
             }
         };
 
-        var controller = new MeController(users, new FakeUserAdminService(), new FakeEmpresaRepository("tauro"));
+        var controller = new MeController(
+            users,
+            new FakeUserAdminService(),
+            new FakeEmpresaRepository("tauro"),
+            new FakePermissionService());
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext
@@ -153,6 +157,7 @@ public class CompanyKeyTests
         public Task<Usuario?> GetByIdAsync(Guid id, CancellationToken ct) => Task.FromResult(UserById);
         public Task<WebLoginFallbackResult?> LoginWithFallbackAsync(string usuario, string contrasenaPlano, string contrasenaHashWeb, CancellationToken ct) => Task.FromResult(LoginResult);
         public Task<bool> ExistsByUsuarioAsync(string usuario, CancellationToken ct) => Task.FromResult(false);
+        public Task<List<RoleCatalogItem>> ListRolesCatalogAsync(int empresaId, CancellationToken ct) => Task.FromResult(new List<RoleCatalogItem>());
         public Task<List<Usuario>> ListAsync(int? empresaId, CancellationToken ct) => Task.FromResult(new List<Usuario>());
         public Task AddAsync(Usuario user, CancellationToken ct) => Task.CompletedTask;
         public Task UpdateAsync(Usuario user, CancellationToken ct) => Task.CompletedTask;
@@ -190,11 +195,50 @@ public class CompanyKeyTests
     {
         public Task<CreateUserResponse> CreateUserAsync(CreateUserRequest req, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
         public Task<List<UserResponse>> ListUsersAsync(ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
+        public Task<List<UserRoleOptionResponse>> ListRolesCatalogAsync(ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
         public Task<UserResponse> GetUserByIdAsync(Guid userId, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
         public Task<UserResponse> UpdateUserAsync(Guid userId, UpdateUserRequest req, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
         public Task<UserResponse> UpdateEstadoAsync(Guid userId, UpdateUserEstadoRequest req, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
         public Task<ResetPasswordResponse> ResetPasswordAsync(Guid userId, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
         public Task<UserResponse> UpdateEmpresaAsync(Guid userId, UpdateUserEmpresaRequest req, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
         public Task ChangeMyPasswordAsync(ChangePasswordRequest req, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
+    }
+
+    private sealed class FakePermissionService : IPermissionService
+    {
+        public Task<PermissionSnapshot> GetPermissionsAsync(Guid userId, int empresaId, string rolLegacy, CancellationToken ct)
+            => Task.FromResult(new PermissionSnapshot
+            {
+                UserId = userId,
+                EmpresaId = empresaId,
+                RolLegacy = rolLegacy,
+                PermissionsEnabled = false,
+                Permissions = new List<string>(),
+                PermissionsVersion = DateTime.UtcNow.ToString("O")
+            });
+
+        public bool IsAllowedByLegacy(string rolLegacy, string permission) => true;
+        public Task<PermisosWebBootstrapResponse?> GetPermisosWebBootstrapAsync(int empresaId, CancellationToken ct)
+            => Task.FromResult<PermisosWebBootstrapResponse?>(null);
+        public Task<PermisosWebRolesBootstrapResponse?> GetPermisosRolesBootstrapAsync(int empresaId, CancellationToken ct)
+            => Task.FromResult<PermisosWebRolesBootstrapResponse?>(null);
+        public Task<IReadOnlyList<PermisosWebPermissionItem>> GetPermissionCatalogAsync(int empresaId, CancellationToken ct)
+            => Task.FromResult<IReadOnlyList<PermisosWebPermissionItem>>(Array.Empty<PermisosWebPermissionItem>());
+        public Task<IReadOnlyList<ModuloDisponibleResponse>> GetAvailableModulesAsync(int empresaId, string companyKey, bool includeAllTenants, CancellationToken ct)
+            => Task.FromResult<IReadOnlyList<ModuloDisponibleResponse>>(Array.Empty<ModuloDisponibleResponse>());
+        public Task<IReadOnlyList<PermisosWebModuleItem>> GetModuleCatalogAsync(int empresaId, CancellationToken ct)
+            => Task.FromResult<IReadOnlyList<PermisosWebModuleItem>>(Array.Empty<PermisosWebModuleItem>());
+        public Task<PermisosWebModuleItem> SetModuleStatusAsync(int empresaId, string moduleKey, int idStatus, CancellationToken ct)
+            => Task.FromResult(new PermisosWebModuleItem { ModuloClave = moduleKey, Nombre = moduleKey, IdStatus = idStatus });
+        public Task<PermisosWebRoleItem> CreateRoleAsync(int empresaId, string roleCode, string name, CancellationToken ct)
+            => Task.FromResult(new PermisosWebRoleItem { Code = roleCode, Name = name });
+        public Task UpsertRolePermissionsAsync(int empresaId, string roleCode, IReadOnlyCollection<string> permissions, CancellationToken ct)
+            => Task.CompletedTask;
+        public Task UpsertUserOverridesAsync(int empresaId, Guid userId, IReadOnlyCollection<string> allow, IReadOnlyCollection<string> deny, CancellationToken ct)
+            => Task.CompletedTask;
+        public Task<PermisosWebSyncCatalogResponse> SyncPermissionCatalogAsync(int empresaId, IReadOnlyCollection<string>? modules, CancellationToken ct)
+            => Task.FromResult(new PermisosWebSyncCatalogResponse());
+        public Task<bool> CreatePermissionAsync(int empresaId, string key, string name, string? description, CancellationToken ct)
+            => Task.FromResult(false);
     }
 }

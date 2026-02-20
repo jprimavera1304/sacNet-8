@@ -89,7 +89,7 @@ namespace ISL_Service.Infrastructure.Repositories
 
                 proveedorPagoDTOList = Funciones.DataTableToList<ProveedorPagoDTO>(ds.Tables[0]);
                 dtProveedoresPagos = ds.Tables[0];
-                EnrichUsuarioCancelacion(Conn, proveedorPagoDTOList, dtProveedoresPagos);
+                EnrichUsuariosAuditoria(Conn, proveedorPagoDTOList, dtProveedoresPagos);
 
                 return proveedorPagoDTOList;
             }
@@ -221,19 +221,24 @@ namespace ISL_Service.Infrastructure.Repositories
 
         #region Helpers
 
-        private static void EnrichUsuarioCancelacion(
+        private static void EnrichUsuariosAuditoria(
             SqlConnection conn,
             List<ProveedorPagoDTO> items,
             DataTable table)
         {
             if (items == null || items.Count == 0) return;
 
+            if (!table.Columns.Contains("UsuarioCreacion"))
+                table.Columns.Add("UsuarioCreacion", typeof(string));
+
             if (!table.Columns.Contains("UsuarioCancelacion"))
                 table.Columns.Add("UsuarioCancelacion", typeof(string));
 
             var ids = items
-                .Where(x => x.IDUsuarioCancelacion.HasValue && x.IDUsuarioCancelacion.Value > 0)
-                .Select(x => x.IDUsuarioCancelacion!.Value)
+                .Select(x => x.IDUsuario)
+                .Where(x => x > 0)
+                .Concat(items.Where(x => x.IDUsuarioCancelacion.HasValue && x.IDUsuarioCancelacion.Value > 0)
+                             .Select(x => x.IDUsuarioCancelacion!.Value))
                 .Distinct()
                 .ToList();
 
@@ -241,39 +246,57 @@ namespace ISL_Service.Infrastructure.Repositories
 
             foreach (var item in items)
             {
-                item.UsuarioCancelacion = ResolveUsuarioCancelacion(item.UsuarioCancelacion, item.IDUsuarioCancelacion, usuarios);
+                item.UsuarioCreacion = ResolveUsuario(item.UsuarioCreacion, item.IDUsuario, usuarios);
+                item.UsuarioCancelacion = ResolveUsuario(item.UsuarioCancelacion, item.IDUsuarioCancelacion, usuarios);
             }
 
             foreach (DataRow row in table.Rows)
             {
-                var existing = row["UsuarioCancelacion"] == DBNull.Value ? "" : row["UsuarioCancelacion"]?.ToString() ?? "";
-                if (!string.IsNullOrWhiteSpace(existing))
+                var existingCreacion = row["UsuarioCreacion"] == DBNull.Value ? "" : row["UsuarioCreacion"]?.ToString() ?? "";
+                if (string.IsNullOrWhiteSpace(existingCreacion))
                 {
-                    row["UsuarioCancelacion"] = existing.Trim();
-                    continue;
+                    int idUsuarioCreacion = 0;
+                    if (table.Columns.Contains("IDUsuario") && row["IDUsuario"] != DBNull.Value)
+                        idUsuarioCreacion = Convert.ToInt32(row["IDUsuario"]);
+
+                    row["UsuarioCreacion"] = (idUsuarioCreacion > 0 && usuarios.TryGetValue(idUsuarioCreacion, out var nombreCreacion))
+                        ? nombreCreacion
+                        : "";
+                }
+                else
+                {
+                    row["UsuarioCreacion"] = existingCreacion.Trim();
                 }
 
-                int idUsuarioCancelacion = 0;
-                if (table.Columns.Contains("IDUsuarioCancelacion") && row["IDUsuarioCancelacion"] != DBNull.Value)
-                    idUsuarioCancelacion = Convert.ToInt32(row["IDUsuarioCancelacion"]);
+                var existingCancelacion = row["UsuarioCancelacion"] == DBNull.Value ? "" : row["UsuarioCancelacion"]?.ToString() ?? "";
+                if (string.IsNullOrWhiteSpace(existingCancelacion))
+                {
+                    int idUsuarioCancelacion = 0;
+                    if (table.Columns.Contains("IDUsuarioCancelacion") && row["IDUsuarioCancelacion"] != DBNull.Value)
+                        idUsuarioCancelacion = Convert.ToInt32(row["IDUsuarioCancelacion"]);
 
-                row["UsuarioCancelacion"] = (idUsuarioCancelacion > 0 && usuarios.TryGetValue(idUsuarioCancelacion, out var nombre))
-                    ? nombre
-                    : "";
+                    row["UsuarioCancelacion"] = (idUsuarioCancelacion > 0 && usuarios.TryGetValue(idUsuarioCancelacion, out var nombreCancelacion))
+                        ? nombreCancelacion
+                        : "";
+                }
+                else
+                {
+                    row["UsuarioCancelacion"] = existingCancelacion.Trim();
+                }
             }
         }
 
-        private static string ResolveUsuarioCancelacion(
-            string? existingUsuarioCancelacion,
-            int? idUsuarioCancelacion,
+        private static string ResolveUsuario(
+            string? existingUsuario,
+            int? idUsuario,
             Dictionary<int, string> usuarios)
         {
-            if (!string.IsNullOrWhiteSpace(existingUsuarioCancelacion))
-                return existingUsuarioCancelacion.Trim();
+            if (!string.IsNullOrWhiteSpace(existingUsuario))
+                return existingUsuario.Trim();
 
-            if (idUsuarioCancelacion.HasValue &&
-                idUsuarioCancelacion.Value > 0 &&
-                usuarios.TryGetValue(idUsuarioCancelacion.Value, out var usuario))
+            if (idUsuario.HasValue &&
+                idUsuario.Value > 0 &&
+                usuarios.TryGetValue(idUsuario.Value, out var usuario))
                 return usuario;
 
             return "";
@@ -284,12 +307,14 @@ namespace ISL_Service.Infrastructure.Repositories
             var result = new Dictionary<int, string>();
             if (ids == null || ids.Count == 0) return result;
 
-            // Prioriza UsuarioWeb si existe con schema legacy.
-            if (TryLoadUsuariosFromTable(conn, "dbo", "UsuarioWeb", "IDUsuario", "Usuario", ids, result) && result.Count > 0)
-                return result;
-
-            // Fallback para instalaciones legacy.
+            // Legacy principal.
+            TryLoadUsuariosFromTable(conn, "dbo", "Usuarios", "IDUsuario", "Usuario", ids, result);
+            // Fallbacks legacy alternos.
             TryLoadUsuariosFromTable(conn, "dbo", "Usuario", "IDUsuario", "Usuario", ids, result);
+            TryLoadUsuariosFromTable(conn, "dbo", "Usuario", "IDUsuario", "Nombre", ids, result);
+            // Compatibilidad por si existe estructura distinta.
+            TryLoadUsuariosFromTable(conn, "dbo", "UsuarioWeb", "IDUsuario", "Usuario", ids, result);
+
             return result;
         }
 
@@ -324,8 +349,9 @@ WHERE {idColumn} IN ({string.Join(",", paramNames)});";
             {
                 if (reader.IsDBNull(0)) continue;
                 int id = reader.GetInt32(0);
-                var usuario = reader.IsDBNull(1) ? "" : reader.GetString(1).Trim();
-                result[id] = usuario;
+                var usuario = reader.IsDBNull(1) ? "" : Convert.ToString(reader.GetValue(1))?.Trim() ?? "";
+                if (!string.IsNullOrWhiteSpace(usuario))
+                    result[id] = usuario;
             }
 
             return true;

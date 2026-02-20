@@ -1,12 +1,14 @@
 ﻿using System.Threading.Tasks;
 using ISL_Service.Application.DTOs.Persona;
 using ISL_Service.Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ISL_Service.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class PersonasController : ControllerBase
     {
         private readonly IPersonasService _service;
@@ -23,6 +25,7 @@ namespace ISL_Service.Controllers
         /// <param name="idPersona">ID de la persona (opcional)</param>
         /// <param name="idStatus">1 = Activo, 2 = Cancelado (opcional)</param>
         [HttpGet("consultar")]
+        [Authorize(Policy = "perm:proveedores.ver")]
         public async Task<IActionResult> Consultar(
             [FromQuery] int? idPersona,
             [FromQuery] int? idStatus)
@@ -36,6 +39,7 @@ namespace ISL_Service.Controllers
         /// IDStatus siempre se crea en 1 (Activo).
         /// </summary>
         [HttpPost("insertar")]
+        [Authorize(Policy = "perm:proveedores.crear")]
         public async Task<IActionResult> Insertar(
             [FromBody] PersonaInputDTO input)
         {
@@ -48,6 +52,7 @@ namespace ISL_Service.Controllers
         /// No modifica el IDStatus.
         /// </summary>
         [HttpPut("actualizar")]
+        [Authorize(Policy = "perm:proveedores.editar")]
         public async Task<IActionResult> Actualizar(
             [FromBody] PersonaInputDTO input)
         {
@@ -61,6 +66,7 @@ namespace ISL_Service.Controllers
         /// No permite cancelar si ya esta cancelada.
         /// </summary>
         [HttpPut("cancelar")]
+        [Authorize(Policy = "perm:proveedores.estado.editar")]
         public async Task<IActionResult> Cancelar(
             [FromBody] PersonaInputDTO input)
         {
@@ -78,6 +84,7 @@ namespace ISL_Service.Controllers
         /// Cambia IDStatus a 1.
         /// </summary>
         [HttpPut("reactivar")]
+        [Authorize(Policy = "perm:proveedores.estado.editar")]
         public async Task<IActionResult> Reactivar(
             [FromBody] PersonaInputDTO input)
         {

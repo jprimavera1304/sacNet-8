@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ISL_Service.Domain.Entities;
 
@@ -13,4 +14,7 @@ public class Usuario
     public int Estado { get; set; }
     public DateTime FechaCreacion { get; set; }
     public DateTime FechaActualizacion { get; set; }
+
+    [NotMapped]
+    public int LegacyUserId { get; set; }
 }
