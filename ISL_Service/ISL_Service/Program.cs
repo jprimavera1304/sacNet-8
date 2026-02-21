@@ -162,7 +162,7 @@ builder.Services.AddAuthorization();
 // -------------------- CORS --------------------
 // AllowedOrigins desde configuracion (Azure Variables de entorno)
 // Ejemplo Azure:
-// AllowedOrigins=https://mactauro.com,https://www.mactauro.com,https://sacmac.net,https://www.sacmac.net,https://integralsportsleague.net,https://www.integralsportsleague.net
+// AllowedOrigins=https://mactauro.com,https://www.mactauro.com,https://zaragozamac.com,https://www.zaragozamac.com,https://sacmac.net,https://www.sacmac.net,https://integralsportsleague.net,https://www.integralsportsleague.net
 var allowedOriginsRaw = builder.Configuration["AllowedOrigins"];
 var configuredOrigins = (allowedOriginsRaw ?? "")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -174,6 +174,8 @@ var defaultOrigins = new[]
     "http://localhost:5173",
     "https://mactauro.com",
     "https://www.mactauro.com",
+    "https://zaragozamac.com",
+    "https://www.zaragozamac.com",
     "https://sacmac.net",
     "https://www.sacmac.net",
     "https://integralsportsleague.net",
