@@ -1,4 +1,4 @@
-﻿using ISL_Service.Application.DTOs.Recaudacion;
+using ISL_Service.Application.DTOs.Recaudacion;
 using ISL_Service.Infrastructure.Data;
 using ISL_Service.Utils;
 using Microsoft.Data.SqlClient;
@@ -25,15 +25,14 @@ namespace ISL_Service.Infrastructure.Repositories
         public string debug = "";
 
         private readonly string spConsultaRecaudaciones = "sp_n_ConsultaRecaudaciones";
+#pragma warning disable CS0414 // Campos reservados para uso futuro (stored procedures)
         private readonly string spConsultaRecaudacionesRecurrentes = "sp_n_ConsultaRecaudacionesRecurrentes";
         private readonly string spConsultaRecaudacionesNextID = "sp_n_ConsultaRecaudacionNextID";
         private readonly string spConsultaRecaudacionesCortes = "sp_n_ConsultaRecaudacionesCortes";
-
         private readonly string spInsertarRecaudacion = "sp_n_InsertarRecaudacion";
         private readonly string spInsertarRecaudacionCorte = "sp_n_InsertarRecaudacionCorte";
-
-        ////private readonly string spActualizarRecaudacion = "sp_n_ActualizarEconomico";
         private readonly string spCancelarRecaudacion = "sp_n_CancelarRecaudacion";
+#pragma warning restore CS0414
 
         public RecaudacionRepository(AppDbContext _dbContext)
         {

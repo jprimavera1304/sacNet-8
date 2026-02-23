@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Authentication;
 using System.Text.Json;
 using ISL_Service.Application.Exceptions;
+using Microsoft.Data.SqlClient;
 
 namespace ISL_Service.Infrastructure.Middleware;
 
@@ -54,6 +55,14 @@ public class ExceptionHandlingMiddleware
             context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
             context.Response.ContentType = "application/json";
             await context.Response.WriteAsync(JsonSerializer.Serialize(new { message = ex.Message }));
+        }
+        catch (SqlException ex)
+        {
+            // RAISERROR con severity 16 suele usar error number 50001-99999
+            var isUserError = ex.Number >= 50000 && ex.Number <= 99999;
+            context.Response.StatusCode = isUserError ? (int)HttpStatusCode.BadRequest : (int)HttpStatusCode.InternalServerError;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync(JsonSerializer.Serialize(new { message = isUserError ? ex.Message : "Error de base de datos.", detail = ex.Message }));
         }
         catch (Exception ex)
         {
