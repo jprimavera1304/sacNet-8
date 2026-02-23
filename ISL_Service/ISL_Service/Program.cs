@@ -33,8 +33,12 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "ISL_Service",
-        Version = "v1"
+        Version = "v1",
+        Description = "API ISL. Tarimas: IdStatus 1=Activo, 2=Cancelado. Errores: 409 duplicado nombre+tipo casco."
     });
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, "ISL_Service.xml");
+    if (File.Exists(xmlPath))
+        c.IncludeXmlComments(xmlPath);
 
     // Definicion de seguridad JWT
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -117,6 +121,10 @@ builder.Services.AddScoped<IUserAdminService, UserAdminService>();
 builder.Services.AddScoped<IEmpresaRepository, EmpresaRepository>();
 builder.Services.AddScoped<IEmpresaService, EmpresaService>();
 
+// -------------------- TARIMAS + CATALOGOS --------------------
+builder.Services.AddScoped<ITarimaRepository, TarimaRepository>();
+builder.Services.AddScoped<ITarimaService, TarimaService>();
+builder.Services.AddScoped<ICatalogosRepository, CatalogosRepository>();
 
 // -------------------- JWT Authentication --------------------
 var jwtSection = builder.Configuration.GetSection("Jwt");

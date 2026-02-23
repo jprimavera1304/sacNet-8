@@ -1,4 +1,4 @@
-﻿# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
 
 name: Build and deploy ASP.Net Core apps to Azure Web Apps (sac26 + mac-tauro)
 
@@ -93,5 +93,59 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: mac-tauro
+          slot-name: Production
+          package: .
+
+  deploy_mac_sportsleague:
+    runs-on: windows-latest
+    needs: build
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: .net-app
+
+      - name: Login to Azure (mac-sportsleague)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_ECF6111C67514A278B76ADCFC566FBC9 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_5A063949238643BA840234339BCDDEFE }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_A1539898EBCF4685BB0CF4653C872045 }}
+
+      - name: Deploy to Azure Web App (mac-sportsleague)
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: mac-sportsleague
+          slot-name: Production
+          package: .
+
+  deploy_mac_zaragoza:
+    runs-on: windows-latest
+    needs: build
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: .net-app
+
+      - name: Login to Azure (mac-zaragoza)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_5CCB279EECEF45D09E46C3F5DEA0C955 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_8AC6E1E250144B8796EC3A1653749C28 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_5F6E025C238144A29081458B220ACD2D }}
+
+      - name: Deploy to Azure Web App (mac-zaragoza)
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: mac-zaragoza
           slot-name: Production
           package: .

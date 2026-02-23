@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 
 namespace ISL_Service.Application.DTOs.GenericHttpResponse
 {
@@ -12,9 +12,8 @@ namespace ISL_Service.Application.DTOs.GenericHttpResponse
 
         public static HttpResponseMessage Response(HttpRequestMessage request, HttpStatusCode httpStatusCode, string message)
         {
-            int id = 0;
-            //return request.CreateResponse(HttpStatusCode.OK, new GenericResponseDTO(id, httpStatusCode, message));
-            return null;
+            //return request.CreateResponse(HttpStatusCode.OK, new GenericResponseDTO(0, httpStatusCode, message));
+            return null!;
         }
 
         //public static HttpResponseMessage Response(HttpRequestMessage request, HttpStatusCode httpStatusCode, int id)

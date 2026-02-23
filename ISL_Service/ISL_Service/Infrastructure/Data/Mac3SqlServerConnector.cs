@@ -1,4 +1,4 @@
-﻿using ISL_Service.Utils;
+using ISL_Service.Utils;
 using Microsoft.Data.SqlClient;
 
 namespace ISL_Service.Infrastructure.Data
@@ -46,7 +46,6 @@ namespace ISL_Service.Infrastructure.Data
                 connectionString = connectionString.Replace("@Info", "User Id=sa; Password=Hope5y2k");
 
             SqlConn = new SqlConnection(connectionString);
-            connectionString = connectionString;
         }
 
         public Mac3SqlServerConnector(int NumCaja)
