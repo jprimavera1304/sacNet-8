@@ -51,7 +51,7 @@ public class TarimaService : ITarimaService
         }
     }
 
-    public async Task CambiarStatusAsync(int idTarima, int idStatus, CancellationToken ct = default)
+    public async Task CambiarStatusAsync(int idTarima, int idStatus, string? usuario, CancellationToken ct = default)
     {
         if (idStatus != 1 && idStatus != 2)
             throw new ArgumentException("IdStatus debe ser 1 (Activo) o 2 (Cancelado).");
@@ -65,7 +65,8 @@ public class TarimaService : ITarimaService
 
         try
         {
-            await _repository.CambiarStatusTarimaAsync(idTarima, idStatus, ct);
+            var usuarioParaSp = string.IsNullOrWhiteSpace(usuario) ? "Sistema" : usuario.Trim();
+            await _repository.CambiarStatusTarimaAsync(idTarima, idStatus, usuarioParaSp, ct);
         }
         catch (SqlException ex)
         {

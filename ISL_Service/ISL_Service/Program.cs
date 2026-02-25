@@ -34,7 +34,7 @@ builder.Services.AddSwaggerGen(c =>
     {
         Title = "ISL_Service",
         Version = "v1",
-        Description = "API ISL. Tarimas: IdStatus 1=Activo, 2=Cancelado. Errores: 409 duplicado nombre+tipo casco."
+        Description = "API ISL. Tarimas: IdStatus 1=Activo, 2=Cancelado. Almacén de Cascos: movimientos (salidas/entradas), catálogos repartidores/tarimas/tipos-casco. Errores: 409 duplicado o conflicto de negocio."
     });
     var xmlPath = Path.Combine(AppContext.BaseDirectory, "ISL_Service.xml");
     if (File.Exists(xmlPath))
@@ -125,6 +125,10 @@ builder.Services.AddScoped<IEmpresaService, EmpresaService>();
 builder.Services.AddScoped<ITarimaRepository, TarimaRepository>();
 builder.Services.AddScoped<ITarimaService, TarimaService>();
 builder.Services.AddScoped<ICatalogosRepository, CatalogosRepository>();
+
+// -------------------- ALMACEN CASCOS --------------------
+builder.Services.AddScoped<IAlmacenCascosRepository, AlmacenCascosRepository>();
+builder.Services.AddScoped<IAlmacenCascosService, AlmacenCascosService>();
 
 // -------------------- JWT Authentication --------------------
 var jwtSection = builder.Configuration.GetSection("Jwt");

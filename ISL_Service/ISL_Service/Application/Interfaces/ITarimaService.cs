@@ -8,5 +8,5 @@ public interface ITarimaService
     Task<TarimaDto?> GetByIdAsync(int idTarima, CancellationToken ct = default);
     Task<int> CrearAsync(CreateTarimaRequest request, string usuarioCreacion, CancellationToken ct = default);
     Task ActualizarAsync(int idTarima, UpdateTarimaRequest request, string usuarioModificacion, CancellationToken ct = default);
-    Task CambiarStatusAsync(int idTarima, int idStatus, CancellationToken ct = default);
+    Task CambiarStatusAsync(int idTarima, int idStatus, string? usuario, CancellationToken ct = default);
 }

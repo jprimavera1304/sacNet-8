@@ -91,7 +91,7 @@ public class TarimaRepository : ITarimaRepository
         await cmd.ExecuteNonQueryAsync(ct);
     }
 
-    public async Task CambiarStatusTarimaAsync(int idTarima, int idStatus, CancellationToken ct = default)
+    public async Task CambiarStatusTarimaAsync(int idTarima, int idStatus, string? usuarioModificacion, CancellationToken ct = default)
     {
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
@@ -100,6 +100,7 @@ public class TarimaRepository : ITarimaRepository
         cmd.CommandType = CommandType.StoredProcedure;
         cmd.Parameters.AddWithValue("@IdTarima", idTarima);
         cmd.Parameters.AddWithValue("@IdStatus", idStatus);
+        cmd.Parameters.AddWithValue("@UsuarioModificacion", string.IsNullOrWhiteSpace(usuarioModificacion) ? DBNull.Value : usuarioModificacion.Trim());
 
         await cmd.ExecuteNonQueryAsync(ct);
     }
