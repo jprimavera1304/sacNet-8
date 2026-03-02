@@ -20,9 +20,13 @@ public class TorneosController : ControllerBase
 
     [HttpGet]
     [ProducesResponseType(typeof(List<TorneoDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> List([FromQuery] Guid? temporadaId, [FromQuery] byte? estado, [FromQuery] string? texto, CancellationToken ct)
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> List([FromQuery] Guid? temporadaId, [FromQuery] byte? estado, [FromQuery] string? texto, [FromQuery] DateTime? fechaInicio, [FromQuery] DateTime? fechaFin, CancellationToken ct)
     {
-        var list = await _service.ConsultarTorneosAsync(temporadaId, estado, texto, ct);
+        if (fechaInicio.HasValue && fechaFin.HasValue && fechaFin < fechaInicio)
+            return BadRequest(new { message = "fechaFin no puede ser menor que fechaInicio." });
+
+        var list = await _service.ConsultarTorneosAsync(temporadaId, estado, texto, fechaInicio, fechaFin, ct);
         return Ok(list);
     }
 
@@ -101,6 +105,7 @@ public class TorneosController : ControllerBase
     [ProducesResponseType(typeof(TorneoDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelTorneoRequest? request, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
@@ -112,6 +117,64 @@ public class TorneosController : ControllerBase
 
         var canceled = await _service.CancelarTorneoAsync(id, motivo, userId, ct);
         return Ok(canceled);
+    }
+
+    [HttpPost("{id:guid}/activar")]
+    [ProducesResponseType(typeof(TorneoDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Activar(Guid id, CancellationToken ct)
+    {
+        if (!TryGetUserId(out var userId))
+            return Unauthorized(new { message = "Token invalido." });
+
+        var activated = await _service.ActivarTorneoAsync(id, userId, ct);
+        return Ok(activated);
+    }
+
+    [HttpPost("{id:guid}/cerrar")]
+    [ProducesResponseType(typeof(TorneoDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Cerrar(Guid id, CancellationToken ct)
+    {
+        if (!TryGetUserId(out var userId))
+            return Unauthorized(new { message = "Token invalido." });
+
+        var closed = await _service.CerrarTorneoAsync(id, userId, ct);
+        return Ok(closed);
+    }
+
+    [HttpPost("{id:guid}/reactivar")]
+    [ProducesResponseType(typeof(TorneoDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Reactivar(Guid id, CancellationToken ct)
+    {
+        if (!TryGetUserId(out var userId))
+            return Unauthorized(new { message = "Token invalido." });
+
+        var reactivated = await _service.ReactivarTorneoAsync(id, userId, ct);
+        return Ok(reactivated);
+    }
+
+    [HttpPost("cerrar-vencidos")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> CerrarVencidos([FromQuery] DateTime? fechaCorte, CancellationToken ct)
+    {
+        if (!TryGetUserId(out var userId))
+            return Unauthorized(new { message = "Token invalido." });
+
+        var cerrados = await _service.CerrarTorneosVencidosAsync(userId, fechaCorte, ct);
+        return Ok(new
+        {
+            torneosCerrados = cerrados,
+            fechaCorte = (fechaCorte ?? DateTime.UtcNow.Date).Date
+        });
     }
 
     private bool TryGetUserId(out Guid userId)

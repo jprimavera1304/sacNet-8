@@ -110,12 +110,12 @@ public class TemporadasService : ITemporadasService
         }
     }
 
-    public Task<List<TorneoDto>> ConsultarTorneosAsync(Guid? temporadaId, byte? estado, string? texto, CancellationToken ct = default)
-        => _repository.ConsultarTorneosAsync(temporadaId, estado, NormalizeText(texto), ct);
+    public Task<List<TorneoDto>> ConsultarTorneosAsync(Guid? temporadaId, byte? estado, string? texto, DateTime? fechaInicio, DateTime? fechaFin, CancellationToken ct = default)
+        => _repository.ConsultarTorneosAsync(temporadaId, estado, NormalizeText(texto), fechaInicio, fechaFin, ct);
 
     public async Task<TorneoDto?> GetTorneoByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var list = await _repository.ConsultarTorneosAsync(null, null, null, ct);
+        var list = await _repository.ConsultarTorneosAsync(null, null, null, null, null, ct);
         return list.FirstOrDefault(x => x.Id == id);
     }
 
@@ -140,8 +140,8 @@ public class TemporadasService : ITemporadasService
         var actual = await GetTorneoByIdAsync(id, ct);
         if (actual is null)
             throw new NotFoundException("El torneo no existe.", id.ToString());
-        if (actual.Estado is 0 or 2)
-            throw new ConflictException("No se puede modificar: torneo inhabilitado o cancelado.");
+        if (actual.Estado is 0 or 3 or 4)
+            throw new ConflictException("No se puede modificar: torneo inhabilitado, cerrado o cancelado.");
 
         try
         {
@@ -162,7 +162,7 @@ public class TemporadasService : ITemporadasService
         var actual = await GetTorneoByIdAsync(id, ct);
         if (actual is null)
             throw new NotFoundException("El torneo no existe.", id.ToString());
-        if (actual.Estado == 2)
+        if (actual.Estado == 4)
             return actual;
 
         try
@@ -179,6 +179,75 @@ public class TemporadasService : ITemporadasService
         }
     }
 
+    public async Task<TorneoDto> ActivarTorneoAsync(Guid id, Guid usuarioId, CancellationToken ct = default)
+    {
+        var actual = await GetTorneoByIdAsync(id, ct);
+        if (actual is null)
+            throw new NotFoundException("El torneo no existe.", id.ToString());
+        if (actual.Estado == 2)
+            return actual;
+
+        try
+        {
+            var activated = await _repository.ActivarTorneoAsync(id, usuarioId, ct);
+            if (activated is null)
+                throw new InvalidOperationException("No se pudo activar el torneo.");
+            return activated;
+        }
+        catch (SqlException ex)
+        {
+            ThrowMappedException(ex);
+            throw;
+        }
+    }
+
+    public async Task<TorneoDto> CerrarTorneoAsync(Guid id, Guid usuarioId, CancellationToken ct = default)
+    {
+        var actual = await GetTorneoByIdAsync(id, ct);
+        if (actual is null)
+            throw new NotFoundException("El torneo no existe.", id.ToString());
+        if (actual.Estado == 3)
+            return actual;
+
+        try
+        {
+            var closed = await _repository.CerrarTorneoAsync(id, usuarioId, ct);
+            if (closed is null)
+                throw new InvalidOperationException("No se pudo cerrar el torneo.");
+            return closed;
+        }
+        catch (SqlException ex)
+        {
+            ThrowMappedException(ex);
+            throw;
+        }
+    }
+
+    public async Task<TorneoDto> ReactivarTorneoAsync(Guid id, Guid usuarioId, CancellationToken ct = default)
+    {
+        var actual = await GetTorneoByIdAsync(id, ct);
+        if (actual is null)
+            throw new NotFoundException("El torneo no existe.", id.ToString());
+        if (actual.Estado != 4)
+            throw new ConflictException("No se pudo reactivar: el torneo no esta cancelado.");
+
+        try
+        {
+            var reactivated = await _repository.ReactivarTorneoAsync(id, usuarioId, ct);
+            if (reactivated is null)
+                throw new InvalidOperationException("No se pudo reactivar el torneo.");
+            return reactivated;
+        }
+        catch (SqlException ex)
+        {
+            ThrowMappedException(ex);
+            throw;
+        }
+    }
+
+    public Task<int> CerrarTorneosVencidosAsync(Guid usuarioSistemaId, DateTime? fechaCorte, CancellationToken ct = default)
+        => _repository.CerrarTorneosVencidosAsync(usuarioSistemaId, fechaCorte, ct);
+
     private static string? NormalizeText(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -191,12 +260,20 @@ public class TemporadasService : ITemporadasService
         var msg = ex.Message;
         if (msg.Contains("No se puede modificar: temporada inhabilitada o cancelada", StringComparison.OrdinalIgnoreCase))
             throw new ConflictException("No se puede modificar: temporada inhabilitada o cancelada.", msg);
-        if (msg.Contains("No se puede modificar: torneo inhabilitado o cancelado", StringComparison.OrdinalIgnoreCase))
-            throw new ConflictException("No se puede modificar: torneo inhabilitado o cancelado.", msg);
+        if (msg.Contains("No se puede modificar: torneo inhabilitado, cerrado o cancelado", StringComparison.OrdinalIgnoreCase))
+            throw new ConflictException("No se puede modificar: torneo inhabilitado, cerrado o cancelado.", msg);
         if (msg.Contains("No se puede cancelar: existen torneos activos", StringComparison.OrdinalIgnoreCase))
             throw new ConflictException("No se puede cancelar: existen torneos activos en la temporada.", msg);
+        if (msg.Contains("No se pudo activar", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("No se pudo cerrar", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("No se puede cancelar un torneo cerrado", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("No se pudo cancelar", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("No se pudo reactivar", StringComparison.OrdinalIgnoreCase))
+            throw new ConflictException(msg);
         if (msg.Contains("No se puede reactivar", StringComparison.OrdinalIgnoreCase))
             throw new ConflictException(msg);
+        if (msg.Contains("No se puede crear torneo: Temporada", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Temporada invalida o no activa.");
         if (msg.Contains("Temporada invalida o no activa", StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("Temporada invalida o no activa.");
         if (msg.Contains("duplicate", StringComparison.OrdinalIgnoreCase) ||

@@ -19,9 +19,13 @@ public class TemporadasRepository : ITemporadasRepository
     private const string SpReactivarTemporada = "dbo.sp_w_ReactivarTemporada";
 
     private const string SpConsultarTorneos = "dbo.sp_w_ConsultarTorneos";
+    private const string SpCerrarTorneosVencidos = "dbo.sp_w_CerrarTorneosVencidos";
     private const string SpInsertarTorneo = "dbo.sp_w_InsertarTorneo";
     private const string SpActualizarTorneo = "dbo.sp_w_ActualizarTorneo";
     private const string SpCancelarTorneo = "dbo.sp_w_CancelarTorneo";
+    private const string SpActivarTorneo = "dbo.sp_w_ActivarTorneo";
+    private const string SpCerrarTorneo = "dbo.sp_w_CerrarTorneo";
+    private const string SpReactivarTorneo = "dbo.sp_w_ReactivarTorneo";
 
     public TemporadasRepository(IConfiguration configuration)
     {
@@ -155,7 +159,7 @@ public class TemporadasRepository : ITemporadasRepository
         return await ExecuteSingleAsync<TemporadaDto>(cmd, ct);
     }
 
-    public async Task<List<TorneoDto>> ConsultarTorneosAsync(Guid? temporadaId, byte? estado, string? texto, CancellationToken ct = default)
+    public async Task<List<TorneoDto>> ConsultarTorneosAsync(Guid? temporadaId, byte? estado, string? texto, DateTime? fechaInicio, DateTime? fechaFin, CancellationToken ct = default)
     {
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
@@ -165,6 +169,8 @@ public class TemporadasRepository : ITemporadasRepository
         cmd.Parameters.AddWithValue("@TemporadaId", (object?)temporadaId ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@Estado", (object?)estado ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@Texto", string.IsNullOrWhiteSpace(texto) ? DBNull.Value : texto.Trim());
+        cmd.Parameters.AddWithValue("@FechaInicio", (object?)fechaInicio ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@FechaFin", (object?)fechaFin ?? DBNull.Value);
 
         var dt = new DataTable();
         using (var adapter = new SqlDataAdapter(cmd))
@@ -222,6 +228,63 @@ public class TemporadasRepository : ITemporadasRepository
         cmd.Parameters.AddWithValue("@UsuarioId", usuarioId);
 
         return await ExecuteSingleAsync<TorneoDto>(cmd, ct);
+    }
+
+    public async Task<TorneoDto?> ActivarTorneoAsync(Guid id, Guid usuarioId, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(SpActivarTorneo, conn);
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.Parameters.AddWithValue("@Id", id);
+        cmd.Parameters.AddWithValue("@UsuarioId", usuarioId);
+
+        return await ExecuteSingleAsync<TorneoDto>(cmd, ct);
+    }
+
+    public async Task<TorneoDto?> CerrarTorneoAsync(Guid id, Guid usuarioId, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(SpCerrarTorneo, conn);
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.Parameters.AddWithValue("@Id", id);
+        cmd.Parameters.AddWithValue("@UsuarioId", usuarioId);
+
+        return await ExecuteSingleAsync<TorneoDto>(cmd, ct);
+    }
+
+    public async Task<TorneoDto?> ReactivarTorneoAsync(Guid id, Guid usuarioId, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(SpReactivarTorneo, conn);
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.Parameters.AddWithValue("@Id", id);
+        cmd.Parameters.AddWithValue("@UsuarioId", usuarioId);
+
+        return await ExecuteSingleAsync<TorneoDto>(cmd, ct);
+    }
+
+    public async Task<int> CerrarTorneosVencidosAsync(Guid usuarioSistemaId, DateTime? fechaCorte, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(SpCerrarTorneosVencidos, conn);
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.Parameters.AddWithValue("@UsuarioSistemaId", usuarioSistemaId);
+        cmd.Parameters.AddWithValue("@FechaCorte", (object?)fechaCorte ?? DBNull.Value);
+
+        using var reader = await cmd.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct))
+            return 0;
+
+        var ordinal = reader.GetOrdinal("TorneosCerrados");
+        return reader.IsDBNull(ordinal) ? 0 : reader.GetInt32(ordinal);
     }
 
     private static async Task<T?> ExecuteSingleAsync<T>(SqlCommand cmd, CancellationToken ct = default) where T : class

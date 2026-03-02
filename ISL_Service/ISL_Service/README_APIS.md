@@ -321,7 +321,7 @@ Errores: 404 si no hay registros, 500 con mensaje de excepción.
 
 ## 14. Temporadas y Torneos
 
-Base: `api/temporadas` y `api/torneos`. Requiere JWT. Usa SPs: `sp_w_ConsultarTemporadas`, `sp_w_InsertarTemporada`, `sp_w_ActualizarTemporada`, `sp_w_CancelarTemporada`, `sp_w_ConsultarTorneos`, `sp_w_InsertarTorneo`, `sp_w_ActualizarTorneo`, `sp_w_CancelarTorneo`.
+Base: `api/temporadas` y `api/torneos`. Requiere JWT. Usa SPs: `sp_w_ConsultarTemporadas`, `sp_w_InsertarTemporada`, `sp_w_ActualizarTemporada`, `sp_w_CancelarTemporada`, `sp_w_ConsultarTorneos`, `sp_w_InsertarTorneo`, `sp_w_ActualizarTorneo`, `sp_w_CancelarTorneo`, `sp_w_ActivarTorneo`, `sp_w_CerrarTorneo`, `sp_w_ReactivarTorneo`, `sp_w_CerrarTorneosVencidos`.
 
 ### Temporadas (`api/temporadas`)
 
@@ -338,11 +338,15 @@ Base: `api/temporadas` y `api/torneos`. Requiere JWT. Usa SPs: `sp_w_ConsultarTe
 
 | Metodo | Ruta | Descripcion |
 |--------|------|-------------|
-| `GET` | `/api/torneos` | Lista torneos. Filtros: `temporadaId`, `estado` (0/1/2), `texto` (nombre/clave). |
+| `GET` | `/api/torneos` | Lista torneos. Filtros: `temporadaId`, `estado` (0/1/2/3/4), `texto` (nombre/clave), `fechaInicio`, `fechaFin`. |
 | `GET` | `/api/torneos/{id}` | Obtiene torneo por Id (GUID). |
 | `POST` | `/api/torneos` | Crea torneo. Body: `CreateTorneoRequest` (`temporadaId`, `nombre`, `clave`, `fechaInicio`, `fechaFin`). |
-| `PUT` | `/api/torneos/{id}` | Actualiza torneo activo. Body: `UpdateTorneoRequest`. |
-| `POST` | `/api/torneos/{id}/cancelar` | Cancela torneo activo. Body opcional: `CancelTorneoRequest` (`motivo`). |
+| `PUT` | `/api/torneos/{id}` | Actualiza torneo. Body: `UpdateTorneoRequest`. |
+| `POST` | `/api/torneos/{id}/activar` | Activa torneo (Borrador -> Activo). |
+| `POST` | `/api/torneos/{id}/cerrar` | Cierra torneo (Activo -> Cerrado). |
+| `POST` | `/api/torneos/{id}/cancelar` | Cancela torneo. Body opcional: `CancelTorneoRequest` (`motivo`). |
+| `POST` | `/api/torneos/{id}/reactivar` | Reactiva torneo cancelado (puede quedar Activo o Cerrado segun fecha fin). |
+| `POST` | `/api/torneos/cerrar-vencidos` | Cierra torneos activos vencidos. Query opcional: `fechaCorte`. |
 
 Reglas de negocio principales:
 - `nombre` temporada max 80.
