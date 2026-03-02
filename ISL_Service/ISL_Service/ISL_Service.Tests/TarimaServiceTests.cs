@@ -54,7 +54,7 @@ public class TarimaServiceTests
             ConsultarResult = new List<TarimaDto> { new() { IdTarima = 1, IdStatus = 2 } }
         };
         var service = new TarimaService(repo);
-        await service.CambiarStatusAsync(1, 2, CancellationToken.None);
+        await service.CambiarStatusAsync(1, 2, null, CancellationToken.None);
         Assert.Equal(0, repo.CambiarStatusCallCount);
     }
 
@@ -63,7 +63,7 @@ public class TarimaServiceTests
     {
         var repo = new FakeTarimaRepository { ConsultarResult = new List<TarimaDto>() };
         var service = new TarimaService(repo);
-        await Assert.ThrowsAsync<ArgumentException>(() => service.CambiarStatusAsync(1, 99, CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.CambiarStatusAsync(1, 99, null, CancellationToken.None));
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public class TarimaServiceTests
     {
         var repo = new FakeTarimaRepository { ConsultarResult = new List<TarimaDto>() };
         var service = new TarimaService(repo);
-        var ex = await Assert.ThrowsAsync<NotFoundException>(() => service.CambiarStatusAsync(999, 2, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<NotFoundException>(() => service.CambiarStatusAsync(999, 2, null, CancellationToken.None));
         Assert.Contains("no existe", ex.Message);
     }
 
@@ -90,7 +90,7 @@ public class TarimaServiceTests
         public Task ActualizarTarimaAsync(int idTarima, UpdateTarimaRequest request, string usuarioModificacion, CancellationToken ct = default)
             => Task.CompletedTask;
 
-        public Task CambiarStatusTarimaAsync(int idTarima, int idStatus, CancellationToken ct = default)
+        public Task CambiarStatusTarimaAsync(int idTarima, int idStatus, string? usuarioModificacion, CancellationToken ct = default)
         {
             CambiarStatusCallCount++;
             return Task.CompletedTask;

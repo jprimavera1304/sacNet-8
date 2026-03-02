@@ -24,7 +24,8 @@ public class TarimasController : ControllerBase
     /// <summary>
     /// Lista tarimas con filtros opcionales por estatus y busqueda por nombre.
     /// </summary>
-    /// <param name="idStatus">NULL = todas, 1 = Activo, 2 = Cancelado</param>
+    /// <param name="idStatus">NULL = todas, 1 = Activo, 2 = Cancelado/Inactivo</param>
+    /// <param name="estatus">Alternativa a idStatus: "activo"=1, "inactivo" o "cancelado"=2, "todos"=todas. Si se envía idStatus tiene prioridad.</param>
     /// <param name="busqueda">Filtro por nombre (opcional)</param>
     /// <returns>Lista de TarimaDto</returns>
     /// <response code="200">Lista obtenida correctamente</response>
@@ -33,10 +34,23 @@ public class TarimasController : ControllerBase
     [HttpGet]
     [Authorize(Policy = "perm:tarimas.ver")]
     [ProducesResponseType(typeof(List<TarimaDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> List([FromQuery] int? idStatus, [FromQuery] string? busqueda, CancellationToken ct)
+    public async Task<IActionResult> List([FromQuery] int? idStatus, [FromQuery] string? estatus, [FromQuery] string? busqueda, CancellationToken ct)
     {
-        var list = await _service.ConsultarTarimasAsync(idStatus, busqueda, ct);
+        var statusFilter = ResolveStatusFilter(idStatus, estatus);
+        var list = await _service.ConsultarTarimasAsync(statusFilter, busqueda, ct);
         return Ok(list);
+    }
+
+    /// <summary>Mapea idStatus (prioridad) o estatus (activo/inactivo/cancelado/todos) a 1, 2 o null.</summary>
+    private static int? ResolveStatusFilter(int? idStatus, string? estatus)
+    {
+        if (idStatus.HasValue)
+            return idStatus.Value;
+        var e = estatus?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(e) || e == "todos") return null;
+        if (e == "activo") return 1;
+        if (e == "inactivo" || e == "cancelado") return 2;
+        return null;
     }
 
     /// <summary>
@@ -143,8 +157,20 @@ public class TarimasController : ControllerBase
     {
         if (request == null)
             return BadRequest(new { message = "Body requerido. idStatus debe ser 1 (Activo) o 2 (Cancelado)." });
-        await _service.CambiarStatusAsync(idTarima, request.IdStatus, ct);
+        var usuario = GetUsuarioFromToken();
+        await _service.CambiarStatusAsync(idTarima, request.IdStatus, usuario, ct);
         return Ok(new { message = "Estatus actualizado." });
+    }
+
+    /// <summary>Obtiene el nombre de usuario del token (varios claims posibles). Nunca devuelve null/vacío: usa "Sistema" como fallback.</summary>
+    private string GetUsuarioFromToken()
+    {
+        var u = User.FindFirstValue("username")
+            ?? User.FindFirstValue("preferred_username")
+            ?? User.FindFirstValue("name")
+            ?? User.FindFirstValue("unique_name")
+            ?? User.Identity?.Name;
+        return string.IsNullOrWhiteSpace(u) ? "Sistema" : u.Trim();
     }
 
     private static object? ValidateCreate(CreateTarimaRequest r)

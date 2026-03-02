@@ -16,10 +16,12 @@ En desarrollo, Swagger está disponible en `/swagger`.
 7. [Empresas](#7-empresas)
 8. [Tarimas](#8-tarimas)
 9. [Catálogos](#9-catálogos)
-10. [Personas (Proveedores)](#10-personas-proveedores)
-11. [Recaudaciones](#11-recaudaciones)
-12. [Proveedores de pagos](#12-proveedores-de-pagos)
-13. [Utilidades](#13-utilidades)
+10. [Almacén de Cascos](#10-almacén-de-cascos)
+11. [Personas (Proveedores)](#11-personas-proveedores)
+12. [Recaudaciones](#12-recaudaciones)
+13. [Proveedores de pagos](#13-proveedores-de-pagos)
+14. [Temporadas y Torneos](#14-temporadas-y-torneos)
+15. [Utilidades](#15-utilidades)
 
 ---
 
@@ -148,7 +150,7 @@ Base: `api/empresas`. **Requiere:** `perm:empresas.ver`.
 
 ## 8. Tarimas
 
-Base: `api/tarimas`. Estatus: **1 = Activo**, **2 = Cancelado**. **Requiere:** JWT y políticas por acción.
+Base: `api/tarimas`. Estatus: **1 = Activo**, **2 = Cancelado/Inactivo**. **Requiere:** JWT y políticas por acción.
 
 | Método | Ruta | Política | Descripción |
 |--------|------|----------|-------------|
@@ -156,11 +158,12 @@ Base: `api/tarimas`. Estatus: **1 = Activo**, **2 = Cancelado**. **Requiere:** J
 | `GET` | `/api/tarimas/{idTarima}` | `perm:tarimas.ver` | Obtiene una tarima por IdTarima (entero). |
 | `POST` | `/api/tarimas` | `perm:tarimas.crear` | Crea una tarima. Usuario de auditoría del token. |
 | `PUT` | `/api/tarimas/{idTarima}` | `perm:tarimas.editar` | Actualiza tarima (solo si está activa). |
-| `PATCH` | `/api/tarimas/{idTarima}/status` | `perm:tarimas.estado.editar` | Cambia estatus (1 Activo, 2 Cancelado). |
+| `PATCH` | `/api/tarimas/{idTarima}/status` | `perm:tarimas.estado.editar` | Cambia estatus (1 Activo, 2 Cancelado/Inactivo). |
 
 **Query (GET list):**
 
-- `idStatus`: opcional. NULL = todas, 1 = Activo, 2 = Cancelado.
+- `idStatus`: opcional. NULL = todas, 1 = Activo, 2 = Cancelado/Inactivo.
+- `estatus`: alternativa a idStatus. Valores: `activo` (1), `inactivo` o `cancelado` (2), `todos` (todas). Si se envía `idStatus`, tiene prioridad.
 - `busqueda`: opcional. Filtro por nombre.
 
 **Body crear:** `CreateTarimaRequest`: nombreTarima, idTipoCasco, numeroCascosBase, observaciones (opcional).  
@@ -177,17 +180,100 @@ Base: `api/catalogos`. **Requiere:** usuario autenticado. Solo lectura para drop
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| `GET` | `/api/catalogos/tipos-casco` | Lista tipos de casco (TiposUsados) para dropdown en tarimas. |
+| `GET` | `/api/catalogos/tipos-casco` | Lista tipos de casco (TiposUsados) para dropdown en tarimas y almacén de cascos. |
+| `GET` | `/api/catalogos/repartidores` | Lista repartidores ([Catalogo Repartidores]) para dropdown en almacén de cascos. |
+| `GET` | `/api/catalogos/tarimas` | Lista tarimas (WTarima) activas para dropdown en almacén de cascos. |
 
-**Query:**
+**Query (todos):**
 
 - `status`: opcional. Filtro por IdStatus (ej. 1 = activos). NULL = todos.
 
-**Respuesta:** Lista de `TipoCascoItemDto` (idTipoCasco, descripcion).
+**Respuestas:**
+- tipos-casco: lista de `TipoCascoItemDto` (idTipoCasco, descripcion).
+- repartidores: lista de `RepartidorItemDto` (idRepartidor, repartidor).
+- tarimas: lista de `TarimaCatalogItemDto` (idTarima, nombreTarima, idTipoCasco, numeroCascosBase).
 
 ---
 
-## 10. Personas (Proveedores)
+## 10. Almacén de Cascos
+
+Base: `api/almacen-cascos`. **Requiere:** usuario autenticado (JWT). Usa tablas `WMovimientoCasco`, `WMovimientoCascoDetalle`, `WConstantes`, `WTarima` y SP `sp_w_*`. Usuario de auditoría se toma del token.
+
+**Convenciones:**
+- **TipoMovimiento:** 1 = SALIDA, 2 = ENTRADA.
+- **Estatus:** 1 = REGISTRADA, 2 = ACEPTADA, 3 = CANCELADA.
+- **IdStatus en catálogos:** 1 = ACTIVO, 2 = CANCELADO.
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/api/almacen-cascos/movimientos` | Lista movimientos (cabecera) con nombres de repartidor entrega/recibe. |
+| `GET` | `/api/almacen-cascos/movimientos/{idMovimiento}/detalle` | Detalle plano de un movimiento (líneas por numeroTarima y tipo casco). |
+| `GET` | `/api/almacen-cascos/movimientos/{idMovimiento}/detalle-agrupado` | Detalle agrupado por tarima lógica (`numeroTarima`) con líneas por tipo casco. |
+| `POST` | `/api/almacen-cascos/salidas` | Crea una SALIDA: cabecera + detalle. TotalTarimas/TotalPiezas se calculan en backend; TotalKilos = 0. |
+| `POST` | `/api/almacen-cascos/entradas` | Acepta una ENTRADA desde una salida registrada (SP crea entrada, acepta salida, suma kilos a WConstantes). |
+| `POST` | `/api/almacen-cascos/movimientos/{idMovimiento}/cancelar` | Cancela un movimiento (entrada o salida). Reglas validadas en SP. |
+
+**Query GET movimientos:**
+
+- `estatus`: opcional. NULL = todos, 1 = REGISTRADA, 2 = ACEPTADA, 3 = CANCELADA.
+- `tipoMovimiento`: opcional. 1 = SALIDA, 2 = ENTRADA.
+- `fechaInicio`, `fechaFin`: opcional. Filtro por rango de fechas (FechaCreacion).
+
+**Body POST salidas:** `CreateSalidaRequest`
+
+```json
+{
+  "idRepartidorEntrega": 1,
+  "observaciones": "string opcional",
+  "tarimas": [
+    {
+      "numeroTarima": 1,
+      "lineas": [
+        { "idTipoCasco": 1, "piezas": 10 },
+        { "idTipoCasco": 2, "piezas": 5 }
+      ]
+    }
+  ]
+}
+```
+
+- `idRepartidorEntrega`: requerido, debe ser repartidor activo (status=1).
+- `tarimas`: al menos una tarima lógica.
+- Cada tarima: `numeroTarima` (>0, no repetido) y `lineas` (>=1).
+- Cada línea: `idTipoCasco` activo y `piezas` (>0).
+
+**Body POST entradas:** `CreateEntradaRequest`
+
+```json
+{
+  "idMovimientoSalida": 1,
+  "idRepartidorRecibe": 2,
+  "kilos": 123.4567,
+  "observaciones": "string opcional",
+  "detalle": [
+    { "numeroTarima": 1, "idTipoCasco": 1, "piezas": 10 }
+  ]
+}
+```
+
+- `idMovimientoSalida`: salida ya registrada y con detalle.
+- `idRepartidorRecibe`: repartidor activo.
+- `kilos`: requerido, > 0, hasta 4 decimales.
+- `detalle`: opcional; si se envía, el backend valida que coincida exactamente con el detalle de la salida.
+
+**Body POST cancelar:** `CancelarMovimientoRequest`
+
+```json
+{
+  "motivoCancelacion": "string requerido"
+}
+```
+
+**Códigos:** 200 OK, 201 Created, 400 Validación o regla de negocio, 409 Conflicto (ej. doble entrada por salida, ya cancelado, no se puede cancelar).
+
+---
+
+## 11. Personas (Proveedores)
 
 Base: `api/Personas`. **Requiere:** usuario autenticado y políticas indicadas.
 
@@ -203,7 +289,7 @@ Base: `api/Personas`. **Requiere:** usuario autenticado y políticas indicadas.
 
 ---
 
-## 11. Recaudaciones
+## 12. Recaudaciones
 
 Base: `api/Recaudaciones`. Endpoints principales por **ticket/QR** (cadena encriptada).
 
@@ -218,7 +304,7 @@ Los métodos POST, PUT y DELETE están definidos pero sin lógica (vacíos).
 
 ---
 
-## 12. Proveedores de pagos
+## 13. Proveedores de pagos
 
 Base: `api/ProveedoresPagos`. **Sin** atributo `[Authorize]` en el controlador (endpoints públicos o según configuración global).
 
@@ -233,7 +319,45 @@ Errores: 404 si no hay registros, 500 con mensaje de excepción.
 
 ---
 
-## 13. Utilidades
+## 14. Temporadas y Torneos
+
+Base: `api/temporadas` y `api/torneos`. Requiere JWT. Usa SPs: `sp_w_ConsultarTemporadas`, `sp_w_InsertarTemporada`, `sp_w_ActualizarTemporada`, `sp_w_CancelarTemporada`, `sp_w_ConsultarTorneos`, `sp_w_InsertarTorneo`, `sp_w_ActualizarTorneo`, `sp_w_CancelarTorneo`, `sp_w_ActivarTorneo`, `sp_w_CerrarTorneo`, `sp_w_ReactivarTorneo`, `sp_w_CerrarTorneosVencidos`.
+
+### Temporadas (`api/temporadas`)
+
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| `GET` | `/api/temporadas` | Lista temporadas. Filtros: `estado` (0/1/2) y `texto` (busqueda por nombre). |
+| `GET` | `/api/temporadas/{id}` | Obtiene temporada por Id (GUID). |
+| `POST` | `/api/temporadas` | Crea temporada. Body: `CreateTemporadaRequest` (`nombre`, `fechaInicio`, `fechaFin`). |
+| `PUT` | `/api/temporadas/{id}` | Actualiza temporada activa. Body: `UpdateTemporadaRequest`. |
+| `POST` | `/api/temporadas/{id}/cancelar` | Cancela temporada activa. Body opcional: `CancelTemporadaRequest` (`motivo`). |
+| `POST` | `/api/temporadas/{id}/reactivar` | Reactiva temporada cancelada (estado 2) a activa (estado 1). |
+
+### Torneos (`api/torneos`)
+
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| `GET` | `/api/torneos` | Lista torneos. Filtros: `temporadaId`, `estado` (0/1/2/3/4), `texto` (nombre/clave), `fechaInicio`, `fechaFin`. |
+| `GET` | `/api/torneos/{id}` | Obtiene torneo por Id (GUID). |
+| `POST` | `/api/torneos` | Crea torneo. Body: `CreateTorneoRequest` (`temporadaId`, `nombre`, `clave`, `fechaInicio`, `fechaFin`). |
+| `PUT` | `/api/torneos/{id}` | Actualiza torneo. Body: `UpdateTorneoRequest`. |
+| `POST` | `/api/torneos/{id}/activar` | Activa torneo (Borrador -> Activo). |
+| `POST` | `/api/torneos/{id}/cerrar` | Cierra torneo (Activo -> Cerrado). |
+| `POST` | `/api/torneos/{id}/cancelar` | Cancela torneo. Body opcional: `CancelTorneoRequest` (`motivo`). |
+| `POST` | `/api/torneos/{id}/reactivar` | Reactiva torneo cancelado (puede quedar Activo o Cerrado segun fecha fin). |
+| `POST` | `/api/torneos/cerrar-vencidos` | Cierra torneos activos vencidos. Query opcional: `fechaCorte`. |
+
+Reglas de negocio principales:
+- `nombre` temporada max 80.
+- `nombre` torneo max 120, `clave` max 30.
+- `fechaFin` no puede ser menor a `fechaInicio`.
+- Para crear/actualizar torneo, la temporada debe estar activa.
+- No se puede cancelar temporada si tiene torneos activos.
+
+---
+
+## 15. Utilidades
 
 Endpoints mínimos (Program.cs), sin autenticación JWT:
 

@@ -20,7 +20,9 @@ BEGIN
         t.UsuarioCreacion,
         t.FechaCreacion,
         t.UsuarioModificacion,
-        t.FechaModificacion
+        t.FechaModificacion,
+        t.UsuarioCancelacion,
+        t.FechaCancelacion
     FROM dbo.WTarima t
     LEFT JOIN [Catalogo TiposUsados] tu
         ON tu.IdTipoUsado = t.IdTipoCasco AND tu.IDStatus = 1

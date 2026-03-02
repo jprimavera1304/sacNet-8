@@ -17,4 +17,8 @@ public class TarimaDto
     public DateTime? FechaCreacion { get; set; }
     public string? UsuarioModificacion { get; set; }
     public DateTime? FechaModificacion { get; set; }
+    /// <summary>Usuario que inactivó la tarima (cuando IdStatus = 2).</summary>
+    public string? UsuarioCancelacion { get; set; }
+    /// <summary>Fecha y hora en que se inactivó (cuando IdStatus = 2).</summary>
+    public DateTime? FechaCancelacion { get; set; }
 }

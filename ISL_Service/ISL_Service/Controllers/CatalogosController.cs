@@ -33,4 +33,28 @@ public class CatalogosController : ControllerBase
         var list = await _repository.ListTiposCascoAsync(status, ct);
         return Ok(list);
     }
+
+    /// <summary>
+    /// Lista repartidores (Catalogo Repartidores). Para dropdown en Almacén de Cascos.
+    /// </summary>
+    /// <param name="status">Filtro por IDStatus (ej. 1 = activos). NULL = todos</param>
+    [HttpGet("repartidores")]
+    [ProducesResponseType(typeof(List<RepartidorItemDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetRepartidores([FromQuery] int? status, CancellationToken ct)
+    {
+        var list = await _repository.ListRepartidoresAsync(status, ct);
+        return Ok(list);
+    }
+
+    /// <summary>
+    /// Lista tarimas (WTarima). Para dropdown en Almacén de Cascos.
+    /// </summary>
+    /// <param name="status">Filtro por IdStatus (ej. 1 = activos). NULL = todos</param>
+    [HttpGet("tarimas")]
+    [ProducesResponseType(typeof(List<TarimaCatalogItemDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTarimas([FromQuery] int? status, CancellationToken ct)
+    {
+        var list = await _repository.ListTarimasAsync(status, ct);
+        return Ok(list);
+    }
 }
