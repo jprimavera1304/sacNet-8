@@ -9,7 +9,7 @@ using Microsoft.Extensions.Configuration;
 namespace ISL_Service.Infrastructure.Repositories;
 
 /// <summary>
-/// Repository Almacén de Cascos: SP sp_w_* y consultas directas a WMovimientoCasco / WMovimientoCascoDetalle.
+/// Repository Almacen de Cascos: SP sp_w_* y consultas directas a WMovimientoCasco / WMovimientoCascoDetalle.
 /// </summary>
 public class AlmacenCascosRepository : IAlmacenCascosRepository
 {
@@ -76,10 +76,10 @@ SELECT d.IdDetalle, d.IdMovimiento, d.IdTarima, d.IdTipoCasco, d.NumeroTarima, d
        t.NombreTarima,
        ISNULL(tu.[Tipo de Usado], N'') AS TipoCascoDescripcion
 FROM dbo.WMovimientoCascoDetalle d
-INNER JOIN dbo.WTarima t ON t.IdTarima = d.IdTarima
+LEFT JOIN dbo.WTarima t ON t.IdTarima = d.IdTarima
 LEFT JOIN [Catalogo TiposUsados] tu ON tu.IdTipoUsado = d.IdTipoCasco
 WHERE d.IdMovimiento = @IdMovimiento
-ORDER BY d.IdDetalle";
+ORDER BY d.NumeroTarima, d.IdDetalle";
 
         await using var cmd = new SqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("@IdMovimiento", idMovimiento);
@@ -101,7 +101,6 @@ ORDER BY d.IdDetalle";
         try
         {
             int idMovimiento;
-            // 1) SP crea cabecera SALIDA y devuelve IdMovimiento
             await using (var cmdSp = new SqlCommand(SpInsertarSalida, conn, tran))
             {
                 cmdSp.CommandType = CommandType.StoredProcedure;
@@ -117,60 +116,38 @@ ORDER BY d.IdDetalle";
             }
 
             if (idMovimiento <= 0)
+                throw new ArgumentException("No se obtuvo IdMovimiento al insertar cabecera.");
+
+            var lineas = FlattenTarimas(request.Tarimas);
+            var totalTarimas = lineas.Select(x => x.NumeroTarima).Distinct().Count();
+            var totalPiezas = lineas.Sum(x => x.Piezas);
+
+            foreach (var item in lineas)
             {
-                tran.Rollback();
-                throw new InvalidOperationException("No se obtuvo IdMovimiento al insertar cabecera.");
-            }
-
-            // 2) Obtener IdTipoCasco por cada IdTarima
-            var idTarimas = request.Detalle.Select(x => x.IdTarima).Distinct().ToList();
-            var tarimaTipoMap = new Dictionary<int, int>();
-            if (idTarimas.Count > 0)
-            {
-                var inList = string.Join(",", idTarimas);
-                await using var cmdTarimas = new SqlCommand($"SELECT IdTarima, IdTipoCasco FROM dbo.WTarima WHERE IdTarima IN ({inList})", conn, tran);
-                await using var rTarimas = await cmdTarimas.ExecuteReaderAsync(ct);
-                while (await rTarimas.ReadAsync(ct))
-                    tarimaTipoMap[rTarimas.GetInt32(0)] = rTarimas.GetInt32(1);
-            }
-
-            int totalTarimas = request.Detalle.Sum(x => x.NumeroTarima);
-            int totalPiezas = 0;
-
-            foreach (var item in request.Detalle)
-            {
-                if (!tarimaTipoMap.TryGetValue(item.IdTarima, out var idTipoCasco))
-                {
-                    tran.Rollback();
-                    throw new InvalidOperationException($"Tarima IdTarima={item.IdTarima} no encontrada o sin IdTipoCasco.");
-                }
-                totalPiezas += item.Piezas;
-
                 await using var cmdDet = new SqlCommand(@"
 INSERT INTO dbo.WMovimientoCascoDetalle (IdMovimiento, IdTarima, IdTipoCasco, NumeroTarima, Piezas)
 VALUES (@IdMovimiento, @IdTarima, @IdTipoCasco, @NumeroTarima, @Piezas)", conn, tran);
                 cmdDet.Parameters.AddWithValue("@IdMovimiento", idMovimiento);
-                cmdDet.Parameters.AddWithValue("@IdTarima", item.IdTarima);
-                cmdDet.Parameters.AddWithValue("@IdTipoCasco", idTipoCasco);
+                cmdDet.Parameters.AddWithValue("@IdTarima", DBNull.Value);
+                cmdDet.Parameters.AddWithValue("@IdTipoCasco", item.IdTipoCasco);
                 cmdDet.Parameters.AddWithValue("@NumeroTarima", item.NumeroTarima);
                 cmdDet.Parameters.AddWithValue("@Piezas", item.Piezas);
                 await cmdDet.ExecuteNonQueryAsync(ct);
             }
 
-            // 3) Actualizar totales en cabecera + NombreTarima (primer detalle)
             await using var cmdUpd = new SqlCommand(@"
 UPDATE m
 SET TotalTarimas = @TotalTarimas,
     TotalPiezas  = @TotalPiezas,
     TotalKilos   = 0,
-    NombreTarima = ISNULL(m.NombreTarima, det.NombreTarima)
+    NombreTarima = det.TipoCascoDescripcion
 FROM dbo.WMovimientoCasco m
 OUTER APPLY (
-    SELECT TOP 1 t.NombreTarima
+    SELECT TOP 1 ISNULL(tu.[Tipo de Usado], N'') AS TipoCascoDescripcion
     FROM dbo.WMovimientoCascoDetalle d
-    INNER JOIN dbo.WTarima t ON t.IdTarima = d.IdTarima
+    LEFT JOIN [Catalogo TiposUsados] tu ON tu.IdTipoUsado = d.IdTipoCasco
     WHERE d.IdMovimiento = @IdMovimiento
-    ORDER BY d.IdDetalle
+    ORDER BY d.NumeroTarima, d.IdDetalle
 ) det
 WHERE m.IdMovimiento = @IdMovimiento", conn, tran);
             cmdUpd.Parameters.AddWithValue("@TotalTarimas", totalTarimas);
@@ -208,20 +185,98 @@ WHERE m.IdMovimiento = @IdMovimiento", conn, tran);
     {
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
+        using var tran = conn.BeginTransaction();
 
-        await using var cmd = new SqlCommand(SpActualizar, conn);
-        cmd.CommandType = CommandType.StoredProcedure;
-        cmd.Parameters.AddWithValue("@IdMovimiento", idMovimiento);
-        cmd.Parameters.AddWithValue("@IdRepartidorEntrega", request.IdRepartidorEntrega);
-        cmd.Parameters.AddWithValue("@IdTarima", request.IdTarima);
-        cmd.Parameters.AddWithValue("@NumeroTarima", request.NumeroTarima);
-        cmd.Parameters.AddWithValue("@Piezas", request.Piezas);
-        cmd.Parameters.AddWithValue("@Kilos", DBNull.Value);
-        cmd.Parameters.AddWithValue("@IdRepartidorRecibe", DBNull.Value);
-        cmd.Parameters.AddWithValue("@Observaciones", string.IsNullOrWhiteSpace(request.Observaciones) ? DBNull.Value : request.Observaciones!.Trim());
-        cmd.Parameters.AddWithValue("@Usuario", string.IsNullOrWhiteSpace(usuario) ? DBNull.Value : usuario.Trim());
+        try
+        {
+            await using (var cmdMov = new SqlCommand(@"
+SELECT TipoMovimiento, Estatus
+FROM dbo.WMovimientoCasco WITH (UPDLOCK, ROWLOCK)
+WHERE IdMovimiento = @IdMovimiento", conn, tran))
+            {
+                cmdMov.Parameters.AddWithValue("@IdMovimiento", idMovimiento);
+                await using var reader = await cmdMov.ExecuteReaderAsync(ct);
+                if (!await reader.ReadAsync(ct))
+                    throw new ArgumentException("Movimiento no encontrado.");
 
-        await cmd.ExecuteNonQueryAsync(ct);
+                var tipoMov = reader.GetInt32(0);
+                var estatus = reader.GetInt32(1);
+                if (tipoMov != 1)
+                    throw new ArgumentException("El movimiento no corresponde a una salida.");
+                if (estatus == 3)
+                    throw new ArgumentException("No se puede modificar un movimiento cancelado.");
+                await reader.CloseAsync();
+            }
+
+            await using (var cmdUpdHeader = new SqlCommand(@"
+UPDATE dbo.WMovimientoCasco
+SET IdRepartidorEntrega = @IdRepartidorEntrega,
+    Observaciones = @Observaciones,
+    UsuarioModificacion = @Usuario,
+    FechaModificacion = GETDATE()
+WHERE IdMovimiento = @IdMovimiento", conn, tran))
+            {
+                cmdUpdHeader.Parameters.AddWithValue("@IdMovimiento", idMovimiento);
+                cmdUpdHeader.Parameters.AddWithValue("@IdRepartidorEntrega", request.IdRepartidorEntrega);
+                cmdUpdHeader.Parameters.AddWithValue("@Observaciones", string.IsNullOrWhiteSpace(request.Observaciones) ? DBNull.Value : request.Observaciones!.Trim());
+                cmdUpdHeader.Parameters.AddWithValue("@Usuario", string.IsNullOrWhiteSpace(usuario) ? DBNull.Value : usuario.Trim());
+                await cmdUpdHeader.ExecuteNonQueryAsync(ct);
+            }
+
+            await using (var cmdDel = new SqlCommand("DELETE FROM dbo.WMovimientoCascoDetalle WHERE IdMovimiento = @IdMovimiento", conn, tran))
+            {
+                cmdDel.Parameters.AddWithValue("@IdMovimiento", idMovimiento);
+                await cmdDel.ExecuteNonQueryAsync(ct);
+            }
+
+            var lineas = FlattenTarimas(request.Tarimas);
+            var totalTarimas = lineas.Select(x => x.NumeroTarima).Distinct().Count();
+            var totalPiezas = lineas.Sum(x => x.Piezas);
+
+            foreach (var item in lineas)
+            {
+                await using var cmdDet = new SqlCommand(@"
+INSERT INTO dbo.WMovimientoCascoDetalle (IdMovimiento, IdTarima, IdTipoCasco, NumeroTarima, Piezas)
+VALUES (@IdMovimiento, @IdTarima, @IdTipoCasco, @NumeroTarima, @Piezas)", conn, tran);
+                cmdDet.Parameters.AddWithValue("@IdMovimiento", idMovimiento);
+                cmdDet.Parameters.AddWithValue("@IdTarima", DBNull.Value);
+                cmdDet.Parameters.AddWithValue("@IdTipoCasco", item.IdTipoCasco);
+                cmdDet.Parameters.AddWithValue("@NumeroTarima", item.NumeroTarima);
+                cmdDet.Parameters.AddWithValue("@Piezas", item.Piezas);
+                await cmdDet.ExecuteNonQueryAsync(ct);
+            }
+
+            await using (var cmdUpdTot = new SqlCommand(@"
+UPDATE m
+SET TotalTarimas = @TotalTarimas,
+    TotalPiezas  = @TotalPiezas,
+    NombreTarima = det.TipoCascoDescripcion,
+    UsuarioModificacion = @Usuario,
+    FechaModificacion = GETDATE()
+FROM dbo.WMovimientoCasco m
+OUTER APPLY (
+    SELECT TOP 1 ISNULL(tu.[Tipo de Usado], N'') AS TipoCascoDescripcion
+    FROM dbo.WMovimientoCascoDetalle d
+    LEFT JOIN [Catalogo TiposUsados] tu ON tu.IdTipoUsado = d.IdTipoCasco
+    WHERE d.IdMovimiento = @IdMovimiento
+    ORDER BY d.NumeroTarima, d.IdDetalle
+) det
+WHERE m.IdMovimiento = @IdMovimiento", conn, tran))
+            {
+                cmdUpdTot.Parameters.AddWithValue("@IdMovimiento", idMovimiento);
+                cmdUpdTot.Parameters.AddWithValue("@TotalTarimas", totalTarimas);
+                cmdUpdTot.Parameters.AddWithValue("@TotalPiezas", totalPiezas);
+                cmdUpdTot.Parameters.AddWithValue("@Usuario", string.IsNullOrWhiteSpace(usuario) ? DBNull.Value : usuario.Trim());
+                await cmdUpdTot.ExecuteNonQueryAsync(ct);
+            }
+
+            tran.Commit();
+        }
+        catch
+        {
+            tran.Rollback();
+            throw;
+        }
     }
 
     public async Task ActualizarEntradaAsync(int idMovimiento, UpdateEntradaRequest request, string usuario, CancellationToken ct = default)
@@ -256,5 +311,20 @@ WHERE m.IdMovimiento = @IdMovimiento", conn, tran);
         cmd.Parameters.AddWithValue("@Usuario", string.IsNullOrWhiteSpace(usuario) ? DBNull.Value : usuario.Trim());
 
         await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    private static List<(int NumeroTarima, int IdTipoCasco, int Piezas)> FlattenTarimas(IEnumerable<SalidaTarimaDto> tarimas)
+    {
+        var result = new List<(int NumeroTarima, int IdTipoCasco, int Piezas)>();
+
+        foreach (var tarima in tarimas)
+        {
+            foreach (var linea in tarima.Lineas)
+            {
+                result.Add((tarima.NumeroTarima, linea.IdTipoCasco, linea.Piezas));
+            }
+        }
+
+        return result;
     }
 }

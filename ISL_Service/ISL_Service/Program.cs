@@ -125,6 +125,8 @@ builder.Services.AddScoped<IEmpresaService, EmpresaService>();
 builder.Services.AddScoped<ITarimaRepository, TarimaRepository>();
 builder.Services.AddScoped<ITarimaService, TarimaService>();
 builder.Services.AddScoped<ICatalogosRepository, CatalogosRepository>();
+builder.Services.AddScoped<ITemporadasRepository, TemporadasRepository>();
+builder.Services.AddScoped<ITemporadasService, TemporadasService>();
 
 // -------------------- ALMACEN CASCOS --------------------
 builder.Services.AddScoped<IAlmacenCascosRepository, AlmacenCascosRepository>();

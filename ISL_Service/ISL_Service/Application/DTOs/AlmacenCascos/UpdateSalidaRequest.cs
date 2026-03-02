@@ -6,8 +6,6 @@ namespace ISL_Service.Application.DTOs.AlmacenCascos;
 public class UpdateSalidaRequest
 {
     public int IdRepartidorEntrega { get; set; }
-    public int IdTarima { get; set; }
-    public int NumeroTarima { get; set; }
-    public int Piezas { get; set; }
     public string? Observaciones { get; set; }
+    public List<SalidaTarimaDto> Tarimas { get; set; } = new();
 }

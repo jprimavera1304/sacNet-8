@@ -6,7 +6,7 @@ using Microsoft.Data.SqlClient;
 namespace ISL_Service.Application.Services;
 
 /// <summary>
-/// Servicio Almacén de Cascos: validaciones (repartidores/tarimas activos, kilos, piezas) y mapeo de errores SQL a 400/409.
+/// Servicio Almacen de Cascos: validaciones (repartidores/tipos activos, kilos, piezas) y mapeo de errores SQL a 400/409.
 /// </summary>
 public class AlmacenCascosService : IAlmacenCascosService
 {
@@ -116,26 +116,38 @@ public class AlmacenCascosService : IAlmacenCascosService
         if (request.IdRepartidorEntrega <= 0)
             throw new ArgumentException("idRepartidorEntrega es requerido y debe ser mayor a 0.");
 
-        if (request.Detalle == null || request.Detalle.Count == 0)
-            throw new ArgumentException("detalle es requerido y debe tener al menos un item.");
+        if (request.Tarimas == null || request.Tarimas.Count == 0)
+            throw new ArgumentException("tarimas es requerido y debe tener al menos un item.");
 
         var repartidores = await _catalogos.ListRepartidoresAsync(1, ct);
         if (repartidores.All(r => r.IdRepartidor != request.IdRepartidorEntrega))
             throw new ArgumentException("idRepartidorEntrega no es un repartidor activo.");
 
-        var tarimas = await _catalogos.ListTarimasAsync(1, ct);
-        var idsTarima = tarimas.Select(t => t.IdTarima).ToHashSet();
+        var tipos = await _catalogos.ListTiposCascoAsync(1, ct);
+        var idsTipoCasco = tipos.Select(t => t.IdTipoCasco).ToHashSet();
+        var numeros = new HashSet<int>();
 
-        foreach (var item in request.Detalle)
+        foreach (var tarima in request.Tarimas)
         {
-            if (item.IdTarima <= 0)
-                throw new ArgumentException("Cada item del detalle debe tener idTarima mayor a 0.");
-            if (!idsTarima.Contains(item.IdTarima))
-                throw new ArgumentException($"La tarima IdTarima={item.IdTarima} no existe o no está activa.");
-            if (item.Piezas <= 0)
-                throw new ArgumentException("Cada item del detalle debe tener piezas mayor a 0.");
-            if (item.NumeroTarima <= 0)
-                throw new ArgumentException("Cada item del detalle debe tener numeroTarima mayor a 0.");
+            if (tarima.NumeroTarima <= 0)
+                throw new ArgumentException("Cada tarima debe tener numeroTarima mayor a 0.");
+            if (!numeros.Add(tarima.NumeroTarima))
+                throw new ArgumentException($"numeroTarima repetido: {tarima.NumeroTarima}.");
+            if (tarima.Lineas == null || tarima.Lineas.Count == 0)
+                throw new ArgumentException($"La tarima {tarima.NumeroTarima} debe tener al menos una linea.");
+
+            var tiposTarima = new HashSet<int>();
+            foreach (var linea in tarima.Lineas)
+            {
+                if (linea.IdTipoCasco <= 0)
+                    throw new ArgumentException("Cada linea debe tener idTipoCasco mayor a 0.");
+                if (!idsTipoCasco.Contains(linea.IdTipoCasco))
+                    throw new ArgumentException($"El tipo de casco IdTipoCasco={linea.IdTipoCasco} no existe o no esta activo.");
+                if (!tiposTarima.Add(linea.IdTipoCasco))
+                    throw new ArgumentException($"Tipo de casco repetido en la tarima {tarima.NumeroTarima}: {linea.IdTipoCasco}.");
+                if (linea.Piezas <= 0)
+                    throw new ArgumentException("Cada linea debe tener piezas mayor a 0.");
+            }
         }
     }
 
@@ -147,12 +159,29 @@ public class AlmacenCascosService : IAlmacenCascosService
             throw new ArgumentException("idRepartidorRecibe es requerido y debe ser mayor a 0.");
         if (request.Kilos <= 0)
             throw new ArgumentException("kilos debe ser mayor a 0.");
-        // 4 decimales: redondear si viene con más
+
         request.Kilos = Math.Round(request.Kilos, 4);
 
         var repartidores = await _catalogos.ListRepartidoresAsync(1, ct);
         if (repartidores.All(r => r.IdRepartidor != request.IdRepartidorRecibe))
             throw new ArgumentException("idRepartidorRecibe no es un repartidor activo.");
+
+        if (request.Detalle is { Count: > 0 })
+        {
+            var actual = await _repository.GetDetalleMovimientoAsync(request.IdMovimientoSalida, ct);
+
+            var expected = request.Detalle
+                .Select(x => (x.NumeroTarima, x.IdTipoCasco, x.Piezas))
+                .OrderBy(x => x.NumeroTarima).ThenBy(x => x.IdTipoCasco).ThenBy(x => x.Piezas)
+                .ToList();
+            var current = actual
+                .Select(x => (x.NumeroTarima, x.IdTipoCasco, x.Piezas))
+                .OrderBy(x => x.NumeroTarima).ThenBy(x => x.IdTipoCasco).ThenBy(x => x.Piezas)
+                .ToList();
+
+            if (expected.Count != current.Count || !expected.SequenceEqual(current))
+                throw new ArgumentException("El detalle de entrada no coincide con el detalle de la salida.");
+        }
     }
 
     /// <summary>
@@ -161,18 +190,19 @@ public class AlmacenCascosService : IAlmacenCascosService
     private static void MapSqlException(SqlException ex)
     {
         var msg = ex.Message;
-        // Violación de índice único (doble entrada por salida)
         if (ex.Number == 2627 || ex.Number == 2601 || msg.Contains("UX_WMovimientoCasco_EntradaUnica", StringComparison.OrdinalIgnoreCase) || msg.Contains("duplicate", StringComparison.OrdinalIgnoreCase) && msg.Contains("IdMovimientoSalida", StringComparison.OrdinalIgnoreCase))
             throw new ConflictException("Ya existe una entrada registrada para esta salida.", msg);
-        if (msg.Contains("ya está cancelado", StringComparison.OrdinalIgnoreCase) || msg.Contains("ya cancelado", StringComparison.OrdinalIgnoreCase))
-            throw new ConflictException("El movimiento ya está cancelado.", msg);
+        if (msg.Contains("ya existe una entrada para esta salida", StringComparison.OrdinalIgnoreCase))
+            throw new ConflictException("Ya existe una entrada registrada para esta salida.", msg);
+        if (msg.Contains("ya esta cancelado", StringComparison.OrdinalIgnoreCase) || msg.Contains("ya cancelado", StringComparison.OrdinalIgnoreCase))
+            throw new ConflictException("El movimiento ya esta cancelado.", msg);
         if (msg.Contains("no se puede modificar", StringComparison.OrdinalIgnoreCase))
             throw new ConflictException(msg, msg);
         if (msg.Contains("no se puede cancelar", StringComparison.OrdinalIgnoreCase) || msg.Contains("tiene entrada aceptada", StringComparison.OrdinalIgnoreCase))
             throw new ConflictException(msg, msg);
         if (msg.Contains("no tiene detalle", StringComparison.OrdinalIgnoreCase) || msg.Contains("sin detalle", StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException(msg);
-        if (msg.Contains("no válida", StringComparison.OrdinalIgnoreCase) || msg.Contains("Repartidor no válido", StringComparison.OrdinalIgnoreCase) || msg.Contains("salida no está", StringComparison.OrdinalIgnoreCase))
+        if (msg.Contains("no valida", StringComparison.OrdinalIgnoreCase) || msg.Contains("Repartidor no valido", StringComparison.OrdinalIgnoreCase) || msg.Contains("salida no esta", StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException(msg);
         if (ex.Number >= 50000 && ex.Number <= 99999)
             throw new ArgumentException(msg);
@@ -182,20 +212,39 @@ public class AlmacenCascosService : IAlmacenCascosService
     {
         if (request.IdRepartidorEntrega <= 0)
             throw new ArgumentException("idRepartidorEntrega es requerido y debe ser mayor a 0.");
-        if (request.IdTarima <= 0)
-            throw new ArgumentException("idTarima es requerido y debe ser mayor a 0.");
-        if (request.NumeroTarima <= 0)
-            throw new ArgumentException("numeroTarima debe ser mayor a 0.");
-        if (request.Piezas <= 0)
-            throw new ArgumentException("piezas debe ser mayor a 0.");
+        if (request.Tarimas == null || request.Tarimas.Count == 0)
+            throw new ArgumentException("tarimas es requerido y debe tener al menos un item.");
 
         var repartidores = await _catalogos.ListRepartidoresAsync(1, ct);
         if (repartidores.All(r => r.IdRepartidor != request.IdRepartidorEntrega))
             throw new ArgumentException("idRepartidorEntrega no es un repartidor activo.");
 
-        var tarimas = await _catalogos.ListTarimasAsync(1, ct);
-        if (tarimas.All(t => t.IdTarima != request.IdTarima))
-            throw new ArgumentException("idTarima no existe o no está activa.");
+        var tipos = await _catalogos.ListTiposCascoAsync(1, ct);
+        var idsTipoCasco = tipos.Select(t => t.IdTipoCasco).ToHashSet();
+        var numeros = new HashSet<int>();
+
+        foreach (var tarima in request.Tarimas)
+        {
+            if (tarima.NumeroTarima <= 0)
+                throw new ArgumentException("Cada tarima debe tener numeroTarima mayor a 0.");
+            if (!numeros.Add(tarima.NumeroTarima))
+                throw new ArgumentException($"numeroTarima repetido: {tarima.NumeroTarima}.");
+            if (tarima.Lineas == null || tarima.Lineas.Count == 0)
+                throw new ArgumentException($"La tarima {tarima.NumeroTarima} debe tener al menos una linea.");
+
+            var tiposTarima = new HashSet<int>();
+            foreach (var linea in tarima.Lineas)
+            {
+                if (linea.IdTipoCasco <= 0)
+                    throw new ArgumentException("Cada linea debe tener idTipoCasco mayor a 0.");
+                if (!idsTipoCasco.Contains(linea.IdTipoCasco))
+                    throw new ArgumentException($"El tipo de casco IdTipoCasco={linea.IdTipoCasco} no existe o no esta activo.");
+                if (!tiposTarima.Add(linea.IdTipoCasco))
+                    throw new ArgumentException($"Tipo de casco repetido en la tarima {tarima.NumeroTarima}: {linea.IdTipoCasco}.");
+                if (linea.Piezas <= 0)
+                    throw new ArgumentException("Cada linea debe tener piezas mayor a 0.");
+            }
+        }
     }
 
     private async Task ValidarEntradaUpdateAsync(UpdateEntradaRequest request, CancellationToken ct)

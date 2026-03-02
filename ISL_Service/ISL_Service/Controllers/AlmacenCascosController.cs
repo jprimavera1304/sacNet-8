@@ -53,6 +53,41 @@ public class AlmacenCascosController : ControllerBase
     }
 
     /// <summary>
+    /// Obtiene detalle agrupado por tarima logica (numeroTarima) y lineas por tipo de casco.
+    /// </summary>
+    [HttpGet("movimientos/{idMovimiento:int}/detalle-agrupado")]
+    [ProducesResponseType(typeof(MovimientoCascoDetalleAgrupadoDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetDetalleAgrupado(int idMovimiento, CancellationToken ct)
+    {
+        var list = await _service.GetDetalleMovimientoAsync(idMovimiento, ct);
+        var grouped = new MovimientoCascoDetalleAgrupadoDto
+        {
+            IdMovimiento = idMovimiento,
+            Tarimas = list
+                .GroupBy(x => x.NumeroTarima)
+                .OrderBy(g => g.Key)
+                .Select(g => new TarimaDetalleAgrupadoDto
+                {
+                    NumeroTarima = g.Key,
+                    Lineas = g
+                        .OrderBy(x => x.IdDetalle)
+                        .Select(x => new TarimaDetalleLineaDto
+                        {
+                            IdDetalle = x.IdDetalle,
+                            IdTarima = x.IdTarima,
+                            IdTipoCasco = x.IdTipoCasco,
+                            TipoCascoDescripcion = x.TipoCascoDescripcion,
+                            Piezas = x.Piezas
+                        })
+                        .ToList()
+                })
+                .ToList()
+        };
+
+        return Ok(grouped);
+    }
+
+    /// <summary>
     /// Crea una SALIDA (cabecera + detalle). TotalTarimas/TotalPiezas se calculan en backend; TotalKilos = 0.
     /// </summary>
     /// <response code="201">Salida creada (devuelve idMovimiento)</response>

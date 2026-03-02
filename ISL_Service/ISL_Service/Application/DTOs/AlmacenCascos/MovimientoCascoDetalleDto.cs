@@ -7,7 +7,7 @@ public class MovimientoCascoDetalleDto
 {
     public int IdDetalle { get; set; }
     public int IdMovimiento { get; set; }
-    public int IdTarima { get; set; }
+    public int? IdTarima { get; set; }
     public int IdTipoCasco { get; set; }
     public int NumeroTarima { get; set; }
     public int Piezas { get; set; }
