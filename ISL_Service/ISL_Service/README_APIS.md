@@ -21,7 +21,8 @@ En desarrollo, Swagger está disponible en `/swagger`.
 12. [Recaudaciones](#12-recaudaciones)
 13. [Proveedores de pagos](#13-proveedores-de-pagos)
 14. [Temporadas y Torneos](#14-temporadas-y-torneos)
-15. [Utilidades](#15-utilidades)
+15. [Categorias Equipos](#15-categorias-equipos)
+16. [Utilidades](#16-utilidades)
 
 ---
 
@@ -357,7 +358,27 @@ Reglas de negocio principales:
 
 ---
 
-## 15. Utilidades
+## 15. Categorias Equipos
+
+Base: `api/categorias`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarCategorias`, `sp_w_InsertarCategoria`, `sp_w_ActualizarCategoria`, `sp_w_InhabilitarCategoria`.
+
+| Metodo | Ruta | Politica | Descripcion |
+|--------|------|----------|-------------|
+| `GET` | `/api/categorias` | `perm:categorias.ver` | Lista categorias. Filtros opcionales: `estado` (1 activo, 2 inactivo), `texto` (busqueda por nombre). |
+| `GET` | `/api/categorias/{id}` | `perm:categorias.ver` | Obtiene categoria por Id (GUID). |
+| `POST` | `/api/categorias` | `perm:categorias.crear` | Crea categoria. Body: `CreateCategoriaRequest` (`nombre`). |
+| `PUT` | `/api/categorias/{id}` | `perm:categorias.editar` | Actualiza categoria activa. Body: `UpdateCategoriaRequest` (`nombre`). |
+| `POST` | `/api/categorias/{id}/inhabilitar` | `perm:categorias.activar` | Inhabilita categoria (estado 2). Body opcional: `InhabilitarCategoriaRequest` (`motivo`). |
+
+Reglas:
+- `nombre` requerido, max 120.
+- `motivo` max 200.
+- No permite nombre duplicado.
+- No permite modificar categoria inactiva.
+
+---
+
+## 16. Utilidades
 
 Endpoints mínimos (Program.cs), sin autenticación JWT:
 
