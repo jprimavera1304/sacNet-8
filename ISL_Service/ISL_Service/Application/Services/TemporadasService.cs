@@ -8,6 +8,8 @@ namespace ISL_Service.Application.Services;
 public class TemporadasService : ITemporadasService
 {
     private readonly ITemporadasRepository _repository;
+    private const byte EstadoTemporadaActiva = 1;
+    private const byte EstadoTorneoActivo = 2;
 
     public TemporadasService(ITemporadasRepository repository)
     {
@@ -72,6 +74,12 @@ public class TemporadasService : ITemporadasService
         if (actual.Estado == 2)
             return actual;
 
+        // Evita cancelar temporada si aun tiene torneos activos.
+        await _repository.CerrarTorneosVencidosAsync(usuarioId, null, ct);
+        var torneosActivos = await _repository.ConsultarTorneosAsync(id, EstadoTorneoActivo, null, null, null, ct);
+        if (torneosActivos.Count > 0)
+            throw new ConflictException("No se puede cancelar: existen torneos activos en la temporada.");
+
         try
         {
             var canceled = await _repository.CancelarTemporadaAsync(id, motivo, usuarioId, ct);
@@ -113,6 +121,9 @@ public class TemporadasService : ITemporadasService
     public Task<List<TorneoDto>> ConsultarTorneosAsync(Guid? temporadaId, byte? estado, string? texto, DateTime? fechaInicio, DateTime? fechaFin, CancellationToken ct = default)
         => _repository.ConsultarTorneosAsync(temporadaId, estado, NormalizeText(texto), fechaInicio, fechaFin, ct);
 
+    public Task<List<TorneoDto>> ConsultarTorneosListadoAsync(Guid? temporadaId, byte? estado, string? texto, DateTime? fechaInicio, DateTime? fechaFin, Guid usuarioSistemaId, CancellationToken ct = default)
+        => _repository.ConsultarTorneosListadoAsync(temporadaId, estado, NormalizeText(texto), fechaInicio, fechaFin, usuarioSistemaId, ct);
+
     public async Task<TorneoDto?> GetTorneoByIdAsync(Guid id, CancellationToken ct = default)
     {
         var list = await _repository.ConsultarTorneosAsync(null, null, null, null, null, ct);
@@ -121,6 +132,8 @@ public class TemporadasService : ITemporadasService
 
     public async Task<TorneoDto> CrearTorneoAsync(CreateTorneoRequest request, Guid usuarioId, CancellationToken ct = default)
     {
+        await ValidateTorneoDentroTemporadaAsync(request.TemporadaId, request.FechaInicio, request.FechaFin, ct);
+
         try
         {
             var created = await _repository.InsertarTorneoAsync(request, usuarioId, ct);
@@ -142,6 +155,8 @@ public class TemporadasService : ITemporadasService
             throw new NotFoundException("El torneo no existe.", id.ToString());
         if (actual.Estado is 0 or 3 or 4)
             throw new ConflictException("No se puede modificar: torneo inhabilitado, cerrado o cancelado.");
+
+        await ValidateTorneoDentroTemporadaAsync(request.TemporadaId, request.FechaInicio, request.FechaFin, ct);
 
         try
         {
@@ -253,6 +268,30 @@ public class TemporadasService : ITemporadasService
         if (string.IsNullOrWhiteSpace(text))
             return null;
         return text.Trim();
+    }
+
+    private async Task ValidateTorneoDentroTemporadaAsync(Guid temporadaId, DateTime? torneoFechaInicio, DateTime? torneoFechaFin, CancellationToken ct)
+    {
+        var temporada = await GetTemporadaByIdAsync(temporadaId, ct);
+        if (temporada is null || temporada.Estado != EstadoTemporadaActiva)
+            throw new ArgumentException("Temporada invalida o no activa.");
+
+        var temporadaInicio = temporada.FechaInicio?.Date;
+        var temporadaFin = temporada.FechaFin?.Date;
+        var inicioTorneo = torneoFechaInicio?.Date;
+        var finTorneo = torneoFechaFin?.Date;
+
+        if (temporadaInicio.HasValue && inicioTorneo.HasValue && inicioTorneo.Value < temporadaInicio.Value)
+            throw new ArgumentException("El torneo no puede iniciar antes que la temporada.");
+
+        if (temporadaFin.HasValue && inicioTorneo.HasValue && inicioTorneo.Value > temporadaFin.Value)
+            throw new ArgumentException("La fecha de inicio del torneo no puede ser posterior al fin de la temporada.");
+
+        if (temporadaInicio.HasValue && finTorneo.HasValue && finTorneo.Value < temporadaInicio.Value)
+            throw new ArgumentException("La fecha de fin del torneo no puede ser anterior al inicio de la temporada.");
+
+        if (temporadaFin.HasValue && finTorneo.HasValue && finTorneo.Value > temporadaFin.Value)
+            throw new ArgumentException("El torneo no puede durar mas que la temporada.");
     }
 
     private static void ThrowMappedException(SqlException ex)

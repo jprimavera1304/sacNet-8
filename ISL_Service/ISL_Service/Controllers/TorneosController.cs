@@ -25,8 +25,10 @@ public class TorneosController : ControllerBase
     {
         if (fechaInicio.HasValue && fechaFin.HasValue && fechaFin < fechaInicio)
             return BadRequest(new { message = "fechaFin no puede ser menor que fechaInicio." });
+        if (!TryGetUserId(out var userId))
+            return Unauthorized(new { message = "Token invalido." });
 
-        var list = await _service.ConsultarTorneosAsync(temporadaId, estado, texto, fechaInicio, fechaFin, ct);
+        var list = await _service.ConsultarTorneosListadoAsync(temporadaId, estado, texto, fechaInicio, fechaFin, userId, ct);
         return Ok(list);
     }
 
