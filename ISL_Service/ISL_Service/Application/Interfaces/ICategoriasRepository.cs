@@ -8,5 +8,5 @@ public interface ICategoriasRepository
     Task<CategoriaDto?> InsertarAsync(CreateCategoriaRequest request, Guid usuarioId, CancellationToken ct = default);
     Task<CategoriaDto?> ActualizarAsync(Guid id, UpdateCategoriaRequest request, Guid usuarioId, CancellationToken ct = default);
     Task<CategoriaDto?> InhabilitarAsync(Guid id, string? motivo, Guid usuarioId, CancellationToken ct = default);
+    Task<CategoriaDto?> HabilitarAsync(Guid id, Guid usuarioId, CancellationToken ct = default);
 }
-

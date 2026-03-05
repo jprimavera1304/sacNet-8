@@ -83,6 +83,28 @@ public class CategoriasService : ICategoriasService
         }
     }
 
+    public async Task<CategoriaDto> HabilitarAsync(Guid id, Guid usuarioId, CancellationToken ct = default)
+    {
+        var actual = await GetByIdAsync(id, ct);
+        if (actual is null)
+            throw new NotFoundException("La categoria no existe.", id.ToString());
+        if (actual.Estado == 1)
+            return actual;
+
+        try
+        {
+            var enabled = await _repository.HabilitarAsync(id, usuarioId, ct);
+            if (enabled is null)
+                throw new InvalidOperationException("No se pudo habilitar la categoria.");
+            return enabled;
+        }
+        catch (SqlException ex)
+        {
+            ThrowMappedException(ex);
+            throw;
+        }
+    }
+
     private static string? NormalizeText(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -105,4 +127,3 @@ public class CategoriasService : ICategoriasService
             throw new ArgumentException(msg);
     }
 }
-

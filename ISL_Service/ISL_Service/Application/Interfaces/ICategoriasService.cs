@@ -9,5 +9,5 @@ public interface ICategoriasService
     Task<CategoriaDto> CrearAsync(CreateCategoriaRequest request, Guid usuarioId, CancellationToken ct = default);
     Task<CategoriaDto> ActualizarAsync(Guid id, UpdateCategoriaRequest request, Guid usuarioId, CancellationToken ct = default);
     Task<CategoriaDto> InhabilitarAsync(Guid id, string? motivo, Guid usuarioId, CancellationToken ct = default);
+    Task<CategoriaDto> HabilitarAsync(Guid id, Guid usuarioId, CancellationToken ct = default);
 }
-

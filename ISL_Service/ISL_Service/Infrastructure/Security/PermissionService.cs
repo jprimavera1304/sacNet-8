@@ -42,7 +42,12 @@ public sealed class PermissionService : IPermissionService
         ["categorias.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
         ["categorias.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
         ["categorias.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
-        ["categorias.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" }
+        ["categorias.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["profesores.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["profesores.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["profesores.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["profesores.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["profesores.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" }
     };
 
     private readonly AppDbContext _db;
@@ -84,6 +89,12 @@ public sealed class PermissionService : IPermissionService
         new("categorias.crear", "Categorias - Crear", "categorias"),
         new("categorias.editar", "Categorias - Editar", "categorias"),
         new("categorias.activar", "Categorias - Activar/Inactivar", "categorias"),
+
+        new("profesores.ver_modulo", "Profesores - Ver modulo", "profesores"),
+        new("profesores.ver", "Profesores - Ver", "profesores"),
+        new("profesores.crear", "Profesores - Crear", "profesores"),
+        new("profesores.editar", "Profesores - Editar", "profesores"),
+        new("profesores.activar", "Profesores - Activar/Inactivar", "profesores"),
 
         new("pagosproveedores.ver", "Pagos Proveedores - Ver", "pagosproveedores"),
         new("pagosproveedores.crear", "Pagos Proveedores - Crear", "pagosproveedores"),
@@ -488,6 +499,7 @@ ORDER BY CASE WHEN m.ModuloClave = 'inicio' THEN 0 ELSE 1 END, m.ModuloClave;";
             "inicio",
             "cheques",
             "pagosproveedores",
+            "profesores",
             "permisos_modulos",
             "permisos_roles",
             "permisos_usuarios",

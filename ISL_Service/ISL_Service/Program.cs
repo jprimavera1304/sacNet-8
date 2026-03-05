@@ -127,6 +127,8 @@ builder.Services.AddScoped<ITarimaService, TarimaService>();
 builder.Services.AddScoped<ICatalogosRepository, CatalogosRepository>();
 builder.Services.AddScoped<ICategoriasRepository, CategoriasRepository>();
 builder.Services.AddScoped<ICategoriasService, CategoriasService>();
+builder.Services.AddScoped<IProfesoresRepository, ProfesoresRepository>();
+builder.Services.AddScoped<IProfesoresService, ProfesoresService>();
 builder.Services.AddScoped<ITemporadasRepository, TemporadasRepository>();
 builder.Services.AddScoped<ITemporadasService, TemporadasService>();
 

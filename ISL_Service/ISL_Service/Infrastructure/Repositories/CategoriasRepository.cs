@@ -93,6 +93,45 @@ public class CategoriasRepository : ICategoriasRepository
         return await ExecuteSingleAsync<CategoriaDto>(cmd, ct);
     }
 
+    public async Task<CategoriaDto?> HabilitarAsync(Guid id, Guid usuarioId, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        const string sql = @"
+UPDATE dbo.WCategoria
+SET
+    Estado = 1,
+    FechaActualizacion = GETDATE(),
+    UsuarioActualizacionId = @UsuarioId,
+    FechaCancelacion = NULL,
+    UsuarioCancelacionId = NULL,
+    MotivoCancelacion = NULL
+WHERE Id = @CategoriaId;
+
+SELECT
+    Id,
+    Nombre,
+    Estado,
+    FechaCreacion,
+    UsuarioCreacionId,
+    FechaActualizacion,
+    UsuarioActualizacionId,
+    FechaCancelacion,
+    UsuarioCancelacionId,
+    MotivoCancelacion,
+    RowVer
+FROM dbo.WCategoria
+WHERE Id = @CategoriaId;";
+
+        await using var cmd = new SqlCommand(sql, conn);
+        cmd.CommandType = CommandType.Text;
+        cmd.Parameters.AddWithValue("@CategoriaId", id);
+        cmd.Parameters.AddWithValue("@UsuarioId", usuarioId);
+
+        return await ExecuteSingleAsync<CategoriaDto>(cmd, ct);
+    }
+
     private static async Task<T?> ExecuteSingleAsync<T>(SqlCommand cmd, CancellationToken ct = default) where T : class
     {
         using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -101,4 +140,3 @@ public class CategoriasRepository : ICategoriasRepository
         return Funciones.DataTableToList<T>(dt).FirstOrDefault();
     }
 }
-

@@ -22,7 +22,8 @@ En desarrollo, Swagger está disponible en `/swagger`.
 13. [Proveedores de pagos](#13-proveedores-de-pagos)
 14. [Temporadas y Torneos](#14-temporadas-y-torneos)
 15. [Categorias Equipos](#15-categorias-equipos)
-16. [Utilidades](#16-utilidades)
+16. [Profesores](#16-profesores)
+17. [Utilidades](#17-utilidades)
 
 ---
 
@@ -369,6 +370,7 @@ Base: `api/categorias`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_Consu
 | `POST` | `/api/categorias` | `perm:categorias.crear` | Crea categoria. Body: `CreateCategoriaRequest` (`nombre`). |
 | `PUT` | `/api/categorias/{id}` | `perm:categorias.editar` | Actualiza categoria activa. Body: `UpdateCategoriaRequest` (`nombre`). |
 | `POST` | `/api/categorias/{id}/inhabilitar` | `perm:categorias.activar` | Inhabilita categoria (estado 2). Body opcional: `InhabilitarCategoriaRequest` (`motivo`). |
+| `POST` | `/api/categorias/{id}/habilitar` | `perm:categorias.activar` | Habilita categoria (estado 1). Sin body. |
 
 Reglas:
 - `nombre` requerido, max 120.
@@ -378,7 +380,29 @@ Reglas:
 
 ---
 
-## 16. Utilidades
+## 16. Profesores
+
+Base: `api/profesores`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarProfesores`, `sp_w_InsertarProfesor`, `sp_w_ActualizarProfesor`, `sp_w_InhabilitarProfesor`.
+
+| Metodo | Ruta | Politica | Descripcion |
+|--------|------|----------|-------------|
+| `GET` | `/api/profesores` | `perm:profesores.ver` | Lista profesores. Filtros opcionales: `estado` (1 activo, 2 inactivo), `texto` (nombre/telefono/correo). |
+| `GET` | `/api/profesores/{id}` | `perm:profesores.ver` | Obtiene profesor por Id (GUID). |
+| `POST` | `/api/profesores` | `perm:profesores.crear` | Crea profesor. Body: `CreateProfesorRequest` (`nombre`, `telefono`, `correo?`). |
+| `PUT` | `/api/profesores/{id}` | `perm:profesores.editar` | Actualiza profesor activo. Body: `UpdateProfesorRequest` (`nombre`, `telefono`, `correo?`). |
+| `POST` | `/api/profesores/{id}/inhabilitar` | `perm:profesores.activar` | Inhabilita profesor (estado 2). Body opcional: `InhabilitarProfesorRequest` (`motivo` opcional). |
+
+Reglas:
+- `nombre` requerido, max 120.
+- `telefono` requerido, max 30.
+- `correo` opcional, max 200.
+- `motivo` opcional, max 200.
+- No permite duplicado por `Nombre + Telefono`.
+- No permite modificar profesor inactivo.
+
+---
+
+## 17. Utilidades
 
 Endpoints mínimos (Program.cs), sin autenticación JWT:
 
