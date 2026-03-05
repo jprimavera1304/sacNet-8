@@ -391,6 +391,7 @@ Base: `api/profesores`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_Consu
 | `POST` | `/api/profesores` | `perm:profesores.crear` | Crea profesor. Body: `CreateProfesorRequest` (`nombre`, `telefono`, `correo?`). |
 | `PUT` | `/api/profesores/{id}` | `perm:profesores.editar` | Actualiza profesor activo. Body: `UpdateProfesorRequest` (`nombre`, `telefono`, `correo?`). |
 | `POST` | `/api/profesores/{id}/inhabilitar` | `perm:profesores.activar` | Inhabilita profesor (estado 2). Body opcional: `InhabilitarProfesorRequest` (`motivo` opcional). |
+| `POST` | `/api/profesores/{id}/habilitar` | `perm:profesores.activar` | Habilita profesor (estado 1). Sin body. |
 
 Reglas:
 - `nombre` requerido, max 120.

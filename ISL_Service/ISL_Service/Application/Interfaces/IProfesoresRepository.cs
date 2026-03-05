@@ -8,4 +8,5 @@ public interface IProfesoresRepository
     Task<ProfesorDto?> InsertarAsync(CreateProfesorRequest request, Guid usuarioId, CancellationToken ct = default);
     Task<ProfesorDto?> ActualizarAsync(Guid id, UpdateProfesorRequest request, Guid usuarioId, CancellationToken ct = default);
     Task<ProfesorDto?> InhabilitarAsync(Guid id, string? motivo, Guid usuarioId, CancellationToken ct = default);
+    Task<ProfesorDto?> HabilitarAsync(Guid id, Guid usuarioId, CancellationToken ct = default);
 }

@@ -114,6 +114,20 @@ public class ProfesoresController : ControllerBase
         return Ok(disabled);
     }
 
+    [HttpPost("{id:guid}/habilitar")]
+    [Authorize(Policy = "perm:profesores.activar")]
+    [ProducesResponseType(typeof(ProfesorDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Habilitar(Guid id, CancellationToken ct)
+    {
+        if (!TryGetUserId(out var userId))
+            return Unauthorized(new { message = "Token invalido." });
+
+        var enabled = await _service.HabilitarAsync(id, userId, ct);
+        return Ok(enabled);
+    }
+
     private bool TryGetUserId(out Guid userId)
     {
         var sub = User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.NameIdentifier);

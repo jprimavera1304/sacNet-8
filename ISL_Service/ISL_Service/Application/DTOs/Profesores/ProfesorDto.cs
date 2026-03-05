@@ -14,5 +14,8 @@ public class ProfesorDto
     public DateTime? FechaCancelacion { get; set; }
     public Guid? UsuarioCancelacionId { get; set; }
     public string? MotivoCancelacion { get; set; }
+    public string? UsuarioCreacion { get; set; }
+    public string? UsuarioActualizacion { get; set; }
+    public string? UsuarioCancelacion { get; set; }
     public byte[]? RowVer { get; set; }
 }
