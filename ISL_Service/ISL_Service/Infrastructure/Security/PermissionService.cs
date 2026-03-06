@@ -47,7 +47,12 @@ public sealed class PermissionService : IPermissionService
         ["profesores.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
         ["profesores.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
         ["profesores.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
-        ["profesores.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" }
+        ["profesores.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["equipos.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["equipos.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["equipos.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["equipos.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["equipos.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" }
     };
 
     private readonly AppDbContext _db;
@@ -95,6 +100,12 @@ public sealed class PermissionService : IPermissionService
         new("profesores.crear", "Profesores - Crear", "profesores"),
         new("profesores.editar", "Profesores - Editar", "profesores"),
         new("profesores.activar", "Profesores - Activar/Inactivar", "profesores"),
+
+        new("equipos.ver_modulo", "Equipos - Ver modulo", "equipos"),
+        new("equipos.ver", "Equipos - Ver", "equipos"),
+        new("equipos.crear", "Equipos - Crear", "equipos"),
+        new("equipos.editar", "Equipos - Editar", "equipos"),
+        new("equipos.activar", "Equipos - Activar/Inactivar", "equipos"),
 
         new("pagosproveedores.ver", "Pagos Proveedores - Ver", "pagosproveedores"),
         new("pagosproveedores.crear", "Pagos Proveedores - Crear", "pagosproveedores"),

@@ -23,7 +23,8 @@ En desarrollo, Swagger está disponible en `/swagger`.
 14. [Temporadas y Torneos](#14-temporadas-y-torneos)
 15. [Categorias Equipos](#15-categorias-equipos)
 16. [Profesores](#16-profesores)
-17. [Utilidades](#17-utilidades)
+17. [Equipos](#17-equipos)
+18. [Utilidades](#18-utilidades)
 
 ---
 
@@ -403,7 +404,31 @@ Reglas:
 
 ---
 
-## 17. Utilidades
+## 17. Equipos
+
+Base: `api/equipos`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarEquipos`, `sp_w_InsertarEquipo`, `sp_w_ActualizarEquipo`, `sp_w_InhabilitarEquipo`.
+
+| Metodo | Ruta | Politica | Descripcion |
+|--------|------|----------|-------------|
+| `GET` | `/api/equipos` | `perm:equipos.ver` | Lista equipos. Filtros opcionales: `estado` (1 activo, 2 inactivo), `categoriaId` (GUID), `diaJuego` (1 sabado, 2 domingo), `texto` (nombre/categoria/profesores). |
+| `GET` | `/api/equipos/{id}` | `perm:equipos.ver` | Obtiene equipo por Id (GUID). |
+| `POST` | `/api/equipos` | `perm:equipos.crear` | Crea equipo. Body: `CreateEquipoRequest` (`nombre`, `categoriaPredeterminadaId`, `diaJuegoPredeterminado`, `profesorTitularPredeterminadoId`, `profesorAuxiliarPredeterminadoId?`). |
+| `PUT` | `/api/equipos/{id}` | `perm:equipos.editar` | Actualiza equipo activo. Body: `UpdateEquipoRequest` (mismos campos de create). |
+| `POST` | `/api/equipos/{id}/inhabilitar` | `perm:equipos.activar` | Inhabilita equipo (estado 2). Body opcional: `InhabilitarEquipoRequest` (`motivo` opcional). |
+| `POST` | `/api/equipos/{id}/habilitar` | `perm:equipos.activar` | Habilita equipo (estado 1). Sin body. |
+
+Reglas:
+- `nombre` requerido, max 120.
+- `categoriaPredeterminadaId` requerido y activo.
+- `diaJuegoPredeterminado` requerido (1 o 2).
+- `profesorTitularPredeterminadoId` requerido y activo.
+- `profesorAuxiliarPredeterminadoId` opcional y distinto al titular.
+- `motivo` opcional, max 200.
+- No permite nombre de equipo duplicado.
+
+---
+
+## 18. Utilidades
 
 Endpoints mínimos (Program.cs), sin autenticación JWT:
 

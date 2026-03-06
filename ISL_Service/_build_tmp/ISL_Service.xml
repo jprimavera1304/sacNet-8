@@ -1,0 +1,355 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>ISL_Service</name>
+    </assembly>
+    <members>
+        <member name="T:ISL_Service.Application.DTOs.AlmacenCascos.CreateEntradaRequest">
+            <summary>
+            Request para aceptar ENTRADA (desde una salida registrada).
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Application.DTOs.AlmacenCascos.CreateSalidaRequest">
+            <summary>
+            Request para crear una SALIDA (cabecera + detalle).
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Application.DTOs.AlmacenCascos.MovimientoCascoDetalleDto">
+            <summary>
+            Línea de detalle de un movimiento (tarima + piezas).
+            </summary>
+        </member>
+        <member name="P:ISL_Service.Application.DTOs.AlmacenCascos.MovimientoCascoDetalleDto.NombreTarima">
+            <summary>Nombre de la tarima (desde WTarima).</summary>
+        </member>
+        <member name="P:ISL_Service.Application.DTOs.AlmacenCascos.MovimientoCascoDetalleDto.TipoCascoDescripcion">
+            <summary>Descripción del tipo de casco (desde [Catalogo TiposUsados]).</summary>
+        </member>
+        <member name="T:ISL_Service.Application.DTOs.AlmacenCascos.MovimientoCascoDto">
+            <summary>
+            Cabecera de movimiento (salida o entrada). TipoMovimiento: 1=SALIDA, 2=ENTRADA. Estatus: 1=REGISTRADA, 2=ACEPTADA, 3=CANCELADA.
+            </summary>
+        </member>
+        <member name="P:ISL_Service.Application.DTOs.AlmacenCascos.MovimientoCascoDto.EntregaNombre">
+            <summary>Nombre del repartidor que entrega (desde catálogo).</summary>
+        </member>
+        <member name="P:ISL_Service.Application.DTOs.AlmacenCascos.MovimientoCascoDto.RecibeNombre">
+            <summary>Nombre del repartidor que recibe (desde catálogo).</summary>
+        </member>
+        <member name="T:ISL_Service.Application.DTOs.AlmacenCascos.UpdateEntradaRequest">
+            <summary>
+            Request para actualizar una ENTRADA existente.
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Application.DTOs.AlmacenCascos.UpdateSalidaRequest">
+            <summary>
+            Request para actualizar una SALIDA existente.
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Application.DTOs.Catalogos.RepartidorItemDto">
+            <summary>
+            Item del catálogo [Catalogo Repartidores]. Para dropdown en Almacén de Cascos.
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Application.DTOs.Catalogos.TarimaCatalogItemDto">
+            <summary>
+            Item de tarima para catálogo (solo activas). Para dropdown en Almacén de Cascos.
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Application.DTOs.Catalogos.TipoCascoItemDto">
+            <summary>
+            Item del catalogo de tipos de casco (TiposUsados). Para dropdown en front.
+            </summary>
+        </member>
+        <member name="P:ISL_Service.Application.DTOs.ProveedoresPagos.ProveedorPagoDTO.IDStatus">
+            <summary>
+            1 = Activo, 2 = Cancelado
+            </summary>
+        </member>
+        <member name="P:ISL_Service.Application.DTOs.ProveedoresPagos.ProveedorPagoDTO.Cancelado">
+            <summary>
+            Campo derivado desde SQL
+            0 = No cancelado
+            1 = Cancelado
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Application.DTOs.Tarima.CreateTarimaRequest">
+            <summary>
+            Request para crear una tarima. Usuario se obtiene del token (no enviar en body).
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Application.DTOs.Tarima.TarimaDto">
+            <summary>
+            DTO de lectura para una tarima.
+            IdStatus: 1 = Activo, 2 = Cancelado.
+            </summary>
+        </member>
+        <member name="P:ISL_Service.Application.DTOs.Tarima.TarimaDto.IdStatus">
+            <summary>1 = Activo, 2 = Cancelado</summary>
+        </member>
+        <member name="P:ISL_Service.Application.DTOs.Tarima.TarimaDto.UsuarioCancelacion">
+            <summary>Usuario que inactivó la tarima (cuando IdStatus = 2).</summary>
+        </member>
+        <member name="P:ISL_Service.Application.DTOs.Tarima.TarimaDto.FechaCancelacion">
+            <summary>Fecha y hora en que se inactivó (cuando IdStatus = 2).</summary>
+        </member>
+        <member name="T:ISL_Service.Application.DTOs.Tarima.UpdateTarimaRequest">
+            <summary>
+            Request para actualizar una tarima. Solo aplica si la tarima esta activa.
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Application.DTOs.Tarima.UpdateTarimaStatusRequest">
+            <summary>
+            Request para cambiar estatus de una tarima. IdStatus: 1 = Activo, 2 = Cancelado.
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Application.Interfaces.IAlmacenCascosRepository">
+            <summary>
+            Operaciones del módulo Almacén de Cascos (movimientos, salidas, entradas, cancelación).
+            </summary>
+        </member>
+        <member name="M:ISL_Service.Application.Interfaces.IAlmacenCascosRepository.InsertarSalidaAsync(ISL_Service.Application.DTOs.AlmacenCascos.CreateSalidaRequest,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Crea cabecera SALIDA (SP), inserta detalle y actualiza totales. Transaccional.
+            </summary>
+        </member>
+        <member name="M:ISL_Service.Application.Interfaces.IAlmacenCascosRepository.AceptarEntradaAsync(ISL_Service.Application.DTOs.AlmacenCascos.CreateEntradaRequest,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Ejecuta sp_w_AceptarEntradaCasco (crea ENTRADA, acepta SALIDA, suma kilos).
+            </summary>
+        </member>
+        <member name="M:ISL_Service.Application.Interfaces.IAlmacenCascosRepository.ActualizarSalidaAsync(System.Int32,ISL_Service.Application.DTOs.AlmacenCascos.UpdateSalidaRequest,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Actualiza una salida (cabecera + detalle). Recalcula totales.
+            </summary>
+        </member>
+        <member name="M:ISL_Service.Application.Interfaces.IAlmacenCascosRepository.ActualizarEntradaAsync(System.Int32,ISL_Service.Application.DTOs.AlmacenCascos.UpdateEntradaRequest,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Actualiza una entrada (repartidor recibe, kilos, observaciones).
+            </summary>
+        </member>
+        <member name="M:ISL_Service.Application.Interfaces.IAlmacenCascosRepository.CancelarMovimientoAsync(System.Int32,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Ejecuta sp_w_CancelarMovimientoCasco.
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Application.Interfaces.IAlmacenCascosService">
+            <summary>
+            Servicio de negocio para Almacén de Cascos (validaciones + llamadas al repositorio).
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Application.Interfaces.ICatalogosRepository">
+            <summary>
+            Catalogo de solo lectura (TiposUsados, Repartidores, Tarimas).
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Application.Services.AlmacenCascosService">
+            <summary>
+            Servicio Almacen de Cascos: validaciones (repartidores/tipos activos, kilos, piezas) y mapeo de errores SQL a 400/409.
+            </summary>
+        </member>
+        <member name="M:ISL_Service.Application.Services.AlmacenCascosService.MapSqlException(Microsoft.Data.SqlClient.SqlException)">
+            <summary>
+            Mapea SqlException a ConflictException (409) o ArgumentException (400). Unique constraint -> 409.
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Controllers.AlmacenCascosController">
+            <summary>
+            API Almacén de Cascos: movimientos (salidas/entradas), detalle y cancelación. Usa SP sp_w_* y tablas WMovimientoCasco / WMovimientoCascoDetalle.
+            </summary>
+        </member>
+        <member name="M:ISL_Service.Controllers.AlmacenCascosController.GetMovimientos(System.Nullable{System.Int32},System.Nullable{System.Int32},System.Nullable{System.DateTime},System.Nullable{System.DateTime},System.Threading.CancellationToken)">
+            <summary>
+            Lista movimientos con filtros opcionales. TipoMovimiento: 1=SALIDA, 2=ENTRADA. Estatus: 1=REGISTRADA, 2=ACEPTADA, 3=CANCELADA.
+            </summary>
+            <param name="estatus">NULL = todos, 1/2/3 para filtrar</param>
+            <param name="tipoMovimiento">Opcional: 1=SALIDA, 2=ENTRADA</param>
+            <param name="fechaInicio">Opcional: filtrar desde fecha</param>
+            <param name="fechaFin">Opcional: filtrar hasta fecha</param>
+        </member>
+        <member name="M:ISL_Service.Controllers.AlmacenCascosController.GetDetalle(System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Obtiene el detalle (líneas de tarimas/piezas) de un movimiento.
+            </summary>
+        </member>
+        <member name="M:ISL_Service.Controllers.AlmacenCascosController.GetDetalleAgrupado(System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Obtiene detalle agrupado por tarima logica (numeroTarima) y lineas por tipo de casco.
+            </summary>
+        </member>
+        <member name="M:ISL_Service.Controllers.AlmacenCascosController.CrearSalida(ISL_Service.Application.DTOs.AlmacenCascos.CreateSalidaRequest,System.Threading.CancellationToken)">
+            <summary>
+            Crea una SALIDA (cabecera + detalle). TotalTarimas/TotalPiezas se calculan en backend; TotalKilos = 0.
+            </summary>
+            <response code="201">Salida creada (devuelve idMovimiento)</response>
+            <response code="400">Validación fallida o repartidor/tarimas no activos</response>
+        </member>
+        <member name="M:ISL_Service.Controllers.AlmacenCascosController.AceptarEntrada(ISL_Service.Application.DTOs.AlmacenCascos.CreateEntradaRequest,System.Threading.CancellationToken)">
+            <summary>
+            Acepta una ENTRADA desde una SALIDA registrada. El SP crea la entrada, marca la salida como aceptada y suma kilos a WConstantes.
+            </summary>
+            <response code="200">Entrada aceptada</response>
+            <response code="400">Validación o salida sin detalle / no registrada</response>
+            <response code="409">Ya existe entrada para esta salida (índice único)</response>
+        </member>
+        <member name="M:ISL_Service.Controllers.AlmacenCascosController.ActualizarSalida(System.Int32,ISL_Service.Application.DTOs.AlmacenCascos.UpdateSalidaRequest,System.Threading.CancellationToken)">
+            <summary>
+            Actualiza una SALIDA (repartidor, tarima, cantidad de tarimas, piezas, observaciones).
+            </summary>
+        </member>
+        <member name="M:ISL_Service.Controllers.AlmacenCascosController.ActualizarEntrada(System.Int32,ISL_Service.Application.DTOs.AlmacenCascos.UpdateEntradaRequest,System.Threading.CancellationToken)">
+            <summary>
+            Actualiza una ENTRADA (repartidor recibe, kilos, observaciones).
+            </summary>
+        </member>
+        <member name="M:ISL_Service.Controllers.AlmacenCascosController.Cancelar(System.Int32,ISL_Service.Application.DTOs.AlmacenCascos.CancelarMovimientoRequest,System.Threading.CancellationToken)">
+            <summary>
+            Cancela un movimiento (entrada o salida). Reglas validadas en SP (no cancelar ya cancelado; no cancelar salida si tiene entrada aceptada).
+            </summary>
+            <response code="200">Movimiento cancelado</response>
+            <response code="400">Motivo vacío o regla de negocio</response>
+            <response code="409">Ya cancelado o no se puede cancelar</response>
+        </member>
+        <member name="T:ISL_Service.Controllers.CatalogosController">
+            <summary>
+            Endpoints de catalogos (tipos de casco, etc.) para dropdowns y solo lectura.
+            </summary>
+        </member>
+        <member name="M:ISL_Service.Controllers.CatalogosController.GetTiposCasco(System.Nullable{System.Int32},System.Threading.CancellationToken)">
+            <summary>
+            Lista tipos de casco (TiposUsados). Para dropdown en alta/edicion de tarimas.
+            </summary>
+            <param name="status">Filtro por IdStatus (ej. 1 = activos). NULL = todos</param>
+            <returns>Lista con idTipoCasco (IdTipoUsado) y descripcion</returns>
+            <response code="200">Lista obtenida</response>
+        </member>
+        <member name="M:ISL_Service.Controllers.CatalogosController.GetRepartidores(System.Nullable{System.Int32},System.Threading.CancellationToken)">
+            <summary>
+            Lista repartidores (Catalogo Repartidores). Para dropdown en Almacén de Cascos.
+            </summary>
+            <param name="status">Filtro por IDStatus (ej. 1 = activos). NULL = todos</param>
+        </member>
+        <member name="M:ISL_Service.Controllers.CatalogosController.GetTarimas(System.Nullable{System.Int32},System.Threading.CancellationToken)">
+            <summary>
+            Lista tarimas (WTarima). Para dropdown en Almacén de Cascos.
+            </summary>
+            <param name="status">Filtro por IdStatus (ej. 1 = activos). NULL = todos</param>
+        </member>
+        <member name="M:ISL_Service.Controllers.PersonasController.Consultar(System.Nullable{System.Int32},System.Nullable{System.Int32})">
+            <summary>
+            Consulta personas.
+            Permite filtrar por IDPersona y/o IDStatus.
+            </summary>
+            <param name="idPersona">ID de la persona (opcional)</param>
+            <param name="idStatus">1 = Activo, 2 = Cancelado (opcional)</param>
+        </member>
+        <member name="M:ISL_Service.Controllers.PersonasController.Insertar(ISL_Service.Application.DTOs.Persona.PersonaInputDTO)">
+            <summary>
+            Inserta una nueva persona.
+            IDStatus siempre se crea en 1 (Activo).
+            </summary>
+        </member>
+        <member name="M:ISL_Service.Controllers.PersonasController.Actualizar(ISL_Service.Application.DTOs.Persona.PersonaInputDTO)">
+            <summary>
+            Actualiza una persona existente.
+            No modifica el IDStatus.
+            </summary>
+        </member>
+        <member name="M:ISL_Service.Controllers.PersonasController.Cancelar(ISL_Service.Application.DTOs.Persona.PersonaInputDTO)">
+            <summary>
+            Cancela una persona.
+            Cambia IDStatus a 2.
+            No permite cancelar si ya esta cancelada.
+            </summary>
+        </member>
+        <member name="M:ISL_Service.Controllers.PersonasController.Reactivar(ISL_Service.Application.DTOs.Persona.PersonaInputDTO)">
+            <summary>
+            Reactiva una persona.
+            Cambia IDStatus a 1.
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Controllers.TarimasController">
+            <summary>
+            API de Tarimas (dbo.WTarima). Estatus: 1 = Activo, 2 = Cancelado.
+            </summary>
+        </member>
+        <member name="M:ISL_Service.Controllers.TarimasController.List(System.Nullable{System.Int32},System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Lista tarimas con filtros opcionales por estatus y busqueda por nombre.
+            </summary>
+            <param name="idStatus">NULL = todas, 1 = Activo, 2 = Cancelado/Inactivo</param>
+            <param name="estatus">Alternativa a idStatus: "activo"=1, "inactivo" o "cancelado"=2, "todos"=todas. Si se envía idStatus tiene prioridad.</param>
+            <param name="busqueda">Filtro por nombre (opcional)</param>
+            <returns>Lista de TarimaDto</returns>
+            <response code="200">Lista obtenida correctamente</response>
+            <response code="401">No autenticado</response>
+            <response code="403">Sin permiso tarimas.ver</response>
+        </member>
+        <member name="M:ISL_Service.Controllers.TarimasController.ResolveStatusFilter(System.Nullable{System.Int32},System.String)">
+            <summary>Mapea idStatus (prioridad) o estatus (activo/inactivo/cancelado/todos) a 1, 2 o null.</summary>
+        </member>
+        <member name="M:ISL_Service.Controllers.TarimasController.GetById(System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Obtiene una tarima por IdTarima.
+            </summary>
+            <param name="idTarima">Id de la tarima</param>
+            <response code="200">Tarima encontrada</response>
+            <response code="404">Tarima no encontrada</response>
+            <response code="403">Sin permiso tarimas.ver</response>
+        </member>
+        <member name="M:ISL_Service.Controllers.TarimasController.Create(ISL_Service.Application.DTOs.Tarima.CreateTarimaRequest,System.Threading.CancellationToken)">
+            <summary>
+            Crea una tarima. Usuario se toma del token (no enviar en body).
+            </summary>
+            <response code="201">Tarima creada (devuelve IdTarima)</response>
+            <response code="400">Validacion fallida</response>
+            <response code="409">Ya existe una tarima activa con el mismo nombre y tipo de casco</response>
+            <response code="403">Sin permiso tarimas.crear</response>
+        </member>
+        <member name="M:ISL_Service.Controllers.TarimasController.Update(System.Int32,ISL_Service.Application.DTOs.Tarima.UpdateTarimaRequest,System.Threading.CancellationToken)">
+            <summary>
+            Actualiza una tarima. Solo si esta activa (IdStatus = 1).
+            </summary>
+            <response code="200">Actualizada</response>
+            <response code="400">Validacion fallida</response>
+            <response code="404">Tarima no encontrada</response>
+            <response code="409">Solo se puede actualizar una tarima activa / duplicado nombre+tipo casco</response>
+            <response code="403">Sin permiso tarimas.editar</response>
+        </member>
+        <member name="M:ISL_Service.Controllers.TarimasController.UpdateStatus(System.Int32,ISL_Service.Application.DTOs.Tarima.UpdateTarimaStatusRequest,System.Threading.CancellationToken)">
+            <summary>
+            Cambia el estatus de una tarima: 1 = Activo, 2 = Cancelado.
+            Si ya esta en el mismo estatus, responde 200 sin cambios.
+            </summary>
+            <response code="200">Estatus actualizado o ya estaba en ese estatus</response>
+            <response code="400">idStatus no es 1 ni 2</response>
+            <response code="404">Tarima no encontrada</response>
+            <response code="403">Sin permiso tarimas.estado.editar</response>
+        </member>
+        <member name="M:ISL_Service.Controllers.TarimasController.GetUsuarioFromToken">
+            <summary>Obtiene el nombre de usuario del token (varios claims posibles). Nunca devuelve null/vacío: usa "Sistema" como fallback.</summary>
+        </member>
+        <member name="T:ISL_Service.Infrastructure.Repositories.AlmacenCascosRepository">
+            <summary>
+            Repository Almacen de Cascos: SP sp_w_* y consultas directas a WMovimientoCasco / WMovimientoCascoDetalle.
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Infrastructure.Repositories.CatalogosRepository">
+            <summary>
+            Catalogo de solo lectura. Consulta [Catalogo TiposUsados] con IDStatus = 1.
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Infrastructure.Repositories.ProveedoresPagosRepository">
+            <summary>
+            Repository de ProveedoresPagos
+            Cambia automaticamente entre ConnectionString Local y Mac3
+            segun el ambiente (ASPNETCORE_ENVIRONMENT).
+            </summary>
+        </member>
+        <member name="T:ISL_Service.Infrastructure.Repositories.TarimaRepository">
+            <summary>
+            Repository de Tarimas usando SP: sp_w_ConsultarTarimas, sp_w_InsertarTarima, sp_w_ActualizarTarima, sp_w_CancelarTarima.
+            </summary>
+        </member>
+    </members>
+</doc>
