@@ -131,6 +131,8 @@ builder.Services.AddScoped<IProfesoresRepository, ProfesoresRepository>();
 builder.Services.AddScoped<IProfesoresService, ProfesoresService>();
 builder.Services.AddScoped<IEquiposRepository, EquiposRepository>();
 builder.Services.AddScoped<IEquiposService, EquiposService>();
+builder.Services.AddScoped<IChequesRepository, ChequesRepository>();
+builder.Services.AddScoped<IChequesService, ChequesService>();
 builder.Services.AddScoped<ITemporadasRepository, TemporadasRepository>();
 builder.Services.AddScoped<ITemporadasService, TemporadasService>();
 

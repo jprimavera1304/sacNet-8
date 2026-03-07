@@ -24,7 +24,8 @@ En desarrollo, Swagger está disponible en `/swagger`.
 15. [Categorias Equipos](#15-categorias-equipos)
 16. [Profesores](#16-profesores)
 17. [Equipos](#17-equipos)
-18. [Utilidades](#18-utilidades)
+18. [Cheques](#18-cheques)
+19. [Utilidades](#19-utilidades)
 
 ---
 
@@ -186,6 +187,8 @@ Base: `api/catalogos`. **Requiere:** usuario autenticado. Solo lectura para drop
 | `GET` | `/api/catalogos/tipos-casco` | Lista tipos de casco (TiposUsados) para dropdown en tarimas y almacén de cascos. |
 | `GET` | `/api/catalogos/repartidores` | Lista repartidores ([Catalogo Repartidores]) para dropdown en almacén de cascos. |
 | `GET` | `/api/catalogos/tarimas` | Lista tarimas (WTarima) activas para dropdown en almacén de cascos. |
+| `GET` | `/api/catalogos/clientes` | Lista clientes (Clientes) para dropdowns administrativos. |
+| `GET` | `/api/catalogos/bancos` | Lista bancos ([Catalogo Bancos]) para dropdowns administrativos. |
 
 **Query (todos):**
 
@@ -428,7 +431,30 @@ Reglas:
 
 ---
 
-## 18. Utilidades
+## 18. Cheques
+
+Base: `api/cheques`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarCheques`, `sp_w_ConsultarChequeDetalle`, `sp_w_InsertarCheque`, `sp_w_ActualizarCheque`, `sp_w_CambiarEstatusCheque`.
+
+| Metodo | Ruta | Politica | Descripcion |
+|--------|------|----------|-------------|
+| `GET` | `/api/cheques` | `perm:cheques.ver` | Lista cheques. Filtros opcionales: `texto`, `idCliente`, `idBanco`, `estatusCheque` (1-4), `idStatus` (1-2), `fechaChequeInicio`, `fechaChequeFin`. |
+| `GET` | `/api/cheques/{id}` | `perm:cheques.ver` | Obtiene detalle del cheque por Id (GUID), incluyendo historial. |
+| `POST` | `/api/cheques` | `perm:cheques.crear` | Crea cheque. Body: `CreateChequeRequest` (`idCliente`, `idBanco`, `numeroCheque`, `monto`, `fechaCheque`, `observaciones?`, `responsableCobroId?`). |
+| `PUT` | `/api/cheques/{id}` | `perm:cheques.editar` | Actualiza cheque en estatus Registrado. Body: `UpdateChequeRequest`. |
+| `POST` | `/api/cheques/{id}/estatus` | `perm:cheques.activar` | Cambia estatus del cheque. Body: `CambiarEstatusChequeRequest` (`estatusChequeNuevo` 2/3/4, `motivo?`, `observaciones?`, `fechaMovimiento?`). |
+
+Reglas:
+- `numeroCheque` requerido, max 50.
+- `monto` debe ser mayor a 0.
+- `fechaCheque` requerida.
+- `observaciones` max 500.
+- `motivo` max 300.
+- Solo se puede actualizar/cambiar estatus cuando el cheque esta en `Registrado`.
+- Para `estatusChequeNuevo` 3 (Devuelto) o 4 (Cancelado), `motivo` es obligatorio.
+
+---
+
+## 19. Utilidades
 
 Endpoints mínimos (Program.cs), sin autenticación JWT:
 

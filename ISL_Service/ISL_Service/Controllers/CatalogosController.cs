@@ -57,4 +57,28 @@ public class CatalogosController : ControllerBase
         var list = await _repository.ListTarimasAsync(status, ct);
         return Ok(list);
     }
+
+    /// <summary>
+    /// Lista clientes (Clientes). Para dropdowns de modulos administrativos.
+    /// </summary>
+    /// <param name="status">Filtro por IDStatus (1 activo, 2 inactivo). NULL = todos</param>
+    [HttpGet("clientes")]
+    [ProducesResponseType(typeof(List<ClienteCatalogItemDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetClientes([FromQuery] int? status, CancellationToken ct)
+    {
+        var list = await _repository.ListClientesAsync(status, ct);
+        return Ok(list);
+    }
+
+    /// <summary>
+    /// Lista bancos (Catalogo Bancos). Para dropdowns de modulos administrativos.
+    /// </summary>
+    /// <param name="status">Filtro por IDStatus (1 activo, 2 inactivo). NULL = todos</param>
+    [HttpGet("bancos")]
+    [ProducesResponseType(typeof(List<BancoCatalogItemDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetBancos([FromQuery] int? status, CancellationToken ct)
+    {
+        var list = await _repository.ListBancosAsync(status, ct);
+        return Ok(list);
+    }
 }

@@ -52,7 +52,12 @@ public sealed class PermissionService : IPermissionService
         ["equipos.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
         ["equipos.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
         ["equipos.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
-        ["equipos.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" }
+        ["equipos.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["cheques.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["cheques.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["cheques.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["cheques.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["cheques.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" }
     };
 
     private readonly AppDbContext _db;
@@ -111,8 +116,11 @@ public sealed class PermissionService : IPermissionService
         new("pagosproveedores.crear", "Pagos Proveedores - Crear", "pagosproveedores"),
         new("pagosproveedores.editar", "Pagos Proveedores - Modificar", "pagosproveedores"),
         new("pagosproveedores.cancelar", "Pagos Proveedores - Cancelar", "pagosproveedores"),
-
-        new("cheques.ver", "Cheques - Entrar", "cheques")
+        new("cheques.ver_modulo", "Cheques - Ver modulo", "cheques"),
+        new("cheques.ver", "Cheques - Ver", "cheques"),
+        new("cheques.crear", "Cheques - Crear", "cheques"),
+        new("cheques.editar", "Cheques - Editar", "cheques"),
+        new("cheques.activar", "Cheques - Cambiar estatus", "cheques")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)
