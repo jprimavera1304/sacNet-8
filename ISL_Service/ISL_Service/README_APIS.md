@@ -24,8 +24,9 @@ En desarrollo, Swagger está disponible en `/swagger`.
 15. [Categorias Equipos](#15-categorias-equipos)
 16. [Profesores](#16-profesores)
 17. [Equipos](#17-equipos)
-18. [Cheques](#18-cheques)
-19. [Utilidades](#19-utilidades)
+18. [Inscripciones Torneo](#18-inscripciones-torneo)
+19. [Cheques](#19-cheques)
+20. [Utilidades](#20-utilidades)
 
 ---
 
@@ -431,7 +432,32 @@ Reglas:
 
 ---
 
-## 18. Cheques
+## 18. Inscripciones Torneo
+
+Base: `api/inscripciones-torneo`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarInscripcionesTorneo`, `sp_w_InsertarInscripcionTorneo`, `sp_w_ActualizarInscripcionTorneo`, `sp_w_InhabilitarInscripcionTorneo`.
+
+| Metodo | Ruta | Politica | Descripcion |
+|--------|------|----------|-------------|
+| `GET` | `/api/inscripciones-torneo` | `perm:inscripciones.ver` | Lista inscripciones. Filtros opcionales: `torneoId` (GUID), `categoriaId` (GUID), `estado` (1 activo, 2 inhabilitado), `texto` (torneo/equipo/categoria/profesores). |
+| `GET` | `/api/inscripciones-torneo/{id}` | `perm:inscripciones.ver` | Obtiene inscripcion por Id (GUID). |
+| `POST` | `/api/inscripciones-torneo` | `perm:inscripciones.crear` | Crea inscripcion. Body: `CreateInscripcionTorneoRequest` (`torneoId`, `equipoId`, `categoriaId?`, `diaJuego?`, `profesorTitularId?`, `profesorAuxiliarId?`). |
+| `PUT` | `/api/inscripciones-torneo/{id}` | `perm:inscripciones.editar` | Actualiza inscripcion activa. Body: `UpdateInscripcionTorneoRequest` (`categoriaId?`, `diaJuego?`, `profesorTitularId?`, `profesorAuxiliarId?`). |
+| `POST` | `/api/inscripciones-torneo/{id}/inhabilitar` | `perm:inscripciones.activar` | Inhabilita inscripcion (estado 2). Body opcional: `InhabilitarInscripcionTorneoRequest` (`motivo` opcional). |
+| `POST` | `/api/inscripciones-torneo/{id}/habilitar` | `perm:inscripciones.activar` | Habilita inscripcion (estado 1). Sin body. |
+
+Reglas:
+- `torneoId` requerido y el torneo debe estar Activo.
+- `equipoId` requerido y el equipo debe estar activo.
+- `categoriaId` opcional: si no se envia, se usa la predeterminada del equipo.
+- `diaJuego` opcional: si no se envia, se usa el predeterminado del equipo (1 o 2).
+- `profesorTitularId` opcional: si no se envia, se usa el predeterminado del equipo.
+- `profesorAuxiliarId` opcional y distinto al titular.
+- `motivo` opcional, max 200.
+- No permite duplicado de equipo en el mismo torneo y categoria.
+
+---
+
+## 19. Cheques
 
 Base: `api/cheques`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarCheques`, `sp_w_ConsultarChequeDetalle`, `sp_w_InsertarCheque`, `sp_w_ActualizarCheque`, `sp_w_CambiarEstatusCheque`.
 
@@ -454,7 +480,7 @@ Reglas:
 
 ---
 
-## 19. Utilidades
+## 20. Utilidades
 
 Endpoints mínimos (Program.cs), sin autenticación JWT:
 
