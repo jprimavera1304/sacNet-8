@@ -89,6 +89,15 @@ ORDER BY Repartidor";
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
 
+        // Compatibilidad: si el esquema no tiene dbo.WTarima (version legacy/removida),
+        // el catalogo de tarimas se considera opcional y regresa vacio.
+        await using (var existsCmd = new SqlCommand("SELECT OBJECT_ID('dbo.WTarima', 'U')", conn))
+        {
+            var tableId = await existsCmd.ExecuteScalarAsync(ct);
+            if (tableId == null || tableId == DBNull.Value)
+                return new List<TarimaCatalogItemDto>();
+        }
+
         const string sql = @"
 SELECT IdTarima, ISNULL(NombreTarima, N'') AS NombreTarima, IdTipoCasco, NumeroCascosBase
 FROM dbo.WTarima
