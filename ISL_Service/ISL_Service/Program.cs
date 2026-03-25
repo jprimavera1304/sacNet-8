@@ -138,6 +138,9 @@ builder.Services.AddScoped<IChequesService, ChequesService>();
 builder.Services.AddScoped<ITemporadasRepository, TemporadasRepository>();
 builder.Services.AddScoped<ITemporadasService, TemporadasService>();
 
+builder.Services.AddScoped<IDashboardVentasRepository, DashboardVentasRepository>();
+builder.Services.AddScoped<IDashboardVentasService, DashboardVentasService>();
+
 // -------------------- ALMACEN CASCOS --------------------
 builder.Services.AddScoped<IAlmacenCascosRepository, AlmacenCascosRepository>();
 builder.Services.AddScoped<IAlmacenCascosService, AlmacenCascosService>();
