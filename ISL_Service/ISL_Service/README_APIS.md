@@ -204,20 +204,22 @@ Base: `api/catalogos`. **Requiere:** usuario autenticado. Solo lectura para drop
 
 ## 10. Almacén de Cascos
 
-Base: `api/almacen-cascos`. **Requiere:** usuario autenticado (JWT). Usa tablas `WMovimientoCasco`, `WMovimientoCascoDetalle`, `WConstantes`, `WTarima` y SP `sp_w_*`. Usuario de auditoría se toma del token.
+Base: `api/almacen-cascos`. **Requiere:** usuario autenticado (JWT). Usa tablas `WMovimientoCasco`, `WMovimientoCascoDetalle`, `WMovimientoCascoTarima`, `WConstantes`, `WTarima` y SP `sp_w_*`. Usuario de auditoría se toma del token.
 
 **Convenciones:**
 - **TipoMovimiento:** 1 = SALIDA, 2 = ENTRADA.
 - **Estatus:** 1 = REGISTRADA, 2 = ACEPTADA, 3 = CANCELADA.
 - **IdStatus en catálogos:** 1 = ACTIVO, 2 = CANCELADO.
 
-| Método | Ruta | Descripción |
+| M?todo | Ruta | Descripci?n |
 |--------|------|-------------|
 | `GET` | `/api/almacen-cascos/movimientos` | Lista movimientos (cabecera) con nombres de repartidor entrega/recibe. |
-| `GET` | `/api/almacen-cascos/movimientos/{idMovimiento}/detalle` | Detalle plano de un movimiento (líneas por numeroTarima y tipo casco). |
-| `GET` | `/api/almacen-cascos/movimientos/{idMovimiento}/detalle-agrupado` | Detalle agrupado por tarima lógica (`numeroTarima`) con líneas por tipo casco. |
+| `GET` | `/api/almacen-cascos/movimientos/{idMovimiento}/detalle` | Detalle plano de un movimiento (l?neas por numeroTarima y tipo casco). |
+| `GET` | `/api/almacen-cascos/movimientos/{idMovimiento}/tarimas` | Tarimas con kilos capturados para una ENTRADA. |
+| `GET` | `/api/almacen-cascos/movimientos/{idMovimiento}/detalle-agrupado` | Detalle agrupado por tarima l?gica (`numeroTarima`) con l?neas por tipo casco. |
 | `POST` | `/api/almacen-cascos/salidas` | Crea una SALIDA: cabecera + detalle. TotalTarimas/TotalPiezas se calculan en backend; TotalKilos = 0. |
-| `POST` | `/api/almacen-cascos/entradas` | Acepta una ENTRADA desde una salida registrada (SP crea entrada, acepta salida, suma kilos a WConstantes). |
+| `POST` | `/api/almacen-cascos/entradas` | Acepta una ENTRADA desde una salida registrada (SP crea entrada, acepta salida, TotalKilos = 0). |
+| `POST` | `/api/almacen-cascos/movimientos/{idMovimiento}/tarimas/{numeroTarima}/kilos` | Inserta o actualiza kilos por tarima en una ENTRADA. |
 | `POST` | `/api/almacen-cascos/movimientos/{idMovimiento}/cancelar` | Cancela un movimiento (entrada o salida). Reglas validadas en SP. |
 
 **Query GET movimientos:**
@@ -225,6 +227,10 @@ Base: `api/almacen-cascos`. **Requiere:** usuario autenticado (JWT). Usa tablas 
 - `estatus`: opcional. NULL = todos, 1 = REGISTRADA, 2 = ACEPTADA, 3 = CANCELADA.
 - `tipoMovimiento`: opcional. 1 = SALIDA, 2 = ENTRADA.
 - `fechaInicio`, `fechaFin`: opcional. Filtro por rango de fechas (FechaCreacion).
+
+**Notas:**
+
+- En la respuesta, `totalTarimasConKilos` indica cu?ntas tarimas tienen kilos capturados.
 
 **Body POST salidas:** `CreateSalidaRequest`
 
@@ -255,7 +261,6 @@ Base: `api/almacen-cascos`. **Requiere:** usuario autenticado (JWT). Usa tablas 
 {
   "idMovimientoSalida": 1,
   "idRepartidorRecibe": 2,
-  "kilos": 123.4567,
   "observaciones": "string opcional",
   "detalle": [
     { "numeroTarima": 1, "idTipoCasco": 1, "piezas": 10 }
@@ -265,8 +270,17 @@ Base: `api/almacen-cascos`. **Requiere:** usuario autenticado (JWT). Usa tablas 
 
 - `idMovimientoSalida`: salida ya registrada y con detalle.
 - `idRepartidorRecibe`: repartidor activo.
+- `detalle`: opcional; si se env?a, el backend valida que coincida exactamente con el detalle de la salida.
+
+**Body POST kilos por tarima:** `GuardarKilosTarimaRequest`
+
+```json
+{
+  "kilos": 12.3456
+}
+```
+
 - `kilos`: requerido, > 0, hasta 4 decimales.
-- `detalle`: opcional; si se envía, el backend valida que coincida exactamente con el detalle de la salida.
 
 **Body POST cancelar:** `CancelarMovimientoRequest`
 

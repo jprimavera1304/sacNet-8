@@ -19,6 +19,8 @@ public class AlmacenCascosRepository : IAlmacenCascosRepository
     private const string SpAceptarEntrada = "dbo.sp_w_AceptarEntradaCasco";
     private const string SpCancelar = "dbo.sp_w_CancelarMovimientoCasco";
     private const string SpActualizar = "dbo.sp_w_ActualizarMovimientoCasco";
+    private const string SpInsertarTarimaKilos = "dbo.sp_w_InsertarMovimientoCascoTarima";
+    private const string SpConsultarTarimasKilos = "dbo.sp_w_ConsultarMovimientoCascoTarimas";
 
     public AlmacenCascosRepository(IConfiguration configuration)
     {
@@ -53,6 +55,37 @@ public class AlmacenCascosRepository : IAlmacenCascosRepository
         }
 
         var list = Funciones.DataTableToList<MovimientoCascoDto>(dt);
+
+        if (list.Count > 0)
+        {
+            var ids = list.Select(x => x.IdMovimiento).Distinct().ToList();
+            var paramNames = ids.Select((_, i) => $"@Id{i}").ToList();
+
+            var sql = $@"
+SELECT IdMovimiento, COUNT(1) AS TotalTarimasConKilos
+FROM dbo.WMovimientoCascoTarima
+WHERE IdMovimiento IN ({string.Join(", ", paramNames)})
+GROUP BY IdMovimiento";
+
+            await using var cmdTar = new SqlCommand(sql, conn);
+            for (var i = 0; i < ids.Count; i++)
+                cmdTar.Parameters.AddWithValue(paramNames[i], ids[i]);
+
+            var dtTar = new DataTable();
+            using (var adapterTar = new SqlDataAdapter(cmdTar))
+            {
+                adapterTar.Fill(dtTar);
+            }
+
+            var map = dtTar.AsEnumerable()
+                .ToDictionary(r => r.Field<int>("IdMovimiento"), r => r.Field<int>("TotalTarimasConKilos"));
+
+            foreach (var mov in list)
+            {
+                if (map.TryGetValue(mov.IdMovimiento, out var total))
+                    mov.TotalTarimasConKilos = total;
+            }
+        }
 
         if (tipoMovimiento.HasValue)
             list = list.Where(x => x.TipoMovimiento == tipoMovimiento.Value).ToList();
@@ -89,6 +122,46 @@ ORDER BY d.NumeroTarima, d.IdDetalle";
             adapter.Fill(dt);
         }
         return Funciones.DataTableToList<MovimientoCascoDetalleDto>(dt);
+    }
+
+    public async Task<MovimientoCascoDto?> GetMovimientoAsync(int idMovimiento, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        const string sql = @"
+SELECT IdMovimiento, TipoMovimiento, Estatus
+FROM dbo.WMovimientoCasco
+WHERE IdMovimiento = @IdMovimiento";
+
+        await using var cmd = new SqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@IdMovimiento", idMovimiento);
+
+        var dt = new DataTable();
+        using (var adapter = new SqlDataAdapter(cmd))
+        {
+            adapter.Fill(dt);
+        }
+
+        return Funciones.DataTableToList<MovimientoCascoDto>(dt).FirstOrDefault();
+    }
+
+    public async Task<bool> ExisteNumeroTarimaDetalleAsync(int idMovimiento, int numeroTarima, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        const string sql = @"
+SELECT TOP 1 1
+FROM dbo.WMovimientoCascoDetalle
+WHERE IdMovimiento = @IdMovimiento AND NumeroTarima = @NumeroTarima";
+
+        await using var cmd = new SqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@IdMovimiento", idMovimiento);
+        cmd.Parameters.AddWithValue("@NumeroTarima", numeroTarima);
+
+        var result = await cmd.ExecuteScalarAsync(ct);
+        return result != null && result != DBNull.Value;
     }
 
     public async Task<int> InsertarSalidaAsync(CreateSalidaRequest request, string usuario, CancellationToken ct = default)
@@ -173,7 +246,6 @@ WHERE m.IdMovimiento = @IdMovimiento", conn, tran);
         cmd.CommandType = CommandType.StoredProcedure;
         cmd.Parameters.AddWithValue("@IdMovimientoSalida", request.IdMovimientoSalida);
         cmd.Parameters.AddWithValue("@IdRepartidorRecibe", request.IdRepartidorRecibe);
-        cmd.Parameters.AddWithValue("@Kilos", request.Kilos);
         cmd.Parameters.AddWithValue("@Observaciones", string.IsNullOrWhiteSpace(request.Observaciones) ? DBNull.Value : request.Observaciones!.Trim());
         cmd.Parameters.AddWithValue("@Usuario", string.IsNullOrWhiteSpace(usuario) ? DBNull.Value : usuario.Trim());
 
@@ -290,12 +362,98 @@ WHERE m.IdMovimiento = @IdMovimiento", conn, tran))
         cmd.Parameters.AddWithValue("@IdTarima", DBNull.Value);
         cmd.Parameters.AddWithValue("@NumeroTarima", DBNull.Value);
         cmd.Parameters.AddWithValue("@Piezas", DBNull.Value);
-        cmd.Parameters.AddWithValue("@Kilos", request.Kilos);
+        cmd.Parameters.AddWithValue("@Kilos", DBNull.Value);
         cmd.Parameters.AddWithValue("@IdRepartidorRecibe", request.IdRepartidorRecibe);
         cmd.Parameters.AddWithValue("@Observaciones", string.IsNullOrWhiteSpace(request.Observaciones) ? DBNull.Value : request.Observaciones!.Trim());
         cmd.Parameters.AddWithValue("@Usuario", string.IsNullOrWhiteSpace(usuario) ? DBNull.Value : usuario.Trim());
 
         await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    public async Task<MovimientoCascoTarimaKilosResultDto> UpsertMovimientoTarimaKilosAsync(int idMovimiento, int numeroTarima, decimal kilos, string usuario, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+        using var tran = conn.BeginTransaction();
+
+        try
+        {
+            await using (var cmd = new SqlCommand(SpInsertarTarimaKilos, conn, tran))
+            {
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@IdMovimiento", idMovimiento);
+                cmd.Parameters.AddWithValue("@NumeroTarima", numeroTarima);
+                cmd.Parameters.AddWithValue("@Kilos", kilos);
+                cmd.Parameters.AddWithValue("@Usuario", string.IsNullOrWhiteSpace(usuario) ? DBNull.Value : usuario.Trim());
+                await cmd.ExecuteNonQueryAsync(ct);
+            }
+
+            decimal totalKilos;
+            int totalTarimas;
+            await using (var cmdTot = new SqlCommand(@"
+SELECT ISNULL(SUM(Kilos), 0) AS TotalKilos,
+       COUNT(1) AS TotalTarimasConKilos
+FROM dbo.WMovimientoCascoTarima
+WHERE IdMovimiento = @IdMovimiento", conn, tran))
+            {
+                cmdTot.Parameters.AddWithValue("@IdMovimiento", idMovimiento);
+                await using var reader = await cmdTot.ExecuteReaderAsync(ct);
+                totalKilos = 0;
+                totalTarimas = 0;
+                if (await reader.ReadAsync(ct))
+                {
+                    totalKilos = reader.GetDecimal(0);
+                    totalTarimas = reader.GetInt32(1);
+                }
+                await reader.CloseAsync();
+            }
+
+            await using (var cmdUpd = new SqlCommand(@"
+UPDATE dbo.WMovimientoCasco
+SET TotalKilos = @TotalKilos,
+    UsuarioModificacion = @Usuario,
+    FechaModificacion = GETDATE()
+WHERE IdMovimiento = @IdMovimiento", conn, tran))
+            {
+                cmdUpd.Parameters.AddWithValue("@IdMovimiento", idMovimiento);
+                cmdUpd.Parameters.AddWithValue("@TotalKilos", totalKilos);
+                cmdUpd.Parameters.AddWithValue("@Usuario", string.IsNullOrWhiteSpace(usuario) ? DBNull.Value : usuario.Trim());
+                await cmdUpd.ExecuteNonQueryAsync(ct);
+            }
+
+            tran.Commit();
+
+            return new MovimientoCascoTarimaKilosResultDto
+            {
+                IdMovimiento = idMovimiento,
+                NumeroTarima = numeroTarima,
+                Kilos = kilos,
+                TotalKilos = totalKilos,
+                TotalTarimasConKilos = totalTarimas
+            };
+        }
+        catch
+        {
+            tran.Rollback();
+            throw;
+        }
+    }
+
+    public async Task<List<MovimientoCascoTarimaKilosDto>> GetMovimientoTarimasKilosAsync(int idMovimiento, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(SpConsultarTarimasKilos, conn);
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.Parameters.AddWithValue("@IdMovimiento", idMovimiento);
+
+        var dt = new DataTable();
+        using (var adapter = new SqlDataAdapter(cmd))
+        {
+            adapter.Fill(dt);
+        }
+        return Funciones.DataTableToList<MovimientoCascoTarimaKilosDto>(dt);
     }
 
     public async Task CancelarMovimientoAsync(int idMovimiento, string motivoCancelacion, string usuario, CancellationToken ct = default)

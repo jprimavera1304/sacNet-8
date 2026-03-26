@@ -11,9 +11,13 @@ public interface IAlmacenCascosService
 
     Task<List<MovimientoCascoDetalleDto>> GetDetalleMovimientoAsync(int idMovimiento, CancellationToken ct = default);
 
+    Task<List<MovimientoCascoTarimaKilosDto>> GetMovimientoTarimasKilosAsync(int idMovimiento, CancellationToken ct = default);
+
     Task<int> CrearSalidaAsync(CreateSalidaRequest request, string usuario, CancellationToken ct = default);
 
     Task AceptarEntradaAsync(CreateEntradaRequest request, string usuario, CancellationToken ct = default);
+
+    Task<MovimientoCascoTarimaKilosResultDto> GuardarKilosTarimaAsync(int idMovimiento, int numeroTarima, decimal kilos, string usuario, CancellationToken ct = default);
 
     Task ActualizarSalidaAsync(int idMovimiento, UpdateSalidaRequest request, string usuario, CancellationToken ct = default);
 

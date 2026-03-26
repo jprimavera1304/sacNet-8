@@ -15,6 +15,7 @@ public class MovimientoCascoDto
     public int TotalTarimas { get; set; }
     public int TotalPiezas { get; set; }
     public decimal TotalKilos { get; set; }
+    public int TotalTarimasConKilos { get; set; }
     public string? NombreTarima { get; set; }
     public string? Observaciones { get; set; }
     public string? MotivoCancelacion { get; set; }
