@@ -1,0 +1,123 @@
+using ISL_Service.Application.DTOs.DashboardVentas;
+using ISL_Service.Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace ISL_Service.Controllers;
+
+[ApiController]
+[Route("api/dashboard")]
+[Authorize]
+public class DashboardVentasController : ControllerBase
+{
+    private readonly IDashboardVentasService _service;
+
+    public DashboardVentasController(IDashboardVentasService service)
+    {
+        _service = service;
+    }
+
+    [HttpPost("filtros/consultar")]
+    [Authorize(Policy = "perm:dashboardventas.ver")]
+    [ProducesResponseType(typeof(DashboardVentasFiltrosResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConsultarFiltros([FromBody] DashboardVentasFiltroRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var result = await _service.ConsultarFiltrosAsync(request, ct);
+        return Ok(result);
+    }
+
+    [HttpPost("kpis/consultar")]
+    [Authorize(Policy = "perm:dashboardventas.ver")]
+    [ProducesResponseType(typeof(DashboardVentasKpisDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConsultarKpis([FromBody] DashboardVentasFiltroRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var result = await _service.ConsultarKpisAsync(request, ct);
+        return Ok(result);
+    }
+
+    [HttpPost("ventas/serie-mensual/consultar")]
+    [Authorize(Policy = "perm:dashboardventas.ver")]
+    [ProducesResponseType(typeof(List<DashboardVentasSerieMensualDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConsultarSerieMensual([FromBody] DashboardVentasFiltroRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var result = await _service.ConsultarSerieMensualAsync(request, ct);
+        return Ok(result);
+    }
+
+    [HttpPost("top-productos/consultar")]
+    [Authorize(Policy = "perm:dashboardventas.ver")]
+    [ProducesResponseType(typeof(List<DashboardTopProductoDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConsultarTopProductos([FromBody] DashboardVentasFiltroRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var result = await _service.ConsultarTopProductosAsync(request, ct);
+        return Ok(result);
+    }
+
+    [HttpPost("top-clientes/consultar")]
+    [Authorize(Policy = "perm:dashboardventas.ver")]
+    [ProducesResponseType(typeof(List<DashboardTopClienteDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConsultarTopClientes([FromBody] DashboardVentasFiltroRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var result = await _service.ConsultarTopClientesAsync(request, ct);
+        return Ok(result);
+    }
+
+    [HttpPost("almacenes/consultar")]
+    [Authorize(Policy = "perm:dashboardventas.ver")]
+    [ProducesResponseType(typeof(List<DashboardVentasAlmacenDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConsultarVentasAlmacenes([FromBody] DashboardVentasFiltroRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var result = await _service.ConsultarVentasAlmacenesAsync(request, ct);
+        return Ok(result);
+    }
+
+    [HttpPost("agentes/consultar")]
+    [Authorize(Policy = "perm:dashboardventas.ver")]
+    [ProducesResponseType(typeof(List<DashboardVentasAgenteDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConsultarVentasAgentes([FromBody] DashboardVentasFiltroRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var result = await _service.ConsultarVentasAgentesAsync(request, ct);
+        return Ok(result);
+    }
+
+    [HttpPost("detalle/consultar")]
+    [Authorize(Policy = "perm:dashboardventas.ver")]
+    [ProducesResponseType(typeof(List<DashboardVentasDetalleDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConsultarVentasDetalle([FromBody] DashboardVentasFiltroRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var result = await _service.ConsultarVentasDetalleAsync(request, ct);
+        return Ok(result);
+    }
+}

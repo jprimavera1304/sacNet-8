@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using System.Globalization;
 using System.Reflection;
 
 namespace ISL_Service.Utils
@@ -33,13 +34,44 @@ namespace ISL_Service.Utils
                     if (pro.Name == column.ColumnName)
                     {
                         if (dr[column.ColumnName] != DBNull.Value)
-                            pro.SetValue(obj, dr[column.ColumnName], null);
+                        {
+                            var rawValue = dr[column.ColumnName];
+                            var converted = ConvertToPropertyType(rawValue, pro.PropertyType);
+                            pro.SetValue(obj, converted, null);
+                        }
                     }
                     else
                         continue;
                 }
             }
             return obj;
+        }
+        #endregion
+
+        #region "ConvertToPropertyType"
+        private static object? ConvertToPropertyType(object value, Type targetType)
+        {
+            if (value == null) return null;
+
+            var nonNullableType = Nullable.GetUnderlyingType(targetType) ?? targetType;
+            if (nonNullableType.IsInstanceOfType(value)) return value;
+
+            if (nonNullableType == typeof(string))
+                return Convert.ToString(value, CultureInfo.InvariantCulture);
+
+            if (nonNullableType == typeof(Guid))
+                return value is Guid g ? g : Guid.Parse(Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty);
+
+            if (nonNullableType == typeof(DateTime))
+                return value is DateTime dt ? dt : Convert.ToDateTime(value, CultureInfo.InvariantCulture);
+
+            if (nonNullableType.IsEnum)
+            {
+                if (value is string s) return Enum.Parse(nonNullableType, s, ignoreCase: true);
+                return Enum.ToObject(nonNullableType, value);
+            }
+
+            return Convert.ChangeType(value, nonNullableType, CultureInfo.InvariantCulture);
         }
         #endregion
 

@@ -21,7 +21,12 @@ En desarrollo, Swagger está disponible en `/swagger`.
 12. [Recaudaciones](#12-recaudaciones)
 13. [Proveedores de pagos](#13-proveedores-de-pagos)
 14. [Temporadas y Torneos](#14-temporadas-y-torneos)
-15. [Utilidades](#15-utilidades)
+15. [Categorias Equipos](#15-categorias-equipos)
+16. [Profesores](#16-profesores)
+17. [Equipos](#17-equipos)
+18. [Inscripciones Torneo](#18-inscripciones-torneo)
+19. [Cheques](#19-cheques)
+20. [Utilidades](#20-utilidades)
 
 ---
 
@@ -183,6 +188,8 @@ Base: `api/catalogos`. **Requiere:** usuario autenticado. Solo lectura para drop
 | `GET` | `/api/catalogos/tipos-casco` | Lista tipos de casco (TiposUsados) para dropdown en tarimas y almacén de cascos. |
 | `GET` | `/api/catalogos/repartidores` | Lista repartidores ([Catalogo Repartidores]) para dropdown en almacén de cascos. |
 | `GET` | `/api/catalogos/tarimas` | Lista tarimas (WTarima) activas para dropdown en almacén de cascos. |
+| `GET` | `/api/catalogos/clientes` | Lista clientes (Clientes) para dropdowns administrativos. |
+| `GET` | `/api/catalogos/bancos` | Lista bancos ([Catalogo Bancos]) para dropdowns administrativos. |
 
 **Query (todos):**
 
@@ -357,7 +364,123 @@ Reglas de negocio principales:
 
 ---
 
-## 15. Utilidades
+## 15. Categorias Equipos
+
+Base: `api/categorias`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarCategorias`, `sp_w_InsertarCategoria`, `sp_w_ActualizarCategoria`, `sp_w_InhabilitarCategoria`.
+
+| Metodo | Ruta | Politica | Descripcion |
+|--------|------|----------|-------------|
+| `GET` | `/api/categorias` | `perm:categorias.ver` | Lista categorias. Filtros opcionales: `estado` (1 activo, 2 inactivo), `texto` (busqueda por nombre). |
+| `GET` | `/api/categorias/{id}` | `perm:categorias.ver` | Obtiene categoria por Id (GUID). |
+| `POST` | `/api/categorias` | `perm:categorias.crear` | Crea categoria. Body: `CreateCategoriaRequest` (`nombre`). |
+| `PUT` | `/api/categorias/{id}` | `perm:categorias.editar` | Actualiza categoria activa. Body: `UpdateCategoriaRequest` (`nombre`). |
+| `POST` | `/api/categorias/{id}/inhabilitar` | `perm:categorias.activar` | Inhabilita categoria (estado 2). Body opcional: `InhabilitarCategoriaRequest` (`motivo`). |
+| `POST` | `/api/categorias/{id}/habilitar` | `perm:categorias.activar` | Habilita categoria (estado 1). Sin body. |
+
+Reglas:
+- `nombre` requerido, max 120.
+- `motivo` max 200.
+- No permite nombre duplicado.
+- No permite modificar categoria inactiva.
+
+---
+
+## 16. Profesores
+
+Base: `api/profesores`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarProfesores`, `sp_w_InsertarProfesor`, `sp_w_ActualizarProfesor`, `sp_w_InhabilitarProfesor`.
+
+| Metodo | Ruta | Politica | Descripcion |
+|--------|------|----------|-------------|
+| `GET` | `/api/profesores` | `perm:profesores.ver` | Lista profesores. Filtros opcionales: `estado` (1 activo, 2 inactivo), `texto` (nombre/telefono/correo). |
+| `GET` | `/api/profesores/{id}` | `perm:profesores.ver` | Obtiene profesor por Id (GUID). |
+| `POST` | `/api/profesores` | `perm:profesores.crear` | Crea profesor. Body: `CreateProfesorRequest` (`nombre`, `telefono`, `correo?`). |
+| `PUT` | `/api/profesores/{id}` | `perm:profesores.editar` | Actualiza profesor activo. Body: `UpdateProfesorRequest` (`nombre`, `telefono`, `correo?`). |
+| `POST` | `/api/profesores/{id}/inhabilitar` | `perm:profesores.activar` | Inhabilita profesor (estado 2). Body opcional: `InhabilitarProfesorRequest` (`motivo` opcional). |
+| `POST` | `/api/profesores/{id}/habilitar` | `perm:profesores.activar` | Habilita profesor (estado 1). Sin body. |
+
+Reglas:
+- `nombre` requerido, max 120.
+- `telefono` requerido, max 30.
+- `correo` opcional, max 200.
+- `motivo` opcional, max 200.
+- No permite duplicado por `Nombre + Telefono`.
+- No permite modificar profesor inactivo.
+
+---
+
+## 17. Equipos
+
+Base: `api/equipos`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarEquipos`, `sp_w_InsertarEquipo`, `sp_w_ActualizarEquipo`, `sp_w_InhabilitarEquipo`.
+
+| Metodo | Ruta | Politica | Descripcion |
+|--------|------|----------|-------------|
+| `GET` | `/api/equipos` | `perm:equipos.ver` | Lista equipos. Filtros opcionales: `estado` (1 activo, 2 inactivo), `categoriaId` (GUID), `diaJuego` (1 sabado, 2 domingo), `texto` (nombre/categoria/profesores). |
+| `GET` | `/api/equipos/{id}` | `perm:equipos.ver` | Obtiene equipo por Id (GUID). |
+| `POST` | `/api/equipos` | `perm:equipos.crear` | Crea equipo. Body: `CreateEquipoRequest` (`nombre`, `categoriaPredeterminadaId`, `diaJuegoPredeterminado`, `profesorTitularPredeterminadoId`, `profesorAuxiliarPredeterminadoId?`). |
+| `PUT` | `/api/equipos/{id}` | `perm:equipos.editar` | Actualiza equipo activo. Body: `UpdateEquipoRequest` (mismos campos de create). |
+| `POST` | `/api/equipos/{id}/inhabilitar` | `perm:equipos.activar` | Inhabilita equipo (estado 2). Body opcional: `InhabilitarEquipoRequest` (`motivo` opcional). |
+| `POST` | `/api/equipos/{id}/habilitar` | `perm:equipos.activar` | Habilita equipo (estado 1). Sin body. |
+
+Reglas:
+- `nombre` requerido, max 120.
+- `categoriaPredeterminadaId` requerido y activo.
+- `diaJuegoPredeterminado` requerido (1 o 2).
+- `profesorTitularPredeterminadoId` requerido y activo.
+- `profesorAuxiliarPredeterminadoId` opcional y distinto al titular.
+- `motivo` opcional, max 200.
+- No permite nombre de equipo duplicado.
+
+---
+
+## 18. Inscripciones Torneo
+
+Base: `api/inscripciones-torneo`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarInscripcionesTorneo`, `sp_w_InsertarInscripcionTorneo`, `sp_w_ActualizarInscripcionTorneo`, `sp_w_InhabilitarInscripcionTorneo`.
+
+| Metodo | Ruta | Politica | Descripcion |
+|--------|------|----------|-------------|
+| `GET` | `/api/inscripciones-torneo` | `perm:inscripciones.ver` | Lista inscripciones. Filtros opcionales: `torneoId` (GUID), `categoriaId` (GUID), `estado` (1 activo, 2 inhabilitado), `texto` (torneo/equipo/categoria/profesores). |
+| `GET` | `/api/inscripciones-torneo/{id}` | `perm:inscripciones.ver` | Obtiene inscripcion por Id (GUID). |
+| `POST` | `/api/inscripciones-torneo` | `perm:inscripciones.crear` | Crea inscripcion. Body: `CreateInscripcionTorneoRequest` (`torneoId`, `equipoId`, `categoriaId?`, `diaJuego?`, `profesorTitularId?`, `profesorAuxiliarId?`). |
+| `PUT` | `/api/inscripciones-torneo/{id}` | `perm:inscripciones.editar` | Actualiza inscripcion activa. Body: `UpdateInscripcionTorneoRequest` (`categoriaId?`, `diaJuego?`, `profesorTitularId?`, `profesorAuxiliarId?`). |
+| `POST` | `/api/inscripciones-torneo/{id}/inhabilitar` | `perm:inscripciones.activar` | Inhabilita inscripcion (estado 2). Body opcional: `InhabilitarInscripcionTorneoRequest` (`motivo` opcional). |
+| `POST` | `/api/inscripciones-torneo/{id}/habilitar` | `perm:inscripciones.activar` | Habilita inscripcion (estado 1). Sin body. |
+
+Reglas:
+- `torneoId` requerido y el torneo debe estar Activo.
+- `equipoId` requerido y el equipo debe estar activo.
+- `categoriaId` opcional: si no se envia, se usa la predeterminada del equipo.
+- `diaJuego` opcional: si no se envia, se usa el predeterminado del equipo (1 o 2).
+- `profesorTitularId` opcional: si no se envia, se usa el predeterminado del equipo.
+- `profesorAuxiliarId` opcional y distinto al titular.
+- `motivo` opcional, max 200.
+- No permite duplicado de equipo en el mismo torneo y categoria.
+
+---
+
+## 19. Cheques
+
+Base: `api/cheques`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarCheques`, `sp_w_ConsultarChequeDetalle`, `sp_w_InsertarCheque`, `sp_w_ActualizarCheque`, `sp_w_CambiarEstatusCheque`.
+
+| Metodo | Ruta | Politica | Descripcion |
+|--------|------|----------|-------------|
+| `GET` | `/api/cheques` | `perm:cheques.ver` | Lista cheques. Filtros opcionales: `texto`, `idCliente`, `idBanco`, `estatusCheque` (1-4), `idStatus` (1-2), `fechaChequeInicio`, `fechaChequeFin`. |
+| `GET` | `/api/cheques/{id}` | `perm:cheques.ver` | Obtiene detalle del cheque por Id (GUID), incluyendo historial. |
+| `POST` | `/api/cheques` | `perm:cheques.crear` | Crea cheque. Body: `CreateChequeRequest` (`idCliente`, `idBanco`, `numeroCheque`, `monto`, `fechaCheque`, `observaciones?`, `responsableCobroId?`). |
+| `PUT` | `/api/cheques/{id}` | `perm:cheques.editar` | Actualiza cheque en estatus Registrado. Body: `UpdateChequeRequest`. |
+| `POST` | `/api/cheques/{id}/estatus` | `perm:cheques.activar` | Cambia estatus del cheque. Body: `CambiarEstatusChequeRequest` (`estatusChequeNuevo` 2/3/4, `motivo?`, `observaciones?`, `fechaMovimiento?`). |
+
+Reglas:
+- `numeroCheque` requerido, max 50.
+- `monto` debe ser mayor a 0.
+- `fechaCheque` requerida.
+- `observaciones` max 500.
+- `motivo` max 300.
+- Solo se puede actualizar/cambiar estatus cuando el cheque esta en `Registrado`.
+- Para `estatusChequeNuevo` 3 (Devuelto) o 4 (Cancelado), `motivo` es obligatorio.
+
+---
+
+## 20. Utilidades
 
 Endpoints mínimos (Program.cs), sin autenticación JWT:
 

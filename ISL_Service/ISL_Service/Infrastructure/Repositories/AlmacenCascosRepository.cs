@@ -73,10 +73,9 @@ public class AlmacenCascosRepository : IAlmacenCascosRepository
 
         const string sql = @"
 SELECT d.IdDetalle, d.IdMovimiento, d.IdTarima, d.IdTipoCasco, d.NumeroTarima, d.Piezas,
-       t.NombreTarima,
+       ISNULL(tu.[Tipo de Usado], N'') AS NombreTarima,
        ISNULL(tu.[Tipo de Usado], N'') AS TipoCascoDescripcion
 FROM dbo.WMovimientoCascoDetalle d
-LEFT JOIN dbo.WTarima t ON t.IdTarima = d.IdTarima
 LEFT JOIN [Catalogo TiposUsados] tu ON tu.IdTipoUsado = d.IdTipoCasco
 WHERE d.IdMovimiento = @IdMovimiento
 ORDER BY d.NumeroTarima, d.IdDetalle";

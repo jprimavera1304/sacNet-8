@@ -89,6 +89,15 @@ ORDER BY Repartidor";
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
 
+        // Compatibilidad: si el esquema no tiene dbo.WTarima (version legacy/removida),
+        // el catalogo de tarimas se considera opcional y regresa vacio.
+        await using (var existsCmd = new SqlCommand("SELECT OBJECT_ID('dbo.WTarima', 'U')", conn))
+        {
+            var tableId = await existsCmd.ExecuteScalarAsync(ct);
+            if (tableId == null || tableId == DBNull.Value)
+                return new List<TarimaCatalogItemDto>();
+        }
+
         const string sql = @"
 SELECT IdTarima, ISNULL(NombreTarima, N'') AS NombreTarima, IdTipoCasco, NumeroCascosBase
 FROM dbo.WTarima
@@ -107,6 +116,68 @@ ORDER BY NombreTarima";
                 NombreTarima = reader.IsDBNull(1) ? "" : reader.GetString(1),
                 IdTipoCasco = reader.GetInt32(2),
                 NumeroCascosBase = reader.GetInt32(3)
+            });
+        }
+        return list;
+    }
+
+    public async Task<List<ClienteCatalogItemDto>> ListClientesAsync(int? idStatus, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        const string sql = @"
+SELECT 
+    IDCliente,
+    IDStatus,
+    ISNULL(CONVERT(NVARCHAR(50), Numero), N'') AS Numero,
+    ISNULL(Nombre, N'') AS Nombre
+FROM dbo.Clientes
+WHERE (@IdStatus IS NULL OR IDStatus = @IdStatus)
+ORDER BY Nombre, Numero";
+        await using var cmd = new SqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@IdStatus", (object?)idStatus ?? DBNull.Value);
+
+        var list = new List<ClienteCatalogItemDto>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            list.Add(new ClienteCatalogItemDto
+            {
+                IDCliente = Convert.ToInt32(reader.GetValue(0)),
+                IDStatus = Convert.ToInt32(reader.GetValue(1)),
+                Numero = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                Nombre = reader.IsDBNull(3) ? "" : reader.GetString(3)
+            });
+        }
+        return list;
+    }
+
+    public async Task<List<BancoCatalogItemDto>> ListBancosAsync(int? idStatus, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        const string sql = @"
+SELECT 
+    IDBanco,
+    IDStatus,
+    ISNULL(Banco, N'') AS Banco
+FROM dbo.[Catalogo Bancos]
+WHERE (@IdStatus IS NULL OR IDStatus = @IdStatus)
+ORDER BY Banco";
+        await using var cmd = new SqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@IdStatus", (object?)idStatus ?? DBNull.Value);
+
+        var list = new List<BancoCatalogItemDto>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            list.Add(new BancoCatalogItemDto
+            {
+                IDBanco = Convert.ToInt32(reader.GetValue(0)),
+                IDStatus = Convert.ToInt32(reader.GetValue(1)),
+                Banco = reader.IsDBNull(2) ? "" : reader.GetString(2)
             });
         }
         return list;

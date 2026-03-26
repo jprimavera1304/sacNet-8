@@ -19,4 +19,5 @@ public interface ITemporadasRepository
     Task<TorneoDto?> CerrarTorneoAsync(Guid id, Guid usuarioId, CancellationToken ct = default);
     Task<TorneoDto?> ReactivarTorneoAsync(Guid id, Guid usuarioId, CancellationToken ct = default);
     Task<int> CerrarTorneosVencidosAsync(Guid usuarioSistemaId, DateTime? fechaCorte, CancellationToken ct = default);
+    Task<List<TorneoDto>> ConsultarTorneosListadoAsync(Guid? temporadaId, byte? estado, string? texto, DateTime? fechaInicio, DateTime? fechaFin, Guid usuarioSistemaId, CancellationToken ct = default);
 }

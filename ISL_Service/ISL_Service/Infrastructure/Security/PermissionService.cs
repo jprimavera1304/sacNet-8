@@ -42,7 +42,27 @@ public sealed class PermissionService : IPermissionService
         ["categorias.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
         ["categorias.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
         ["categorias.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
-        ["categorias.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" }
+        ["categorias.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["profesores.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["profesores.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["profesores.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["profesores.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["profesores.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["equipos.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["equipos.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["equipos.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["equipos.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["equipos.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["inscripciones.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["inscripciones.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["inscripciones.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["inscripciones.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["inscripciones.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["cheques.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["cheques.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["cheques.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["cheques.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["cheques.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" }
     };
 
     private readonly AppDbContext _db;
@@ -85,12 +105,33 @@ public sealed class PermissionService : IPermissionService
         new("categorias.editar", "Categorias - Editar", "categorias"),
         new("categorias.activar", "Categorias - Activar/Inactivar", "categorias"),
 
+        new("profesores.ver_modulo", "Profesores - Ver modulo", "profesores"),
+        new("profesores.ver", "Profesores - Ver", "profesores"),
+        new("profesores.crear", "Profesores - Crear", "profesores"),
+        new("profesores.editar", "Profesores - Editar", "profesores"),
+        new("profesores.activar", "Profesores - Activar/Inactivar", "profesores"),
+
+        new("equipos.ver_modulo", "Equipos - Ver modulo", "equipos"),
+        new("equipos.ver", "Equipos - Ver", "equipos"),
+        new("equipos.crear", "Equipos - Crear", "equipos"),
+        new("equipos.editar", "Equipos - Editar", "equipos"),
+        new("equipos.activar", "Equipos - Activar/Inactivar", "equipos"),
+
+        new("inscripciones.ver_modulo", "Inscripciones Torneo - Ver modulo", "inscripciones"),
+        new("inscripciones.ver", "Inscripciones Torneo - Ver", "inscripciones"),
+        new("inscripciones.crear", "Inscripciones Torneo - Crear", "inscripciones"),
+        new("inscripciones.editar", "Inscripciones Torneo - Editar", "inscripciones"),
+        new("inscripciones.activar", "Inscripciones Torneo - Activar/Inactivar", "inscripciones"),
+
         new("pagosproveedores.ver", "Pagos Proveedores - Ver", "pagosproveedores"),
         new("pagosproveedores.crear", "Pagos Proveedores - Crear", "pagosproveedores"),
         new("pagosproveedores.editar", "Pagos Proveedores - Modificar", "pagosproveedores"),
         new("pagosproveedores.cancelar", "Pagos Proveedores - Cancelar", "pagosproveedores"),
-
-        new("cheques.ver", "Cheques - Entrar", "cheques")
+        new("cheques.ver_modulo", "Cheques - Ver modulo", "cheques"),
+        new("cheques.ver", "Cheques - Ver", "cheques"),
+        new("cheques.crear", "Cheques - Crear", "cheques"),
+        new("cheques.editar", "Cheques - Editar", "cheques"),
+        new("cheques.activar", "Cheques - Cambiar estatus", "cheques")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)
@@ -488,6 +529,7 @@ ORDER BY CASE WHEN m.ModuloClave = 'inicio' THEN 0 ELSE 1 END, m.ModuloClave;";
             "inicio",
             "cheques",
             "pagosproveedores",
+            "profesores",
             "permisos_modulos",
             "permisos_roles",
             "permisos_usuarios",

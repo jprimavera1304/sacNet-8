@@ -10,4 +10,6 @@ public interface ICatalogosRepository
     Task<List<TipoCascoItemDto>> ListTiposCascoAsync(int? idStatus, CancellationToken ct = default);
     Task<List<RepartidorItemDto>> ListRepartidoresAsync(int? idStatus, CancellationToken ct = default);
     Task<List<TarimaCatalogItemDto>> ListTarimasAsync(int? idStatus, CancellationToken ct = default);
+    Task<List<ClienteCatalogItemDto>> ListClientesAsync(int? idStatus, CancellationToken ct = default);
+    Task<List<BancoCatalogItemDto>> ListBancosAsync(int? idStatus, CancellationToken ct = default);
 }

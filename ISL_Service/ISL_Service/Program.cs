@@ -125,8 +125,21 @@ builder.Services.AddScoped<IEmpresaService, EmpresaService>();
 builder.Services.AddScoped<ITarimaRepository, TarimaRepository>();
 builder.Services.AddScoped<ITarimaService, TarimaService>();
 builder.Services.AddScoped<ICatalogosRepository, CatalogosRepository>();
+builder.Services.AddScoped<ICategoriasRepository, CategoriasRepository>();
+builder.Services.AddScoped<ICategoriasService, CategoriasService>();
+builder.Services.AddScoped<IProfesoresRepository, ProfesoresRepository>();
+builder.Services.AddScoped<IProfesoresService, ProfesoresService>();
+builder.Services.AddScoped<IEquiposRepository, EquiposRepository>();
+builder.Services.AddScoped<IEquiposService, EquiposService>();
+builder.Services.AddScoped<IInscripcionesTorneoRepository, InscripcionesTorneoRepository>();
+builder.Services.AddScoped<IInscripcionesTorneoService, InscripcionesTorneoService>();
+builder.Services.AddScoped<IChequesRepository, ChequesRepository>();
+builder.Services.AddScoped<IChequesService, ChequesService>();
 builder.Services.AddScoped<ITemporadasRepository, TemporadasRepository>();
 builder.Services.AddScoped<ITemporadasService, TemporadasService>();
+
+builder.Services.AddScoped<IDashboardVentasRepository, DashboardVentasRepository>();
+builder.Services.AddScoped<IDashboardVentasService, DashboardVentasService>();
 
 // -------------------- ALMACEN CASCOS --------------------
 builder.Services.AddScoped<IAlmacenCascosRepository, AlmacenCascosRepository>();

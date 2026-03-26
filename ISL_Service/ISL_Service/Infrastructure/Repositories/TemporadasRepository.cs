@@ -181,6 +181,46 @@ public class TemporadasRepository : ITemporadasRepository
         return Funciones.DataTableToList<TorneoDto>(dt);
     }
 
+    public async Task<List<TorneoDto>> ConsultarTorneosListadoAsync(Guid? temporadaId, byte? estado, string? texto, DateTime? fechaInicio, DateTime? fechaFin, Guid usuarioSistemaId, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        try
+        {
+            await using (var closeCmd = new SqlCommand(SpCerrarTorneosVencidos, conn, (SqlTransaction)tx))
+            {
+                closeCmd.CommandType = CommandType.StoredProcedure;
+                closeCmd.Parameters.AddWithValue("@UsuarioSistemaId", usuarioSistemaId);
+                closeCmd.Parameters.AddWithValue("@FechaCorte", DBNull.Value);
+                await closeCmd.ExecuteNonQueryAsync(ct);
+            }
+
+            await using var listCmd = new SqlCommand(SpConsultarTorneos, conn, (SqlTransaction)tx);
+            listCmd.CommandType = CommandType.StoredProcedure;
+            listCmd.Parameters.AddWithValue("@TemporadaId", (object?)temporadaId ?? DBNull.Value);
+            listCmd.Parameters.AddWithValue("@Estado", (object?)estado ?? DBNull.Value);
+            listCmd.Parameters.AddWithValue("@Texto", string.IsNullOrWhiteSpace(texto) ? DBNull.Value : texto.Trim());
+            listCmd.Parameters.AddWithValue("@FechaInicio", (object?)fechaInicio ?? DBNull.Value);
+            listCmd.Parameters.AddWithValue("@FechaFin", (object?)fechaFin ?? DBNull.Value);
+
+            var dt = new DataTable();
+            using (var adapter = new SqlDataAdapter(listCmd))
+            {
+                adapter.Fill(dt);
+            }
+
+            await tx.CommitAsync(ct);
+            return Funciones.DataTableToList<TorneoDto>(dt);
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
+    }
+
     public async Task<TorneoDto?> InsertarTorneoAsync(CreateTorneoRequest request, Guid usuarioId, CancellationToken ct = default)
     {
         await using var conn = GetConnection();
