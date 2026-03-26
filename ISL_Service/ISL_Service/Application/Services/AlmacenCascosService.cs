@@ -29,6 +29,11 @@ public class AlmacenCascosService : IAlmacenCascosService
         return await _repository.GetDetalleMovimientoAsync(idMovimiento, ct);
     }
 
+    public async Task<List<MovimientoCascoTarimaKilosDto>> GetMovimientoTarimasKilosAsync(int idMovimiento, CancellationToken ct = default)
+    {
+        return await _repository.GetMovimientoTarimasKilosAsync(idMovimiento, ct);
+    }
+
     public async Task<int> CrearSalidaAsync(CreateSalidaRequest request, string usuario, CancellationToken ct = default)
     {
         await ValidarSalidaAsync(request, ct);
@@ -87,6 +92,40 @@ public class AlmacenCascosService : IAlmacenCascosService
         try
         {
             await _repository.ActualizarEntradaAsync(idMovimiento, request, usuario, ct);
+        }
+        catch (SqlException ex)
+        {
+            MapSqlException(ex);
+            throw;
+        }
+    }
+
+    public async Task<MovimientoCascoTarimaKilosResultDto> GuardarKilosTarimaAsync(int idMovimiento, int numeroTarima, decimal kilos, string usuario, CancellationToken ct = default)
+    {
+        if (idMovimiento <= 0)
+            throw new ArgumentException("idMovimiento es requerido y debe ser mayor a 0.");
+        if (numeroTarima <= 0)
+            throw new ArgumentException("numeroTarima es requerido y debe ser mayor a 0.");
+        if (kilos <= 0)
+            throw new ArgumentException("kilos debe ser mayor a 0.");
+
+        kilos = Math.Round(kilos, 4);
+
+        var mov = await _repository.GetMovimientoAsync(idMovimiento, ct);
+        if (mov == null)
+            throw new ArgumentException("Movimiento no encontrado.");
+        if (mov.TipoMovimiento != 2)
+            throw new ArgumentException("Los kilos por tarima solo aplican a movimientos de entrada.");
+        if (mov.Estatus == 3)
+            throw new ArgumentException("No se puede capturar kilos en un movimiento cancelado.");
+
+        var existeTarima = await _repository.ExisteNumeroTarimaDetalleAsync(idMovimiento, numeroTarima, ct);
+        if (!existeTarima)
+            throw new ArgumentException($"La tarima {numeroTarima} no existe en el detalle del movimiento.");
+
+        try
+        {
+            return await _repository.UpsertMovimientoTarimaKilosAsync(idMovimiento, numeroTarima, kilos, usuario, ct);
         }
         catch (SqlException ex)
         {
@@ -157,10 +196,6 @@ public class AlmacenCascosService : IAlmacenCascosService
             throw new ArgumentException("idMovimientoSalida es requerido y debe ser mayor a 0.");
         if (request.IdRepartidorRecibe <= 0)
             throw new ArgumentException("idRepartidorRecibe es requerido y debe ser mayor a 0.");
-        if (request.Kilos <= 0)
-            throw new ArgumentException("kilos debe ser mayor a 0.");
-
-        request.Kilos = Math.Round(request.Kilos, 4);
 
         var repartidores = await _catalogos.ListRepartidoresAsync(1, ct);
         if (repartidores.All(r => r.IdRepartidor != request.IdRepartidorRecibe))
@@ -251,9 +286,6 @@ public class AlmacenCascosService : IAlmacenCascosService
     {
         if (request.IdRepartidorRecibe <= 0)
             throw new ArgumentException("idRepartidorRecibe es requerido y debe ser mayor a 0.");
-        if (request.Kilos <= 0)
-            throw new ArgumentException("kilos debe ser mayor a 0.");
-        request.Kilos = Math.Round(request.Kilos, 4);
 
         var repartidores = await _catalogos.ListRepartidoresAsync(1, ct);
         if (repartidores.All(r => r.IdRepartidor != request.IdRepartidorRecibe))

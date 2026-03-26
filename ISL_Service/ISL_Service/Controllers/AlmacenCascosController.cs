@@ -53,6 +53,17 @@ public class AlmacenCascosController : ControllerBase
     }
 
     /// <summary>
+    /// Obtiene las tarimas con kilos capturados para una ENTRADA.
+    /// </summary>
+    [HttpGet("movimientos/{idMovimiento:int}/tarimas")]
+    [ProducesResponseType(typeof(List<MovimientoCascoTarimaKilosDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTarimasKilos(int idMovimiento, CancellationToken ct)
+    {
+        var list = await _service.GetMovimientoTarimasKilosAsync(idMovimiento, ct);
+        return Ok(list);
+    }
+
+    /// <summary>
     /// Obtiene detalle agrupado por tarima logica (numeroTarima) y lineas por tipo de casco.
     /// </summary>
     [HttpGet("movimientos/{idMovimiento:int}/detalle-agrupado")]
@@ -106,7 +117,7 @@ public class AlmacenCascosController : ControllerBase
     }
 
     /// <summary>
-    /// Acepta una ENTRADA desde una SALIDA registrada. El SP crea la entrada, marca la salida como aceptada y suma kilos a WConstantes.
+    /// Acepta una ENTRADA desde una SALIDA registrada. El SP crea la entrada, marca la salida como aceptada y deja TotalKilos = 0.
     /// </summary>
     /// <response code="200">Entrada aceptada</response>
     /// <response code="400">Validación o salida sin detalle / no registrada</response>
@@ -126,6 +137,22 @@ public class AlmacenCascosController : ControllerBase
     }
 
     /// <summary>
+    /// Guarda kilos por tarima para una ENTRADA (inserta o actualiza).
+    /// </summary>
+    [HttpPost("movimientos/{idMovimiento:int}/tarimas/{numeroTarima:int}/kilos")]
+    [ProducesResponseType(typeof(MovimientoCascoTarimaKilosResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GuardarKilosTarima(int idMovimiento, int numeroTarima, [FromBody] GuardarKilosTarimaRequest request, CancellationToken ct)
+    {
+        if (request == null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var usuario = GetUsuarioFromToken();
+        var result = await _service.GuardarKilosTarimaAsync(idMovimiento, numeroTarima, request.Kilos, usuario, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Actualiza una SALIDA (repartidor, tarima, cantidad de tarimas, piezas, observaciones).
     /// </summary>
     [HttpPut("salidas/{idMovimiento:int}")]
@@ -142,7 +169,7 @@ public class AlmacenCascosController : ControllerBase
     }
 
     /// <summary>
-    /// Actualiza una ENTRADA (repartidor recibe, kilos, observaciones).
+    /// Actualiza una ENTRADA (repartidor recibe, observaciones).
     /// </summary>
     [HttpPut("entradas/{idMovimiento:int}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
