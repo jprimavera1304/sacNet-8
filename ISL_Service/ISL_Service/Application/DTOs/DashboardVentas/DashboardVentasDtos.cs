@@ -21,6 +21,16 @@ public class DashboardVentasSerieMensualDto
     public decimal Tickets { get; set; }
 }
 
+public class DashboardVentasSerieSemanalDto
+{
+    public int SemanaNumero { get; set; }
+    public DateTime FechaInicioSemana { get; set; }
+    public DateTime FechaFinSemana { get; set; }
+    public decimal VentaTotal { get; set; }
+    public decimal GananciaTotal { get; set; }
+    public decimal CantidadVendida { get; set; }
+}
+
 public class DashboardTopProductoDto
 {
     public int IDProducto { get; set; }
@@ -34,9 +44,29 @@ public class DashboardTopProductoDto
 public class DashboardTopClienteDto
 {
     public int IDCliente { get; set; }
+    public string? ClienteNumero { get; set; }
     public string? Cliente { get; set; }
     public decimal VentaTotal { get; set; }
+    public decimal GananciaTotal { get; set; }
     public decimal Tickets { get; set; }
+}
+
+public class DashboardTopCategoriaDto
+{
+    public int IDCategoria { get; set; }
+    public string? Categoria { get; set; }
+    public decimal CantidadVendida { get; set; }
+    public decimal VentaTotal { get; set; }
+    public decimal GananciaTotal { get; set; }
+}
+
+public class DashboardTopMarcaDto
+{
+    public int IDMarca { get; set; }
+    public string? Marca { get; set; }
+    public decimal CantidadVendida { get; set; }
+    public decimal VentaTotal { get; set; }
+    public decimal GananciaTotal { get; set; }
 }
 
 public class DashboardVentasAlmacenDto

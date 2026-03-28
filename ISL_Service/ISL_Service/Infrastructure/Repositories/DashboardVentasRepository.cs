@@ -16,6 +16,8 @@ public class DashboardVentasRepository : IDashboardVentasRepository
     private const string SpConsultarSerieMensual = "dbo.sp_w_ConsultarDashboardVentasSerieMensual";
     private const string SpConsultarTopProductos = "dbo.sp_w_ConsultarDashboardTopProductos";
     private const string SpConsultarTopClientes = "dbo.sp_w_ConsultarDashboardTopClientes";
+    private const string SpConsultarTopCategorias = "dbo.sp_w_ConsultarDashboardTopCategorias";
+    private const string SpConsultarTopMarcas = "dbo.sp_w_ConsultarDashboardTopMarcas";
     private const string SpConsultarVentasAlmacenes = "dbo.sp_w_ConsultarDashboardVentasAlmacenes";
     private const string SpConsultarVentasAgentes = "dbo.sp_w_ConsultarDashboardVentasAgentes";
     private const string SpConsultarVentasDetalle = "dbo.sp_w_ConsultarDashboardVentasDetalle";
@@ -83,14 +85,26 @@ public class DashboardVentasRepository : IDashboardVentasRepository
 
     public async Task<List<DashboardTopProductoDto>> ConsultarTopProductosAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
     {
-        var dt = await ExecuteSingleTableAsync(SpConsultarTopProductos, request, ct);
+        var dt = await ExecuteSingleTableWithTopAsync(SpConsultarTopProductos, request, ct);
         return Funciones.DataTableToList<DashboardTopProductoDto>(dt);
     }
 
     public async Task<List<DashboardTopClienteDto>> ConsultarTopClientesAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
     {
-        var dt = await ExecuteSingleTableAsync(SpConsultarTopClientes, request, ct);
+        var dt = await ExecuteSingleTableWithTopAsync(SpConsultarTopClientes, request, ct);
         return Funciones.DataTableToList<DashboardTopClienteDto>(dt);
+    }
+
+    public async Task<List<DashboardTopCategoriaDto>> ConsultarTopCategoriasAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
+    {
+        var dt = await ExecuteSingleTableWithTopAsync(SpConsultarTopCategorias, request, ct);
+        return Funciones.DataTableToList<DashboardTopCategoriaDto>(dt);
+    }
+
+    public async Task<List<DashboardTopMarcaDto>> ConsultarTopMarcasAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
+    {
+        var dt = await ExecuteSingleTableWithTopAsync(SpConsultarTopMarcas, request, ct);
+        return Funciones.DataTableToList<DashboardTopMarcaDto>(dt);
     }
 
     public async Task<List<DashboardVentasAlmacenDto>> ConsultarVentasAlmacenesAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
@@ -121,6 +135,27 @@ public class DashboardVentasRepository : IDashboardVentasRepository
             CommandType = CommandType.StoredProcedure
         };
         AddFilterParams(cmd, request);
+
+        var dt = new DataTable();
+        using (var adapter = new SqlDataAdapter(cmd))
+        {
+            adapter.Fill(dt);
+        }
+
+        return dt;
+    }
+
+    private async Task<DataTable> ExecuteSingleTableWithTopAsync(string storedProcedure, DashboardVentasFiltroRequest request, CancellationToken ct)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(storedProcedure, conn)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        AddFilterParams(cmd, request);
+        cmd.Parameters.Add(new SqlParameter("@Top", SqlDbType.Int) { Value = request.Top ?? 10 });
 
         var dt = new DataTable();
         using (var adapter = new SqlDataAdapter(cmd))

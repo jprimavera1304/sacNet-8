@@ -16,17 +16,18 @@ En desarrollo, Swagger está disponible en `/swagger`.
 7. [Empresas](#7-empresas)
 8. [Tarimas](#8-tarimas)
 9. [Catálogos](#9-catálogos)
-10. [Almacén de Cascos](#10-almacén-de-cascos)
-11. [Personas (Proveedores)](#11-personas-proveedores)
-12. [Recaudaciones](#12-recaudaciones)
-13. [Proveedores de pagos](#13-proveedores-de-pagos)
-14. [Temporadas y Torneos](#14-temporadas-y-torneos)
-15. [Categorias Equipos](#15-categorias-equipos)
-16. [Profesores](#16-profesores)
-17. [Equipos](#17-equipos)
-18. [Inscripciones Torneo](#18-inscripciones-torneo)
-19. [Cheques](#19-cheques)
-20. [Utilidades](#20-utilidades)
+10. [Dashboard Ventas](#10-dashboard-ventas)
+11. [Almac?n de Cascos](#11-almac?n-de-cascos)
+12. [Personas (Proveedores)](#12-personas-proveedores)
+13. [Recaudaciones](#13-recaudaciones)
+14. [Proveedores de pagos](#14-proveedores-de-pagos)
+15. [Temporadas y Torneos](#15-temporadas-y-torneos)
+16. [Categorias Equipos](#16-categorias-equipos)
+17. [Profesores](#17-profesores)
+18. [Equipos](#18-equipos)
+19. [Inscripciones Torneo](#19-inscripciones-torneo)
+20. [Cheques](#20-cheques)
+21. [Utilidades](#21-utilidades)
 
 ---
 
@@ -202,7 +203,41 @@ Base: `api/catalogos`. **Requiere:** usuario autenticado. Solo lectura para drop
 
 ---
 
-## 10. Almacén de Cascos
+## 10. Dashboard Ventas
+
+Base: `api/dashboard`. **Requiere:** usuario autenticado (JWT) y `perm:dashboardventas.ver`.
+
+**Filtros globales (body):**
+
+- `fechaInicial` (DATE)
+- `fechaFinal` (DATE)
+- `idEmpresa`, `idAlmacen`, `idAgente`, `idCliente`, `idProducto`, `idCategoria`, `idMarca`, `idTipoDocumento` (INT/null)
+- `top` (INT, opcional, default 10) para endpoints Top
+
+| M?todo | Ruta | Descripci?n |
+|--------|------|-------------|
+| `POST` | `/api/dashboard/filtros/consultar` | Devuelve cat?logos: empresas, almacenes, agentes, clientes, productos, categor?as, marcas, tiposDocumento. |
+| `POST` | `/api/dashboard/kpis/consultar` | KPIs: ventaTotal, gananciaTotal, descuentoTotal, tickets, unidadesVendidas, ticketPromedio, margenPorcentaje. |
+| `POST` | `/api/dashboard/ventas/serie-mensual/consultar` | Serie mensual: anio, mes, mesNombre, ventaTotal, gananciaTotal, tickets. |
+| `POST` | `/api/dashboard/ventas/serie-semanal/consultar` | Serie semanal por mes (rangos fijos): semanaNumero, fechaInicioSemana, fechaFinSemana, ventaTotal, gananciaTotal, cantidadVendida. |
+| `POST` | `/api/dashboard/top-productos/consultar` | Top productos (usa `top`). |
+| `POST` | `/api/dashboard/top-clientes/consultar` | Top clientes (usa `top`). |
+| `POST` | `/api/dashboard/top-categorias/consultar` | Top categor?as (usa `top`). |
+| `POST` | `/api/dashboard/top-marcas/consultar` | Top marcas (usa `top`). |
+| `POST` | `/api/dashboard/almacenes/consultar` | Ventas por almac?n. |
+| `POST` | `/api/dashboard/agentes/consultar` | Ventas por agente. |
+| `POST` | `/api/dashboard/detalle/consultar` | Detalle de ventas (tabla). |
+
+**Notas:**
+
+- Todos los filtros se env?an en el body; si no aplican, usar `null`.
+- `fechaInicial` y `fechaFinal` son obligatorias.
+- Los endpoints Top usan `top` (si no se env?a, default 10).
+- La venta total usa ImporteConIvaRnd y la ganancia usa GananciaRnd (ya vienen calculadas en SP).
+
+---
+
+## 11. Almacén de Cascos
 
 Base: `api/almacen-cascos`. **Requiere:** usuario autenticado (JWT). Usa tablas `WMovimientoCasco`, `WMovimientoCascoDetalle`, `WMovimientoCascoTarima`, `WConstantes`, `WTarima` y SP `sp_w_*`. Usuario de auditoría se toma del token.
 
@@ -294,7 +329,7 @@ Base: `api/almacen-cascos`. **Requiere:** usuario autenticado (JWT). Usa tablas 
 
 ---
 
-## 11. Personas (Proveedores)
+## 12. Personas (Proveedores)
 
 Base: `api/Personas`. **Requiere:** usuario autenticado y políticas indicadas.
 
@@ -310,7 +345,7 @@ Base: `api/Personas`. **Requiere:** usuario autenticado y políticas indicadas.
 
 ---
 
-## 12. Recaudaciones
+## 13. Recaudaciones
 
 Base: `api/Recaudaciones`. Endpoints principales por **ticket/QR** (cadena encriptada).
 
@@ -325,7 +360,7 @@ Los métodos POST, PUT y DELETE están definidos pero sin lógica (vacíos).
 
 ---
 
-## 13. Proveedores de pagos
+## 14. Proveedores de pagos
 
 Base: `api/ProveedoresPagos`. **Sin** atributo `[Authorize]` en el controlador (endpoints públicos o según configuración global).
 
@@ -340,7 +375,7 @@ Errores: 404 si no hay registros, 500 con mensaje de excepción.
 
 ---
 
-## 14. Temporadas y Torneos
+## 15. Temporadas y Torneos
 
 Base: `api/temporadas` y `api/torneos`. Requiere JWT. Usa SPs: `sp_w_ConsultarTemporadas`, `sp_w_InsertarTemporada`, `sp_w_ActualizarTemporada`, `sp_w_CancelarTemporada`, `sp_w_ConsultarTorneos`, `sp_w_InsertarTorneo`, `sp_w_ActualizarTorneo`, `sp_w_CancelarTorneo`, `sp_w_ActivarTorneo`, `sp_w_CerrarTorneo`, `sp_w_ReactivarTorneo`, `sp_w_CerrarTorneosVencidos`.
 
@@ -378,7 +413,7 @@ Reglas de negocio principales:
 
 ---
 
-## 15. Categorias Equipos
+## 16. Categorias Equipos
 
 Base: `api/categorias`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarCategorias`, `sp_w_InsertarCategoria`, `sp_w_ActualizarCategoria`, `sp_w_InhabilitarCategoria`.
 
@@ -399,7 +434,7 @@ Reglas:
 
 ---
 
-## 16. Profesores
+## 17. Profesores
 
 Base: `api/profesores`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarProfesores`, `sp_w_InsertarProfesor`, `sp_w_ActualizarProfesor`, `sp_w_InhabilitarProfesor`.
 
@@ -422,7 +457,7 @@ Reglas:
 
 ---
 
-## 17. Equipos
+## 18. Equipos
 
 Base: `api/equipos`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarEquipos`, `sp_w_InsertarEquipo`, `sp_w_ActualizarEquipo`, `sp_w_InhabilitarEquipo`.
 
@@ -446,7 +481,7 @@ Reglas:
 
 ---
 
-## 18. Inscripciones Torneo
+## 19. Inscripciones Torneo
 
 Base: `api/inscripciones-torneo`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarInscripcionesTorneo`, `sp_w_InsertarInscripcionTorneo`, `sp_w_ActualizarInscripcionTorneo`, `sp_w_InhabilitarInscripcionTorneo`.
 
@@ -471,7 +506,7 @@ Reglas:
 
 ---
 
-## 19. Cheques
+## 20. Cheques
 
 Base: `api/cheques`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarCheques`, `sp_w_ConsultarChequeDetalle`, `sp_w_InsertarCheque`, `sp_w_ActualizarCheque`, `sp_w_CambiarEstatusCheque`.
 
@@ -494,7 +529,7 @@ Reglas:
 
 ---
 
-## 20. Utilidades
+## 21. Utilidades
 
 Endpoints mínimos (Program.cs), sin autenticación JWT:
 
