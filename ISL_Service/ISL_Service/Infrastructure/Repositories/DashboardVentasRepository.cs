@@ -85,7 +85,13 @@ public class DashboardVentasRepository : IDashboardVentasRepository
     public async Task<List<DashboardTopProductoDto>> ConsultarTopProductosAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
     {
         var dt = await ExecuteSingleTableWithTopAsync(SpConsultarTopProductos, request, AddParamsTopProductos, ct);
-        return Funciones.DataTableToList<DashboardTopProductoDto>(dt);
+        var list = Funciones.DataTableToList<DashboardTopProductoDto>(dt);
+        foreach (var item in list)
+        {
+            if (!string.IsNullOrWhiteSpace(item.Codigo))
+                item.Producto = item.Codigo;
+        }
+        return list;
     }
 
     public async Task<List<DashboardTopClienteDto>> ConsultarTopClientesAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
