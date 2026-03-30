@@ -40,6 +40,7 @@ public class DashboardVentasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.ConsultarKpisAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
         return Ok(result);
     }
 
@@ -53,6 +54,7 @@ public class DashboardVentasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.ConsultarSerieMensualAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
         return Ok(result);
     }
 
@@ -82,6 +84,7 @@ public class DashboardVentasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.ConsultarTopProductosAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
         return Ok(result);
     }
 
@@ -95,6 +98,7 @@ public class DashboardVentasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.ConsultarTopClientesAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
         return Ok(result);
     }
 
@@ -108,6 +112,7 @@ public class DashboardVentasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.ConsultarTopCategoriasAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
         return Ok(result);
     }
 
@@ -121,6 +126,7 @@ public class DashboardVentasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.ConsultarTopMarcasAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
         return Ok(result);
     }
 
@@ -134,6 +140,7 @@ public class DashboardVentasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.ConsultarVentasAlmacenesAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
         return Ok(result);
     }
 
@@ -147,19 +154,35 @@ public class DashboardVentasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.ConsultarVentasAgentesAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
         return Ok(result);
     }
 
     [HttpPost("detalle/consultar")]
     [Authorize(Policy = "perm:dashboardventas.ver")]
-    [ProducesResponseType(typeof(List<DashboardVentasDetalleDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(DashboardVentasDetallePagedResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ConsultarVentasDetalle([FromBody] DashboardVentasFiltroRequest request, CancellationToken ct)
+    public async Task<IActionResult> ConsultarVentasDetalle([FromBody] DashboardVentasDetalleRequest request, CancellationToken ct)
     {
         if (request is null)
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.ConsultarVentasDetalleAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
+        return Ok(result);
+    }
+
+    [HttpPost("overview/consultar")]
+    [Authorize(Policy = "perm:dashboardventas.ver")]
+    [ProducesResponseType(typeof(DashboardVentasOverviewResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConsultarOverview([FromBody] DashboardVentasFiltroRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var result = await _service.ConsultarOverviewAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
         return Ok(result);
     }
 }

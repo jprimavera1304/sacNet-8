@@ -14,6 +14,7 @@ public class DashboardVentasRepository : IDashboardVentasRepository
     private const string SpConsultarFiltros = "dbo.sp_w_ConsultarDashboardVentasFiltros";
     private const string SpConsultarKpis = "dbo.sp_w_ConsultarDashboardVentasKpis";
     private const string SpConsultarSerieMensual = "dbo.sp_w_ConsultarDashboardVentasSerieMensual";
+    private const string SpConsultarSerieSemanal = "dbo.sp_w_ConsultarDashboardVentasSerieSemanal";
     private const string SpConsultarTopProductos = "dbo.sp_w_ConsultarDashboardTopProductos";
     private const string SpConsultarTopClientes = "dbo.sp_w_ConsultarDashboardTopClientes";
     private const string SpConsultarTopCategorias = "dbo.sp_w_ConsultarDashboardTopCategorias";
@@ -80,6 +81,12 @@ public class DashboardVentasRepository : IDashboardVentasRepository
     {
         var dt = await ExecuteSingleTableAsync(SpConsultarSerieMensual, request, AddParamsSerieMensual, ct);
         return Funciones.DataTableToList<DashboardVentasSerieMensualDto>(dt);
+    }
+
+    public async Task<List<DashboardVentasSerieSemanalRawDto>> ConsultarSerieSemanalAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
+    {
+        var dt = await ExecuteSingleTableAsync(SpConsultarSerieSemanal, request, AddParamsSerieSemanal, ct);
+        return Funciones.DataTableToList<DashboardVentasSerieSemanalRawDto>(dt);
     }
 
     public async Task<List<DashboardTopProductoDto>> ConsultarTopProductosAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
@@ -196,6 +203,11 @@ public class DashboardVentasRepository : IDashboardVentasRepository
         AddParamsKpis(cmd, request);
     }
 
+    private static void AddParamsSerieSemanal(SqlCommand cmd, DashboardVentasFiltroRequest request)
+    {
+        AddParamsKpis(cmd, request);
+    }
+
     private static void AddParamsDetalle(SqlCommand cmd, DashboardVentasFiltroRequest request)
     {
         AddParamsKpis(cmd, request);
@@ -247,6 +259,7 @@ public class DashboardVentasRepository : IDashboardVentasRepository
     {
         AddBaseParams(cmd, request);
         cmd.Parameters.Add(new SqlParameter("@IDEmpresa", SqlDbType.Int) { Value = (object?)request.IDEmpresa ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDAlmacen", SqlDbType.Int) { Value = (object?)request.IDAlmacen ?? DBNull.Value });
         cmd.Parameters.Add(new SqlParameter("@IDAgente", SqlDbType.Int) { Value = (object?)request.IDAgente ?? DBNull.Value });
         cmd.Parameters.Add(new SqlParameter("@IDCliente", SqlDbType.Int) { Value = (object?)request.IDCliente ?? DBNull.Value });
         cmd.Parameters.Add(new SqlParameter("@IDProducto", SqlDbType.Int) { Value = (object?)request.IDProducto ?? DBNull.Value });
@@ -260,6 +273,7 @@ public class DashboardVentasRepository : IDashboardVentasRepository
         AddBaseParams(cmd, request);
         cmd.Parameters.Add(new SqlParameter("@IDEmpresa", SqlDbType.Int) { Value = (object?)request.IDEmpresa ?? DBNull.Value });
         cmd.Parameters.Add(new SqlParameter("@IDAlmacen", SqlDbType.Int) { Value = (object?)request.IDAlmacen ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDAgente", SqlDbType.Int) { Value = (object?)request.IDAgente ?? DBNull.Value });
         cmd.Parameters.Add(new SqlParameter("@IDCliente", SqlDbType.Int) { Value = (object?)request.IDCliente ?? DBNull.Value });
         cmd.Parameters.Add(new SqlParameter("@IDProducto", SqlDbType.Int) { Value = (object?)request.IDProducto ?? DBNull.Value });
         cmd.Parameters.Add(new SqlParameter("@IDCategoria", SqlDbType.Int) { Value = (object?)request.IDCategoria ?? DBNull.Value });

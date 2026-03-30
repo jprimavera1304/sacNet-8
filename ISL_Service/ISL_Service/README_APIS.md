@@ -26,8 +26,10 @@ En desarrollo, Swagger está disponible en `/swagger`.
 17. [Profesores](#17-profesores)
 18. [Equipos](#18-equipos)
 19. [Inscripciones Torneo](#19-inscripciones-torneo)
-20. [Cheques](#20-cheques)
-21. [Utilidades](#21-utilidades)
+20. [Jornadas](#20-jornadas)
+21. [ConfiguraciÃ³n Rol Torneo](#21-configuraci%C3%B3n-rol-torneo)
+22. [Cheques](#22-cheques)
+23. [Utilidades](#23-utilidades)
 
 ---
 
@@ -506,7 +508,90 @@ Reglas:
 
 ---
 
-## 20. Cheques
+## 20. Jornadas
+
+Base: `api/jornadas`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarJornadas`, `sp_w_InsertarJornada`, `sp_w_ActualizarJornada`, `sp_w_InhabilitarJornada`.
+
+| Metodo | Ruta | Politica | Descripcion |
+|--------|------|----------|-------------|
+| `GET` | `/api/jornadas` | `perm:jornadas.ver` | Lista jornadas. Filtros opcionales: `estado` (1 activo, 2 inhabilitado), `texto` (nombre/numero). |
+| `GET` | `/api/jornadas/{id}` | `perm:jornadas.ver` | Obtiene jornada por Id (GUID). |
+| `POST` | `/api/jornadas` | `perm:jornadas.crear` | Crea jornada. Body: `CreateJornadaRequest` (`numeroJornada`). |
+| `PUT` | `/api/jornadas/{id}` | `perm:jornadas.editar` | Actualiza jornada activa. Body: `UpdateJornadaRequest` (`numeroJornada`). |
+| `POST` | `/api/jornadas/{id}/inhabilitar` | `perm:jornadas.activar` | Inhabilita jornada (estado 2). Body: `InhabilitarJornadaRequest` (`motivo` requerido). |
+
+Reglas:
+- `numeroJornada` requerido, > 0.
+- `motivo` requerido, max 200.
+- No permite numero o nombre duplicado.
+- No permite modificar jornada inactiva.
+---
+
+## 21. ConfiguraciÃ³n Rol Torneo
+
+Base: `api/configuracion-rol-torneo`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarConfiguracionesRolTorneo`, `sp_w_ObtenerConfiguracionRolTorneo`, `sp_w_InsertarConfiguracionRolTorneo`, `sp_w_ActualizarConfiguracionRolTorneo`, `sp_w_InhabilitarConfiguracionRolTorneo`.
+
+| Metodo | Ruta | Politica | Descripcion |
+|--------|------|----------|-------------|
+| `GET` | `/api/configuracion-rol-torneo` | `perm:configuracionroltorneo.ver` | Lista configuraciones con filtros. |
+| `GET` | `/api/configuracion-rol-torneo/{id}` | `perm:configuracionroltorneo.ver` | Obtiene configuracion por Id (GUID). |
+| `GET` | `/api/configuracion-rol-torneo/torneo/{torneoId}` | `perm:configuracionroltorneo.ver` | Obtiene configuracion activa por torneo. |
+| `POST` | `/api/configuracion-rol-torneo` | `perm:configuracionroltorneo.crear` | Crea configuracion. |
+| `PUT` | `/api/configuracion-rol-torneo/{id}` | `perm:configuracionroltorneo.editar` | Actualiza configuracion activa. |
+| `POST` | `/api/configuracion-rol-torneo/{id}/inhabilitar` | `perm:configuracionroltorneo.activar` | Inhabilita configuracion. |
+
+**Query (GET list):**
+
+- `texto`: opcional. Busca por nombre/clave de torneo o temporada.
+- `temporadaId`: opcional (GUID).
+- `estado`: opcional (1 activo, 2 inhabilitado).
+
+**Body POST crear:** `CreateConfiguracionRolTorneoRequest`
+
+```json
+{
+  "torneoId": "GUID",
+  "horaInicioPredeterminada": "08:00:00",
+  "duracionPartidoMin": 50,
+  "minutosEntrePartidos": 10,
+  "numeroCanchas": 2,
+  "observacionesPredeterminadas": "string opcional"
+}
+```
+
+**Body PUT actualizar:** `UpdateConfiguracionRolTorneoRequest`
+
+```json
+{
+  "horaInicioPredeterminada": "09:00:00",
+  "duracionPartidoMin": 45,
+  "minutosEntrePartidos": 5,
+  "numeroCanchas": 3,
+  "observacionesPredeterminadas": "string opcional"
+}
+```
+
+**Body POST inhabilitar:** `InhabilitarConfiguracionRolTorneoRequest`
+
+```json
+{
+  "motivo": "string requerido"
+}
+```
+
+Reglas:
+
+- Un solo registro por torneo.
+- El torneo debe estar en estado Borrador/Activo para crear.
+- `duracionPartidoMin` > 0.
+- `minutosEntrePartidos` >= 0.
+- `numeroCanchas` > 0.
+- `observacionesPredeterminadas` max 500.
+- `motivo` max 200 (requerido para inhabilitar).
+
+---
+
+## 22. Cheques
 
 Base: `api/cheques`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarCheques`, `sp_w_ConsultarChequeDetalle`, `sp_w_InsertarCheque`, `sp_w_ActualizarCheque`, `sp_w_CambiarEstatusCheque`.
 
@@ -529,7 +614,7 @@ Reglas:
 
 ---
 
-## 21. Utilidades
+## 23. Utilidades
 
 Endpoints mínimos (Program.cs), sin autenticación JWT:
 
@@ -554,3 +639,6 @@ Endpoints mínimos (Program.cs), sin autenticación JWT:
 - **ErrorController**, **DevController** y **AuthController** están comentados en el código; no exponen rutas activas.
 - Rutas con `api/[controller]` resuelven a: Personas → `api/Personas`, Recaudaciones → `api/Recaudaciones`, ProveedoresPagos → `api/ProveedoresPagos`.
 - Tarimas: validaciones en crear/actualizar (nombreTarima requerido, longitudes, idTipoCasco > 0, numeroCascosBase 1–99999, observaciones opcional max 500).
+
+
+

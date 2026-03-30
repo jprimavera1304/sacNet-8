@@ -15,5 +15,6 @@ public interface IDashboardVentasService
     Task<List<DashboardTopMarcaDto>> ConsultarTopMarcasAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default);
     Task<List<DashboardVentasAlmacenDto>> ConsultarVentasAlmacenesAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default);
     Task<List<DashboardVentasAgenteDto>> ConsultarVentasAgentesAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default);
-    Task<List<DashboardVentasDetalleDto>> ConsultarVentasDetalleAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default);
+    Task<DashboardVentasDetallePagedResponse> ConsultarVentasDetalleAsync(DashboardVentasDetalleRequest request, CancellationToken ct = default);
+    Task<DashboardVentasOverviewResponse> ConsultarOverviewAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default);
 }
