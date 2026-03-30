@@ -135,6 +135,8 @@ builder.Services.AddScoped<IInscripcionesTorneoRepository, InscripcionesTorneoRe
 builder.Services.AddScoped<IInscripcionesTorneoService, InscripcionesTorneoService>();
 builder.Services.AddScoped<IJornadasRepository, JornadasRepository>();
 builder.Services.AddScoped<IJornadasService, JornadasService>();
+builder.Services.AddScoped<IGeneracionRolTorneoRepository, GeneracionRolTorneoRepository>();
+builder.Services.AddScoped<IGeneracionRolTorneoService, GeneracionRolTorneoService>();
 builder.Services.AddScoped<IConfiguracionRolTorneoRepository, ConfiguracionRolTorneoRepository>();
 builder.Services.AddScoped<IConfiguracionRolTorneoService, ConfiguracionRolTorneoService>();
 builder.Services.AddScoped<IChequesRepository, ChequesRepository>();

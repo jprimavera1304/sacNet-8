@@ -28,8 +28,9 @@ En desarrollo, Swagger está disponible en `/swagger`.
 19. [Inscripciones Torneo](#19-inscripciones-torneo)
 20. [Jornadas](#20-jornadas)
 21. [ConfiguraciÃ³n Rol Torneo](#21-configuraci%C3%B3n-rol-torneo)
-22. [Cheques](#22-cheques)
-23. [Utilidades](#23-utilidades)
+22. [Generación Rol de Juego](#22-generaci%C3%B3n-rol-de-juego)
+23. [Cheques](#23-cheques)
+24. [Utilidades](#24-utilidades)
 
 ---
 
@@ -591,7 +592,63 @@ Reglas:
 
 ---
 
-## 22. Cheques
+## 22. Generación Rol de Juego
+
+Base: `api/generacion-rol-torneo`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarGeneracionesRolTorneo`, `sp_w_ObtenerGeneracionRolTorneo`, `sp_w_InsertarGeneracionRolTorneo`, `sp_w_ActualizarGeneracionRolTorneo`, `sp_w_CancelarGeneracionRolTorneo`, `sp_w_CargarEquiposGeneracionRolTorneo`, `sp_w_ConsultarEquiposGeneracionRolTorneo`, `sp_w_ActualizarParticipacionEquipoGeneracionRolTorneo`, `sp_w_GenerarPartidosGeneracionRolTorneo`, `sp_w_ConsultarPartidosGeneracionRolTorneo`.
+
+| Metodo | Ruta | Politica | Descripcion |
+|--------|------|----------|-------------|
+| `GET` | `/api/generacion-rol-torneo` | `perm:generacionroltorneo.ver` | Lista generaciones. Filtros opcionales: `texto`, `torneoId`, `jornadaId`, `diaJuego` (1/2), `estado` (1 borrador, 2 generado, 3 cancelado). |
+| `GET` | `/api/generacion-rol-torneo/{id}` | `perm:generacionroltorneo.ver` | Obtiene generación por Id (GUID). |
+| `POST` | `/api/generacion-rol-torneo` | `perm:generacionroltorneo.crear` | Crea generación (borrador). Body: `CreateGeneracionRolTorneoRequest`. |
+| `PUT` | `/api/generacion-rol-torneo/{id}` | `perm:generacionroltorneo.editar` | Actualiza generación en borrador. Body: `UpdateGeneracionRolTorneoRequest`. |
+| `POST` | `/api/generacion-rol-torneo/{id}/cancelar` | `perm:generacionroltorneo.activar` | Cancela generación. Body: `CancelarGeneracionRolTorneoRequest` (`motivo` requerido). |
+| `POST` | `/api/generacion-rol-torneo/{id}/equipos/cargar` | `perm:generacionroltorneo.editar` | Carga equipos de inscripciones activas para la generación en borrador. |
+| `GET` | `/api/generacion-rol-torneo/{id}/equipos` | `perm:generacionroltorneo.ver` | Lista equipos de la generación. |
+| `PUT` | `/api/generacion-rol-torneo/equipos/{id}` | `perm:generacionroltorneo.editar` | Cambia participación de un equipo. Body: `UpdateParticipacionEquipoRequest` (`participa`, `observaciones?`). |
+| `POST` | `/api/generacion-rol-torneo/{id}/generar-partidos` | `perm:generacionroltorneo.activar` | Genera partidos y cambia estado a Generado. Devuelve partidos y notas. |
+| `GET` | `/api/generacion-rol-torneo/{id}/partidos` | `perm:generacionroltorneo.ver` | Consulta partidos generados. |
+
+**Body POST crear:** `CreateGeneracionRolTorneoRequest`
+
+```json
+{
+  "torneoId": "GUID",
+  "jornadaId": "GUID",
+  "diaJuego": 1,
+  "horaInicio": "08:00:00",
+  "duracionPartidoMin": 45,
+  "minutosEntrePartidos": 10,
+  "numeroCanchas": 2,
+  "observaciones": "string opcional"
+}
+```
+
+**Body PUT actualizar:** `UpdateGeneracionRolTorneoRequest`
+
+```json
+{
+  "jornadaId": "GUID",
+  "diaJuego": 2,
+  "horaInicio": "09:00:00",
+  "duracionPartidoMin": 50,
+  "minutosEntrePartidos": 5,
+  "numeroCanchas": 3,
+  "observaciones": "string opcional"
+}
+```
+
+Reglas:
+- `diaJuego` debe ser 1 o 2.
+- `duracionPartidoMin` > 0.
+- `minutosEntrePartidos` >= 0.
+- `numeroCanchas` > 0.
+- `observaciones` max 500.
+- Solo se puede actualizar/cargar equipos en generación en borrador.
+- Para generar partidos debe haber equipos participantes.
+---
+
+## 23. Cheques
 
 Base: `api/cheques`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarCheques`, `sp_w_ConsultarChequeDetalle`, `sp_w_InsertarCheque`, `sp_w_ActualizarCheque`, `sp_w_CambiarEstatusCheque`.
 
@@ -614,7 +671,7 @@ Reglas:
 
 ---
 
-## 23. Utilidades
+## 24. Utilidades
 
 Endpoints mínimos (Program.cs), sin autenticación JWT:
 
@@ -639,6 +696,8 @@ Endpoints mínimos (Program.cs), sin autenticación JWT:
 - **ErrorController**, **DevController** y **AuthController** están comentados en el código; no exponen rutas activas.
 - Rutas con `api/[controller]` resuelven a: Personas → `api/Personas`, Recaudaciones → `api/Recaudaciones`, ProveedoresPagos → `api/ProveedoresPagos`.
 - Tarimas: validaciones en crear/actualizar (nombreTarima requerido, longitudes, idTipoCasco > 0, numeroCascosBase 1–99999, observaciones opcional max 500).
+
+
 
 
 
