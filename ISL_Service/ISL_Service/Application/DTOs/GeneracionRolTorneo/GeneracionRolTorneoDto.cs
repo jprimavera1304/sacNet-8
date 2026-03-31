@@ -8,6 +8,7 @@ public class GeneracionRolTorneoDto
     public string? TorneoClave { get; set; }
     public Guid JornadaId { get; set; }
     public string? Jornada { get; set; }
+    public DateTime FechaJuego { get; set; }
     public byte DiaJuego { get; set; }
     public string? DiaJuegoNombre { get; set; }
     public TimeSpan HoraInicio { get; set; }

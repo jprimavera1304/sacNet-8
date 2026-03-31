@@ -8,6 +8,7 @@ public class PartidoGeneracionRolTorneoDto
     public string? Torneo { get; set; }
     public Guid JornadaId { get; set; }
     public string? Jornada { get; set; }
+    public DateTime? FechaJuego { get; set; }
     public Guid CategoriaId { get; set; }
     public string? Categoria { get; set; }
     public Guid InscripcionLocalId { get; set; }

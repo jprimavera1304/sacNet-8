@@ -25,11 +25,12 @@ public class GeneracionRolTorneoController : ControllerBase
         [FromQuery] string? texto,
         [FromQuery] Guid? torneoId,
         [FromQuery] Guid? jornadaId,
+        [FromQuery] DateTime? fechaJuego,
         [FromQuery] byte? diaJuego,
         [FromQuery] byte? estado,
         CancellationToken ct)
     {
-        var list = await _service.ConsultarAsync(texto, torneoId, jornadaId, diaJuego, estado, ct);
+        var list = await _service.ConsultarAsync(texto, torneoId, jornadaId, fechaJuego, diaJuego, estado, ct);
         return Ok(list);
     }
 
@@ -66,6 +67,7 @@ public class GeneracionRolTorneoController : ControllerBase
         {
             TorneoId = request.TorneoId,
             JornadaId = request.JornadaId,
+            FechaJuego = request.FechaJuego,
             DiaJuego = request.DiaJuego,
             HoraInicio = request.HoraInicio,
             DuracionPartidoMin = request.DuracionPartidoMin,
@@ -98,6 +100,7 @@ public class GeneracionRolTorneoController : ControllerBase
         var updated = await _service.ActualizarAsync(id, new UpdateGeneracionRolTorneoRequest
         {
             JornadaId = request.JornadaId,
+            FechaJuego = request.FechaJuego,
             DiaJuego = request.DiaJuego,
             HoraInicio = request.HoraInicio,
             DuracionPartidoMin = request.DuracionPartidoMin,
@@ -213,6 +216,8 @@ public class GeneracionRolTorneoController : ControllerBase
             return new { message = "torneoId es requerido." };
         if (request.JornadaId == Guid.Empty)
             return new { message = "jornadaId es requerido." };
+        if (request.FechaJuego == default)
+            return new { message = "fechaJuego es requerido." };
         if (request.DiaJuego is not (1 or 2))
             return new { message = "diaJuego debe ser 1 o 2." };
         if (request.DuracionPartidoMin is not null && request.DuracionPartidoMin <= 0)
@@ -230,6 +235,8 @@ public class GeneracionRolTorneoController : ControllerBase
     {
         if (request.JornadaId == Guid.Empty)
             return new { message = "jornadaId es requerido." };
+        if (request.FechaJuego == default)
+            return new { message = "fechaJuego es requerido." };
         if (request.DiaJuego is not (1 or 2))
             return new { message = "diaJuego debe ser 1 o 2." };
         if (request.DuracionPartidoMin <= 0)

@@ -3,6 +3,7 @@
 public class UpdateGeneracionRolTorneoRequest
 {
     public Guid JornadaId { get; set; }
+    public DateTime FechaJuego { get; set; }
     public byte DiaJuego { get; set; }
     public TimeSpan HoraInicio { get; set; }
     public short DuracionPartidoMin { get; set; }

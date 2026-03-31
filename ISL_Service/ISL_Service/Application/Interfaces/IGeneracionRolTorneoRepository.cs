@@ -4,7 +4,7 @@ namespace ISL_Service.Application.Interfaces;
 
 public interface IGeneracionRolTorneoRepository
 {
-    Task<List<GeneracionRolTorneoDto>> ConsultarAsync(string? texto, Guid? torneoId, Guid? jornadaId, byte? diaJuego, byte? estado, CancellationToken ct = default);
+    Task<List<GeneracionRolTorneoDto>> ConsultarAsync(string? texto, Guid? torneoId, Guid? jornadaId, DateTime? fechaJuego, byte? diaJuego, byte? estado, CancellationToken ct = default);
     Task<GeneracionRolTorneoDto?> ObtenerAsync(Guid id, CancellationToken ct = default);
     Task<GeneracionRolTorneoDto?> InsertarAsync(CreateGeneracionRolTorneoRequest request, Guid usuarioId, CancellationToken ct = default);
     Task<GeneracionRolTorneoDto?> ActualizarAsync(Guid id, UpdateGeneracionRolTorneoRequest request, Guid usuarioId, CancellationToken ct = default);

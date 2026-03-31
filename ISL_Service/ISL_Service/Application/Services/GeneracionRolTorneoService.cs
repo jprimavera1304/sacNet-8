@@ -14,8 +14,8 @@ public class GeneracionRolTorneoService : IGeneracionRolTorneoService
         _repository = repository;
     }
 
-    public Task<List<GeneracionRolTorneoDto>> ConsultarAsync(string? texto, Guid? torneoId, Guid? jornadaId, byte? diaJuego, byte? estado, CancellationToken ct = default)
-        => _repository.ConsultarAsync(NormalizeText(texto), torneoId, jornadaId, diaJuego, estado, ct);
+    public Task<List<GeneracionRolTorneoDto>> ConsultarAsync(string? texto, Guid? torneoId, Guid? jornadaId, DateTime? fechaJuego, byte? diaJuego, byte? estado, CancellationToken ct = default)
+        => _repository.ConsultarAsync(NormalizeText(texto), torneoId, jornadaId, fechaJuego, diaJuego, estado, ct);
 
     public Task<GeneracionRolTorneoDto?> ObtenerAsync(Guid id, CancellationToken ct = default)
         => _repository.ObtenerAsync(id, ct);

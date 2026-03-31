@@ -598,7 +598,7 @@ Base: `api/generacion-rol-torneo`. Requiere JWT y permisos por accion. Usa SPs: 
 
 | Metodo | Ruta | Politica | Descripcion |
 |--------|------|----------|-------------|
-| `GET` | `/api/generacion-rol-torneo` | `perm:generacionroltorneo.ver` | Lista generaciones. Filtros opcionales: `texto`, `torneoId`, `jornadaId`, `diaJuego` (1/2), `estado` (1 borrador, 2 generado, 3 cancelado). |
+| `GET` | `/api/generacion-rol-torneo` | `perm:generacionroltorneo.ver` | Lista generaciones. Filtros opcionales: `texto`, `torneoId`, `jornadaId`, `fechaJuego`, `diaJuego` (1/2), `estado` (1 borrador, 2 generado, 3 cancelado). |
 | `GET` | `/api/generacion-rol-torneo/{id}` | `perm:generacionroltorneo.ver` | Obtiene generación por Id (GUID). |
 | `POST` | `/api/generacion-rol-torneo` | `perm:generacionroltorneo.crear` | Crea generación (borrador). Body: `CreateGeneracionRolTorneoRequest`. |
 | `PUT` | `/api/generacion-rol-torneo/{id}` | `perm:generacionroltorneo.editar` | Actualiza generación en borrador. Body: `UpdateGeneracionRolTorneoRequest`. |
@@ -614,8 +614,7 @@ Base: `api/generacion-rol-torneo`. Requiere JWT y permisos por accion. Usa SPs: 
 ```json
 {
   "torneoId": "GUID",
-  "jornadaId": "GUID",
-  "diaJuego": 1,
+  "jornadaId": "GUID",`r`n  "fechaJuego": "2026-03-31",`r`n  "diaJuego": 1,
   "horaInicio": "08:00:00",
   "duracionPartidoMin": 45,
   "minutosEntrePartidos": 10,
@@ -628,8 +627,7 @@ Base: `api/generacion-rol-torneo`. Requiere JWT y permisos por accion. Usa SPs: 
 
 ```json
 {
-  "jornadaId": "GUID",
-  "diaJuego": 2,
+  "jornadaId": "GUID",`r`n  "fechaJuego": "2026-03-31",`r`n  "diaJuego": 2,
   "horaInicio": "09:00:00",
   "duracionPartidoMin": 50,
   "minutosEntrePartidos": 5,
@@ -639,7 +637,8 @@ Base: `api/generacion-rol-torneo`. Requiere JWT y permisos por accion. Usa SPs: 
 ```
 
 Reglas:
-- `diaJuego` debe ser 1 o 2.
+- echaJuego requerido.
+- diaJuego debe ser 1 o 2.
 - `duracionPartidoMin` > 0.
 - `minutosEntrePartidos` >= 0.
 - `numeroCanchas` > 0.
@@ -696,6 +695,7 @@ Endpoints mínimos (Program.cs), sin autenticación JWT:
 - **ErrorController**, **DevController** y **AuthController** están comentados en el código; no exponen rutas activas.
 - Rutas con `api/[controller]` resuelven a: Personas → `api/Personas`, Recaudaciones → `api/Recaudaciones`, ProveedoresPagos → `api/ProveedoresPagos`.
 - Tarimas: validaciones en crear/actualizar (nombreTarima requerido, longitudes, idTipoCasco > 0, numeroCascosBase 1–99999, observaciones opcional max 500).
+
 
 
 

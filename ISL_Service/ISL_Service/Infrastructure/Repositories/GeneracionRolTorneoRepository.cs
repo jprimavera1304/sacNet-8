@@ -39,7 +39,7 @@ public class GeneracionRolTorneoRepository : IGeneracionRolTorneoRepository
         return connector.GetConnection;
     }
 
-    public async Task<List<GeneracionRolTorneoDto>> ConsultarAsync(string? texto, Guid? torneoId, Guid? jornadaId, byte? diaJuego, byte? estado, CancellationToken ct = default)
+    public async Task<List<GeneracionRolTorneoDto>> ConsultarAsync(string? texto, Guid? torneoId, Guid? jornadaId, DateTime? fechaJuego, byte? diaJuego, byte? estado, CancellationToken ct = default)
     {
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
@@ -51,6 +51,7 @@ public class GeneracionRolTorneoRepository : IGeneracionRolTorneoRepository
         cmd.Parameters.AddWithValue("@Texto", string.IsNullOrWhiteSpace(texto) ? DBNull.Value : texto.Trim());
         cmd.Parameters.AddWithValue("@TorneoId", (object?)torneoId ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@JornadaId", (object?)jornadaId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@FechaJuego", (object?)fechaJuego?.Date ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@DiaJuego", (object?)diaJuego ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@Estado", (object?)estado ?? DBNull.Value);
 
@@ -88,6 +89,7 @@ public class GeneracionRolTorneoRepository : IGeneracionRolTorneoRepository
         };
         cmd.Parameters.AddWithValue("@TorneoId", request.TorneoId);
         cmd.Parameters.AddWithValue("@JornadaId", request.JornadaId);
+        cmd.Parameters.AddWithValue("@FechaJuego", request.FechaJuego.Date);
         cmd.Parameters.AddWithValue("@DiaJuego", request.DiaJuego);
         cmd.Parameters.AddWithValue("@HoraInicio", (object?)request.HoraInicio ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@DuracionPartidoMin", (object?)request.DuracionPartidoMin ?? DBNull.Value);
@@ -110,6 +112,7 @@ public class GeneracionRolTorneoRepository : IGeneracionRolTorneoRepository
         };
         cmd.Parameters.AddWithValue("@Id", id);
         cmd.Parameters.AddWithValue("@JornadaId", request.JornadaId);
+        cmd.Parameters.AddWithValue("@FechaJuego", request.FechaJuego.Date);
         cmd.Parameters.AddWithValue("@DiaJuego", request.DiaJuego);
         cmd.Parameters.AddWithValue("@HoraInicio", request.HoraInicio);
         cmd.Parameters.AddWithValue("@DuracionPartidoMin", request.DuracionPartidoMin);
