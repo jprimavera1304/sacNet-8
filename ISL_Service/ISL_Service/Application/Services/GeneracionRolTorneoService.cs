@@ -80,6 +80,45 @@ public class GeneracionRolTorneoService : IGeneracionRolTorneoService
         }
     }
 
+    public async Task<List<GeneracionRolCategoriaDto>> ConsultarCategoriasAsync(Guid generacionId, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repository.ConsultarCategoriasAsync(generacionId, ct);
+        }
+        catch (SqlException ex)
+        {
+            ThrowMappedException(ex);
+            throw;
+        }
+    }
+
+    public async Task<List<GeneracionRolCanchaDto>> GuardarCanchasAsync(Guid generacionId, Guid usuarioId, IReadOnlyList<GeneracionRolCanchaItemRequest> canchas, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repository.GuardarCanchasAsync(generacionId, usuarioId, canchas, ct);
+        }
+        catch (SqlException ex)
+        {
+            ThrowMappedException(ex);
+            throw;
+        }
+    }
+
+    public async Task<List<GeneracionRolCanchaDto>> ConsultarCanchasAsync(Guid generacionId, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repository.ConsultarCanchasAsync(generacionId, ct);
+        }
+        catch (SqlException ex)
+        {
+            ThrowMappedException(ex);
+            throw;
+        }
+    }
+
     public async Task<List<GeneracionRolEquipoDto>> CargarEquiposAsync(Guid generacionId, Guid usuarioId, CancellationToken ct = default)
     {
         try
@@ -140,6 +179,35 @@ public class GeneracionRolTorneoService : IGeneracionRolTorneoService
         try
         {
             return await _repository.ConsultarPartidosAsync(generacionId, ct);
+        }
+        catch (SqlException ex)
+        {
+            ThrowMappedException(ex);
+            throw;
+        }
+    }
+
+    public async Task<List<PartidoGeneracionRolTorneoDto>> ActualizarOrdenPartidosAsync(Guid generacionId, Guid usuarioId, IReadOnlyList<OrdenPartidoItemRequest> partidos, CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repository.ActualizarOrdenPartidosAsync(generacionId, usuarioId, partidos, ct);
+        }
+        catch (SqlException ex)
+        {
+            ThrowMappedException(ex);
+            throw;
+        }
+    }
+
+    public async Task<PartidoGeneracionRolTorneoDto> ActualizarObservacionPartidoAsync(Guid partidoId, string? observaciones, Guid usuarioId, CancellationToken ct = default)
+    {
+        try
+        {
+            var updated = await _repository.ActualizarObservacionPartidoAsync(partidoId, observaciones, usuarioId, ct);
+            if (updated is null)
+                throw new InvalidOperationException("No se pudo actualizar la observacion.");
+            return updated;
         }
         catch (SqlException ex)
         {

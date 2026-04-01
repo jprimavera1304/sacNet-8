@@ -66,6 +66,7 @@ public class GeneracionRolTorneoController : ControllerBase
         var created = await _service.CrearAsync(new CreateGeneracionRolTorneoRequest
         {
             TorneoId = request.TorneoId,
+            TemporadaId = request.TemporadaId,
             JornadaId = request.JornadaId,
             FechaJuego = request.FechaJuego,
             DiaJuego = request.DiaJuego,
@@ -99,6 +100,7 @@ public class GeneracionRolTorneoController : ControllerBase
 
         var updated = await _service.ActualizarAsync(id, new UpdateGeneracionRolTorneoRequest
         {
+            TemporadaId = request.TemporadaId,
             JornadaId = request.JornadaId,
             FechaJuego = request.FechaJuego,
             DiaJuego = request.DiaJuego,
@@ -148,6 +150,45 @@ public class GeneracionRolTorneoController : ControllerBase
 
         var equipos = await _service.CargarEquiposAsync(id, userId, ct);
         return Ok(equipos);
+    }
+
+    [HttpGet("{id:guid}/categorias")]
+    [Authorize(Policy = "perm:generacionroltorneo.ver")]
+    [ProducesResponseType(typeof(List<GeneracionRolCategoriaDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ConsultarCategorias(Guid id, CancellationToken ct)
+    {
+        var categorias = await _service.ConsultarCategoriasAsync(id, ct);
+        return Ok(categorias);
+    }
+
+    [HttpGet("{id:guid}/canchas")]
+    [Authorize(Policy = "perm:generacionroltorneo.ver")]
+    [ProducesResponseType(typeof(List<GeneracionRolCanchaDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ConsultarCanchas(Guid id, CancellationToken ct)
+    {
+        var canchas = await _service.ConsultarCanchasAsync(id, ct);
+        return Ok(canchas);
+    }
+
+    [HttpPost("{id:guid}/canchas")]
+    [Authorize(Policy = "perm:generacionroltorneo.editar")]
+    [ProducesResponseType(typeof(List<GeneracionRolCanchaDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> GuardarCanchas(Guid id, [FromBody] GuardarCanchasGeneracionRolTorneoRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var validation = ValidateCanchas(request);
+        if (validation is not null)
+            return BadRequest(validation);
+
+        if (!TryGetUserId(out var userId))
+            return Unauthorized(new { message = "Token invalido." });
+
+        var canchas = await _service.GuardarCanchasAsync(id, userId, request.Canchas, ct);
+        return Ok(canchas);
     }
 
     [HttpGet("{id:guid}/equipos")]
@@ -204,6 +245,48 @@ public class GeneracionRolTorneoController : ControllerBase
         return Ok(partidos);
     }
 
+    [HttpPost("{id:guid}/partidos/orden")]
+    [Authorize(Policy = "perm:generacionroltorneo.editar")]
+    [ProducesResponseType(typeof(List<PartidoGeneracionRolTorneoDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ActualizarOrdenPartidos(Guid id, [FromBody] ActualizarOrdenPartidosRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var validation = ValidateOrdenPartidos(request);
+        if (validation is not null)
+            return BadRequest(validation);
+
+        if (!TryGetUserId(out var userId))
+            return Unauthorized(new { message = "Token invalido." });
+
+        var partidos = await _service.ActualizarOrdenPartidosAsync(id, userId, request.Partidos, ct);
+        return Ok(partidos);
+    }
+
+    [HttpPost("partidos/{partidoId:guid}/observacion")]
+    [Authorize(Policy = "perm:generacionroltorneo.editar")]
+    [ProducesResponseType(typeof(PartidoGeneracionRolTorneoDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ActualizarObservacion(Guid partidoId, [FromBody] ActualizarObservacionPartidoRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var validation = ValidateObservacion(request);
+        if (validation is not null)
+            return BadRequest(validation);
+
+        if (!TryGetUserId(out var userId))
+            return Unauthorized(new { message = "Token invalido." });
+
+        var updated = await _service.ActualizarObservacionPartidoAsync(partidoId, request.Observaciones, userId, ct);
+        return Ok(updated);
+    }
+
     private bool TryGetUserId(out Guid userId)
     {
         var sub = User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -214,12 +297,18 @@ public class GeneracionRolTorneoController : ControllerBase
     {
         if (request.TorneoId == Guid.Empty)
             return new { message = "torneoId es requerido." };
+        if (request.TemporadaId == Guid.Empty)
+            return new { message = "temporadaId es requerido." };
         if (request.JornadaId == Guid.Empty)
             return new { message = "jornadaId es requerido." };
         if (request.FechaJuego == default)
             return new { message = "fechaJuego es requerido." };
+        if (!IsWeekend(request.FechaJuego))
+            return new { message = "fechaJuego debe ser sabado o domingo." };
         if (request.DiaJuego is not (1 or 2))
             return new { message = "diaJuego debe ser 1 o 2." };
+        if (!IsDiaJuegoCompatible(request.FechaJuego, request.DiaJuego))
+            return new { message = "diaJuego no coincide con fechaJuego." };
         if (request.DuracionPartidoMin is not null && request.DuracionPartidoMin <= 0)
             return new { message = "duracionPartidoMin debe ser mayor a cero." };
         if (request.MinutosEntrePartidos is not null && request.MinutosEntrePartidos < 0)
@@ -233,12 +322,18 @@ public class GeneracionRolTorneoController : ControllerBase
 
     private static object? ValidateUpdate(UpdateGeneracionRolTorneoRequest request)
     {
+        if (request.TemporadaId == Guid.Empty)
+            return new { message = "temporadaId es requerido." };
         if (request.JornadaId == Guid.Empty)
             return new { message = "jornadaId es requerido." };
         if (request.FechaJuego == default)
             return new { message = "fechaJuego es requerido." };
+        if (!IsWeekend(request.FechaJuego))
+            return new { message = "fechaJuego debe ser sabado o domingo." };
         if (request.DiaJuego is not (1 or 2))
             return new { message = "diaJuego debe ser 1 o 2." };
+        if (!IsDiaJuegoCompatible(request.FechaJuego, request.DiaJuego))
+            return new { message = "diaJuego no coincide con fechaJuego." };
         if (request.DuracionPartidoMin <= 0)
             return new { message = "duracionPartidoMin debe ser mayor a cero." };
         if (request.MinutosEntrePartidos < 0)
@@ -255,5 +350,53 @@ public class GeneracionRolTorneoController : ControllerBase
         if (request.Observaciones is not null && request.Observaciones.Length > 200)
             return new { message = "observaciones max 200 caracteres." };
         return null;
+    }
+
+    private static object? ValidateCanchas(GuardarCanchasGeneracionRolTorneoRequest request)
+    {
+        if (request.Canchas is null || request.Canchas.Count == 0)
+            return new { message = "canchas es requerido." };
+        foreach (var c in request.Canchas)
+        {
+            if (c is null) return new { message = "canchas contiene elementos invalidos." };
+            if (c.CategoriaId == Guid.Empty) return new { message = "categoriaId es requerido." };
+            if (string.IsNullOrWhiteSpace(c.NombreCancha)) return new { message = "nombreCancha es requerido." };
+            if (c.NombreCancha.Length > 100) return new { message = "nombreCancha max 100 caracteres." };
+        }
+        return null;
+    }
+
+    private static object? ValidateOrdenPartidos(ActualizarOrdenPartidosRequest request)
+    {
+        if (request.Partidos is null || request.Partidos.Count == 0)
+            return new { message = "partidos es requerido." };
+        foreach (var p in request.Partidos)
+        {
+            if (p is null) return new { message = "partidos contiene elementos invalidos." };
+            if (p.PartidoId == Guid.Empty) return new { message = "partidoId es requerido." };
+            if (p.Orden <= 0) return new { message = "orden debe ser mayor a cero." };
+        }
+        return null;
+    }
+
+    private static object? ValidateObservacion(ActualizarObservacionPartidoRequest request)
+    {
+        if (request.Observaciones is not null && request.Observaciones.Length > 300)
+            return new { message = "observaciones max 300 caracteres." };
+        return null;
+    }
+
+    private static bool IsWeekend(DateTime fecha)
+    {
+        var day = fecha.DayOfWeek;
+        return day == DayOfWeek.Saturday || day == DayOfWeek.Sunday;
+    }
+
+    private static bool IsDiaJuegoCompatible(DateTime fecha, byte diaJuego)
+    {
+        var day = fecha.DayOfWeek;
+        if (diaJuego == 1) return day == DayOfWeek.Saturday;
+        if (diaJuego == 2) return day == DayOfWeek.Sunday;
+        return false;
     }
 }

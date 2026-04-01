@@ -64,7 +64,7 @@ public class AlmacenCascosController : ControllerBase
     }
 
     /// <summary>
-    /// Obtiene detalle agrupado por tarima logica (numeroTarima) y lineas por tipo de casco.
+    /// Obtiene detalle agrupado por tarima lógica (numeroTarima) y líneas por tipo de casco.
     /// </summary>
     [HttpGet("movimientos/{idMovimiento:int}/detalle-agrupado")]
     [ProducesResponseType(typeof(MovimientoCascoDetalleAgrupadoDto), StatusCodes.Status200OK)]

@@ -9,9 +9,14 @@ public interface IGeneracionRolTorneoService
     Task<GeneracionRolTorneoDto> CrearAsync(CreateGeneracionRolTorneoRequest request, Guid usuarioId, CancellationToken ct = default);
     Task<GeneracionRolTorneoDto> ActualizarAsync(Guid id, UpdateGeneracionRolTorneoRequest request, Guid usuarioId, CancellationToken ct = default);
     Task<GeneracionRolTorneoDto> CancelarAsync(Guid id, string motivo, Guid usuarioId, CancellationToken ct = default);
+    Task<List<GeneracionRolCategoriaDto>> ConsultarCategoriasAsync(Guid generacionId, CancellationToken ct = default);
+    Task<List<GeneracionRolCanchaDto>> GuardarCanchasAsync(Guid generacionId, Guid usuarioId, IReadOnlyList<GeneracionRolCanchaItemRequest> canchas, CancellationToken ct = default);
+    Task<List<GeneracionRolCanchaDto>> ConsultarCanchasAsync(Guid generacionId, CancellationToken ct = default);
     Task<List<GeneracionRolEquipoDto>> CargarEquiposAsync(Guid generacionId, Guid usuarioId, CancellationToken ct = default);
     Task<List<GeneracionRolEquipoDto>> ConsultarEquiposAsync(Guid generacionId, CancellationToken ct = default);
     Task<GeneracionRolEquipoDto> ActualizarParticipacionEquipoAsync(Guid id, UpdateParticipacionEquipoRequest request, Guid usuarioId, CancellationToken ct = default);
     Task<GenerarPartidosGeneracionRolTorneoResponse> GenerarPartidosAsync(Guid generacionId, Guid usuarioId, CancellationToken ct = default);
     Task<List<PartidoGeneracionRolTorneoDto>> ConsultarPartidosAsync(Guid generacionId, CancellationToken ct = default);
+    Task<List<PartidoGeneracionRolTorneoDto>> ActualizarOrdenPartidosAsync(Guid generacionId, Guid usuarioId, IReadOnlyList<OrdenPartidoItemRequest> partidos, CancellationToken ct = default);
+    Task<PartidoGeneracionRolTorneoDto> ActualizarObservacionPartidoAsync(Guid partidoId, string? observaciones, Guid usuarioId, CancellationToken ct = default);
 }

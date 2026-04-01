@@ -6,6 +6,7 @@ public class GeneracionRolTorneoDto
     public Guid TorneoId { get; set; }
     public string? Torneo { get; set; }
     public string? TorneoClave { get; set; }
+    public Guid TemporadaId { get; set; }
     public Guid JornadaId { get; set; }
     public string? Jornada { get; set; }
     public DateTime FechaJuego { get; set; }

@@ -3,6 +3,7 @@
 public class CreateGeneracionRolTorneoRequest
 {
     public Guid TorneoId { get; set; }
+    public Guid TemporadaId { get; set; }
     public Guid JornadaId { get; set; }
     public DateTime FechaJuego { get; set; }
     public byte DiaJuego { get; set; }

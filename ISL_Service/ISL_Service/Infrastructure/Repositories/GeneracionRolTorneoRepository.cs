@@ -16,11 +16,16 @@ public class GeneracionRolTorneoRepository : IGeneracionRolTorneoRepository
     private const string SpInsertar = "dbo.sp_w_InsertarGeneracionRolTorneo";
     private const string SpActualizar = "dbo.sp_w_ActualizarGeneracionRolTorneo";
     private const string SpCancelar = "dbo.sp_w_CancelarGeneracionRolTorneo";
+    private const string SpConsultarCategorias = "dbo.sp_w_ConsultarCategoriasGeneracionRolTorneo";
+    private const string SpGuardarCanchas = "dbo.sp_w_GuardarCanchasGeneracionRolTorneo";
+    private const string SpConsultarCanchas = "dbo.sp_w_ConsultarCanchasGeneracionRolTorneo";
     private const string SpCargarEquipos = "dbo.sp_w_CargarEquiposGeneracionRolTorneo";
     private const string SpActualizarEquipo = "dbo.sp_w_ActualizarParticipacionEquipoGeneracionRolTorneo";
     private const string SpConsultarEquipos = "dbo.sp_w_ConsultarEquiposGeneracionRolTorneo";
     private const string SpGenerarPartidos = "dbo.sp_w_GenerarPartidosGeneracionRolTorneo";
     private const string SpConsultarPartidos = "dbo.sp_w_ConsultarPartidosGeneracionRolTorneo";
+    private const string SpActualizarOrdenPartidos = "dbo.sp_w_ActualizarOrdenPartidosGeneracionRolTorneo";
+    private const string SpActualizarObservacionPartido = "dbo.sp_w_ActualizarObservacionPartidoGeneracionRolTorneo";
 
     public GeneracionRolTorneoRepository(IConfiguration configuration)
     {
@@ -88,6 +93,7 @@ public class GeneracionRolTorneoRepository : IGeneracionRolTorneoRepository
             CommandType = CommandType.StoredProcedure
         };
         cmd.Parameters.AddWithValue("@TorneoId", request.TorneoId);
+        cmd.Parameters.AddWithValue("@TemporadaId", request.TemporadaId);
         cmd.Parameters.AddWithValue("@JornadaId", request.JornadaId);
         cmd.Parameters.AddWithValue("@FechaJuego", request.FechaJuego.Date);
         cmd.Parameters.AddWithValue("@DiaJuego", request.DiaJuego);
@@ -111,6 +117,7 @@ public class GeneracionRolTorneoRepository : IGeneracionRolTorneoRepository
             CommandType = CommandType.StoredProcedure
         };
         cmd.Parameters.AddWithValue("@Id", id);
+        cmd.Parameters.AddWithValue("@TemporadaId", request.TemporadaId);
         cmd.Parameters.AddWithValue("@JornadaId", request.JornadaId);
         cmd.Parameters.AddWithValue("@FechaJuego", request.FechaJuego.Date);
         cmd.Parameters.AddWithValue("@DiaJuego", request.DiaJuego);
@@ -138,6 +145,72 @@ public class GeneracionRolTorneoRepository : IGeneracionRolTorneoRepository
         cmd.Parameters.AddWithValue("@UsuarioId", usuarioId);
 
         return await ExecuteSingleAsync<GeneracionRolTorneoDto>(cmd, ct);
+    }
+
+    public async Task<List<GeneracionRolCategoriaDto>> ConsultarCategoriasAsync(Guid generacionId, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(SpConsultarCategorias, conn)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        cmd.Parameters.AddWithValue("@GeneracionRolTorneoId", generacionId);
+
+        var dt = new DataTable();
+        using (var adapter = new SqlDataAdapter(cmd))
+        {
+            adapter.Fill(dt);
+        }
+
+        return Funciones.DataTableToList<GeneracionRolCategoriaDto>(dt);
+    }
+
+    public async Task<List<GeneracionRolCanchaDto>> GuardarCanchasAsync(Guid generacionId, Guid usuarioId, IReadOnlyList<GeneracionRolCanchaItemRequest> canchas, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(SpGuardarCanchas, conn)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        cmd.Parameters.AddWithValue("@GeneracionRolTorneoId", generacionId);
+        cmd.Parameters.AddWithValue("@UsuarioId", usuarioId);
+
+        var table = BuildCanchasTable(canchas);
+        var param = cmd.Parameters.AddWithValue("@Canchas", table);
+        param.SqlDbType = SqlDbType.Structured;
+        param.TypeName = "dbo.WGeneracionRolCanchaType";
+
+        var dt = new DataTable();
+        using (var adapter = new SqlDataAdapter(cmd))
+        {
+            adapter.Fill(dt);
+        }
+
+        return Funciones.DataTableToList<GeneracionRolCanchaDto>(dt);
+    }
+
+    public async Task<List<GeneracionRolCanchaDto>> ConsultarCanchasAsync(Guid generacionId, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(SpConsultarCanchas, conn)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        cmd.Parameters.AddWithValue("@GeneracionRolTorneoId", generacionId);
+
+        var dt = new DataTable();
+        using (var adapter = new SqlDataAdapter(cmd))
+        {
+            adapter.Fill(dt);
+        }
+
+        return Funciones.DataTableToList<GeneracionRolCanchaDto>(dt);
     }
 
     public async Task<List<GeneracionRolEquipoDto>> CargarEquiposAsync(Guid generacionId, Guid usuarioId, CancellationToken ct = default)
@@ -244,11 +317,84 @@ public class GeneracionRolTorneoRepository : IGeneracionRolTorneoRepository
         return Funciones.DataTableToList<PartidoGeneracionRolTorneoDto>(dt);
     }
 
+    public async Task<List<PartidoGeneracionRolTorneoDto>> ActualizarOrdenPartidosAsync(Guid generacionId, Guid usuarioId, IReadOnlyList<OrdenPartidoItemRequest> partidos, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(SpActualizarOrdenPartidos, conn)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        cmd.Parameters.AddWithValue("@GeneracionRolTorneoId", generacionId);
+        cmd.Parameters.AddWithValue("@UsuarioId", usuarioId);
+
+        var table = BuildOrdenPartidosTable(partidos);
+        var param = cmd.Parameters.AddWithValue("@Partidos", table);
+        param.SqlDbType = SqlDbType.Structured;
+        param.TypeName = "dbo.WGeneracionRolPartidoOrdenType";
+
+        var dt = new DataTable();
+        using (var adapter = new SqlDataAdapter(cmd))
+        {
+            adapter.Fill(dt);
+        }
+
+        return Funciones.DataTableToList<PartidoGeneracionRolTorneoDto>(dt);
+    }
+
+    public async Task<PartidoGeneracionRolTorneoDto?> ActualizarObservacionPartidoAsync(Guid partidoId, string? observaciones, Guid usuarioId, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(SpActualizarObservacionPartido, conn)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        cmd.Parameters.AddWithValue("@PartidoId", partidoId);
+        cmd.Parameters.AddWithValue("@Observaciones", string.IsNullOrWhiteSpace(observaciones) ? DBNull.Value : observaciones.Trim());
+        cmd.Parameters.AddWithValue("@UsuarioId", usuarioId);
+
+        return await ExecuteSingleAsync<PartidoGeneracionRolTorneoDto>(cmd, ct);
+    }
+
     private static async Task<T?> ExecuteSingleAsync<T>(SqlCommand cmd, CancellationToken ct = default) where T : class
     {
         using var reader = await cmd.ExecuteReaderAsync(ct);
         var dt = new DataTable();
         dt.Load(reader);
         return Funciones.DataTableToList<T>(dt).FirstOrDefault();
+    }
+
+    private static DataTable BuildCanchasTable(IEnumerable<GeneracionRolCanchaItemRequest> canchas)
+    {
+        var table = new DataTable();
+        table.Columns.Add("NombreCancha", typeof(string));
+        table.Columns.Add("CategoriaId", typeof(Guid));
+
+        foreach (var item in canchas ?? Array.Empty<GeneracionRolCanchaItemRequest>())
+        {
+            if (item is null) continue;
+            var name = item.NombreCancha?.Trim() ?? string.Empty;
+            table.Rows.Add(name, item.CategoriaId);
+        }
+
+        return table;
+    }
+
+    private static DataTable BuildOrdenPartidosTable(IEnumerable<OrdenPartidoItemRequest> partidos)
+    {
+        var table = new DataTable();
+        table.Columns.Add("PartidoId", typeof(Guid));
+        table.Columns.Add("Orden", typeof(int));
+
+        foreach (var item in partidos ?? Array.Empty<OrdenPartidoItemRequest>())
+        {
+            if (item is null) continue;
+            table.Rows.Add(item.PartidoId, item.Orden);
+        }
+
+        return table;
     }
 }

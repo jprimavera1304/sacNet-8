@@ -8,7 +8,7 @@ public static class CurrentUser
     {
         var id = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.FindFirstValue("sub");
         if (string.IsNullOrWhiteSpace(id))
-            throw new UnauthorizedAccessException("Token invalido: falta sub/nameid.");
+            throw new UnauthorizedAccessException("Token inválido: falta sub/nameid.");
 
         return Guid.Parse(id);
     }

@@ -127,7 +127,7 @@ public sealed class PermissionService : IPermissionService
         new("equipos.editar", "Equipos - Editar", "equipos"),
         new("equipos.activar", "Equipos - Activar/Inactivar", "equipos"),
 
-        new("inscripciones.ver_modulo", "Inscripciones Torneo - Ver modulo", "inscripciones"),
+        new("inscripciones.ver_modulo", "Inscripciones Torneo - Ver módulo", "inscripciones"),
         new("inscripciones.ver", "Inscripciones Torneo - Ver", "inscripciones"),
         new("inscripciones.crear", "Inscripciones Torneo - Crear", "inscripciones"),
         new("inscripciones.editar", "Inscripciones Torneo - Editar", "inscripciones"),

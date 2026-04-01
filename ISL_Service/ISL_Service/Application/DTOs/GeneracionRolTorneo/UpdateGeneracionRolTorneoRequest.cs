@@ -2,6 +2,7 @@
 
 public class UpdateGeneracionRolTorneoRequest
 {
+    public Guid TemporadaId { get; set; }
     public Guid JornadaId { get; set; }
     public DateTime FechaJuego { get; set; }
     public byte DiaJuego { get; set; }

@@ -17,6 +17,8 @@ public class GeneracionRolEquipoDto
     public byte? DiaJuego { get; set; }
     public string? DiaJuegoNombre { get; set; }
     public bool Participa { get; set; }
+    public bool? EsElegible { get; set; }
+    public string? MotivoNoElegible { get; set; }
     public string? Observaciones { get; set; }
     public byte Estado { get; set; }
     public string? EstadoNombre { get; set; }
