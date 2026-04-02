@@ -233,7 +233,9 @@ public class GeneracionRolTorneoService : IGeneracionRolTorneoService
             throw new NotFoundException(msg);
         if (msg.Contains("borrador", StringComparison.OrdinalIgnoreCase) ||
             msg.Contains("cancelad", StringComparison.OrdinalIgnoreCase) ||
-            msg.Contains("inactiva", StringComparison.OrdinalIgnoreCase))
+            msg.Contains("inactiva", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("mismo profesor titular", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("emparejamiento", StringComparison.OrdinalIgnoreCase))
             throw new ConflictException(msg);
         if (ex.Number >= 50000 && ex.Number <= 99999)
             throw new ArgumentException(msg);

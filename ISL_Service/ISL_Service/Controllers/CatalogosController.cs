@@ -59,7 +59,7 @@ public class CatalogosController : ControllerBase
     }
 
     /// <summary>
-    /// Lista clientes (Clientes). Para dropdowns de modulos administrativos.
+    /// Lista clientes (Clientes). Para dropdowns de módulos administrativos.
     /// </summary>
     /// <param name="status">Filtro por IDStatus (1 activo, 2 inactivo). NULL = todos</param>
     [HttpGet("clientes")]
@@ -71,7 +71,7 @@ public class CatalogosController : ControllerBase
     }
 
     /// <summary>
-    /// Lista bancos (Catalogo Bancos). Para dropdowns de modulos administrativos.
+    /// Lista bancos (Catalogo Bancos). Para dropdowns de módulos administrativos.
     /// </summary>
     /// <param name="status">Filtro por IDStatus (1 activo, 2 inactivo). NULL = todos</param>
     [HttpGet("bancos")]

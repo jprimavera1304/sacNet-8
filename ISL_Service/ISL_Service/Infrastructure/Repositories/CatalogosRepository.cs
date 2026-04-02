@@ -90,7 +90,7 @@ ORDER BY Repartidor";
         await conn.OpenAsync(ct);
 
         // Compatibilidad: si el esquema no tiene dbo.WTarima (version legacy/removida),
-        // el catalogo de tarimas se considera opcional y regresa vacio.
+        // el catálogo de tarimas se considera opcional y regresa vacío.
         await using (var existsCmd = new SqlCommand("SELECT OBJECT_ID('dbo.WTarima', 'U')", conn))
         {
             var tableId = await existsCmd.ExecuteScalarAsync(ct);

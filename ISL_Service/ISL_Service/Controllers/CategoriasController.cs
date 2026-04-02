@@ -54,7 +54,7 @@ public class CategoriasController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var created = await _service.CrearAsync(new CreateCategoriaRequest
         {
@@ -80,7 +80,7 @@ public class CategoriasController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var updated = await _service.ActualizarAsync(id, new UpdateCategoriaRequest
         {
@@ -99,7 +99,7 @@ public class CategoriasController : ControllerBase
     public async Task<IActionResult> Inhabilitar(Guid id, [FromBody] InhabilitarCategoriaRequest? request, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var motivo = request?.Motivo?.Trim();
         if (motivo is { Length: > 200 })
@@ -117,7 +117,7 @@ public class CategoriasController : ControllerBase
     public async Task<IActionResult> Habilitar(Guid id, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var enabled = await _service.HabilitarAsync(id, userId, ct);
         return Ok(enabled);

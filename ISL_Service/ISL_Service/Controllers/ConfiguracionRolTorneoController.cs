@@ -70,7 +70,7 @@ public class ConfiguracionRolTorneoController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var created = await _service.CrearAsync(new CreateConfiguracionRolTorneoRequest
         {
@@ -101,7 +101,7 @@ public class ConfiguracionRolTorneoController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var updated = await _service.ActualizarAsync(id, new UpdateConfiguracionRolTorneoRequest
         {
@@ -133,7 +133,7 @@ public class ConfiguracionRolTorneoController : ControllerBase
             return BadRequest(new { message = "motivo max 200 caracteres." });
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var disabled = await _service.InhabilitarAsync(id, motivo, userId, ct);
         return Ok(disabled);

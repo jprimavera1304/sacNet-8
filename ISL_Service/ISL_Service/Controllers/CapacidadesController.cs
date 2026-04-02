@@ -25,7 +25,7 @@ public class CapacidadesController : ControllerBase
     {
         var sub = User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(sub) || !Guid.TryParse(sub, out var userId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var user = await _users.GetByIdAsync(userId, ct);
         if (user is null)

@@ -221,13 +221,13 @@ public class UserAdminService : IUserAdminService
     {
         var normalized = (usuario ?? string.Empty).Trim().ToUpperInvariant();
         if (normalized.Length < 4 || normalized.Length > 60)
-            throw new ArgumentException("Usuario invalido. Longitud permitida: 4 a 60.");
+            throw new ArgumentException("Usuario inválido. Longitud permitida: 4 a 60.");
 
         foreach (var ch in normalized)
         {
             var isValid = (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_';
             if (!isValid)
-                throw new ArgumentException("Usuario invalido. Usa A-Z, 0-9 y _.");
+                throw new ArgumentException("Usuario inválido. Usa A-Z, 0-9 y _.");
         }
 
         return normalized;
@@ -237,7 +237,7 @@ public class UserAdminService : IUserAdminService
     {
         var input = (rol ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(input))
-            throw new ArgumentException("Rol invalido. Seleccione un rol.");
+            throw new ArgumentException("Rol inválido. Seleccione un rol.");
 
         var inputCode = NormalizeRoleCode(input);
         var roles = await _repo.ListRolesCatalogAsync(ResolveEmpresaId(actor), ct);
@@ -246,7 +246,7 @@ public class UserAdminService : IUserAdminService
             string.Equals((r.Name ?? string.Empty).Trim(), input, StringComparison.OrdinalIgnoreCase));
 
         if (match is null)
-            throw new ArgumentException("Rol invalido. No existe en catalogo de roles.");
+            throw new ArgumentException("Rol inválido. No existe en catálogo de roles.");
 
         return ToStoredRolValue(NormalizeRoleCode(match.Code));
     }

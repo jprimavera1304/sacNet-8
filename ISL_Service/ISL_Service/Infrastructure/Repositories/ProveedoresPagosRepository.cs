@@ -390,7 +390,7 @@ WHERE TABLE_SCHEMA = @schema
                 throw new Exception($"{fieldName} es obligatoria.");
 
             if (!DateTime.TryParse(value, out var dt))
-                throw new Exception($"{fieldName} tiene formato invalido.");
+                throw new Exception($"{fieldName} tiene formato inválido.");
 
             return dt;
         }

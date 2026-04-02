@@ -659,6 +659,7 @@ Reglas:
 - `observaciones` max 500.
 - Solo se puede actualizar/cargar equipos en generación en borrador.
 - Para generar partidos debe haber equipos participantes.
+- Para generar partidos no se permiten enfrentamientos entre equipos con el mismo profesor titular.
 
 ---
 ## 23. Cheques
@@ -710,10 +711,4 @@ Endpoints mínimos (Program.cs), sin autenticación JWT:
 - Rutas con `api/[controller]` resuelven a: Personas → `api/Personas`, Recaudaciones → `api/Recaudaciones`, ProveedoresPagos → `api/ProveedoresPagos`.
 - Tarimas: validaciones en crear/actualizar (nombreTarima requerido, longitudes, idTipoCasco > 0, numeroCascosBase 1 a 99999, observaciones opcional max 500).
 
-
-
-
-
-
-
-
+-             
