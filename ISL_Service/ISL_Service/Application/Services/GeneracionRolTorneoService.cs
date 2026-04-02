@@ -161,11 +161,11 @@ public class GeneracionRolTorneoService : IGeneracionRolTorneoService
         }
     }
 
-    public async Task<GenerarPartidosGeneracionRolTorneoResponse> GenerarPartidosAsync(Guid generacionId, Guid usuarioId, CancellationToken ct = default)
+    public async Task<GenerarPartidosGeneracionRolTorneoResponse> GenerarPartidosAsync(Guid generacionId, Guid usuarioId, bool confirmarEstado = true, bool soloConfirmarEstado = false, CancellationToken ct = default)
     {
         try
         {
-            return await _repository.GenerarPartidosAsync(generacionId, usuarioId, ct);
+            return await _repository.GenerarPartidosAsync(generacionId, usuarioId, confirmarEstado, soloConfirmarEstado, ct);
         }
         catch (SqlException ex)
         {

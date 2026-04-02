@@ -17,6 +17,9 @@ public class PartidoGeneracionRolTorneoDto
     public string? EquipoVisitante { get; set; }
     public byte DiaJuego { get; set; }
     public string? DiaJuegoNombre { get; set; }
+    public Guid? SlotId { get; set; }
+    public int? NumeroSlot { get; set; }
+    public Guid? CanchaId { get; set; }
     public TimeSpan HoraInicio { get; set; }
     public TimeSpan HoraFin { get; set; }
     public string? Cancha { get; set; }

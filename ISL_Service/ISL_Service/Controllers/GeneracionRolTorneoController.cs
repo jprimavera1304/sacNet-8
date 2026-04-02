@@ -232,7 +232,35 @@ public class GeneracionRolTorneoController : ControllerBase
         if (!TryGetUserId(out var userId))
             return Unauthorized(new { message = "Token inválido." });
 
-        var response = await _service.GenerarPartidosAsync(id, userId, ct);
+        var response = await _service.GenerarPartidosAsync(id, userId, confirmarEstado: true, soloConfirmarEstado: false, ct: ct);
+        return Ok(response);
+    }
+
+    [HttpPost("{id:guid}/previsualizar-partidos")]
+    [Authorize(Policy = "perm:generacionroltorneo.editar")]
+    [ProducesResponseType(typeof(GenerarPartidosGeneracionRolTorneoResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> PrevisualizarPartidos(Guid id, CancellationToken ct)
+    {
+        if (!TryGetUserId(out var userId))
+            return Unauthorized(new { message = "Token inválido." });
+
+        var response = await _service.GenerarPartidosAsync(id, userId, confirmarEstado: false, soloConfirmarEstado: false, ct: ct);
+        return Ok(response);
+    }
+
+    [HttpPost("{id:guid}/confirmar-generacion")]
+    [Authorize(Policy = "perm:generacionroltorneo.activar")]
+    [ProducesResponseType(typeof(GenerarPartidosGeneracionRolTorneoResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ConfirmarGeneracion(Guid id, CancellationToken ct)
+    {
+        if (!TryGetUserId(out var userId))
+            return Unauthorized(new { message = "Token inválido." });
+
+        var response = await _service.GenerarPartidosAsync(id, userId, confirmarEstado: true, soloConfirmarEstado: true, ct: ct);
         return Ok(response);
     }
 

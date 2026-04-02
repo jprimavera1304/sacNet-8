@@ -271,7 +271,7 @@ public class GeneracionRolTorneoRepository : IGeneracionRolTorneoRepository
         return await ExecuteSingleAsync<GeneracionRolEquipoDto>(cmd, ct);
     }
 
-    public async Task<GenerarPartidosGeneracionRolTorneoResponse> GenerarPartidosAsync(Guid generacionId, Guid usuarioId, CancellationToken ct = default)
+    public async Task<GenerarPartidosGeneracionRolTorneoResponse> GenerarPartidosAsync(Guid generacionId, Guid usuarioId, bool confirmarEstado = true, bool soloConfirmarEstado = false, CancellationToken ct = default)
     {
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
@@ -282,6 +282,8 @@ public class GeneracionRolTorneoRepository : IGeneracionRolTorneoRepository
         };
         cmd.Parameters.AddWithValue("@GeneracionRolTorneoId", generacionId);
         cmd.Parameters.AddWithValue("@UsuarioId", usuarioId);
+        cmd.Parameters.AddWithValue("@ConfirmarEstado", confirmarEstado);
+        cmd.Parameters.AddWithValue("@SoloConfirmarEstado", soloConfirmarEstado);
 
         using var adapter = new SqlDataAdapter(cmd);
         var ds = new DataSet();

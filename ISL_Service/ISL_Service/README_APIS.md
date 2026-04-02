@@ -609,6 +609,8 @@ Base: `api/generacion-rol-torneo`. Requiere JWT y permisos por acción. Usa SPs:
 | `POST` | `/api/generacion-rol-torneo/{id}/equipos/cargar` | `perm:generacionroltorneo.editar` | Carga equipos de inscripciones activas para la generación en borrador. |
 | `GET` | `/api/generacion-rol-torneo/{id}/equipos` | `perm:generacionroltorneo.ver` | Lista equipos de la generación. |
 | `PUT` | `/api/generacion-rol-torneo/equipos/{id}` | `perm:generacionroltorneo.editar` | Cambia participación de un equipo. Body: `UpdateParticipacionEquipoRequest` (`participa`, `observaciones?`). |
+| `POST` | `/api/generacion-rol-torneo/{id}/previsualizar-partidos` | `perm:generacionroltorneo.editar` | Genera/actualiza vista previa de partidos sin cambiar estado de la generación (permanece en Borrador). |
+| `POST` | `/api/generacion-rol-torneo/{id}/confirmar-generacion` | `perm:generacionroltorneo.activar` | Confirma la generación ya previsualizada y cambia estado a Generado (sin recalcular partidos). |
 | `POST` | `/api/generacion-rol-torneo/{id}/generar-partidos` | `perm:generacionroltorneo.activar` | Genera partidos y cambia estado a Generado. Devuelve partidos y notas. |
 | `GET` | `/api/generacion-rol-torneo/{id}/partidos` | `perm:generacionroltorneo.ver` | Consulta partidos generados. |
 | `POST` | `/api/generacion-rol-torneo/{id}/partidos/orden` | `perm:generacionroltorneo.editar` | Guarda orden de partidos (drag & drop). Body: `ActualizarOrdenPartidosRequest`. |
