@@ -117,6 +117,8 @@ builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler
 
 // -------------------- USER ADMIN (NUEVO) --------------------
 builder.Services.AddScoped<IUserAdminService, UserAdminService>();
+builder.Services.AddScoped<IUsuarioModuloFavoritoRepository, UsuarioModuloFavoritoRepository>();
+builder.Services.AddScoped<IUsuarioModuloFavoritoService, UsuarioModuloFavoritoService>();
 
 builder.Services.AddScoped<IEmpresaRepository, EmpresaRepository>();
 builder.Services.AddScoped<IEmpresaService, EmpresaService>();

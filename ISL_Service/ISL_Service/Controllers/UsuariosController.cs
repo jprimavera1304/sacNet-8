@@ -11,10 +11,12 @@ namespace ISL_Service.Controllers;
 public class UsuariosController : ControllerBase
 {
     private readonly IUserAdminService _service;
+    private readonly IUsuarioModuloFavoritoService _favoritosService;
 
-    public UsuariosController(IUserAdminService service)
+    public UsuariosController(IUserAdminService service, IUsuarioModuloFavoritoService favoritosService)
     {
         _service = service;
+        _favoritosService = favoritosService;
     }
 
     [HttpPost]
@@ -127,6 +129,34 @@ public class UsuariosController : ControllerBase
     {
         var result = await _service.GetUserByIdAsync(id, User, ct);
         return Ok(result);
+    }
+
+    [HttpGet("{usuarioId:guid}/favoritos-modulos")]
+    public async Task<IActionResult> ListarFavoritos(Guid usuarioId, CancellationToken ct)
+    {
+        var data = await _favoritosService.ListarAsync(usuarioId, User, ct);
+        return Ok(new { ok = true, message = "Favoritos consultados.", data });
+    }
+
+    [HttpPost("{usuarioId:guid}/favoritos-modulos")]
+    public async Task<IActionResult> AgregarFavorito(Guid usuarioId, [FromBody] UsuarioModuloFavoritoRequest req, CancellationToken ct)
+    {
+        var data = await _favoritosService.AgregarAsync(usuarioId, req.ModuloClave, User, ct);
+        return Ok(new { ok = true, message = "Favorito agregado.", data });
+    }
+
+    [HttpDelete("{usuarioId:guid}/favoritos-modulos/{moduloClave}")]
+    public async Task<IActionResult> QuitarFavorito(Guid usuarioId, string moduloClave, CancellationToken ct)
+    {
+        var data = await _favoritosService.QuitarAsync(usuarioId, moduloClave, User, ct);
+        return Ok(new { ok = true, message = "Favorito quitado.", data });
+    }
+
+    [HttpPost("{usuarioId:guid}/favoritos-modulos/toggle")]
+    public async Task<IActionResult> ToggleFavorito(Guid usuarioId, [FromBody] UsuarioModuloFavoritoRequest req, CancellationToken ct)
+    {
+        var data = await _favoritosService.ToggleAsync(usuarioId, req.ModuloClave, User, ct);
+        return Ok(new { ok = true, message = "Favorito actualizado.", data });
     }
 
 }
