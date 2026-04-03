@@ -58,6 +58,16 @@ public sealed class PermissionService : IPermissionService
         ["inscripciones.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
         ["inscripciones.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
         ["inscripciones.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["jornadas.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["jornadas.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["jornadas.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["jornadas.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["jornadas.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["generacionroltorneo.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["generacionroltorneo.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["generacionroltorneo.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["generacionroltorneo.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["generacionroltorneo.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
         ["cheques.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
         ["cheques.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
         ["cheques.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
@@ -79,7 +89,7 @@ public sealed class PermissionService : IPermissionService
 
     private static readonly List<PermissionSeed> PermissionCatalogSeeds = new()
     {
-        new("usuarios.ver_modulo", "Usuarios - Ver modulo", "usuarios"),
+        new("usuarios.ver_modulo", "Usuarios - Ver módulo", "usuarios"),
         new("usuarios.ver", "Usuarios - Ver", "usuarios"),
         new("usuarios.crear", "Usuarios - Crear", "usuarios"),
         new("usuarios.editar", "Usuarios - Editar", "usuarios"),
@@ -89,45 +99,57 @@ public sealed class PermissionService : IPermissionService
 
         new("empresas.ver", "Empresas - Ver", "empresas"),
 
-        new("permisosweb.bootstrap", "Permisos Web - Ver Administracion", "permisosweb"),
+        new("permisosweb.bootstrap", "Permisos Web - Ver Administración", "permisosweb"),
         new("permisosweb.roles.editar", "Permisos Web - Editar Roles", "permisosweb"),
         new("permisosweb.overrides.editar", "Permisos Web - Editar Overrides", "permisosweb"),
-        new("permisosweb.catalogo.editar", "Permisos Web - Editar Catalogo", "permisosweb"),
+        new("permisosweb.catalogo.editar", "Permisos Web - Editar Catálogo", "permisosweb"),
 
         new("proveedores.ver", "Proveedores - Ver", "proveedores"),
         new("proveedores.crear", "Proveedores - Crear", "proveedores"),
         new("proveedores.editar", "Proveedores - Editar", "proveedores"),
         new("proveedores.estado.editar", "Proveedores - Activar/Inactivar", "proveedores"),
 
-        new("categorias.ver_modulo", "Categorias - Ver modulo", "categorias"),
-        new("categorias.ver", "Categorias - Ver", "categorias"),
-        new("categorias.crear", "Categorias - Crear", "categorias"),
-        new("categorias.editar", "Categorias - Editar", "categorias"),
-        new("categorias.activar", "Categorias - Activar/Inactivar", "categorias"),
+        new("categorias.ver_modulo", "Categorías - Ver módulo", "categorias"),
+        new("categorias.ver", "Categorías - Ver", "categorias"),
+        new("categorias.crear", "Categorías - Crear", "categorias"),
+        new("categorias.editar", "Categorías - Editar", "categorias"),
+        new("categorias.activar", "Categorías - Activar/Inactivar", "categorias"),
 
-        new("profesores.ver_modulo", "Profesores - Ver modulo", "profesores"),
+        new("profesores.ver_modulo", "Profesores - Ver módulo", "profesores"),
         new("profesores.ver", "Profesores - Ver", "profesores"),
         new("profesores.crear", "Profesores - Crear", "profesores"),
         new("profesores.editar", "Profesores - Editar", "profesores"),
         new("profesores.activar", "Profesores - Activar/Inactivar", "profesores"),
 
-        new("equipos.ver_modulo", "Equipos - Ver modulo", "equipos"),
+        new("equipos.ver_modulo", "Equipos - Ver módulo", "equipos"),
         new("equipos.ver", "Equipos - Ver", "equipos"),
         new("equipos.crear", "Equipos - Crear", "equipos"),
         new("equipos.editar", "Equipos - Editar", "equipos"),
         new("equipos.activar", "Equipos - Activar/Inactivar", "equipos"),
 
-        new("inscripciones.ver_modulo", "Inscripciones Torneo - Ver modulo", "inscripciones"),
+        new("inscripciones.ver_modulo", "Inscripciones Torneo - Ver módulo", "inscripciones"),
         new("inscripciones.ver", "Inscripciones Torneo - Ver", "inscripciones"),
         new("inscripciones.crear", "Inscripciones Torneo - Crear", "inscripciones"),
         new("inscripciones.editar", "Inscripciones Torneo - Editar", "inscripciones"),
         new("inscripciones.activar", "Inscripciones Torneo - Activar/Inactivar", "inscripciones"),
 
+        new("jornadas.ver_modulo", "Jornadas - Ver módulo", "jornadas"),
+        new("jornadas.ver", "Jornadas - Ver", "jornadas"),
+        new("jornadas.crear", "Jornadas - Crear", "jornadas"),
+        new("jornadas.editar", "Jornadas - Editar", "jornadas"),
+        new("jornadas.activar", "Jornadas - Activar/Inactivar", "jornadas"),
+
+        new("generacionroltorneo.ver_modulo", "Generación Rol Torneo - Ver módulo", "generacionroltorneo"),
+        new("generacionroltorneo.ver", "Generación Rol Torneo - Ver", "generacionroltorneo"),
+        new("generacionroltorneo.crear", "Generación Rol Torneo - Crear", "generacionroltorneo"),
+        new("generacionroltorneo.editar", "Generación Rol Torneo - Editar", "generacionroltorneo"),
+        new("generacionroltorneo.activar", "Generación Rol Torneo - Activar/Inactivar", "generacionroltorneo"),
+
         new("pagosproveedores.ver", "Pagos Proveedores - Ver", "pagosproveedores"),
         new("pagosproveedores.crear", "Pagos Proveedores - Crear", "pagosproveedores"),
         new("pagosproveedores.editar", "Pagos Proveedores - Modificar", "pagosproveedores"),
         new("pagosproveedores.cancelar", "Pagos Proveedores - Cancelar", "pagosproveedores"),
-        new("cheques.ver_modulo", "Cheques - Ver modulo", "cheques"),
+        new("cheques.ver_modulo", "Cheques - Ver módulo", "cheques"),
         new("cheques.ver", "Cheques - Ver", "cheques"),
         new("cheques.crear", "Cheques - Crear", "cheques"),
         new("cheques.editar", "Cheques - Editar", "cheques"),
@@ -599,7 +621,7 @@ ORDER BY CASE WHEN ModuloClave = 'inicio' THEN 0 ELSE 1 END, ModuloClave;", conn
     {
         var key = NormalizeModuleKey(moduleKey);
         if (idStatus is not (1 or 2))
-            throw new ArgumentException("IdStatus invalido. Use 1 (Activo) o 2 (Inactivo).");
+            throw new ArgumentException("IdStatus inválido. Use 1 (Activo) o 2 (Inactivo).");
 
         await using var conn = new SqlConnection(_db.Database.GetConnectionString());
         await conn.OpenAsync(ct);
@@ -781,7 +803,7 @@ VALUES ({string.Join(", ", insertValues)});";
         if (permissionIds.Count != normalizedPermissions.Count)
         {
             var missing = normalizedPermissions.Where(x => !permissionIds.Keys.Contains(x, StringComparer.OrdinalIgnoreCase));
-            throw new ArgumentException($"Permisos invalidos: {string.Join(", ", missing)}");
+            throw new ArgumentException($"Permisos inválidos: {string.Join(", ", missing)}");
         }
 
         var deleteSql = $@"
@@ -850,7 +872,7 @@ VALUES ({string.Join(", ", insertValues)});";
         if (permissionIds.Count != combined.Count)
         {
             var missing = combined.Where(x => !permissionIds.Keys.Contains(x, StringComparer.OrdinalIgnoreCase));
-            throw new ArgumentException($"Permisos invalidos: {string.Join(", ", missing)}");
+            throw new ArgumentException($"Permisos inválidos: {string.Join(", ", missing)}");
         }
 
         var deleteSql = $@"
@@ -969,7 +991,7 @@ WHERE t.name = 'WUsuarioPermiso';";
             .ToList();
 
         if (seeds.Count == 0)
-            throw new ArgumentException("No hay permisos semilla para los modulos solicitados.");
+            throw new ArgumentException("No hay permisos semilla para los módulos solicitados.");
 
         var permColumns = await GetTableColumnsAsync(conn, "WPermiso", ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
@@ -1250,7 +1272,7 @@ WHERE t.name IN ('WRol','WPermiso','WRolPermiso','WUsuarioPermiso');", conn);
         if (string.IsNullOrWhiteSpace(normalized))
             throw new ArgumentException("Codigo de rol requerido.");
         if (normalized.Length < 3 || normalized.Length > 30)
-            throw new ArgumentException("Codigo de rol invalido. Longitud permitida: 3 a 30.");
+            throw new ArgumentException("Código de rol inválido. Longitud permitida: 3 a 30.");
         return normalized;
     }
 
@@ -1620,7 +1642,7 @@ WHERE EmpresaId = @EmpresaId
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
         if (invalid.Count > 0)
-            throw new ArgumentException($"Permisos en modulos inactivos: {string.Join(", ", invalid)}");
+            throw new ArgumentException($"Permisos en módulos inactivos: {string.Join(", ", invalid)}");
     }
 
     private static string ExtractModuleFromPermissionKey(string key)
@@ -1654,7 +1676,7 @@ WHERE EmpresaId = @EmpresaId
         }
 
         if (!value.Contains('.', StringComparison.Ordinal))
-            throw new ArgumentException("La clave debe tener formato modulo.accion");
+            throw new ArgumentException("La clave debe tener formato módulo.acción");
 
         return value;
     }

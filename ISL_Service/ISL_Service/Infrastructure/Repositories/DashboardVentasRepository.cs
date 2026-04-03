@@ -14,8 +14,11 @@ public class DashboardVentasRepository : IDashboardVentasRepository
     private const string SpConsultarFiltros = "dbo.sp_w_ConsultarDashboardVentasFiltros";
     private const string SpConsultarKpis = "dbo.sp_w_ConsultarDashboardVentasKpis";
     private const string SpConsultarSerieMensual = "dbo.sp_w_ConsultarDashboardVentasSerieMensual";
+    private const string SpConsultarSerieSemanal = "dbo.sp_w_ConsultarDashboardVentasSerieSemanal";
     private const string SpConsultarTopProductos = "dbo.sp_w_ConsultarDashboardTopProductos";
     private const string SpConsultarTopClientes = "dbo.sp_w_ConsultarDashboardTopClientes";
+    private const string SpConsultarTopCategorias = "dbo.sp_w_ConsultarDashboardTopCategorias";
+    private const string SpConsultarTopMarcas = "dbo.sp_w_ConsultarDashboardTopMarcas";
     private const string SpConsultarVentasAlmacenes = "dbo.sp_w_ConsultarDashboardVentasAlmacenes";
     private const string SpConsultarVentasAgentes = "dbo.sp_w_ConsultarDashboardVentasAgentes";
     private const string SpConsultarVentasDetalle = "dbo.sp_w_ConsultarDashboardVentasDetalle";
@@ -46,7 +49,6 @@ public class DashboardVentasRepository : IDashboardVentasRepository
         {
             CommandType = CommandType.StoredProcedure
         };
-        AddFilterParams(cmd, request);
 
         var ds = new DataSet();
         using (var adapter = new SqlDataAdapter(cmd))
@@ -71,47 +73,72 @@ public class DashboardVentasRepository : IDashboardVentasRepository
 
     public async Task<DashboardVentasKpisDto?> ConsultarKpisAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
     {
-        var dt = await ExecuteSingleTableAsync(SpConsultarKpis, request, ct);
+        var dt = await ExecuteSingleTableAsync(SpConsultarKpis, request, AddParamsKpis, ct);
         return Funciones.DataTableToList<DashboardVentasKpisDto>(dt).FirstOrDefault();
     }
 
     public async Task<List<DashboardVentasSerieMensualDto>> ConsultarSerieMensualAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
     {
-        var dt = await ExecuteSingleTableAsync(SpConsultarSerieMensual, request, ct);
+        var dt = await ExecuteSingleTableAsync(SpConsultarSerieMensual, request, AddParamsSerieMensual, ct);
         return Funciones.DataTableToList<DashboardVentasSerieMensualDto>(dt);
+    }
+
+    public async Task<List<DashboardVentasSerieSemanalRawDto>> ConsultarSerieSemanalAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
+    {
+        var dt = await ExecuteSingleTableAsync(SpConsultarSerieSemanal, request, AddParamsSerieSemanal, ct);
+        return Funciones.DataTableToList<DashboardVentasSerieSemanalRawDto>(dt);
     }
 
     public async Task<List<DashboardTopProductoDto>> ConsultarTopProductosAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
     {
-        var dt = await ExecuteSingleTableAsync(SpConsultarTopProductos, request, ct);
-        return Funciones.DataTableToList<DashboardTopProductoDto>(dt);
+        var dt = await ExecuteSingleTableWithTopAsync(SpConsultarTopProductos, request, AddParamsTopProductos, ct);
+        var list = Funciones.DataTableToList<DashboardTopProductoDto>(dt);
+        foreach (var item in list)
+        {
+            if (!string.IsNullOrWhiteSpace(item.Codigo))
+                item.Producto = item.Codigo;
+        }
+        return list;
     }
 
     public async Task<List<DashboardTopClienteDto>> ConsultarTopClientesAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
     {
-        var dt = await ExecuteSingleTableAsync(SpConsultarTopClientes, request, ct);
+        var dt = await ExecuteSingleTableWithTopAsync(SpConsultarTopClientes, request, AddParamsTopClientes, ct);
         return Funciones.DataTableToList<DashboardTopClienteDto>(dt);
+    }
+
+    public async Task<List<DashboardTopCategoriaDto>> ConsultarTopCategoriasAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
+    {
+        var dt = await ExecuteSingleTableWithTopAsync(SpConsultarTopCategorias, request, AddParamsTopCategorias, ct);
+        return Funciones.DataTableToList<DashboardTopCategoriaDto>(dt);
+    }
+
+    public async Task<List<DashboardTopMarcaDto>> ConsultarTopMarcasAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
+    {
+        var dt = await ExecuteSingleTableWithTopAsync(SpConsultarTopMarcas, request, AddParamsTopMarcas, ct);
+        return Funciones.DataTableToList<DashboardTopMarcaDto>(dt);
     }
 
     public async Task<List<DashboardVentasAlmacenDto>> ConsultarVentasAlmacenesAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
     {
-        var dt = await ExecuteSingleTableAsync(SpConsultarVentasAlmacenes, request, ct);
-        return Funciones.DataTableToList<DashboardVentasAlmacenDto>(dt);
+        var dt = await ExecuteSingleTableAsync(SpConsultarVentasAlmacenes, request, AddParamsVentasAlmacenes, ct);
+        var list = Funciones.DataTableToList<DashboardVentasAlmacenDto>(dt);
+        return list.Where(x => x.IDAlmacen > 0).ToList();
     }
 
     public async Task<List<DashboardVentasAgenteDto>> ConsultarVentasAgentesAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
     {
-        var dt = await ExecuteSingleTableAsync(SpConsultarVentasAgentes, request, ct);
+        var dt = await ExecuteSingleTableAsync(SpConsultarVentasAgentes, request, AddParamsVentasAgentes, ct);
         return Funciones.DataTableToList<DashboardVentasAgenteDto>(dt);
     }
 
     public async Task<List<DashboardVentasDetalleDto>> ConsultarVentasDetalleAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
     {
-        var dt = await ExecuteSingleTableAsync(SpConsultarVentasDetalle, request, ct);
+        var dt = await ExecuteSingleTableAsync(SpConsultarVentasDetalle, request, AddParamsDetalle, ct);
         return Funciones.DataTableToList<DashboardVentasDetalleDto>(dt);
     }
 
-    private async Task<DataTable> ExecuteSingleTableAsync(string storedProcedure, DashboardVentasFiltroRequest request, CancellationToken ct)
+    private async Task<DataTable> ExecuteSingleTableAsync(string storedProcedure, DashboardVentasFiltroRequest request, Action<SqlCommand, DashboardVentasFiltroRequest> addParams, CancellationToken ct)
     {
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
@@ -120,7 +147,7 @@ public class DashboardVentasRepository : IDashboardVentasRepository
         {
             CommandType = CommandType.StoredProcedure
         };
-        AddFilterParams(cmd, request);
+        addParams(cmd, request);
 
         var dt = new DataTable();
         using (var adapter = new SqlDataAdapter(cmd))
@@ -131,10 +158,119 @@ public class DashboardVentasRepository : IDashboardVentasRepository
         return dt;
     }
 
-    private static void AddFilterParams(SqlCommand cmd, DashboardVentasFiltroRequest request)
+    private async Task<DataTable> ExecuteSingleTableWithTopAsync(string storedProcedure, DashboardVentasFiltroRequest request, Action<SqlCommand, DashboardVentasFiltroRequest> addParams, CancellationToken ct)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(storedProcedure, conn)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        addParams(cmd, request);
+        cmd.Parameters.Add(new SqlParameter("@Top", SqlDbType.Int) { Value = request.Top ?? 10 });
+
+        var dt = new DataTable();
+        using (var adapter = new SqlDataAdapter(cmd))
+        {
+            adapter.Fill(dt);
+        }
+
+        return dt;
+    }
+
+    private static void AddBaseParams(SqlCommand cmd, DashboardVentasFiltroRequest request)
     {
         cmd.Parameters.Add(new SqlParameter("@FechaInicial", SqlDbType.DateTime) { Value = request.FechaInicial });
         cmd.Parameters.Add(new SqlParameter("@FechaFinal", SqlDbType.DateTime) { Value = request.FechaFinal });
+    }
+
+    private static void AddParamsKpis(SqlCommand cmd, DashboardVentasFiltroRequest request)
+    {
+        AddBaseParams(cmd, request);
+        cmd.Parameters.Add(new SqlParameter("@IDEmpresa", SqlDbType.Int) { Value = (object?)request.IDEmpresa ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDAlmacen", SqlDbType.Int) { Value = (object?)request.IDAlmacen ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDAgente", SqlDbType.Int) { Value = (object?)request.IDAgente ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDCliente", SqlDbType.Int) { Value = (object?)request.IDCliente ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDProducto", SqlDbType.Int) { Value = (object?)request.IDProducto ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDCategoria", SqlDbType.Int) { Value = (object?)request.IDCategoria ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDMarca", SqlDbType.Int) { Value = (object?)request.IDMarca ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDTipoDocumento", SqlDbType.Int) { Value = (object?)request.IDTipoDocumento ?? DBNull.Value });
+    }
+
+    private static void AddParamsSerieMensual(SqlCommand cmd, DashboardVentasFiltroRequest request)
+    {
+        AddParamsKpis(cmd, request);
+    }
+
+    private static void AddParamsSerieSemanal(SqlCommand cmd, DashboardVentasFiltroRequest request)
+    {
+        AddParamsKpis(cmd, request);
+    }
+
+    private static void AddParamsDetalle(SqlCommand cmd, DashboardVentasFiltroRequest request)
+    {
+        AddParamsKpis(cmd, request);
+    }
+
+    private static void AddParamsTopProductos(SqlCommand cmd, DashboardVentasFiltroRequest request)
+    {
+        AddBaseParams(cmd, request);
+        cmd.Parameters.Add(new SqlParameter("@IDEmpresa", SqlDbType.Int) { Value = (object?)request.IDEmpresa ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDAlmacen", SqlDbType.Int) { Value = (object?)request.IDAlmacen ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDAgente", SqlDbType.Int) { Value = (object?)request.IDAgente ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDCliente", SqlDbType.Int) { Value = (object?)request.IDCliente ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDCategoria", SqlDbType.Int) { Value = (object?)request.IDCategoria ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDMarca", SqlDbType.Int) { Value = (object?)request.IDMarca ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDTipoDocumento", SqlDbType.Int) { Value = (object?)request.IDTipoDocumento ?? DBNull.Value });
+    }
+
+    private static void AddParamsTopClientes(SqlCommand cmd, DashboardVentasFiltroRequest request)
+    {
+        AddBaseParams(cmd, request);
+        cmd.Parameters.Add(new SqlParameter("@IDEmpresa", SqlDbType.Int) { Value = (object?)request.IDEmpresa ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDAlmacen", SqlDbType.Int) { Value = (object?)request.IDAlmacen ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDAgente", SqlDbType.Int) { Value = (object?)request.IDAgente ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDCategoria", SqlDbType.Int) { Value = (object?)request.IDCategoria ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDMarca", SqlDbType.Int) { Value = (object?)request.IDMarca ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDTipoDocumento", SqlDbType.Int) { Value = (object?)request.IDTipoDocumento ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDProducto", SqlDbType.Int) { Value = (object?)request.IDProducto ?? DBNull.Value });
+    }
+
+    private static void AddParamsTopCategorias(SqlCommand cmd, DashboardVentasFiltroRequest request)
+    {
+        AddBaseParams(cmd, request);
+        cmd.Parameters.Add(new SqlParameter("@IDEmpresa", SqlDbType.Int) { Value = (object?)request.IDEmpresa ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDAlmacen", SqlDbType.Int) { Value = (object?)request.IDAlmacen ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDAgente", SqlDbType.Int) { Value = (object?)request.IDAgente ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDCliente", SqlDbType.Int) { Value = (object?)request.IDCliente ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDCategoria", SqlDbType.Int) { Value = (object?)request.IDCategoria ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDMarca", SqlDbType.Int) { Value = (object?)request.IDMarca ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDTipoDocumento", SqlDbType.Int) { Value = (object?)request.IDTipoDocumento ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDProducto", SqlDbType.Int) { Value = (object?)request.IDProducto ?? DBNull.Value });
+    }
+
+    private static void AddParamsTopMarcas(SqlCommand cmd, DashboardVentasFiltroRequest request)
+    {
+        AddParamsTopCategorias(cmd, request);
+    }
+
+    private static void AddParamsVentasAlmacenes(SqlCommand cmd, DashboardVentasFiltroRequest request)
+    {
+        AddBaseParams(cmd, request);
+        cmd.Parameters.Add(new SqlParameter("@IDEmpresa", SqlDbType.Int) { Value = (object?)request.IDEmpresa ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDAlmacen", SqlDbType.Int) { Value = (object?)request.IDAlmacen ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDAgente", SqlDbType.Int) { Value = (object?)request.IDAgente ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDCliente", SqlDbType.Int) { Value = (object?)request.IDCliente ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDProducto", SqlDbType.Int) { Value = (object?)request.IDProducto ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDCategoria", SqlDbType.Int) { Value = (object?)request.IDCategoria ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDMarca", SqlDbType.Int) { Value = (object?)request.IDMarca ?? DBNull.Value });
+        cmd.Parameters.Add(new SqlParameter("@IDTipoDocumento", SqlDbType.Int) { Value = (object?)request.IDTipoDocumento ?? DBNull.Value });
+    }
+
+    private static void AddParamsVentasAgentes(SqlCommand cmd, DashboardVentasFiltroRequest request)
+    {
+        AddBaseParams(cmd, request);
         cmd.Parameters.Add(new SqlParameter("@IDEmpresa", SqlDbType.Int) { Value = (object?)request.IDEmpresa ?? DBNull.Value });
         cmd.Parameters.Add(new SqlParameter("@IDAlmacen", SqlDbType.Int) { Value = (object?)request.IDAlmacen ?? DBNull.Value });
         cmd.Parameters.Add(new SqlParameter("@IDAgente", SqlDbType.Int) { Value = (object?)request.IDAgente ?? DBNull.Value });

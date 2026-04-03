@@ -21,11 +21,11 @@ public class ModulosController : ControllerBase
     public async Task<IActionResult> Disponibles([FromQuery] string? scope = "tenant", CancellationToken ct = default)
     {
         if (!TryGetEmpresaId(User, out var empresaId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var companyKey = (User.FindFirstValue("companyKey") ?? string.Empty).Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(companyKey))
-            return Unauthorized(new { message = "Token invalido: companyKey faltante." });
+            return Unauthorized(new { message = "Token inválido: companyKey faltante." });
 
         var rawScope = (scope ?? "tenant").Trim().ToLowerInvariant();
         var includeAll = string.Equals(rawScope, "all", StringComparison.OrdinalIgnoreCase);
@@ -42,7 +42,7 @@ public class ModulosController : ControllerBase
 
         var sub = User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(sub) || !Guid.TryParse(sub, out var userId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var snapshot = await _permissions.GetPermissionsAsync(userId, empresaId, rolLegacy, ct);
         var modules = await _permissions.GetAvailableModulesAsync(empresaId, companyKey, includeAll, ct);

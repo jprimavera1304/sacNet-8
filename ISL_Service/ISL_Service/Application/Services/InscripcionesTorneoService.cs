@@ -29,7 +29,7 @@ public class InscripcionesTorneoService : IInscripcionesTorneoService
         {
             var created = await _repository.InsertarAsync(request, usuarioId, ct);
             if (created is null)
-                throw new InvalidOperationException("No se pudo crear la inscripción.");
+                throw new InvalidOperationException("No se pudo crear la inscripci\u00F3n.");
             return created;
         }
         catch (SqlException ex)
@@ -43,15 +43,15 @@ public class InscripcionesTorneoService : IInscripcionesTorneoService
     {
         var actual = await GetByIdAsync(id, ct);
         if (actual is null)
-            throw new NotFoundException("La inscripción no existe.", id.ToString());
+            throw new NotFoundException("La inscripci\u00F3n no existe.", id.ToString());
         if (actual.Estado == 2)
-            throw new ConflictException("No se puede modificar una inscripción inhabilitada.");
+            throw new ConflictException("No se puede modificar una inscripci\u00F3n inhabilitada.");
 
         try
         {
             var updated = await _repository.ActualizarAsync(id, request, usuarioId, ct);
             if (updated is null)
-                throw new InvalidOperationException("No se pudo actualizar la inscripción.");
+                throw new InvalidOperationException("No se pudo actualizar la inscripci\u00F3n.");
             return updated;
         }
         catch (SqlException ex)
@@ -65,7 +65,7 @@ public class InscripcionesTorneoService : IInscripcionesTorneoService
     {
         var actual = await GetByIdAsync(id, ct);
         if (actual is null)
-            throw new NotFoundException("La inscripción no existe.", id.ToString());
+            throw new NotFoundException("La inscripci\u00F3n no existe.", id.ToString());
         if (actual.Estado == 2)
             return actual;
 
@@ -73,7 +73,7 @@ public class InscripcionesTorneoService : IInscripcionesTorneoService
         {
             var disabled = await _repository.InhabilitarAsync(id, motivo, usuarioId, ct);
             if (disabled is null)
-                throw new InvalidOperationException("No se pudo inhabilitar la inscripción.");
+                throw new InvalidOperationException("No se pudo inhabilitar la inscripci\u00F3n.");
             return disabled;
         }
         catch (SqlException ex)
@@ -87,7 +87,7 @@ public class InscripcionesTorneoService : IInscripcionesTorneoService
     {
         var actual = await GetByIdAsync(id, ct);
         if (actual is null)
-            throw new NotFoundException("La inscripción no existe.", id.ToString());
+            throw new NotFoundException("La inscripci\u00F3n no existe.", id.ToString());
         if (actual.Estado == 1)
             return actual;
 
@@ -95,7 +95,7 @@ public class InscripcionesTorneoService : IInscripcionesTorneoService
         {
             var enabled = await _repository.HabilitarAsync(id, usuarioId, ct);
             if (enabled is null)
-                throw new InvalidOperationException("No se pudo habilitar la inscripción.");
+                throw new InvalidOperationException("No se pudo habilitar la inscripci\u00F3n.");
             return enabled;
         }
         catch (SqlException ex)
@@ -116,7 +116,7 @@ public class InscripcionesTorneoService : IInscripcionesTorneoService
     {
         var msg = ex.Message;
         if (msg.Contains("ya existe", StringComparison.OrdinalIgnoreCase) ||
-            msg.Contains("ya está", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("ya est\u00E1", StringComparison.OrdinalIgnoreCase) ||
             msg.Contains("duplic", StringComparison.OrdinalIgnoreCase))
             throw new ConflictException(msg);
         if (msg.Contains("no existe", StringComparison.OrdinalIgnoreCase))

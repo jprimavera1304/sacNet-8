@@ -54,7 +54,7 @@ public class ProfesoresController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var created = await _service.CrearAsync(new CreateProfesorRequest
         {
@@ -82,7 +82,7 @@ public class ProfesoresController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var updated = await _service.ActualizarAsync(id, new UpdateProfesorRequest
         {
@@ -103,7 +103,7 @@ public class ProfesoresController : ControllerBase
     public async Task<IActionResult> Inhabilitar(Guid id, [FromBody] InhabilitarProfesorRequest? request, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         // Motivo opcional: si no viene, no falla.
         var motivo = request?.Motivo?.Trim();
@@ -122,7 +122,7 @@ public class ProfesoresController : ControllerBase
     public async Task<IActionResult> Habilitar(Guid id, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var enabled = await _service.HabilitarAsync(id, userId, ct);
         return Ok(enabled);

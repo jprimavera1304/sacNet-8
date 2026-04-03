@@ -21,6 +21,26 @@ public class DashboardVentasSerieMensualDto
     public decimal Tickets { get; set; }
 }
 
+public class DashboardVentasSerieSemanalDto
+{
+    public int SemanaNumero { get; set; }
+    public DateTime FechaInicioSemana { get; set; }
+    public DateTime FechaFinSemana { get; set; }
+    public decimal VentaTotal { get; set; }
+    public decimal GananciaTotal { get; set; }
+    public decimal CantidadVendida { get; set; }
+}
+
+public class DashboardVentasSerieSemanalRawDto
+{
+    public int Anio { get; set; }
+    public int Semana { get; set; }
+    public DateTime LunesSemana { get; set; }
+    public decimal VentaTotal { get; set; }
+    public decimal GananciaTotal { get; set; }
+    public decimal Tickets { get; set; }
+}
+
 public class DashboardTopProductoDto
 {
     public int IDProducto { get; set; }
@@ -34,9 +54,29 @@ public class DashboardTopProductoDto
 public class DashboardTopClienteDto
 {
     public int IDCliente { get; set; }
+    public string? ClienteNumero { get; set; }
     public string? Cliente { get; set; }
     public decimal VentaTotal { get; set; }
+    public decimal GananciaTotal { get; set; }
     public decimal Tickets { get; set; }
+}
+
+public class DashboardTopCategoriaDto
+{
+    public int IDCategoria { get; set; }
+    public string? Categoria { get; set; }
+    public decimal CantidadVendida { get; set; }
+    public decimal VentaTotal { get; set; }
+    public decimal GananciaTotal { get; set; }
+}
+
+public class DashboardTopMarcaDto
+{
+    public int IDMarca { get; set; }
+    public string? Marca { get; set; }
+    public decimal CantidadVendida { get; set; }
+    public decimal VentaTotal { get; set; }
+    public decimal GananciaTotal { get; set; }
 }
 
 public class DashboardVentasAlmacenDto
@@ -77,4 +117,24 @@ public class DashboardVentasDetalleDto
     public decimal DescuentoDetalle { get; set; }
     public decimal ImporteVenta { get; set; }
     public decimal GananciaVenta { get; set; }
+}
+
+public class DashboardVentasDetallePagedResponse
+{
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+    public int Total { get; set; }
+    public List<DashboardVentasDetalleDto> Items { get; set; } = new();
+}
+
+public class DashboardVentasOverviewResponse
+{
+    public DashboardVentasKpisDto? Kpis { get; set; }
+    public List<DashboardVentasSerieMensualDto> SerieMensual { get; set; } = new();
+    public List<DashboardTopProductoDto> TopProductos { get; set; } = new();
+    public List<DashboardTopClienteDto> TopClientes { get; set; } = new();
+    public List<DashboardTopCategoriaDto> TopCategorias { get; set; } = new();
+    public List<DashboardTopMarcaDto> TopMarcas { get; set; } = new();
+    public List<DashboardVentasAlmacenDto> Almacenes { get; set; } = new();
+    public List<DashboardVentasAgenteDto> Agentes { get; set; } = new();
 }

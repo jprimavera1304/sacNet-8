@@ -16,17 +16,21 @@ En desarrollo, Swagger está disponible en `/swagger`.
 7. [Empresas](#7-empresas)
 8. [Tarimas](#8-tarimas)
 9. [Catálogos](#9-catálogos)
-10. [Almacén de Cascos](#10-almacén-de-cascos)
-11. [Personas (Proveedores)](#11-personas-proveedores)
-12. [Recaudaciones](#12-recaudaciones)
-13. [Proveedores de pagos](#13-proveedores-de-pagos)
-14. [Temporadas y Torneos](#14-temporadas-y-torneos)
-15. [Categorias Equipos](#15-categorias-equipos)
-16. [Profesores](#16-profesores)
-17. [Equipos](#17-equipos)
-18. [Inscripciones Torneo](#18-inscripciones-torneo)
-19. [Cheques](#19-cheques)
-20. [Utilidades](#20-utilidades)
+10. [Dashboard Ventas](#10-dashboard-ventas)
+11. [Almacén de Cascos](#11-almacén-de-cascos)
+12. [Personas (Proveedores)](#12-personas-proveedores)
+13. [Recaudaciones](#13-recaudaciones)
+14. [Proveedores de pagos](#14-proveedores-de-pagos)
+15. [Temporadas y Torneos](#15-temporadas-y-torneos)
+16. [Categorías de equipos](#16-categorías-de-equipos)
+17. [Profesores](#17-profesores)
+18. [Equipos](#18-equipos)
+19. [Inscripciones Torneo](#19-inscripciones-torneo)
+20. [Jornadas](#20-jornadas)
+21. [Configuración Rol Torneo](#21-configuraci%C3%B3n-rol-torneo)
+22. [Generación Rol de Juego](#22-generación-rol-de-juego)
+23. [Cheques](#23-cheques)
+24. [Utilidades](#24-utilidades)
 
 ---
 
@@ -169,7 +173,7 @@ Base: `api/tarimas`. Estatus: **1 = Activo**, **2 = Cancelado/Inactivo**. **Requ
 
 - `idStatus`: opcional. NULL = todas, 1 = Activo, 2 = Cancelado/Inactivo.
 - `estatus`: alternativa a idStatus. Valores: `activo` (1), `inactivo` o `cancelado` (2), `todos` (todas). Si se envía `idStatus`, tiene prioridad.
-- `busqueda`: opcional. Filtro por nombre.
+- `búsqueda`: opcional. Filtro por nombre.
 
 **Body crear:** `CreateTarimaRequest`: nombreTarima, idTipoCasco, numeroCascosBase, observaciones (opcional).  
 **Body actualizar:** `UpdateTarimaRequest`: mismos campos.  
@@ -202,7 +206,41 @@ Base: `api/catalogos`. **Requiere:** usuario autenticado. Solo lectura para drop
 
 ---
 
-## 10. Almacén de Cascos
+## 10. Dashboard Ventas
+
+Base: `api/dashboard`. **Requiere:** usuario autenticado (JWT) y `perm:dashboardventas.ver`.
+
+**Filtros globales (body):**
+
+- `fechaInicial` (DATE)
+- `fechaFinal` (DATE)
+- `idEmpresa`, `idAlmacen`, `idAgente`, `idCliente`, `idProducto`, `idCategoria`, `idMarca`, `idTipoDocumento` (INT/null)
+- `top` (INT, opcional, default 10) para endpoints Top
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/api/dashboard/filtros/consultar` | Devuelve catálogos: empresas, almacenes, agentes, clientes, productos, categorías, marcas, tiposDocumento. |
+| `POST` | `/api/dashboard/kpis/consultar` | KPIs: ventaTotal, gananciaTotal, descuentoTotal, tickets, unidadesVendidas, ticketPromedio, margenPorcentaje. |
+| `POST` | `/api/dashboard/ventas/serie-mensual/consultar` | Serie mensual: anio, mes, mesNombre, ventaTotal, gananciaTotal, tickets. |
+| `POST` | `/api/dashboard/ventas/serie-semanal/consultar` | Serie semanal por mes (rangos fijos): semanaNumero, fechaInicioSemana, fechaFinSemana, ventaTotal, gananciaTotal, cantidadVendida. |
+| `POST` | `/api/dashboard/top-productos/consultar` | Top productos (usa `top`). |
+| `POST` | `/api/dashboard/top-clientes/consultar` | Top clientes (usa `top`). |
+| `POST` | `/api/dashboard/top-categorias/consultar` | Top categorías (usa `top`). |
+| `POST` | `/api/dashboard/top-marcas/consultar` | Top marcas (usa `top`). |
+| `POST` | `/api/dashboard/almacenes/consultar` | Ventas por almacén. |
+| `POST` | `/api/dashboard/agentes/consultar` | Ventas por agente. |
+| `POST` | `/api/dashboard/detalle/consultar` | Detalle de ventas (tabla). |
+
+**Notas:**
+
+- Todos los filtros se envían en el body; si no aplican, usar `null`.
+- `fechaInicial` y `fechaFinal` son obligatorias.
+- Los endpoints Top usan `top` (si no se envía, default 10).
+- La venta total usa ImporteConIvaRnd y la ganancia usa GananciaRnd (ya vienen calculadas en SP).
+
+---
+
+## 11. Almacén de Cascos
 
 Base: `api/almacen-cascos`. **Requiere:** usuario autenticado (JWT). Usa tablas `WMovimientoCasco`, `WMovimientoCascoDetalle`, `WMovimientoCascoTarima`, `WConstantes`, `WTarima` y SP `sp_w_*`. Usuario de auditoría se toma del token.
 
@@ -211,12 +249,12 @@ Base: `api/almacen-cascos`. **Requiere:** usuario autenticado (JWT). Usa tablas 
 - **Estatus:** 1 = REGISTRADA, 2 = ACEPTADA, 3 = CANCELADA.
 - **IdStatus en catálogos:** 1 = ACTIVO, 2 = CANCELADO.
 
-| M?todo | Ruta | Descripci?n |
+| Método | Ruta | Descripción |
 |--------|------|-------------|
 | `GET` | `/api/almacen-cascos/movimientos` | Lista movimientos (cabecera) con nombres de repartidor entrega/recibe. |
-| `GET` | `/api/almacen-cascos/movimientos/{idMovimiento}/detalle` | Detalle plano de un movimiento (l?neas por numeroTarima y tipo casco). |
+| `GET` | `/api/almacen-cascos/movimientos/{idMovimiento}/detalle` | Detalle plano de un movimiento (líneas por numeroTarima y tipo casco). |
 | `GET` | `/api/almacen-cascos/movimientos/{idMovimiento}/tarimas` | Tarimas con kilos capturados para una ENTRADA. |
-| `GET` | `/api/almacen-cascos/movimientos/{idMovimiento}/detalle-agrupado` | Detalle agrupado por tarima l?gica (`numeroTarima`) con l?neas por tipo casco. |
+| `GET` | `/api/almacen-cascos/movimientos/{idMovimiento}/detalle-agrupado` | Detalle agrupado por tarima lógica (`numeroTarima`) con líneas por tipo casco. |
 | `POST` | `/api/almacen-cascos/salidas` | Crea una SALIDA: cabecera + detalle. TotalTarimas/TotalPiezas se calculan en backend; TotalKilos = 0. |
 | `POST` | `/api/almacen-cascos/entradas` | Acepta una ENTRADA desde una salida registrada (SP crea entrada, acepta salida, TotalKilos = 0). |
 | `POST` | `/api/almacen-cascos/movimientos/{idMovimiento}/tarimas/{numeroTarima}/kilos` | Inserta o actualiza kilos por tarima en una ENTRADA. |
@@ -230,7 +268,7 @@ Base: `api/almacen-cascos`. **Requiere:** usuario autenticado (JWT). Usa tablas 
 
 **Notas:**
 
-- En la respuesta, `totalTarimasConKilos` indica cu?ntas tarimas tienen kilos capturados.
+- En la respuesta, `totalTarimasConKilos` indica cuántas tarimas tienen kilos capturados.
 
 **Body POST salidas:** `CreateSalidaRequest`
 
@@ -270,7 +308,7 @@ Base: `api/almacen-cascos`. **Requiere:** usuario autenticado (JWT). Usa tablas 
 
 - `idMovimientoSalida`: salida ya registrada y con detalle.
 - `idRepartidorRecibe`: repartidor activo.
-- `detalle`: opcional; si se env?a, el backend valida que coincida exactamente con el detalle de la salida.
+- `detalle`: opcional; si se envía, el backend valida que coincida exactamente con el detalle de la salida.
 
 **Body POST kilos por tarima:** `GuardarKilosTarimaRequest`
 
@@ -294,7 +332,7 @@ Base: `api/almacen-cascos`. **Requiere:** usuario autenticado (JWT). Usa tablas 
 
 ---
 
-## 11. Personas (Proveedores)
+## 12. Personas (Proveedores)
 
 Base: `api/Personas`. **Requiere:** usuario autenticado y políticas indicadas.
 
@@ -310,7 +348,7 @@ Base: `api/Personas`. **Requiere:** usuario autenticado y políticas indicadas.
 
 ---
 
-## 12. Recaudaciones
+## 13. Recaudaciones
 
 Base: `api/Recaudaciones`. Endpoints principales por **ticket/QR** (cadena encriptada).
 
@@ -325,7 +363,7 @@ Los métodos POST, PUT y DELETE están definidos pero sin lógica (vacíos).
 
 ---
 
-## 13. Proveedores de pagos
+## 14. Proveedores de pagos
 
 Base: `api/ProveedoresPagos`. **Sin** atributo `[Authorize]` en el controlador (endpoints públicos o según configuración global).
 
@@ -340,15 +378,15 @@ Errores: 404 si no hay registros, 500 con mensaje de excepción.
 
 ---
 
-## 14. Temporadas y Torneos
+## 15. Temporadas y Torneos
 
 Base: `api/temporadas` y `api/torneos`. Requiere JWT. Usa SPs: `sp_w_ConsultarTemporadas`, `sp_w_InsertarTemporada`, `sp_w_ActualizarTemporada`, `sp_w_CancelarTemporada`, `sp_w_ConsultarTorneos`, `sp_w_InsertarTorneo`, `sp_w_ActualizarTorneo`, `sp_w_CancelarTorneo`, `sp_w_ActivarTorneo`, `sp_w_CerrarTorneo`, `sp_w_ReactivarTorneo`, `sp_w_CerrarTorneosVencidos`.
 
 ### Temporadas (`api/temporadas`)
 
-| Metodo | Ruta | Descripcion |
+| Método | Ruta | Descripción |
 |--------|------|-------------|
-| `GET` | `/api/temporadas` | Lista temporadas. Filtros: `estado` (0/1/2) y `texto` (busqueda por nombre). |
+| `GET` | `/api/temporadas` | Lista temporadas. Filtros: `estado` (0/1/2) y `texto` (búsqueda por nombre). |
 | `GET` | `/api/temporadas/{id}` | Obtiene temporada por Id (GUID). |
 | `POST` | `/api/temporadas` | Crea temporada. Body: `CreateTemporadaRequest` (`nombre`, `fechaInicio`, `fechaFin`). |
 | `PUT` | `/api/temporadas/{id}` | Actualiza temporada activa. Body: `UpdateTemporadaRequest`. |
@@ -357,7 +395,7 @@ Base: `api/temporadas` y `api/torneos`. Requiere JWT. Usa SPs: `sp_w_ConsultarTe
 
 ### Torneos (`api/torneos`)
 
-| Metodo | Ruta | Descripcion |
+| Método | Ruta | Descripción |
 |--------|------|-------------|
 | `GET` | `/api/torneos` | Lista torneos. Filtros: `temporadaId`, `estado` (0/1/2/3/4), `texto` (nombre/clave), `fechaInicio`, `fechaFin`. |
 | `GET` | `/api/torneos/{id}` | Obtiene torneo por Id (GUID). |
@@ -366,7 +404,7 @@ Base: `api/temporadas` y `api/torneos`. Requiere JWT. Usa SPs: `sp_w_ConsultarTe
 | `POST` | `/api/torneos/{id}/activar` | Activa torneo (Borrador -> Activo). |
 | `POST` | `/api/torneos/{id}/cerrar` | Cierra torneo (Activo -> Cerrado). |
 | `POST` | `/api/torneos/{id}/cancelar` | Cancela torneo. Body opcional: `CancelTorneoRequest` (`motivo`). |
-| `POST` | `/api/torneos/{id}/reactivar` | Reactiva torneo cancelado (puede quedar Activo o Cerrado segun fecha fin). |
+| `POST` | `/api/torneos/{id}/reactivar` | Reactiva torneo cancelado (puede quedar Activo o Cerrado según fecha fin). |
 | `POST` | `/api/torneos/cerrar-vencidos` | Cierra torneos activos vencidos. Query opcional: `fechaCorte`. |
 
 Reglas de negocio principales:
@@ -378,34 +416,34 @@ Reglas de negocio principales:
 
 ---
 
-## 15. Categorias Equipos
+## 16. Categorías de equipos
 
-Base: `api/categorias`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarCategorias`, `sp_w_InsertarCategoria`, `sp_w_ActualizarCategoria`, `sp_w_InhabilitarCategoria`.
+Base: `api/categorias`. Requiere JWT y permisos por acción. Usa SPs: `sp_w_ConsultarCategorias`, `sp_w_InsertarCategoria`, `sp_w_ActualizarCategoria`, `sp_w_InhabilitarCategoria`.
 
-| Metodo | Ruta | Politica | Descripcion |
+| Método | Ruta | Política | Descripción |
 |--------|------|----------|-------------|
-| `GET` | `/api/categorias` | `perm:categorias.ver` | Lista categorias. Filtros opcionales: `estado` (1 activo, 2 inactivo), `texto` (busqueda por nombre). |
-| `GET` | `/api/categorias/{id}` | `perm:categorias.ver` | Obtiene categoria por Id (GUID). |
-| `POST` | `/api/categorias` | `perm:categorias.crear` | Crea categoria. Body: `CreateCategoriaRequest` (`nombre`). |
-| `PUT` | `/api/categorias/{id}` | `perm:categorias.editar` | Actualiza categoria activa. Body: `UpdateCategoriaRequest` (`nombre`). |
-| `POST` | `/api/categorias/{id}/inhabilitar` | `perm:categorias.activar` | Inhabilita categoria (estado 2). Body opcional: `InhabilitarCategoriaRequest` (`motivo`). |
-| `POST` | `/api/categorias/{id}/habilitar` | `perm:categorias.activar` | Habilita categoria (estado 1). Sin body. |
+| `GET` | `/api/categorias` | `perm:categorias.ver` | Lista categorías. Filtros opcionales: `estado` (1 activo, 2 inactivo), `texto` (búsqueda por nombre). |
+| `GET` | `/api/categorias/{id}` | `perm:categorias.ver` | Obtiene categoría por Id (GUID). |
+| `POST` | `/api/categorias` | `perm:categorias.crear` | Crea categoría. Body: `CreateCategoriaRequest` (`nombre`). |
+| `PUT` | `/api/categorias/{id}` | `perm:categorias.editar` | Actualiza categoría activa. Body: `UpdateCategoriaRequest` (`nombre`). |
+| `POST` | `/api/categorias/{id}/inhabilitar` | `perm:categorias.activar` | Inhabilita categoría (estado 2). Body opcional: `InhabilitarCategoriaRequest` (`motivo`). |
+| `POST` | `/api/categorias/{id}/habilitar` | `perm:categorias.activar` | Habilita categoría (estado 1). Sin body. |
 
 Reglas:
 - `nombre` requerido, max 120.
 - `motivo` max 200.
 - No permite nombre duplicado.
-- No permite modificar categoria inactiva.
+- No permite modificar categoría inactiva.
 
 ---
 
-## 16. Profesores
+## 17. Profesores
 
-Base: `api/profesores`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarProfesores`, `sp_w_InsertarProfesor`, `sp_w_ActualizarProfesor`, `sp_w_InhabilitarProfesor`.
+Base: `api/profesores`. Requiere JWT y permisos por acción. Usa SPs: `sp_w_ConsultarProfesores`, `sp_w_InsertarProfesor`, `sp_w_ActualizarProfesor`, `sp_w_InhabilitarProfesor`.
 
-| Metodo | Ruta | Politica | Descripcion |
+| Método | Ruta | Política | Descripción |
 |--------|------|----------|-------------|
-| `GET` | `/api/profesores` | `perm:profesores.ver` | Lista profesores. Filtros opcionales: `estado` (1 activo, 2 inactivo), `texto` (nombre/telefono/correo). |
+| `GET` | `/api/profesores` | `perm:profesores.ver` | Lista profesores. Filtros opcionales: `estado` (1 activo, 2 inactivo), `texto` (nombre/teléfono/correo). |
 | `GET` | `/api/profesores/{id}` | `perm:profesores.ver` | Obtiene profesor por Id (GUID). |
 | `POST` | `/api/profesores` | `perm:profesores.crear` | Crea profesor. Body: `CreateProfesorRequest` (`nombre`, `telefono`, `correo?`). |
 | `PUT` | `/api/profesores/{id}` | `perm:profesores.editar` | Actualiza profesor activo. Body: `UpdateProfesorRequest` (`nombre`, `telefono`, `correo?`). |
@@ -422,13 +460,13 @@ Reglas:
 
 ---
 
-## 17. Equipos
+## 18. Equipos
 
-Base: `api/equipos`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarEquipos`, `sp_w_InsertarEquipo`, `sp_w_ActualizarEquipo`, `sp_w_InhabilitarEquipo`.
+Base: `api/equipos`. Requiere JWT y permisos por acción. Usa SPs: `sp_w_ConsultarEquipos`, `sp_w_InsertarEquipo`, `sp_w_ActualizarEquipo`, `sp_w_InhabilitarEquipo`.
 
-| Metodo | Ruta | Politica | Descripcion |
+| Método | Ruta | Política | Descripción |
 |--------|------|----------|-------------|
-| `GET` | `/api/equipos` | `perm:equipos.ver` | Lista equipos. Filtros opcionales: `estado` (1 activo, 2 inactivo), `categoriaId` (GUID), `diaJuego` (1 sabado, 2 domingo), `texto` (nombre/categoria/profesores). |
+| `GET` | `/api/equipos` | `perm:equipos.ver` | Lista equipos. Filtros opcionales: `estado` (1 activo, 2 inactivo), `categoriaId` (GUID), `diaJuego` (1 sábado, 2 domingo), `texto` (nombre/categoría/profesores). |
 | `GET` | `/api/equipos/{id}` | `perm:equipos.ver` | Obtiene equipo por Id (GUID). |
 | `POST` | `/api/equipos` | `perm:equipos.crear` | Crea equipo. Body: `CreateEquipoRequest` (`nombre`, `categoriaPredeterminadaId`, `diaJuegoPredeterminado`, `profesorTitularPredeterminadoId`, `profesorAuxiliarPredeterminadoId?`). |
 | `PUT` | `/api/equipos/{id}` | `perm:equipos.editar` | Actualiza equipo activo. Body: `UpdateEquipoRequest` (mismos campos de create). |
@@ -446,36 +484,191 @@ Reglas:
 
 ---
 
-## 18. Inscripciones Torneo
+## 19. Inscripciones Torneo
 
-Base: `api/inscripciones-torneo`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarInscripcionesTorneo`, `sp_w_InsertarInscripcionTorneo`, `sp_w_ActualizarInscripcionTorneo`, `sp_w_InhabilitarInscripcionTorneo`.
+Base: `api/inscripciones-torneo`. Requiere JWT y permisos por acción. Usa SPs: `sp_w_ConsultarInscripcionesTorneo`, `sp_w_InsertarInscripcionTorneo`, `sp_w_ActualizarInscripcionTorneo`, `sp_w_InhabilitarInscripcionTorneo`.
 
-| Metodo | Ruta | Politica | Descripcion |
+| Método | Ruta | Política | Descripción |
 |--------|------|----------|-------------|
-| `GET` | `/api/inscripciones-torneo` | `perm:inscripciones.ver` | Lista inscripciones. Filtros opcionales: `torneoId` (GUID), `categoriaId` (GUID), `estado` (1 activo, 2 inhabilitado), `texto` (torneo/equipo/categoria/profesores). |
-| `GET` | `/api/inscripciones-torneo/{id}` | `perm:inscripciones.ver` | Obtiene inscripcion por Id (GUID). |
-| `POST` | `/api/inscripciones-torneo` | `perm:inscripciones.crear` | Crea inscripcion. Body: `CreateInscripcionTorneoRequest` (`torneoId`, `equipoId`, `categoriaId?`, `diaJuego?`, `profesorTitularId?`, `profesorAuxiliarId?`). |
-| `PUT` | `/api/inscripciones-torneo/{id}` | `perm:inscripciones.editar` | Actualiza inscripcion activa. Body: `UpdateInscripcionTorneoRequest` (`categoriaId?`, `diaJuego?`, `profesorTitularId?`, `profesorAuxiliarId?`). |
-| `POST` | `/api/inscripciones-torneo/{id}/inhabilitar` | `perm:inscripciones.activar` | Inhabilita inscripcion (estado 2). Body opcional: `InhabilitarInscripcionTorneoRequest` (`motivo` opcional). |
-| `POST` | `/api/inscripciones-torneo/{id}/habilitar` | `perm:inscripciones.activar` | Habilita inscripcion (estado 1). Sin body. |
+| `GET` | `/api/inscripciones-torneo` | `perm:inscripciones.ver` | Lista inscripciones. Filtros opcionales: `torneoId` (GUID), `categoriaId` (GUID), `estado` (1 activo, 2 inhabilitado), `texto` (torneo/equipo/categoría/profesores). |
+| `GET` | `/api/inscripciones-torneo/{id}` | `perm:inscripciones.ver` | Obtiene inscripción por Id (GUID). |
+| `POST` | `/api/inscripciones-torneo` | `perm:inscripciones.crear` | Crea inscripción. Body: `CreateInscripcionTorneoRequest` (`torneoId`, `equipoId`, `categoriaId?`, `diaJuego?`, `profesorTitularId?`, `profesorAuxiliarId?`). |
+| `PUT` | `/api/inscripciones-torneo/{id}` | `perm:inscripciones.editar` | Actualiza inscripción activa. Body: `UpdateInscripcionTorneoRequest` (`categoriaId?`, `diaJuego?`, `profesorTitularId?`, `profesorAuxiliarId?`). |
+| `POST` | `/api/inscripciones-torneo/{id}/inhabilitar` | `perm:inscripciones.activar` | Inhabilita inscripción (estado 2). Body opcional: `InhabilitarInscripcionTorneoRequest` (`motivo` opcional). |
+| `POST` | `/api/inscripciones-torneo/{id}/habilitar` | `perm:inscripciones.activar` | Habilita inscripción (estado 1). Sin body. |
 
 Reglas:
 - `torneoId` requerido y el torneo debe estar Activo.
 - `equipoId` requerido y el equipo debe estar activo.
-- `categoriaId` opcional: si no se envia, se usa la predeterminada del equipo.
-- `diaJuego` opcional: si no se envia, se usa el predeterminado del equipo (1 o 2).
-- `profesorTitularId` opcional: si no se envia, se usa el predeterminado del equipo.
+- `categoriaId` opcional: si no se envía, se usa la predeterminada del equipo.
+- `diaJuego` opcional: si no se envía, se usa el predeterminado del equipo (1 o 2).
+- `profesorTitularId` opcional: si no se envía, se usa el predeterminado del equipo.
 - `profesorAuxiliarId` opcional y distinto al titular.
 - `motivo` opcional, max 200.
-- No permite duplicado de equipo en el mismo torneo y categoria.
+- No permite duplicado de equipo en el mismo torneo y categoría.
 
 ---
 
-## 19. Cheques
+## 20. Jornadas
 
-Base: `api/cheques`. Requiere JWT y permisos por accion. Usa SPs: `sp_w_ConsultarCheques`, `sp_w_ConsultarChequeDetalle`, `sp_w_InsertarCheque`, `sp_w_ActualizarCheque`, `sp_w_CambiarEstatusCheque`.
+Base: `api/jornadas`. Requiere JWT y permisos por acción. Usa SPs: `sp_w_ConsultarJornadas`, `sp_w_InsertarJornada`, `sp_w_ActualizarJornada`, `sp_w_InhabilitarJornada`.
 
-| Metodo | Ruta | Politica | Descripcion |
+| Método | Ruta | Política | Descripción |
+|--------|------|----------|-------------|
+| `GET` | `/api/jornadas` | `perm:jornadas.ver` | Lista jornadas. Filtros opcionales: `estado` (1 activo, 2 inhabilitado), `texto` (nombre/numero). |
+| `GET` | `/api/jornadas/{id}` | `perm:jornadas.ver` | Obtiene jornada por Id (GUID). |
+| `POST` | `/api/jornadas` | `perm:jornadas.crear` | Crea jornada. Body: `CreateJornadaRequest` (`numeroJornada`). |
+| `PUT` | `/api/jornadas/{id}` | `perm:jornadas.editar` | Actualiza jornada activa. Body: `UpdateJornadaRequest` (`numeroJornada`). |
+| `POST` | `/api/jornadas/{id}/inhabilitar` | `perm:jornadas.activar` | Inhabilita jornada (estado 2). Body: `InhabilitarJornadaRequest` (`motivo` requerido). |
+
+Reglas:
+- `numeroJornada` requerido, > 0.
+- `motivo` requerido, max 200.
+- No permite numero o nombre duplicado.
+- No permite modificar jornada inactiva.
+---
+
+## 21. Configuración Rol Torneo
+
+Base: `api/configuracion-rol-torneo`. Requiere JWT y permisos por acción. Usa SPs: `sp_w_ConsultarConfiguracionesRolTorneo`, `sp_w_ObtenerConfiguracionRolTorneo`, `sp_w_InsertarConfiguracionRolTorneo`, `sp_w_ActualizarConfiguracionRolTorneo`, `sp_w_InhabilitarConfiguracionRolTorneo`.
+
+| Método | Ruta | Política | Descripción |
+|--------|------|----------|-------------|
+| `GET` | `/api/configuracion-rol-torneo` | `perm:configuracionroltorneo.ver` | Lista configuraciones con filtros. |
+| `GET` | `/api/configuracion-rol-torneo/{id}` | `perm:configuracionroltorneo.ver` | Obtiene configuración por Id (GUID). |
+| `GET` | `/api/configuracion-rol-torneo/torneo/{torneoId}` | `perm:configuracionroltorneo.ver` | Obtiene configuración activa por torneo. |
+| `POST` | `/api/configuracion-rol-torneo` | `perm:configuracionroltorneo.crear` | Crea configuración. |
+| `PUT` | `/api/configuracion-rol-torneo/{id}` | `perm:configuracionroltorneo.editar` | Actualiza configuración activa. |
+| `POST` | `/api/configuracion-rol-torneo/{id}/inhabilitar` | `perm:configuracionroltorneo.activar` | Inhabilita configuración. |
+
+**Query (GET list):**
+
+- `texto`: opcional. Busca por nombre/clave de torneo o temporada.
+- `temporadaId`: opcional (GUID).
+- `estado`: opcional (1 activo, 2 inhabilitado).
+
+**Body POST crear:** `CreateConfiguracionRolTorneoRequest`
+
+```json
+{
+  "torneoId": "GUID",
+  "horaInicioPredeterminada": "08:00:00",
+  "duracionPartidoMin": 50,
+  "minutosEntrePartidos": 10,
+  "numeroCanchas": 2,
+  "observacionesPredeterminadas": "string opcional"
+}
+```
+
+**Body PUT actualizar:** `UpdateConfiguracionRolTorneoRequest`
+
+```json
+{
+  "horaInicioPredeterminada": "09:00:00",
+  "duracionPartidoMin": 45,
+  "minutosEntrePartidos": 5,
+  "numeroCanchas": 3,
+  "observacionesPredeterminadas": "string opcional"
+}
+```
+
+**Body POST inhabilitar:** `InhabilitarConfiguracionRolTorneoRequest`
+
+```json
+{
+  "motivo": "string requerido"
+}
+```
+
+Reglas:
+
+- Un solo registro por torneo.
+- El torneo debe estar en estado Borrador/Activo para crear.
+- `duracionPartidoMin` > 0.
+- `minutosEntrePartidos` >= 0.
+- `numeroCanchas` > 0.
+- `observacionesPredeterminadas` max 500.
+- `motivo` max 200 (requerido para inhabilitar).
+
+---
+
+## 22. Generación Rol de Juego
+
+Base: `api/generacion-rol-torneo`. Requiere JWT y permisos por acción. Usa SPs: `sp_w_ConsultarGeneracionesRolTorneo`, `sp_w_ObtenerGeneracionRolTorneo`, `sp_w_InsertarGeneracionRolTorneo`, `sp_w_ActualizarGeneracionRolTorneo`, `sp_w_CancelarGeneracionRolTorneo`, `sp_w_CargarEquiposGeneracionRolTorneo`, `sp_w_ConsultarEquiposGeneracionRolTorneo`, `sp_w_ActualizarParticipacionEquipoGeneracionRolTorneo`, `sp_w_ConsultarCategoriasGeneracionRolTorneo`, `sp_w_GuardarCanchasGeneracionRolTorneo`, `sp_w_ConsultarCanchasGeneracionRolTorneo`, `sp_w_GenerarPartidosGeneracionRolTorneo`, `sp_w_ConsultarPartidosGeneracionRolTorneo`, `sp_w_ActualizarOrdenPartidosGeneracionRolTorneo`, `sp_w_ActualizarObservacionPartidoGeneracionRolTorneo`.
+
+| Método | Ruta | Política | Descripción |
+|--------|------|----------|-------------|
+| `GET` | `/api/generacion-rol-torneo` | `perm:generacionroltorneo.ver` | Lista generaciones. Filtros opcionales: `texto`, `temporadaId`, `torneoId`, `jornadaId`, `fechaJuego`, `diaJuego` (1/2), `estado` (1 borrador, 2 generado, 3 cancelado). |
+| `GET` | `/api/generacion-rol-torneo/{id}` | `perm:generacionroltorneo.ver` | Obtiene generación por Id (GUID). |
+| `POST` | `/api/generacion-rol-torneo` | `perm:generacionroltorneo.crear` | Crea generación (borrador). Body: `CreateGeneracionRolTorneoRequest`. |
+| `PUT` | `/api/generacion-rol-torneo/{id}` | `perm:generacionroltorneo.editar` | Actualiza generación en borrador. Body: `UpdateGeneracionRolTorneoRequest`. |
+| `POST` | `/api/generacion-rol-torneo/{id}/cancelar` | `perm:generacionroltorneo.activar` | Cancela generación. Body: `CancelarGeneracionRolTorneoRequest` (`motivo` requerido). |
+| `GET` | `/api/generacion-rol-torneo/{id}/categorias` | `perm:generacionroltorneo.ver` | Categorías válidas por generación (según inscripciones activas y día). |
+| `GET` | `/api/generacion-rol-torneo/{id}/canchas` | `perm:generacionroltorneo.ver` | Consulta canchas por categoría. |
+| `POST` | `/api/generacion-rol-torneo/{id}/canchas` | `perm:generacionroltorneo.editar` | Guarda canchas por categoría. Body: `GuardarCanchasGeneracionRolTorneoRequest`. |
+| `POST` | `/api/generacion-rol-torneo/{id}/equipos/cargar` | `perm:generacionroltorneo.editar` | Carga equipos de inscripciones activas para la generación en borrador. |
+| `GET` | `/api/generacion-rol-torneo/{id}/equipos` | `perm:generacionroltorneo.ver` | Lista equipos de la generación. |
+| `PUT` | `/api/generacion-rol-torneo/equipos/{id}` | `perm:generacionroltorneo.editar` | Cambia participación de un equipo. Body: `UpdateParticipacionEquipoRequest` (`participa`, `observaciones?`). |
+| `POST` | `/api/generacion-rol-torneo/{id}/previsualizar-partidos` | `perm:generacionroltorneo.editar` | Genera/actualiza vista previa de partidos sin cambiar estado de la generación (permanece en Borrador). |
+| `POST` | `/api/generacion-rol-torneo/{id}/confirmar-generacion` | `perm:generacionroltorneo.activar` | Confirma la generación ya previsualizada y cambia estado a Generado (sin recalcular partidos). |
+| `POST` | `/api/generacion-rol-torneo/{id}/generar-partidos` | `perm:generacionroltorneo.activar` | Genera partidos y cambia estado a Generado. Devuelve partidos y notas. |
+| `GET` | `/api/generacion-rol-torneo/{id}/partidos` | `perm:generacionroltorneo.ver` | Consulta partidos generados. |
+| `POST` | `/api/generacion-rol-torneo/{id}/partidos/orden` | `perm:generacionroltorneo.editar` | Guarda orden de partidos (drag & drop). Body: `ActualizarOrdenPartidosRequest`. |
+| `POST` | `/api/generacion-rol-torneo/partidos/{partidoId}/observacion` | `perm:generacionroltorneo.editar` | Guarda observaciones por partido. Body: `ActualizarObservacionPartidoRequest`. |
+
+**Body POST crear:** `CreateGeneracionRolTorneoRequest`
+
+```json
+{
+  "torneoId": "GUID",
+  "temporadaId": "GUID",
+  "jornadaId": "GUID",
+  "fechaJuego": "2026-04-01",
+  "diaJuego": 1,
+  "horaInicio": "08:00:00",
+  "duracionPartidoMin": 45,
+  "minutosEntrePartidos": 10,
+  "numeroCanchas": 2,
+  "observaciones": "string opcional"
+}
+```
+
+**Body PUT actualizar:** `UpdateGeneracionRolTorneoRequest`
+
+```json
+{
+  "temporadaId": "GUID",
+  "jornadaId": "GUID",
+  "fechaJuego": "2026-04-01",
+  "diaJuego": 2,
+  "horaInicio": "09:00:00",
+  "duracionPartidoMin": 50,
+  "minutosEntrePartidos": 5,
+  "numeroCanchas": 3,
+  "observaciones": "string opcional"
+}
+```
+
+Reglas:
+- `temporadaId` requerido.
+- `fechaJuego` requerido.
+- `fechaJuego` debe ser sábado o domingo.
+- `diaJuego` debe ser 1 o 2.
+- `diaJuego` debe coincidir con `fechaJuego` (sábado=1, domingo=2).
+- `duracionPartidoMin` > 0.
+- `minutosEntrePartidos` >= 0.
+- `numeroCanchas` > 0.
+- `observaciones` max 500.
+- Solo se puede actualizar/cargar equipos en generación en borrador.
+- Para generar partidos debe haber equipos participantes.
+- Para generar partidos no se permiten enfrentamientos entre equipos con el mismo profesor titular.
+
+---
+## 23. Cheques
+
+Base: `api/cheques`. Requiere JWT y permisos por acción. Usa SPs: `sp_w_ConsultarCheques`, `sp_w_ConsultarChequeDetalle`, `sp_w_InsertarCheque`, `sp_w_ActualizarCheque`, `sp_w_CambiarEstatusCheque`.
+
+| Método | Ruta | Política | Descripción |
 |--------|------|----------|-------------|
 | `GET` | `/api/cheques` | `perm:cheques.ver` | Lista cheques. Filtros opcionales: `texto`, `idCliente`, `idBanco`, `estatusCheque` (1-4), `idStatus` (1-2), `fechaChequeInicio`, `fechaChequeFin`. |
 | `GET` | `/api/cheques/{id}` | `perm:cheques.ver` | Obtiene detalle del cheque por Id (GUID), incluyendo historial. |
@@ -489,12 +682,12 @@ Reglas:
 - `fechaCheque` requerida.
 - `observaciones` max 500.
 - `motivo` max 300.
-- Solo se puede actualizar/cambiar estatus cuando el cheque esta en `Registrado`.
+- Solo se puede actualizar/cambiar estatus cuando el cheque está en `Registrado`.
 - Para `estatusChequeNuevo` 3 (Devuelto) o 4 (Cancelado), `motivo` es obligatorio.
 
 ---
 
-## 20. Utilidades
+## 24. Utilidades
 
 Endpoints mínimos (Program.cs), sin autenticación JWT:
 
@@ -518,4 +711,6 @@ Endpoints mínimos (Program.cs), sin autenticación JWT:
 
 - **ErrorController**, **DevController** y **AuthController** están comentados en el código; no exponen rutas activas.
 - Rutas con `api/[controller]` resuelven a: Personas → `api/Personas`, Recaudaciones → `api/Recaudaciones`, ProveedoresPagos → `api/ProveedoresPagos`.
-- Tarimas: validaciones en crear/actualizar (nombreTarima requerido, longitudes, idTipoCasco > 0, numeroCascosBase 1–99999, observaciones opcional max 500).
+- Tarimas: validaciones en crear/actualizar (nombreTarima requerido, longitudes, idTipoCasco > 0, numeroCascosBase 1 a 99999, observaciones opcional max 500).
+
+-             

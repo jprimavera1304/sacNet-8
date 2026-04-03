@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using ISL_Service.Application.DTOs.Persona;
@@ -54,7 +54,7 @@ namespace ISL_Service.Application.Services
             catch (Exception)
             {
                 response.Success = false;
-                response.Message = "Ocurrio un error inesperado al consultar personas.";
+                response.Message = "Ocurrió un error inesperado al consultar personas.";
                 return response;
             }
         }
@@ -107,7 +107,7 @@ namespace ISL_Service.Application.Services
             catch (Exception)
             {
                 response.Success = false;
-                response.Message = "Ocurrio un error inesperado al insertar persona.";
+                response.Message = "Ocurrió un error inesperado al insertar persona.";
                 return response;
             }
         }
@@ -167,7 +167,7 @@ namespace ISL_Service.Application.Services
             catch (Exception)
             {
                 response.Success = false;
-                response.Message = "Ocurrio un error inesperado al actualizar persona.";
+                response.Message = "Ocurrió un error inesperado al actualizar persona.";
                 return response;
             }
         }
@@ -188,7 +188,7 @@ namespace ISL_Service.Application.Services
                 if (idPersona <= 0)
                 {
                     response.Success = false;
-                    response.Message = "IDPersona invalido.";
+                    response.Message = "IDPersona inválido.";
                     return response;
                 }
 
@@ -227,7 +227,7 @@ namespace ISL_Service.Application.Services
             catch (Exception)
             {
                 response.Success = false;
-                response.Message = "Ocurrio un error inesperado al cancelar persona.";
+                response.Message = "Ocurrió un error inesperado al cancelar persona.";
                 return response;
             }
         }
@@ -248,7 +248,7 @@ namespace ISL_Service.Application.Services
                 if (idPersona <= 0)
                 {
                     response.Success = false;
-                    response.Message = "IDPersona invalido.";
+                    response.Message = "IDPersona inválido.";
                     return response;
                 }
 
@@ -287,7 +287,7 @@ namespace ISL_Service.Application.Services
             catch (Exception)
             {
                 response.Success = false;
-                response.Message = "Ocurrio un error inesperado al reactivar persona.";
+                response.Message = "Ocurrió un error inesperado al reactivar persona.";
                 return response;
             }
         }

@@ -44,7 +44,7 @@ namespace ISL_Service.Controllers
             {
                 if (string.IsNullOrWhiteSpace(qr))
                 {
-                    return BadRequest(new { message = "Ticket invalido.", traceId = HttpContext.TraceIdentifier });
+                    return BadRequest(new { message = "Ticket inválido.", traceId = HttpContext.TraceIdentifier });
                 }
 
                 Encryptacion encryptacion = new Encryptacion();
@@ -64,16 +64,16 @@ namespace ISL_Service.Controllers
                     !int.TryParse(partes[1], out IDCaja) ||
                     !int.TryParse(partes[2], out Dv1))
                 {
-                    _logger.LogWarning("QR invalido en Recaudaciones. rawLen={RawLen}, traceId={TraceId}",
+                    _logger.LogWarning("QR inválido en Recaudaciones. rawLen={RawLen}, traceId={TraceId}",
                         qr.Length, HttpContext.TraceIdentifier);
-                    return BadRequest(new { message = "Ticket invalido.", traceId = HttpContext.TraceIdentifier });
+                    return BadRequest(new { message = "Ticket inválido.", traceId = HttpContext.TraceIdentifier });
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Error al desencriptar QR en Recaudaciones. traceId={TraceId}",
                     HttpContext.TraceIdentifier);
-                return BadRequest(new { message = "Ticket invalido.", traceId = HttpContext.TraceIdentifier });
+                return BadRequest(new { message = "Ticket inválido.", traceId = HttpContext.TraceIdentifier });
             }
 
             try

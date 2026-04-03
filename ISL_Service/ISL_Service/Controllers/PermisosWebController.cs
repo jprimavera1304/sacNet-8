@@ -24,7 +24,7 @@ public class PermisosWebController : ControllerBase
     public async Task<IActionResult> Bootstrap(CancellationToken ct)
     {
         if (!TryGetEmpresaId(User, out var empresaId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var payload = await _permissions.GetPermisosWebBootstrapAsync(empresaId, ct);
         if (payload is null)
@@ -47,7 +47,7 @@ public class PermisosWebController : ControllerBase
     public async Task<IActionResult> RolesBootstrap(CancellationToken ct)
     {
         if (!TryGetEmpresaId(User, out var empresaId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var payload = await _permissions.GetPermisosRolesBootstrapAsync(empresaId, ct);
         if (payload is null)
@@ -68,7 +68,7 @@ public class PermisosWebController : ControllerBase
     public async Task<IActionResult> Catalog(CancellationToken ct)
     {
         if (!TryGetEmpresaId(User, out var empresaId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var items = await _permissions.GetPermissionCatalogAsync(empresaId, ct);
         var modules = await _permissions.GetModuleCatalogAsync(empresaId, ct);
@@ -84,12 +84,12 @@ public class PermisosWebController : ControllerBase
         CancellationToken ct)
     {
         if (!TryGetEmpresaId(User, out var empresaId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var bodyKey = request?.ModuloClave?.Trim() ?? string.Empty;
         var routeKey = moduleKey?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(routeKey))
-            return UnprocessableEntity(new { message = "Modulo invalido." });
+            return UnprocessableEntity(new { message = "Módulo inválido." });
         if (!string.IsNullOrWhiteSpace(bodyKey) && !string.Equals(bodyKey, routeKey, StringComparison.OrdinalIgnoreCase))
             return UnprocessableEntity(new { message = "Modulo de ruta y body no coinciden." });
 
@@ -115,10 +115,10 @@ public class PermisosWebController : ControllerBase
         CancellationToken ct)
     {
         if (!TryGetEmpresaId(User, out var empresaId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         if (request is null || string.IsNullOrWhiteSpace(request.ModuloClave))
-            return UnprocessableEntity(new { message = "Payload invalido." });
+            return UnprocessableEntity(new { message = "Payload inválido." });
 
         try
         {
@@ -144,10 +144,10 @@ public class PermisosWebController : ControllerBase
         CancellationToken ct)
     {
         if (!TryGetEmpresaId(User, out var empresaId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         if (request is null || string.IsNullOrWhiteSpace(roleCode))
-            return UnprocessableEntity(new { message = "Payload invalido." });
+            return UnprocessableEntity(new { message = "Payload inválido." });
 
         if (!string.IsNullOrWhiteSpace(request.RoleCode) &&
             !string.Equals(request.RoleCode.Trim(), roleCode.Trim(), StringComparison.OrdinalIgnoreCase))
@@ -179,10 +179,10 @@ public class PermisosWebController : ControllerBase
         CancellationToken ct)
     {
         if (!TryGetEmpresaId(User, out var empresaId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         if (request is null)
-            return UnprocessableEntity(new { message = "Payload invalido." });
+            return UnprocessableEntity(new { message = "Payload inválido." });
 
         try
         {
@@ -208,10 +208,10 @@ public class PermisosWebController : ControllerBase
         CancellationToken ct)
     {
         if (!TryGetEmpresaId(User, out var empresaId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         if (request is null)
-            return UnprocessableEntity(new { message = "Payload invalido." });
+            return UnprocessableEntity(new { message = "Payload inválido." });
 
         if (request.UserId != Guid.Empty && request.UserId != userId)
             return UnprocessableEntity(new { message = "userId de ruta y body no coinciden." });
@@ -242,7 +242,7 @@ public class PermisosWebController : ControllerBase
         CancellationToken ct)
     {
         if (!TryGetEmpresaId(User, out var empresaId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         try
         {
@@ -266,10 +266,10 @@ public class PermisosWebController : ControllerBase
         CancellationToken ct)
     {
         if (!TryGetEmpresaId(User, out var empresaId))
-            return Unauthorized(new { message = "Token invalido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         if (request is null)
-            return UnprocessableEntity(new { message = "Payload invalido." });
+            return UnprocessableEntity(new { message = "Payload inválido." });
 
         try
         {

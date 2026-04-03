@@ -5,7 +5,7 @@ namespace ISL_Service.Application.DTOs.Requests;
 public class UpdateUserRequest
 {
     [Required, StringLength(60, MinimumLength = 4)]
-    [RegularExpression("^[A-Z0-9_]+$", ErrorMessage = "Usuario invalido. Usa A-Z, 0-9 y _")]
+    [RegularExpression("^[A-Z0-9_]+$", ErrorMessage = "Usuario inválido. Usa A-Z, 0-9 y _")]
     public string Usuario { get; set; } = default!;
 
     [Required, StringLength(30)]

@@ -12,4 +12,5 @@ public class DashboardVentasFiltroRequest
     public int? IDCategoria { get; set; }
     public int? IDMarca { get; set; }
     public int? IDTipoDocumento { get; set; }
+    public int? Top { get; set; }
 }

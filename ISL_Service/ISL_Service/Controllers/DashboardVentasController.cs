@@ -40,6 +40,7 @@ public class DashboardVentasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.ConsultarKpisAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
         return Ok(result);
     }
 
@@ -53,6 +54,23 @@ public class DashboardVentasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.ConsultarSerieMensualAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Serie semanal por mes. Semanas fijas: 1-7, 8-14, 15-21, 22-28, 29-fin.
+    /// </summary>
+    [HttpPost("ventas/serie-semanal/consultar")]
+    [Authorize(Policy = "perm:dashboardventas.ver")]
+    [ProducesResponseType(typeof(List<DashboardVentasSerieSemanalDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConsultarSerieSemanal([FromBody] DashboardVentasSerieSemanalRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var result = await _service.ConsultarSerieSemanalAsync(request, ct);
         return Ok(result);
     }
 
@@ -66,6 +84,7 @@ public class DashboardVentasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.ConsultarTopProductosAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
         return Ok(result);
     }
 
@@ -79,6 +98,35 @@ public class DashboardVentasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.ConsultarTopClientesAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
+        return Ok(result);
+    }
+
+    [HttpPost("top-categorias/consultar")]
+    [Authorize(Policy = "perm:dashboardventas.ver")]
+    [ProducesResponseType(typeof(List<DashboardTopCategoriaDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConsultarTopCategorias([FromBody] DashboardVentasFiltroRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var result = await _service.ConsultarTopCategoriasAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
+        return Ok(result);
+    }
+
+    [HttpPost("top-marcas/consultar")]
+    [Authorize(Policy = "perm:dashboardventas.ver")]
+    [ProducesResponseType(typeof(List<DashboardTopMarcaDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConsultarTopMarcas([FromBody] DashboardVentasFiltroRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var result = await _service.ConsultarTopMarcasAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
         return Ok(result);
     }
 
@@ -92,6 +140,7 @@ public class DashboardVentasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.ConsultarVentasAlmacenesAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
         return Ok(result);
     }
 
@@ -105,19 +154,35 @@ public class DashboardVentasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.ConsultarVentasAgentesAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
         return Ok(result);
     }
 
     [HttpPost("detalle/consultar")]
     [Authorize(Policy = "perm:dashboardventas.ver")]
-    [ProducesResponseType(typeof(List<DashboardVentasDetalleDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(DashboardVentasDetallePagedResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ConsultarVentasDetalle([FromBody] DashboardVentasFiltroRequest request, CancellationToken ct)
+    public async Task<IActionResult> ConsultarVentasDetalle([FromBody] DashboardVentasDetalleRequest request, CancellationToken ct)
     {
         if (request is null)
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.ConsultarVentasDetalleAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
+        return Ok(result);
+    }
+
+    [HttpPost("overview/consultar")]
+    [Authorize(Policy = "perm:dashboardventas.ver")]
+    [ProducesResponseType(typeof(DashboardVentasOverviewResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConsultarOverview([FromBody] DashboardVentasFiltroRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var result = await _service.ConsultarOverviewAsync(request, ct);
+        Response.Headers["Cache-Control"] = "public, max-age=60";
         return Ok(result);
     }
 }
