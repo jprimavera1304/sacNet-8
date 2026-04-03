@@ -226,6 +226,8 @@ public class GeneracionRolTorneoService : IGeneracionRolTorneoService
     private static void ThrowMappedException(SqlException ex)
     {
         var msg = ex.Message;
+        if (ex.Number is 2601 or 2627 or 547)
+            throw new ConflictException(msg);
         if (msg.Contains("ya existe", StringComparison.OrdinalIgnoreCase) ||
             msg.Contains("duplic", StringComparison.OrdinalIgnoreCase))
             throw new ConflictException(msg);
