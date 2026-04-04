@@ -40,7 +40,10 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<Usuario>(entity =>
         {
-            entity.ToTable("UsuarioWeb", "dbo");
+            entity.ToTable("UsuarioWeb", "dbo", tb =>
+            {
+                tb.HasTrigger("trg_UsuarioWeb_FechaActualizacion");
+            });
             entity.HasKey(x => x.Id);
 
             entity.Property(x => x.UsuarioNombre).HasColumnName("Usuario").IsRequired();
