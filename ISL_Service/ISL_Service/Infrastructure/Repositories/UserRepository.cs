@@ -393,7 +393,8 @@ WHERE Id = @Id AND EmpresaId = @EmpresaId;", conn, (SqlTransaction)tx);
             updateWeb.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
             await updateWeb.ExecuteNonQueryAsync(ct);
 
-            if (!string.IsNullOrWhiteSpace(usuarioActual))
+            if (!string.IsNullOrWhiteSpace(usuarioActual)
+                && await TableHasColumnAsync(conn, "dbo", "Usuarios", "Usuario", ct))
             {
                 var updateLegacy = new SqlCommand(@"
 UPDATE dbo.Usuarios
@@ -470,7 +471,8 @@ WHERE Id = @Id AND EmpresaId = @EmpresaId;", conn, (SqlTransaction)tx);
             updateWeb.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
             await updateWeb.ExecuteNonQueryAsync(ct);
 
-            if (!string.IsNullOrWhiteSpace(usuario))
+            if (!string.IsNullOrWhiteSpace(usuario)
+                && await TableHasColumnAsync(conn, "dbo", "Usuarios", "Usuario", ct))
             {
                 var updateLegacy = new SqlCommand(@"
 UPDATE dbo.Usuarios
