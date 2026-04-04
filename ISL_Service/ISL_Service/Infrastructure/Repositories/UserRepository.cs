@@ -352,6 +352,7 @@ WHERE Id = @Id
         var empresaId = await ResolveEmpresaIdAsync(ct);
         await using var conn = new SqlConnection(_db.Database.GetConnectionString());
         await conn.OpenAsync(ct);
+        var hasLegacyUsuarios = await TableHasColumnAsync(conn, "dbo", "Usuarios", "Usuario", ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
 
         try
@@ -393,8 +394,7 @@ WHERE Id = @Id AND EmpresaId = @EmpresaId;", conn, (SqlTransaction)tx);
             updateWeb.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
             await updateWeb.ExecuteNonQueryAsync(ct);
 
-            if (!string.IsNullOrWhiteSpace(usuarioActual)
-                && await TableHasColumnAsync(conn, "dbo", "Usuarios", "Usuario", ct))
+            if (!string.IsNullOrWhiteSpace(usuarioActual) && hasLegacyUsuarios)
             {
                 var updateLegacy = new SqlCommand(@"
 UPDATE dbo.Usuarios
@@ -432,6 +432,7 @@ WHERE UPPER(LTRIM(RTRIM(Usuario))) = UPPER(LTRIM(RTRIM(@UsuarioActual)));", conn
         var empresaId = await ResolveEmpresaIdAsync(ct);
         await using var conn = new SqlConnection(_db.Database.GetConnectionString());
         await conn.OpenAsync(ct);
+        var hasLegacyUsuarios = await TableHasColumnAsync(conn, "dbo", "Usuarios", "Usuario", ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
 
         try
@@ -471,8 +472,7 @@ WHERE Id = @Id AND EmpresaId = @EmpresaId;", conn, (SqlTransaction)tx);
             updateWeb.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
             await updateWeb.ExecuteNonQueryAsync(ct);
 
-            if (!string.IsNullOrWhiteSpace(usuario)
-                && await TableHasColumnAsync(conn, "dbo", "Usuarios", "Usuario", ct))
+            if (!string.IsNullOrWhiteSpace(usuario) && hasLegacyUsuarios)
             {
                 var updateLegacy = new SqlCommand(@"
 UPDATE dbo.Usuarios
