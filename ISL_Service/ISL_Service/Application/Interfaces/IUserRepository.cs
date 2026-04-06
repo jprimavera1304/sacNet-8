@@ -7,7 +7,7 @@ public interface IUserRepository
 {
     Task<Usuario?> GetByUsuarioAsync(string usuario, CancellationToken ct);
     Task<Usuario?> GetByIdAsync(Guid id, CancellationToken ct);
-    Task<WebLoginFallbackResult?> LoginWithFallbackAsync(string usuario, string contrasenaPlano, string contrasenaHashWeb, CancellationToken ct);
+    Task<WebLoginFallbackResult?> LoginWithFallbackAsync(string usuario, string contrasenaPlano, string? contrasenaHashWeb, CancellationToken ct);
 
     Task<bool> ExistsByUsuarioAsync(string usuario, CancellationToken ct);
     Task<List<RoleCatalogItem>> ListRolesCatalogAsync(int empresaId, CancellationToken ct);

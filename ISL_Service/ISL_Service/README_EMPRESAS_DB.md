@@ -12,7 +12,7 @@ Este documento estandariza cambios de empresas en BD para evitar errores por lla
 
 1. Ejecuta siempre en ventana de mantenimiento.
 2. Haz backup antes de correr scripts.
-3. Usa transaccion (`BEGIN TRAN`) y valida antes de `COMMIT`.
+3. Usa transacción (`BEGIN TRAN`) y valida antes de `COMMIT`.
 4. Si algo falla: `ROLLBACK`.
 
 ## 1) Inventario: tablas que referencian `EmpresaWeb`
@@ -178,7 +178,7 @@ ORDER BY EmpresaId;
 
 ## 7) Nota operativa
 
-Si existe logica de negocio por `Clave` o por dominio en frontend/backend, valida configuraciones despues del cambio:
+Si existe lógica de negocio por `Clave` o por dominio en frontend/backend, valida configuraciones después del cambio:
 
 - `AllowedOrigins`
 - `CompanyId` o `companyKey` en API

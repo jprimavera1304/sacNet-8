@@ -34,7 +34,7 @@ namespace ISL_Service.Application.DTOs.ProveedoresPagos
         public int IDUsuario { get; set; }
         public string Equipo { get; set; }
 
-        // Auditoria (actualizacion)
+        // Auditoría (actualización)
         public int IDUsuarioModificacion { get; set; }
         public string EquipoModificacion { get; set; }
 

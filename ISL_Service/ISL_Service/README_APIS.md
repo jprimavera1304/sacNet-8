@@ -7,6 +7,7 @@ En desarrollo, Swagger está disponible en `/swagger`.
 
 ## Índice
 
+**General / Global**
 1. [Autenticación y sesión](#1-autenticación-y-sesión)
 2. [Usuario actual (Me)](#2-usuario-actual-me)
 3. [Capacidades y permisos](#3-capacidades-y-permisos)
@@ -14,23 +15,32 @@ En desarrollo, Swagger está disponible en `/swagger`.
 5. [Permisos Web / Capacidades (admin)](#5-permisos-web--capacidades-admin)
 6. [Usuarios](#6-usuarios)
 7. [Empresas](#7-empresas)
+24. [Utilidades](#24-utilidades)
+
+**Zaragoza**
 8. [Tarimas](#8-tarimas)
 9. [Catálogos](#9-catálogos)
 10. [Dashboard Ventas](#10-dashboard-ventas)
 11. [Almacén de Cascos](#11-almacén-de-cascos)
+
+**Tauro**
 12. [Personas (Proveedores)](#12-personas-proveedores)
-13. [Recaudaciones](#13-recaudaciones)
 14. [Proveedores de pagos](#14-proveedores-de-pagos)
+23. [Cheques](#23-cheques)
+25. [Ventas - Pedidos pendientes de autorizar](#25-ventas---pedidos-pendientes-de-autorizar)
+
+**Aviación**
+13. [Recaudaciones](#13-recaudaciones)
+
+**Sports league**
 15. [Temporadas y Torneos](#15-temporadas-y-torneos)
 16. [Categorías de equipos](#16-categorías-de-equipos)
 17. [Profesores](#17-profesores)
 18. [Equipos](#18-equipos)
 19. [Inscripciones Torneo](#19-inscripciones-torneo)
 20. [Jornadas](#20-jornadas)
-21. [Configuración Rol Torneo](#21-configuraci%C3%B3n-rol-torneo)
+21. [Configuración Rol Torneo](#21-configuración-rol-torneo)
 22. [Generación Rol de Juego](#22-generación-rol-de-juego)
-23. [Cheques](#23-cheques)
-24. [Utilidades](#24-utilidades)
 
 ---
 
@@ -524,7 +534,7 @@ Base: `api/jornadas`. Requiere JWT y permisos por acción. Usa SPs: `sp_w_Consul
 Reglas:
 - `numeroJornada` requerido, > 0.
 - `motivo` requerido, max 200.
-- No permite numero o nombre duplicado.
+- No permite número o nombre duplicado.
 - No permite modificar jornada inactiva.
 ---
 
@@ -695,6 +705,58 @@ Endpoints mínimos (Program.cs), sin autenticación JWT:
 |--------|------|-------------|
 | `GET` | `/whoami` | Información de configuración: companyId, environment, corsAllowedOrigins, db (nombre de conexión usada). |
 | `GET` | `/dbcheck` | Comprueba conexión a SQL Server. Devuelve connected, connection, server, database o error. |
+
+---
+
+## 25. Ventas - Pedidos pendientes de autorizar
+
+Base: `api/ventas/pedidos`. **Requiere:** usuario autenticado.
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/api/ventas/pedidos/pendientes-autorizar/consultar` | Lista pedidos en estatus Pendientes de Autorizar/Rechazar. |
+| `POST` | `/api/ventas/pedidos/autorizar` | Autoriza uno o varios pedidos (procesa venta). |
+
+**Body (consultar pendientes):** `ConsultaVentasPedidosRequest`
+
+```json
+{
+  "idPedido": 0,
+  "idVenta": 0,
+  "idEmpresa": 0,
+  "idCliente": 0,
+  "idUsuario": 0,
+  "idUsuarioActual": 0,
+  "idAgente": 0,
+  "idTipoDocumento": 0,
+  "idStatusPedido": 1,
+  "folioInicial": "",
+  "folioFinal": "",
+  "fechaInicial": "",
+  "fechaFinal": "",
+  "fechaCancelInicial": "",
+  "fechaCancelFinal": "",
+  "formato": 0
+}
+```
+
+**Respuesta (consultar):** `ConsultaVentasPedidosResponse` (`ventasPedidos`).
+
+**Body (autorizar pedidos):** `AutorizarPedidosRequest`
+
+```json
+{
+  "idsPedido": [123, 456],
+  "idUsuario": 0,
+  "equipo": "WEB"
+}
+```
+
+**Respuesta (autorizar):** `AutorizarPedidosResponse` (`pedidos` con errores y `idsVenta`).
+
+Notas:
+- Si `idStatusPedido` no se envía, se fuerza a `1` (PendientesAutorizarRechazar).
+- `idUsuario`/`idUsuarioAutorizar` se toma del token si no se envía.
 
 ---
 

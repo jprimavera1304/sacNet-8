@@ -56,7 +56,7 @@ public class UserAdminService : IUserAdminService
         }
         catch
         {
-            // Si el esquema de capacidades aun no existe, no bloquea la creacion de usuario.
+            // Si el esquema de capacidades aún no existe, no bloquea la creación de usuario.
         }
 
         return new CreateUserResponse

@@ -74,7 +74,7 @@ public class TemporadasService : ITemporadasService
         if (actual.Estado == 2)
             return actual;
 
-        // Evita cancelar temporada si aun tiene torneos activos.
+        // Evita cancelar temporada si aún tiene torneos activos.
         await _repository.CerrarTorneosVencidosAsync(usuarioId, null, ct);
         var torneosActivos = await _repository.ConsultarTorneosAsync(id, EstadoTorneoActivo, null, null, null, ct);
         if (torneosActivos.Count > 0)

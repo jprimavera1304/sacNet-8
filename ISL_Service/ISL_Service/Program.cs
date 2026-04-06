@@ -88,7 +88,7 @@ var effectiveCsName = selectedConnection.Name;
 if (string.IsNullOrWhiteSpace(effectiveCs))
 {
     throw new InvalidOperationException(
-        "No hay cadena de conexion valida. Configura ConnectionStrings:Main, Mac3, Local o Default."
+        "No hay cadena de conexión válida. Configura ConnectionStrings:Main, Mac3, Local o Default."
     );
 }
 
@@ -148,6 +148,9 @@ builder.Services.AddScoped<ITemporadasService, TemporadasService>();
 
 builder.Services.AddScoped<IDashboardVentasRepository, DashboardVentasRepository>();
 builder.Services.AddScoped<IDashboardVentasService, DashboardVentasService>();
+
+builder.Services.AddScoped<IVentasPedidosRepository, VentasPedidosRepository>();
+builder.Services.AddScoped<IVentasPedidosService, VentasPedidosService>();
 
 // -------------------- ALMACEN CASCOS --------------------
 builder.Services.AddScoped<IAlmacenCascosRepository, AlmacenCascosRepository>();
@@ -263,7 +266,7 @@ app.UseAuthorization();
 // AGREGADO: endpoint simple para validar config por empresa
 app.MapGet("/whoami", (IConfiguration config, IWebHostEnvironment env) =>
 {
-    // CompanyId lo configuras en Azure como variable de aplicacion por cada Web App
+    // CompanyId lo configuras en Azure como variable de aplicación por cada Web App
     var companyId = config["CompanyId"] ?? "missing";
 
     return Results.Ok(new

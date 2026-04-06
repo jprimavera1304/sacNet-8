@@ -27,7 +27,7 @@ namespace ISL_Service.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Error en la aplicacion: " + ex.Message);
+                return StatusCode(500, "Error en la aplicación: " + ex.Message);
             }
         }
 
@@ -43,7 +43,7 @@ namespace ISL_Service.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Error en la aplicacion: " + ex.Message);
+                return StatusCode(500, "Error en la aplicación: " + ex.Message);
             }
         }
 
@@ -58,7 +58,7 @@ namespace ISL_Service.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Error en la aplicacion: " + ex.Message);
+                return StatusCode(500, "Error en la aplicación: " + ex.Message);
             }
         }
 
@@ -73,7 +73,7 @@ namespace ISL_Service.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Error en la aplicacion: " + ex.Message);
+                return StatusCode(500, "Error en la aplicación: " + ex.Message);
             }
         }
     }
