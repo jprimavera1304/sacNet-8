@@ -785,6 +785,7 @@ VALUES ({string.Join(", ", insertValues)});";
             spCmd.Parameters.Add(new SqlParameter("@RolCodigo", SqlDbType.NVarChar, 80) { Value = roleCode?.Trim() ?? string.Empty });
             spCmd.Parameters.Add(new SqlParameter("@ClavesCsv", SqlDbType.NVarChar, -1) { Value = string.Join(",", normalizedPermissions) });
             await spCmd.ExecuteNonQueryAsync(ct);
+            InvalidateEmpresaPermissionCache(empresaId);
             return;
         }
         catch (SqlException ex) when (ex.Number == 2812)
@@ -837,6 +838,7 @@ VALUES ({string.Join(", ", insertValues)});";
         }
 
         await tx.CommitAsync(ct);
+        InvalidateEmpresaPermissionCache(empresaId);
     }
 
     public async Task UpsertUserOverridesAsync(int empresaId, Guid userId, IReadOnlyCollection<string> allow, IReadOnlyCollection<string> deny, CancellationToken ct)
@@ -910,6 +912,17 @@ WHERE EmpresaId = @EmpresaId
         foreach (var role in roleCandidates)
         {
             var key = BuildCacheKey(userId, empresaId, role);
+            _cache.Remove(key);
+            _cache.Remove($"{key}:stale");
+            _observedUserCacheKeys.TryRemove(key, out _);
+        }
+    }
+
+    private void InvalidateEmpresaPermissionCache(int empresaId)
+    {
+        var prefix = $"perm:{empresaId}:";
+        foreach (var key in _observedUserCacheKeys.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)))
+        {
             _cache.Remove(key);
             _cache.Remove($"{key}:stale");
             _observedUserCacheKeys.TryRemove(key, out _);
