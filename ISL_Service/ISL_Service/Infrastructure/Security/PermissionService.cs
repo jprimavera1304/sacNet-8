@@ -6,6 +6,7 @@ using ISL_Service.Infrastructure.Data;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Hosting;
 using System.Collections.Concurrent;
 
 namespace ISL_Service.Infrastructure.Security;
@@ -78,13 +79,15 @@ public sealed class PermissionService : IPermissionService
     private readonly AppDbContext _db;
     private readonly IMemoryCache _cache;
     private readonly ILogger<PermissionService> _logger;
+    private readonly IHostEnvironment _hostEnvironment;
     private readonly ConcurrentDictionary<string, byte> _observedUserCacheKeys = new(StringComparer.Ordinal);
 
-    public PermissionService(AppDbContext db, IMemoryCache cache, ILogger<PermissionService> logger)
+    public PermissionService(AppDbContext db, IMemoryCache cache, ILogger<PermissionService> logger, IHostEnvironment hostEnvironment)
     {
         _db = db;
         _cache = cache;
         _logger = logger;
+        _hostEnvironment = hostEnvironment;
     }
 
     private static readonly List<PermissionSeed> PermissionCatalogSeeds = new()
@@ -169,6 +172,13 @@ public sealed class PermissionService : IPermissionService
 
     public async Task<PermissionSnapshot> GetPermissionsAsync(Guid userId, int empresaId, string rolLegacy, CancellationToken ct)
     {
+        // En local/dev preferimos siempre dato fresco para evitar "permisos no aplicados"
+        // por cache en pruebas funcionales de roles y overrides.
+        if (_hostEnvironment.IsDevelopment())
+        {
+            return await BuildSnapshotAsync(userId, empresaId, rolLegacy, ct);
+        }
+
         var cacheKey = BuildCacheKey(userId, empresaId, rolLegacy);
         var staleCacheKey = $"{cacheKey}:stale";
         TrackObservedUserCacheKey(cacheKey);
