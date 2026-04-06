@@ -114,7 +114,7 @@ Validar en front:
 1. En alta de salida, capturar `numero de tarimas`.
 2. Si usuario pone 3, crear Tarima 1, Tarima 2, Tarima 3 por default.
 3. Permitir agregar mas tarimas.
-4. En cada tarima, permitir agregar 1..N lineas (`idTipoCasco + piezas`).
+4. En cada tarima, permitir agregar 1..N líneas (`idTipoCasco + piezas`).
 5. Enviar payload del endpoint de salidas con estructura `tarimas -> lineas`.
 6. Para detalle/edicion, consumir `detalle-agrupado`.
 

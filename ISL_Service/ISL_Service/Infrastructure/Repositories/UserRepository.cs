@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Data;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Models;
@@ -11,6 +12,7 @@ namespace ISL_Service.Infrastructure.Repositories;
 public class UserRepository : IUserRepository
 {
     private readonly AppDbContext _db;
+    private static readonly ConcurrentDictionary<string, bool> ColumnCache = new(StringComparer.OrdinalIgnoreCase);
 
     public UserRepository(AppDbContext db)
     {
@@ -32,13 +34,19 @@ public class UserRepository : IUserRepository
             .FirstOrDefaultAsync(x => x.Id == id && x.EmpresaId == empresaId, ct);
     }
 
-    public async Task<WebLoginFallbackResult?> LoginWithFallbackAsync(string usuario, string contrasenaPlano, string contrasenaHashWeb, CancellationToken ct)
+    public async Task<WebLoginFallbackResult?> LoginWithFallbackAsync(string usuario, string contrasenaPlano, string? contrasenaHashWeb, CancellationToken ct)
     {
         await using var conn = new SqlConnection(_db.Database.GetConnectionString());
         await conn.OpenAsync(ct);
 
         try
         {
+            if (string.IsNullOrWhiteSpace(contrasenaHashWeb))
+            {
+                // Fast path: solo WEB (sin SP) para evitar costo extra.
+                return await LoginWebOnlyAsync(conn, usuario, ct);
+            }
+
             await using var cmd = new SqlCommand("dbo.sp_WebLogin_FallbackLegacy", conn)
             {
                 CommandType = CommandType.StoredProcedure,
@@ -585,6 +593,10 @@ ORDER BY {idColumn};";
         string column,
         CancellationToken ct)
     {
+        var key = $"{schema}.{table}.{column}";
+        if (ColumnCache.TryGetValue(key, out var cached))
+            return cached;
+
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
 SELECT 1
@@ -596,7 +608,9 @@ WHERE TABLE_SCHEMA = @schema
         cmd.Parameters.Add(new SqlParameter("@table", SqlDbType.NVarChar, 128) { Value = table });
         cmd.Parameters.Add(new SqlParameter("@column", SqlDbType.NVarChar, 128) { Value = column });
         var exists = await cmd.ExecuteScalarAsync(ct);
-        return exists is not null;
+        var result = exists is not null;
+        ColumnCache[key] = result;
+        return result;
     }
 
     private async Task<int> ResolveEmpresaIdAsync(CancellationToken ct)

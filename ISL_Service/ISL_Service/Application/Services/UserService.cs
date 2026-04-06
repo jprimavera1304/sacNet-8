@@ -3,6 +3,7 @@ using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Domain.Entities;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace ISL_Service.Application.Services;
 
@@ -11,24 +12,35 @@ public class UserService : IUserService
     private readonly IUserRepository _repo;
     private readonly IJwtTokenGenerator _jwt;
     private readonly IEmpresaRepository _empresas;
+    private readonly IMemoryCache _cache;
 
-    public UserService(IUserRepository repo, IJwtTokenGenerator jwt, IEmpresaRepository empresas)
+    public UserService(IUserRepository repo, IJwtTokenGenerator jwt, IEmpresaRepository empresas, IMemoryCache cache)
     {
         _repo = repo;
         _jwt = jwt;
         _empresas = empresas;
+        _cache = cache;
     }
 
     public async Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken ct)
     {
         var usuario = request.Usuario.Trim();
-        var hashParaPromocion = BCrypt.Net.BCrypt.HashPassword(request.Contrasena);
+        var companyKey = await _cache.GetOrCreateAsync("companyKey", async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+            return await _empresas.GetCompanyKeyAsync(ct);
+        }) ?? await _empresas.GetCompanyKeyAsync(ct);
 
-        var login = await _repo.LoginWithFallbackAsync(
-            usuario,
-            request.Contrasena,
-            hashParaPromocion,
-            ct);
+        var esIsl = string.Equals(companyKey, "isl", StringComparison.OrdinalIgnoreCase);
+
+        // 1) Intenta login WEB sin hash (rápido)
+        var login = await _repo.LoginWithFallbackAsync(usuario, request.Contrasena, null, ct);
+        if (login is null && !esIsl)
+        {
+            // 2) Solo si hace falta, genera hash para promoción legacy
+            var hashParaPromocion = BCrypt.Net.BCrypt.HashPassword(request.Contrasena);
+            login = await _repo.LoginWithFallbackAsync(usuario, request.Contrasena, hashParaPromocion, ct);
+        }
 
         if (login is null) throw new AuthenticationException("Credenciales invalidas.");
 
@@ -58,7 +70,6 @@ public class UserService : IUserService
             Estado = login.Estado
         };
 
-        var companyKey = await _empresas.GetCompanyKeyAsync(ct);
         var token = _jwt.GenerateToken(user, companyKey);
 
         return new LoginResponse

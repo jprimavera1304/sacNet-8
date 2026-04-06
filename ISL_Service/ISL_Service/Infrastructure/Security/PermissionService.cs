@@ -185,7 +185,7 @@ public sealed class PermissionService : IPermissionService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Fallo al calcular permisos para userId={UserId} empresaId={EmpresaId}. Se usara fallback.", userId, empresaId);
+            _logger.LogWarning(ex, "Fallo al calcular permisos para userId={UserId} empresaId={EmpresaId}. Se usará fallback.", userId, empresaId);
             if (_cache.TryGetValue<PermissionSnapshot>(staleCacheKey, out var stale) && stale is not null)
                 return stale;
 
@@ -1672,7 +1672,7 @@ WHERE EmpresaId = @EmpresaId
         {
             var valid = (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '.' || ch == '_';
             if (!valid)
-                throw new ArgumentException("La clave del permiso solo permite a-z, 0-9, punto y guion bajo.");
+                throw new ArgumentException("La clave del permiso solo permite a-z, 0-9, punto y guión bajo.");
         }
 
         if (!value.Contains('.', StringComparison.Ordinal))
@@ -1693,7 +1693,7 @@ WHERE EmpresaId = @EmpresaId
         {
             var valid = (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '_';
             if (!valid)
-                throw new ArgumentException("ModuloClave solo permite a-z, 0-9 y guion bajo.");
+                throw new ArgumentException("ModuloClave solo permite a-z, 0-9 y guión bajo.");
         }
 
         return value;

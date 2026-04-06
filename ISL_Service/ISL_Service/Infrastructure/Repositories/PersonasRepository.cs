@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Threading.Tasks;
@@ -138,7 +138,7 @@ namespace ISL_Service.Infrastructure.Repositories
             }
             catch (SqlException ex) when (ex.Number == 2812) // Stored procedure not found
             {
-                // Fallback SQL para instalaciones donde aun no existe sp_n_ReactivarPersona.
+                // Fallback SQL para instalaciones donde aún no existe sp_n_ReactivarPersona.
             }
 
             using var cmdFallback = new SqlCommand(@"
