@@ -205,21 +205,13 @@ var allowedOriginsRaw = builder.Configuration["AllowedOrigins"];
 var configuredOrigins = (allowedOriginsRaw ?? "")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-var defaultOrigins = new[]
+var localFallbackOrigins = new[]
 {
     "http://127.0.0.1:5500",
     "http://localhost:5500",
     "http://127.0.0.1:5501",
     "http://localhost:5501",
-    "http://localhost:5173",
-    "https://mactauro.com",
-    "https://www.mactauro.com",
-    "https://zaragozamac.com",
-    "https://www.zaragozamac.com",
-    "https://sacmac.net",
-    "https://www.sacmac.net",
-    "https://integralsportsleague.net",
-    "https://www.integralsportsleague.net"
+    "http://localhost:5173"
 };
 
 // Prefijos permitidos para entornos preview de Azure Static Web Apps.
@@ -248,10 +240,18 @@ var allowedPreviewPrefixes = configuredPreviewPrefixes
     .ToArray();
 
 var allowedOrigins = configuredOrigins
-    .Concat(defaultOrigins)
     .Where(x => !string.IsNullOrWhiteSpace(x))
     .Distinct(StringComparer.OrdinalIgnoreCase)
     .ToArray();
+
+if (builder.Environment.IsDevelopment())
+{
+    allowedOrigins = allowedOrigins
+        .Concat(localFallbackOrigins)
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+}
 
 var allowedOriginsSet = new HashSet<string>(allowedOrigins, StringComparer.OrdinalIgnoreCase);
 
