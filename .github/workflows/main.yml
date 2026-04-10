@@ -6,6 +6,10 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 env:
@@ -43,6 +47,7 @@ jobs:
           path: ${{ env.PUBLISH_PATH }}
 
   deploy_sac26:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     needs: build
     permissions:
@@ -70,6 +75,7 @@ jobs:
           package: .
 
   deploy_mac_tauro:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     needs: build
     permissions:
@@ -97,6 +103,7 @@ jobs:
           package: .
 
   deploy_mac_sportsleague:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     needs: build
     permissions:
@@ -124,6 +131,7 @@ jobs:
           package: .
 
   deploy_mac_zaragoza:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     needs: build
     permissions:
