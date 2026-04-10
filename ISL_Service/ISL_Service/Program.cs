@@ -205,32 +205,78 @@ var allowedOriginsRaw = builder.Configuration["AllowedOrigins"];
 var configuredOrigins = (allowedOriginsRaw ?? "")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-var defaultOrigins = new[]
+var localFallbackOrigins = new[]
 {
+    "http://127.0.0.1:5500",
+    "http://localhost:5500",
     "http://127.0.0.1:5501",
     "http://localhost:5501",
-    "http://localhost:5173",
-    "https://mactauro.com",
-    "https://www.mactauro.com",
-    "https://zaragozamac.com",
-    "https://www.zaragozamac.com",
-    "https://sacmac.net",
-    "https://www.sacmac.net",
-    "https://integralsportsleague.net",
-    "https://www.integralsportsleague.net"
+    "http://localhost:5173"
 };
 
-var allowedOrigins = configuredOrigins
-    .Concat(defaultOrigins)
+// Prefijos permitidos para entornos preview de Azure Static Web Apps.
+// Formato esperado del host:
+//   {prefix}{id}.centralus.4.azurestaticapps.net
+// Ejemplo:
+//   green-beach-06e94f810-41.centralus.4.azurestaticapps.net
+var previewPrefixesRaw = builder.Configuration["AllowedAzurePreviewPrefixes"];
+var configuredPreviewPrefixes = (previewPrefixesRaw ?? "")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    .Select(x => x.ToLowerInvariant())
+    .ToArray();
+
+var defaultPreviewPrefixes = new[]
+{
+    "brave-pond-06a013a10-",
+    "nice-pond-0f5acc210-",
+    "green-beach-06e94f810-",
+    "green-ground-038056f10-"
+};
+
+var allowedPreviewPrefixes = configuredPreviewPrefixes
+    .Concat(defaultPreviewPrefixes)
     .Where(x => !string.IsNullOrWhiteSpace(x))
     .Distinct(StringComparer.OrdinalIgnoreCase)
     .ToArray();
+
+var allowedOrigins = configuredOrigins
+    .Where(x => !string.IsNullOrWhiteSpace(x))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+
+if (builder.Environment.IsDevelopment())
+{
+    allowedOrigins = allowedOrigins
+        .Concat(localFallbackOrigins)
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+}
+
+var allowedOriginsSet = new HashSet<string>(allowedOrigins, StringComparer.OrdinalIgnoreCase);
+
+static bool IsAllowedAzurePreviewOrigin(string? origin, string[] allowedPrefixes)
+{
+    if (string.IsNullOrWhiteSpace(origin)) return false;
+    if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri)) return false;
+    if (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)) return false;
+    if (uri.IsDefaultPort == false && uri.Port != 443) return false;
+    if (!string.IsNullOrEmpty(uri.UserInfo)) return false;
+
+    var host = uri.Host.ToLowerInvariant();
+    if (!host.EndsWith(".azurestaticapps.net", StringComparison.OrdinalIgnoreCase)) return false;
+
+    return allowedPrefixes.Any(prefix =>
+        host.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+}
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("DevCors", policy =>
         policy
-            .WithOrigins(allowedOrigins)
+            .SetIsOriginAllowed(origin =>
+                allowedOriginsSet.Contains(origin) ||
+                IsAllowedAzurePreviewOrigin(origin, allowedPreviewPrefixes))
             .AllowAnyHeader()
             .AllowAnyMethod()
     );
