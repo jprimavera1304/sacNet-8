@@ -3,6 +3,7 @@ namespace ISL_Service.Application.DTOs.VentasPedidos;
 public class AutorizarPedidosRequest
 {
     public List<int> IdsPedido { get; set; } = new();
+    public bool AsyncMode { get; set; } = true;
 
     public int? IdUsuario { get; set; }
     public int? IdUsuarioProcesar { get; set; }

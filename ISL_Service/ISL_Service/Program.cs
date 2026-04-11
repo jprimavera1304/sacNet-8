@@ -9,6 +9,7 @@ using ISL_Service.Infrastructure.Data;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Services;
 using ISL_Service.Infrastructure.Repositories;
+using ISL_Service.Infrastructure.Services;
 
 // Login/JWT + Middleware
 using ISL_Service.Infrastructure.Security;
@@ -151,6 +152,7 @@ builder.Services.AddScoped<IDashboardVentasService, DashboardVentasService>();
 
 builder.Services.AddScoped<IVentasPedidosRepository, VentasPedidosRepository>();
 builder.Services.AddScoped<IVentasPedidosService, VentasPedidosService>();
+builder.Services.AddSingleton<IAutorizarPedidosAsyncCoordinator, AutorizarPedidosAsyncCoordinator>();
 
 // -------------------- ALMACEN CASCOS --------------------
 builder.Services.AddScoped<IAlmacenCascosRepository, AlmacenCascosRepository>();
