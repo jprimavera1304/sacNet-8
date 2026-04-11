@@ -10,7 +10,7 @@ namespace ISL_Service.Infrastructure.Repositories;
 public class VentasPedidosRepository : IVentasPedidosRepository
 {
     private const string SpConsultaVentasPedidos = "sp_n_ConsultaVentasPedidos";
-    private const string SpProcesarPedido = "sp_n_ProcesarPedido";
+    private const string SpProcesarPedido = "sp_w_ProcesarPedido";
 
     private readonly IConfiguration _configuration;
 
