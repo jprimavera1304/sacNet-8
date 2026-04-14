@@ -115,9 +115,14 @@ public class EquiposService : IEquiposService
     private static void ThrowMappedException(SqlException ex)
     {
         var msg = ex.Message;
+        if (ex.Number is 2601 or 2627)
+            throw new ConflictException(msg);
+
         if (msg.Contains("ya existe", StringComparison.OrdinalIgnoreCase) ||
             msg.Contains("duplic", StringComparison.OrdinalIgnoreCase) ||
-            msg.Contains("ux_wequipo_nombre", StringComparison.OrdinalIgnoreCase))
+            msg.Contains("ux_wequipo_nombre", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("ux_wequipo_nombre_categoria", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("ux_wequipo_nombre_categoria_diajuego", StringComparison.OrdinalIgnoreCase))
             throw new ConflictException(msg);
         if (msg.Contains("no existe", StringComparison.OrdinalIgnoreCase))
             throw new NotFoundException(msg);
@@ -128,4 +133,3 @@ public class EquiposService : IEquiposService
             throw new ArgumentException(msg);
     }
 }
-

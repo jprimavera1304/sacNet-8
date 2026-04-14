@@ -490,7 +490,7 @@ Reglas:
 - `profesorTitularPredeterminadoId` requerido y activo.
 - `profesorAuxiliarPredeterminadoId` opcional y distinto al titular.
 - `motivo` opcional, max 200.
-- No permite nombre de equipo duplicado.
+- No permite nombre de equipo duplicado en la misma categoría y mismo día de juego (permite mismo nombre en categorías distintas o en distinto día).
 
 ---
 
