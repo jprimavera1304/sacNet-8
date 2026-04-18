@@ -11,10 +11,12 @@ namespace ISL_Service.Controllers;
 public class DashboardVentasController : ControllerBase
 {
     private readonly IDashboardVentasService _service;
+    private readonly IDashboardVentasReportService _reportService;
 
-    public DashboardVentasController(IDashboardVentasService service)
+    public DashboardVentasController(IDashboardVentasService service, IDashboardVentasReportService reportService)
     {
         _service = service;
+        _reportService = reportService;
     }
 
     [HttpPost("filtros/consultar")]
@@ -172,6 +174,19 @@ public class DashboardVentasController : ControllerBase
         return Ok(result);
     }
 
+
+    [HttpPost("reporte/generar")]
+    [Authorize(Policy = "perm:dashboardventas.ver")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GenerarReporte([FromBody] DashboardVentasReporteRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var file = await _reportService.GenerarReporteAsync(request, ct);
+        return File(file.Content, file.ContentType, file.FileName);
+    }
     [HttpPost("overview/consultar")]
     [Authorize(Policy = "perm:dashboardventas.ver")]
     [ProducesResponseType(typeof(DashboardVentasOverviewResponse), StatusCodes.Status200OK)]
@@ -186,3 +201,5 @@ public class DashboardVentasController : ControllerBase
         return Ok(result);
     }
 }
+
+

@@ -10,6 +10,7 @@ using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Services;
 using ISL_Service.Infrastructure.Repositories;
 using ISL_Service.Infrastructure.Services;
+using ISL_Service.Infrastructure.Reports;
 
 // Login/JWT + Middleware
 using ISL_Service.Infrastructure.Security;
@@ -149,6 +150,9 @@ builder.Services.AddScoped<ITemporadasService, TemporadasService>();
 
 builder.Services.AddScoped<IDashboardVentasRepository, DashboardVentasRepository>();
 builder.Services.AddScoped<IDashboardVentasService, DashboardVentasService>();
+builder.Services.AddScoped<IDashboardVentasReportService, DashboardVentasReportService>();
+builder.Services.AddScoped<IDashboardVentasReportRenderer, DashboardVentasPdfReportRenderer>();
+builder.Services.AddScoped<IDashboardVentasReportRenderer, DashboardVentasXlsxReportRenderer>();
 
 builder.Services.AddScoped<IVentasPedidosRepository, VentasPedidosRepository>();
 builder.Services.AddScoped<IVentasPedidosService, VentasPedidosService>();
@@ -351,3 +355,5 @@ app.MapGet("/dbcheck", async () =>
 app.MapControllers();
 
 app.Run();
+
+
