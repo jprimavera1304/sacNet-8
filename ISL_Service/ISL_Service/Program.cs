@@ -153,6 +153,7 @@ builder.Services.AddScoped<IDashboardVentasService, DashboardVentasService>();
 builder.Services.AddScoped<IDashboardVentasReportService, DashboardVentasReportService>();
 builder.Services.AddScoped<IDashboardVentasReportRenderer, DashboardVentasPdfReportRenderer>();
 builder.Services.AddScoped<IDashboardVentasReportRenderer, DashboardVentasXlsxReportRenderer>();
+builder.Services.AddHostedService<ReportEngineWarmupHostedService>();
 
 builder.Services.AddScoped<IVentasPedidosRepository, VentasPedidosRepository>();
 builder.Services.AddScoped<IVentasPedidosService, VentasPedidosService>();

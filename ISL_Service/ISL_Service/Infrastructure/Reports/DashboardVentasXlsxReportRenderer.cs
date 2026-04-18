@@ -15,7 +15,7 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
         using var workbook = new XLWorkbook();
 
         foreach (var year in data.Years)
-            BuildYearSheet(workbook, data, year);
+            BuildYearSheet(workbook, year);
         BuildResumenSheet(workbook, data);
 
         using var ms = new MemoryStream();
@@ -118,10 +118,10 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
             ws.Range(row, 5, row, 5).Style.NumberFormat.Format = "0.00%";
         }
 
-        ws.Columns().AdjustToContents();
+        ws.Columns(1, 8).AdjustToContents();
     }
 
-    private static void BuildYearSheet(XLWorkbook workbook, DashboardVentasReporteData data, DashboardVentasReporteYearData year)
+    private static void BuildYearSheet(XLWorkbook workbook, DashboardVentasReporteYearData year)
     {
         var ws = workbook.Worksheets.Add($"Año {year.Year}");
         ws.Cell("A1").Value = $"Dashboard Ventas {year.Year}";
@@ -272,7 +272,9 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
             ws.Range(1, 6, Math.Max(1, row), 6).Style.NumberFormat.Format = "$ #,##0.00";
         }
 
-        ws.Columns().AdjustToContents();
+        var lastDataRow = Math.Max(1, row);
+        var scanUntilRow = Math.Min(lastDataRow, 300);
+        ws.Columns(1, 10).AdjustToContents(1, scanUntilRow);
     }
 
     private static string ToSpanishMonthName(int month, string? fallbackName)
@@ -313,4 +315,7 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
     );
 
 }
+
+
+
 

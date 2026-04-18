@@ -1,18 +1,26 @@
-using ISL_Service.Application.DTOs.DashboardVentas;
+ï»¿using ISL_Service.Application.DTOs.DashboardVentas;
 using ISL_Service.Application.Interfaces;
+using Microsoft.Extensions.Caching.Memory;
+using System.Globalization;
 
 namespace ISL_Service.Application.Services;
 
 public class DashboardVentasReportService : IDashboardVentasReportService
 {
     private readonly IDashboardVentasService _dashboardService;
+    private readonly IMemoryCache _cache;
     private readonly Dictionary<string, IDashboardVentasReportRenderer> _renderers;
+    private static readonly TimeSpan ReportDataCacheTtl = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan ReportFileCacheTtl = TimeSpan.FromMinutes(2);
+    private const int MaxYearParallelism = 3;
 
     public DashboardVentasReportService(
         IDashboardVentasService dashboardService,
+        IMemoryCache cache,
         IEnumerable<IDashboardVentasReportRenderer> renderers)
     {
         _dashboardService = dashboardService;
+        _cache = cache;
         _renderers = renderers.ToDictionary(x => x.Formato.ToLowerInvariant(), x => x);
     }
 
@@ -25,20 +33,55 @@ public class DashboardVentasReportService : IDashboardVentasReportService
             throw new ArgumentException("Formato de reporte no soportado.");
 
         var years = ResolveYears(request);
+        var tipo = NormalizeTipo(request.Tipo, years.Count);
+
+        var requestCacheKey = BuildRequestCacheKey(request, tipo, years);
+        var fileCacheKey = $"dashboard_ventas:reporte:file:{formato}:{requestCacheKey}";
+
+        if (_cache.TryGetValue(fileCacheKey, out DashboardVentasReporteFile? cachedFile) && cachedFile is not null)
+            return CloneFile(cachedFile);
+
+        var dataCacheKey = $"dashboard_ventas:reporte:data:{requestCacheKey}";
+        var data = await _cache.GetOrCreateAsync(dataCacheKey, async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = ReportDataCacheTtl;
+            return await BuildReportDataAsync(request, years, tipo, ct);
+        }) ?? throw new InvalidOperationException("No se pudo preparar los datos del reporte.");
+
+        var file = await renderer.RenderAsync(data, request, ct);
+        _cache.Set(fileCacheKey, file, ReportFileCacheTtl);
+        return CloneFile(file);
+    }
+
+    private async Task<DashboardVentasReporteData> BuildReportDataAsync(
+        DashboardVentasReporteRequest request,
+        List<int> years,
+        string tipo,
+        CancellationToken ct)
+    {
         var data = new DashboardVentasReporteData
         {
             GeneratedAtUtc = DateTime.UtcNow,
-            Tipo = NormalizeTipo(request.Tipo, years.Count),
+            Tipo = tipo,
             FechaReferenciaInicial = years.Min(y => new DateTime(y, 1, 1)),
             FechaReferenciaFinal = years.Max(y => new DateTime(y, 12, 31))
         };
 
-        foreach (var year in years)
+        var yearResults = new DashboardVentasReporteYearData[years.Count];
+        var yearsWithIndex = years.Select((year, index) => (year, index));
+        var parallelOptions = new ParallelOptions
         {
-            var filtro = BuildYearFilter(request, year);
-            var kpisTask = _dashboardService.ConsultarKpisAsync(filtro, ct);
-            var serieTask = _dashboardService.ConsultarSerieMensualAsync(filtro, ct);
-            var topTask = _dashboardService.ConsultarTopProductosAsync(filtro, ct);
+            CancellationToken = ct,
+            MaxDegreeOfParallelism = Math.Min(MaxYearParallelism, Math.Max(1, years.Count))
+        };
+
+        await Parallel.ForEachAsync(yearsWithIndex, parallelOptions, async (item, token) =>
+        {
+            var filtro = BuildYearFilter(request, item.year);
+            var kpisTask = _dashboardService.ConsultarKpisAsync(filtro, token);
+            var serieTask = _dashboardService.ConsultarSerieMensualAsync(filtro, token);
+            var topTask = _dashboardService.ConsultarTopProductosAsync(filtro, token);
+
             // Detalle (muestra) desactivado temporalmente para reducir tiempo de generacion.
             // Para reactivar: usar LoadDetalleAsync(...) como estaba antes.
             var detalleTask = Task.FromResult((new List<DashboardVentasDetalleDto>(), false, 0));
@@ -46,23 +89,23 @@ public class DashboardVentasReportService : IDashboardVentasReportService
             await Task.WhenAll(kpisTask, serieTask, topTask, detalleTask);
 
             var detalleResult = detalleTask.Result;
-            data.Years.Add(new DashboardVentasReporteYearData
+            yearResults[item.index] = new DashboardVentasReporteYearData
             {
-                Year = year,
+                Year = item.year,
                 Kpis = kpisTask.Result ?? new DashboardVentasKpisDto(),
                 SerieMensual = serieTask.Result.OrderBy(x => x.Mes).ToList(),
                 TopProductos = topTask.Result.OrderByDescending(x => x.VentaTotal).Take(filtro.Top ?? 10).ToList(),
                 Detalle = detalleResult.Item1,
                 DetalleTruncado = detalleResult.Item2,
                 DetalleTotalRegistros = detalleResult.Item3
-            });
-        }
+            };
+        });
 
-        data.Years = data.Years.OrderBy(x => x.Year).ToList();
+        data.Years = yearResults.OrderBy(x => x.Year).ToList();
         data.KpisAcumulados = BuildAcumulado(data.Years);
         data.Comparativo = BuildComparativo(data.Years);
 
-        return await renderer.RenderAsync(data, request, ct);
+        return data;
     }
 
     private static void ValidateRequest(DashboardVentasReporteRequest request)
@@ -78,7 +121,7 @@ public class DashboardVentasReportService : IDashboardVentasReportService
         foreach (var year in years)
         {
             if (year < 2000 || year > 2100)
-                throw new ArgumentException("Los años deben estar entre 2000 y 2100.");
+                throw new ArgumentException("Los anos deben estar entre 2000 y 2100.");
         }
     }
 
@@ -231,5 +274,36 @@ public class DashboardVentasReportService : IDashboardVentasReportService
             DeltaVentaPorcentaje = first.Kpis.VentaTotal == 0 ? 0 : (deltaVenta / first.Kpis.VentaTotal) * 100m,
             DeltaUnidadesPorcentaje = first.Kpis.UnidadesVendidas == 0 ? 0 : (deltaUnidades / first.Kpis.UnidadesVendidas) * 100m
         };
+    }
+
+    private static DashboardVentasReporteFile CloneFile(DashboardVentasReporteFile src)
+    {
+        return new DashboardVentasReporteFile
+        {
+            Content = src.Content.ToArray(),
+            ContentType = src.ContentType,
+            FileName = src.FileName
+        };
+    }
+
+    private static string BuildRequestCacheKey(DashboardVentasReporteRequest request, string tipo, IReadOnlyCollection<int> years)
+    {
+        var yearsKey = string.Join(",", years.OrderBy(x => x));
+        return string.Join("|", new[]
+        {
+            tipo,
+            yearsKey,
+            (request.IDEmpresa ?? 0).ToString(CultureInfo.InvariantCulture),
+            (request.IDAlmacen ?? 0).ToString(CultureInfo.InvariantCulture),
+            (request.IDAgente ?? 0).ToString(CultureInfo.InvariantCulture),
+            (request.IDCliente ?? 0).ToString(CultureInfo.InvariantCulture),
+            (request.IDProducto ?? 0).ToString(CultureInfo.InvariantCulture),
+            (request.IDCategoria ?? 0).ToString(CultureInfo.InvariantCulture),
+            (request.IDMarca ?? 0).ToString(CultureInfo.InvariantCulture),
+            (request.IDTipoDocumento ?? 0).ToString(CultureInfo.InvariantCulture),
+            (request.Top ?? 10).ToString(CultureInfo.InvariantCulture),
+            request.FechaInicial == default ? "-" : request.FechaInicial.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            request.FechaFinal == default ? "-" : request.FechaFinal.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+        });
     }
 }

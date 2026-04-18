@@ -187,6 +187,20 @@ public class DashboardVentasController : ControllerBase
         var file = await _reportService.GenerarReporteAsync(request, ct);
         return File(file.Content, file.ContentType, file.FileName);
     }
+
+    [HttpPost("reporte/prewarm")]
+    [Authorize(Policy = "perm:dashboardventas.ver")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> PrewarmReporte([FromBody] DashboardVentasReporteRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        await _reportService.GenerarReporteAsync(request, ct);
+        return Ok(new { warmed = true });
+    }
+
     [HttpPost("overview/consultar")]
     [Authorize(Policy = "perm:dashboardventas.ver")]
     [ProducesResponseType(typeof(DashboardVentasOverviewResponse), StatusCodes.Status200OK)]
