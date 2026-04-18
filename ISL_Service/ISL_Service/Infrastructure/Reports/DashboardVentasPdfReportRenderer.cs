@@ -150,8 +150,10 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                                         table.Cell().Element(TableCell).Text(ToCurrency(cmp.CurrentVenta));
                                         table.Cell().Element(TableCell).Text(ToSpanishMonthName(cmp.PreviousMonth, null));
                                         table.Cell().Element(TableCell).Text(ToCurrency(cmp.PreviousVenta));
-                                        table.Cell().Element(TableCell).Text(ToSignedCurrencyWithArrow(cmp.DeltaVenta));
-                                        table.Cell().Element(TableCell).Text(ToSignedPercent(cmp.DeltaPorcentaje));
+                                        table.Cell().Element(cmp.DeltaVenta > 0 ? TableCellUp : cmp.DeltaVenta < 0 ? TableCellDown : TableCellNeutral)
+                                            .Text(ToSignedCurrencyWithArrow(cmp.DeltaVenta));
+                                        table.Cell().Element(cmp.DeltaPorcentaje > 0 ? TableCellUp : cmp.DeltaPorcentaje < 0 ? TableCellDown : TableCellNeutral)
+                                            .Text(ToSignedPercent(cmp.DeltaPorcentaje));
                                     }
                                 });
                             }
@@ -218,6 +220,22 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                                     c.Item().Text($"Nota: detalle truncado. Mostrando {year.Detalle.Count} de {year.DetalleTotalRegistros} registros.")
                                         .FontSize(8).FontColor(Colors.Grey.Darken1);
                             }
+                            var monthlySales = year.SerieMensual.OrderBy(x => x.Mes).ToList();
+                            if (monthlySales.Any())
+                            {
+                                c.Item().Text("Grafica de venta mensual").Bold().FontColor("1A2AA5");
+                                var maxVenta = monthlySales.Max(x => x.VentaTotal);
+                                foreach (var mes in monthlySales)
+                                {
+                                    var ratio = maxVenta <= 0 ? 0m : (mes.VentaTotal / maxVenta);
+                                    c.Item().Row(r =>
+                                    {
+                                        r.ConstantItem(84).Text(ToSpanishMonthName(mes.Mes, mes.MesNombre)).FontSize(8).FontColor(Colors.Grey.Darken1);
+                                        r.RelativeItem().PaddingVertical(2).Text(ToAsciiBar(ratio)).FontSize(8).FontColor("1A2AA5");
+                                        r.ConstantItem(95).AlignRight().Text(ToCurrency(mes.VentaTotal)).FontSize(8);
+                                    });
+                                }
+                            }
                         });
                     }
                 });
@@ -252,6 +270,12 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
 
     private static IContainer TableCell(IContainer container)
         => container.BorderBottom(1).BorderColor("E9EDF8").PaddingVertical(3).PaddingHorizontal(6);
+    private static IContainer TableCellUp(IContainer container)
+        => container.BorderBottom(1).BorderColor("D1FAE5").Background("ECFDF3").PaddingVertical(3).PaddingHorizontal(6).DefaultTextStyle(x => x.FontColor("166534").SemiBold());
+    private static IContainer TableCellDown(IContainer container)
+        => container.BorderBottom(1).BorderColor("FECACA").Background("FEF2F2").PaddingVertical(3).PaddingHorizontal(6).DefaultTextStyle(x => x.FontColor("B91C1C").SemiBold());
+    private static IContainer TableCellNeutral(IContainer container)
+        => container.BorderBottom(1).BorderColor("FDE68A").Background("FFFBEB").PaddingVertical(3).PaddingHorizontal(6).DefaultTextStyle(x => x.FontColor("B45309").SemiBold());
 
     private static string ToCurrency(decimal value) => string.Format(EsMx, "{0:C2}", value);
     private static string ToNumber(decimal value) => string.Format(EsMx, "{0:N0}", value);
@@ -259,11 +283,18 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
     private static string ToSignedPercent(decimal value) => $"{(value >= 0 ? "+" : "")}{value:N2}%";
     private static string ToSignedCurrencyWithArrow(decimal value)
     {
-        var trend = value >= 0 ? "Subio" : "Bajo";
+        var icon = value >= 0 ? "^" : "v";
         var sign = value >= 0 ? "+" : "-";
-        return $"{trend} {sign}{ToCurrency(Math.Abs(value))}";
+        return $"{icon} {sign}{ToCurrency(Math.Abs(value))}";
     }
 
+    private static string ToAsciiBar(decimal ratio)
+    {
+        const int width = 26;
+        var safe = Math.Max(0m, Math.Min(1m, ratio));
+        var filled = (int)Math.Round(safe * width, MidpointRounding.AwayFromZero);
+        return new string('#', filled).PadRight(width, '-');
+    }
     private static string ToSpanishMonthName(int month, string? fallbackName)
     {
         if (month >= 1 && month <= 12)

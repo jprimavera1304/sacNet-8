@@ -14,9 +14,9 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
     {
         using var workbook = new XLWorkbook();
 
-        BuildResumenSheet(workbook, data);
         foreach (var year in data.Years)
             BuildYearSheet(workbook, data, year);
+        BuildResumenSheet(workbook, data);
 
         using var ms = new MemoryStream();
         workbook.SaveAs(ms);
@@ -159,6 +159,30 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
         }
         ws.Range(7, 2, Math.Max(7, row - 1), 3).Style.NumberFormat.Format = "$ #,##0.00";
         ws.Range(7, 4, Math.Max(7, row - 1), 4).Style.NumberFormat.Format = "#,##0";
+        var monthlyStartRow = 7;
+        var monthlyEndRow = Math.Max(monthlyStartRow, row - 1);
+        if (monthlyEndRow >= monthlyStartRow)
+        {
+            // Grafica separada (estilo front) para no pintar la columna numerica de venta.
+            ws.Cell("F5").Value = "Grafica venta mensual";
+            ws.Range("F5:H5").Merge().Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#EAF1FF"));
+            ws.Cell("F6").Value = "Mes";
+            ws.Cell("G6").Value = "Barra";
+            ws.Cell("H6").Value = "Venta";
+            ws.Range("F6:H6").Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#DCE7FF"));
+
+            for (var r = monthlyStartRow; r <= monthlyEndRow; r++)
+            {
+                ws.Cell(r, 6).Value = ws.Cell(r, 1).GetString();
+                ws.Cell(r, 7).Value = ws.Cell(r, 2).GetValue<decimal>();
+                ws.Cell(r, 8).Value = ws.Cell(r, 2).GetValue<decimal>();
+            }
+
+            var graphBars = ws.Range(monthlyStartRow, 7, monthlyEndRow, 7);
+            graphBars.Style.NumberFormat.Format = ";;;";
+            graphBars.AddConditionalFormat().DataBar(XLColor.FromHtml("#1A2AA5"));
+            ws.Range(monthlyStartRow, 8, monthlyEndRow, 8).Style.NumberFormat.Format = "$ #,##0.00";
+        }
         var monthlyComparisons = BuildMonthlyComparisons(year.SerieMensual);
         if (monthlyComparisons.Any())
         {
@@ -289,3 +313,4 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
     );
 
 }
+
