@@ -228,10 +228,26 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                                 foreach (var mes in monthlySales)
                                 {
                                     var ratio = maxVenta <= 0 ? 0m : (mes.VentaTotal / maxVenta);
+                                    var barWidth = Math.Max(0f, (float)ratio * 220f);
                                     c.Item().Row(r =>
                                     {
                                         r.ConstantItem(84).Text(ToSpanishMonthName(mes.Mes, mes.MesNombre)).FontSize(8).FontColor(Colors.Grey.Darken1);
-                                        r.RelativeItem().PaddingVertical(2).Text(ToAsciiBar(ratio)).FontSize(8).FontColor("1A2AA5");
+                                        r.RelativeItem().PaddingVertical(2).Element(track =>
+                                        {
+                                            track.Height(11)
+                                                .Background("EEF3FF")
+                                                .Border(1)
+                                                .BorderColor("DCE3F5")
+                                                .Element(inner =>
+                                                {
+                                                    if (barWidth <= 0f)
+                                                        return;
+                                                    inner.AlignLeft()
+                                                        .Width(barWidth)
+                                                        .Height(9)
+                                                        .Background("1A2AA5");
+                                                });
+                                        });
                                         r.ConstantItem(95).AlignRight().Text(ToCurrency(mes.VentaTotal)).FontSize(8);
                                     });
                                 }
@@ -288,13 +304,6 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
         return $"{icon} {sign}{ToCurrency(Math.Abs(value))}";
     }
 
-    private static string ToAsciiBar(decimal ratio)
-    {
-        const int width = 26;
-        var safe = Math.Max(0m, Math.Min(1m, ratio));
-        var filled = (int)Math.Round(safe * width, MidpointRounding.AwayFromZero);
-        return new string('#', filled).PadRight(width, '-');
-    }
     private static string ToSpanishMonthName(int month, string? fallbackName)
     {
         if (month >= 1 && month <= 12)
@@ -333,3 +342,5 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
     );
 
 }
+
+
