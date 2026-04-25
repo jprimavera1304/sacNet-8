@@ -1,9 +1,9 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
+using Shared.Backend.Core.Abstractions;
 
 namespace ISL_Service.Controllers;
 
@@ -15,29 +15,31 @@ public class MeController : ControllerBase
     private readonly IUserAdminService _userAdminService;
     private readonly IEmpresaRepository _empresas;
     private readonly IPermissionService _permissionService;
+    private readonly ICurrentUserAccessor _currentUserAccessor;
 
     public MeController(
         IUserRepository users,
         IUserAdminService userAdminService,
         IEmpresaRepository empresas,
-        IPermissionService permissionService)
+        IPermissionService permissionService,
+        ICurrentUserAccessor currentUserAccessor)
     {
         _users = users;
         _userAdminService = userAdminService;
         _empresas = empresas;
         _permissionService = permissionService;
+        _currentUserAccessor = currentUserAccessor;
     }
 
     [Authorize]
     [HttpGet]
     public async Task<IActionResult> GetMe(CancellationToken ct)
     {
-        var sub = User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId = _currentUserAccessor.GetUserId(User);
+        if (userId is null)
+            return Unauthorized(new { message = "Token invalido." });
 
-        if (string.IsNullOrWhiteSpace(sub) || !Guid.TryParse(sub, out var userId))
-            return Unauthorized(new { message = "Token inválido." });
-
-        var user = await _users.GetByIdAsync(userId, ct);
+        var user = await _users.GetByIdAsync(userId.Value, ct);
         if (user is null)
             return NotFound(new { message = "Usuario no encontrado." });
 
@@ -52,7 +54,7 @@ public class MeController : ControllerBase
         var response = new MeResponse
         {
             UserId = user.Id,
-            IdUsuario = ParseLegacyUserIdClaim(User),
+            IdUsuario = _currentUserAccessor.GetLegacyUserId(User),
             Id = user.Id,
             Usuario = user.UsuarioNombre,
             RolLegacy = user.Rol,
@@ -67,13 +69,6 @@ public class MeController : ControllerBase
 
         return Ok(response);
     }
-
-    private static int ParseLegacyUserIdClaim(ClaimsPrincipal principal)
-    {
-        var raw = principal.FindFirstValue("idUsuario");
-        return int.TryParse(raw, out var idUsuario) && idUsuario > 0 ? idUsuario : 0;
-    }
-
     [Authorize]
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest req, CancellationToken ct)

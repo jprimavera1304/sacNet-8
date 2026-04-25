@@ -1,7 +1,7 @@
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
+using Shared.Backend.Core.Abstractions;
 
 namespace ISL_Service.Controllers;
 
@@ -11,41 +11,41 @@ namespace ISL_Service.Controllers;
 public class ModulosController : ControllerBase
 {
     private readonly IPermissionService _permissions;
+    private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public ModulosController(IPermissionService permissions)
+    public ModulosController(IPermissionService permissions, ICurrentUserAccessor currentUserAccessor)
     {
         _permissions = permissions;
+        _currentUserAccessor = currentUserAccessor;
     }
 
     [HttpGet("disponibles")]
     public async Task<IActionResult> Disponibles([FromQuery] string? scope = "tenant", CancellationToken ct = default)
     {
-        if (!TryGetEmpresaId(User, out var empresaId))
-            return Unauthorized(new { message = "Token inválido." });
+        var empresaId = _currentUserAccessor.GetCompanyId(User);
+        if (empresaId is null)
+            return Unauthorized(new { message = "Token invalido." });
 
-        var companyKey = (User.FindFirstValue("companyKey") ?? string.Empty).Trim().ToLowerInvariant();
+        var companyKey = _currentUserAccessor.GetCompanyKey(User);
         if (string.IsNullOrWhiteSpace(companyKey))
-            return Unauthorized(new { message = "Token inválido: companyKey faltante." });
+            return Unauthorized(new { message = "Token invalido: companyKey faltante." });
 
         var rawScope = (scope ?? "tenant").Trim().ToLowerInvariant();
         var includeAll = string.Equals(rawScope, "all", StringComparison.OrdinalIgnoreCase);
 
-        var rolLegacy = (User.FindFirstValue("roleLegacy")
-            ?? User.FindFirstValue(ClaimTypes.Role)
-            ?? string.Empty).Trim();
-
+        var rolLegacy = _currentUserAccessor.GetRole(User);
         var isSuperAdmin = string.Equals(rolLegacy, "SuperAdmin", StringComparison.OrdinalIgnoreCase)
             || string.Equals(rolLegacy, "SUPER_ADMIN", StringComparison.OrdinalIgnoreCase);
 
         if (includeAll && !isSuperAdmin)
             return Forbid();
 
-        var sub = User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrWhiteSpace(sub) || !Guid.TryParse(sub, out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+        var userId = _currentUserAccessor.GetUserId(User);
+        if (userId is null)
+            return Unauthorized(new { message = "Token invalido." });
 
-        var snapshot = await _permissions.GetPermissionsAsync(userId, empresaId, rolLegacy, ct);
-        var modules = await _permissions.GetAvailableModulesAsync(empresaId, companyKey, includeAll, ct);
+        var snapshot = await _permissions.GetPermissionsAsync(userId.Value, empresaId.Value, rolLegacy, ct);
+        var modules = await _permissions.GetAvailableModulesAsync(empresaId.Value, companyKey, includeAll, ct);
 
         if (!includeAll && !isSuperAdmin)
         {
@@ -70,12 +70,5 @@ public class ModulosController : ControllerBase
             companyKey,
             modules
         });
-    }
-
-    private static bool TryGetEmpresaId(ClaimsPrincipal user, out int empresaId)
-    {
-        empresaId = 0;
-        var raw = user.FindFirstValue("empresaId");
-        return int.TryParse(raw, out empresaId);
     }
 }

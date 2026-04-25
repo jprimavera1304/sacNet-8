@@ -3,6 +3,7 @@ using ISL_Service.Application.DTOs.ConfiguracionRolTorneo;
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Shared.Backend.Core.Abstractions;
 
 namespace ISL_Service.Controllers;
 
@@ -11,11 +12,14 @@ namespace ISL_Service.Controllers;
 [Authorize]
 public class ConfiguracionRolTorneoController : ControllerBase
 {
+    
     private readonly IConfiguracionRolTorneoService _service;
+    private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public ConfiguracionRolTorneoController(IConfiguracionRolTorneoService service)
+    public ConfiguracionRolTorneoController(IConfiguracionRolTorneoService service, ICurrentUserAccessor currentUserAccessor)
     {
         _service = service;
+        _currentUserAccessor = currentUserAccessor;
     }
 
     [HttpGet]
@@ -39,7 +43,7 @@ public class ConfiguracionRolTorneoController : ControllerBase
     {
         var item = await _service.GetByIdAsync(id, ct);
         if (item is null)
-            return NotFound(new { message = "La configuración no existe." });
+            return NotFound(new { message = "La configuraciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n no existe." });
         return Ok(item);
     }
 
@@ -51,7 +55,7 @@ public class ConfiguracionRolTorneoController : ControllerBase
     {
         var item = await _service.ObtenerActivaPorTorneoAsync(torneoId, ct);
         if (item is null)
-            return NotFound(new { message = "No hay configuración activa para el torneo." });
+            return NotFound(new { message = "No hay configuraciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n activa para el torneo." });
         return Ok(item);
     }
 
@@ -70,7 +74,7 @@ public class ConfiguracionRolTorneoController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         var created = await _service.CrearAsync(new CreateConfiguracionRolTorneoRequest
         {
@@ -101,7 +105,7 @@ public class ConfiguracionRolTorneoController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         var updated = await _service.ActualizarAsync(id, new UpdateConfiguracionRolTorneoRequest
         {
@@ -133,7 +137,7 @@ public class ConfiguracionRolTorneoController : ControllerBase
             return BadRequest(new { message = "motivo max 200 caracteres." });
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         var disabled = await _service.InhabilitarAsync(id, motivo, userId, ct);
         return Ok(disabled);
@@ -141,8 +145,9 @@ public class ConfiguracionRolTorneoController : ControllerBase
 
     private bool TryGetUserId(out Guid userId)
     {
-        var sub = User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.TryParse(sub, out userId);
+        var value = _currentUserAccessor.GetUserId(User);
+        userId = value ?? Guid.Empty;
+        return value.HasValue;
     }
 
     private static object? ValidateCreate(CreateConfiguracionRolTorneoRequest request)

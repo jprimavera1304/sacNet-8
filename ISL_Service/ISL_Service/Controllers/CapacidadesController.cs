@@ -2,7 +2,7 @@ using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
+using Shared.Backend.Core.Abstractions;
 
 namespace ISL_Service.Controllers;
 
@@ -13,21 +13,26 @@ public class CapacidadesController : ControllerBase
 {
     private readonly IUserRepository _users;
     private readonly IPermissionService _permissionService;
+    private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public CapacidadesController(IUserRepository users, IPermissionService permissionService)
+    public CapacidadesController(
+        IUserRepository users,
+        IPermissionService permissionService,
+        ICurrentUserAccessor currentUserAccessor)
     {
         _users = users;
         _permissionService = permissionService;
+        _currentUserAccessor = currentUserAccessor;
     }
 
     [HttpGet]
     public async Task<IActionResult> Get(CancellationToken ct)
     {
-        var sub = User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrWhiteSpace(sub) || !Guid.TryParse(sub, out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+        var userId = _currentUserAccessor.GetUserId(User);
+        if (userId is null)
+            return Unauthorized(new { message = "Token invalido." });
 
-        var user = await _users.GetByIdAsync(userId, ct);
+        var user = await _users.GetByIdAsync(userId.Value, ct);
         if (user is null)
             return NotFound(new { message = "Usuario no encontrado." });
 

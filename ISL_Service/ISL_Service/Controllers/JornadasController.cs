@@ -1,8 +1,9 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using ISL_Service.Application.DTOs.Jornadas;
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Shared.Backend.Core.Abstractions;
 
 namespace ISL_Service.Controllers;
 
@@ -11,11 +12,14 @@ namespace ISL_Service.Controllers;
 [Authorize]
 public class JornadasController : ControllerBase
 {
+    
     private readonly IJornadasService _service;
+    private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public JornadasController(IJornadasService service)
+    public JornadasController(IJornadasService service, ICurrentUserAccessor currentUserAccessor)
     {
         _service = service;
+        _currentUserAccessor = currentUserAccessor;
     }
 
     [HttpGet]
@@ -54,7 +58,7 @@ public class JornadasController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã‚Â¡lido." });
 
         var created = await _service.CrearAsync(new CreateJornadaRequest
         {
@@ -80,7 +84,7 @@ public class JornadasController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã‚Â¡lido." });
 
         var updated = await _service.ActualizarAsync(id, new UpdateJornadaRequest
         {
@@ -102,7 +106,7 @@ public class JornadasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã‚Â¡lido." });
 
         var motivo = request.Motivo?.Trim();
         if (string.IsNullOrWhiteSpace(motivo))
@@ -116,8 +120,9 @@ public class JornadasController : ControllerBase
 
     private bool TryGetUserId(out Guid userId)
     {
-        var sub = User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.TryParse(sub, out userId);
+        var value = _currentUserAccessor.GetUserId(User);
+        userId = value ?? Guid.Empty;
+        return value.HasValue;
     }
 
     private static object? ValidateCreate(CreateJornadaRequest request)

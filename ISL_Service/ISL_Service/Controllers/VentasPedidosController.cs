@@ -1,8 +1,8 @@
-﻿using System.Security.Claims;
 using ISL_Service.Application.DTOs.VentasPedidos;
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Shared.Backend.Core.Abstractions;
 
 namespace ISL_Service.Controllers;
 
@@ -13,17 +13,19 @@ public class VentasPedidosController : ControllerBase
 {
     private readonly IVentasPedidosService _service;
     private readonly IAutorizarPedidosAsyncCoordinator _asyncCoordinator;
+    private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public VentasPedidosController(IVentasPedidosService service, IAutorizarPedidosAsyncCoordinator asyncCoordinator)
+    public VentasPedidosController(IVentasPedidosService service, IAutorizarPedidosAsyncCoordinator asyncCoordinator, ICurrentUserAccessor currentUserAccessor)
     {
         _service = service;
         _asyncCoordinator = asyncCoordinator;
+        _currentUserAccessor = currentUserAccessor;
     }
 
     [HttpPost("pendientes-autorizar/consultar")]
     public async Task<IActionResult> ConsultarPendientesAutorizar([FromBody] ConsultaVentasPedidosRequest? request, CancellationToken ct)
     {
-        var idUsuario = ParseLegacyUserIdClaim(User);
+        var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
         var data = await _service.ConsultarPendientesAutorizarAsync(request ?? new ConsultaVentasPedidosRequest(), idUsuario, ct);
         return Ok(new { ok = true, message = "Pendientes consultados.", data });
     }
@@ -36,8 +38,8 @@ public class VentasPedidosController : ControllerBase
         if (request.IdsPedido == null || request.IdsPedido.Count == 0)
             return BadRequest(new { message = "idsPedido es requerido." });
 
-        var idUsuario = ParseLegacyUserIdClaim(User);
-        var equipo = ResolveEquipo(User);
+        var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
+        var equipo = _currentUserAccessor.GetUsername(User, Environment.MachineName);
 
         if (request.AsyncMode)
         {
@@ -62,21 +64,5 @@ public class VentasPedidosController : ControllerBase
         if (status == null)
             return NotFound(new { ok = false, message = "Operacion no encontrada." });
         return Ok(new { ok = true, message = "Estatus de autorizacion.", data = status });
-    }
-
-    private static int ParseLegacyUserIdClaim(ClaimsPrincipal principal)
-    {
-        var raw = principal.FindFirstValue("idUsuario");
-        return int.TryParse(raw, out var idUsuario) && idUsuario > 0 ? idUsuario : 0;
-    }
-
-    private static string ResolveEquipo(ClaimsPrincipal principal)
-    {
-        var u = principal.FindFirstValue("username")
-            ?? principal.FindFirstValue("preferred_username")
-            ?? principal.FindFirstValue("name")
-            ?? principal.FindFirstValue("unique_name")
-            ?? principal.Identity?.Name;
-        return string.IsNullOrWhiteSpace(u) ? Environment.MachineName : u.Trim();
     }
 }

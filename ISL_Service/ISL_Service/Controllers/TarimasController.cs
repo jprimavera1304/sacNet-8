@@ -1,8 +1,8 @@
-using System.Security.Claims;
 using ISL_Service.Application.DTOs.Tarima;
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Shared.Backend.Core.Abstractions;
 
 namespace ISL_Service.Controllers;
 
@@ -15,10 +15,12 @@ namespace ISL_Service.Controllers;
 public class TarimasController : ControllerBase
 {
     private readonly ITarimaService _service;
+    private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public TarimasController(ITarimaService service)
+    public TarimasController(ITarimaService service, ICurrentUserAccessor currentUserAccessor)
     {
         _service = service;
+        _currentUserAccessor = currentUserAccessor;
     }
 
     /// <summary>
@@ -99,7 +101,7 @@ public class TarimasController : ControllerBase
         if (validation != null)
             return BadRequest(validation);
 
-        var usuario = User.FindFirstValue("username") ?? User.Identity?.Name ?? "Sistema";
+        var usuario = _currentUserAccessor.GetUsername(User);
         var id = await _service.CrearAsync(trimmed, usuario, ct);
         if (id <= 0)
             return StatusCode(500, new { message = "No se pudo crear la tarima." });
@@ -135,7 +137,7 @@ public class TarimasController : ControllerBase
         if (validation != null)
             return BadRequest(validation);
 
-        var usuario = User.FindFirstValue("username") ?? User.Identity?.Name ?? "Sistema";
+        var usuario = _currentUserAccessor.GetUsername(User);
         await _service.ActualizarAsync(idTarima, trimmed, usuario, ct);
         return Ok(new { message = "Tarima actualizada." });
     }
@@ -157,20 +159,9 @@ public class TarimasController : ControllerBase
     {
         if (request == null)
             return BadRequest(new { message = "Body requerido. idStatus debe ser 1 (Activo) o 2 (Cancelado)." });
-        var usuario = GetUsuarioFromToken();
+        var usuario = _currentUserAccessor.GetUsername(User);
         await _service.CambiarStatusAsync(idTarima, request.IdStatus, usuario, ct);
         return Ok(new { message = "Estatus actualizado." });
-    }
-
-    /// <summary>Obtiene el nombre de usuario del token (varios claims posibles). Nunca devuelve null/vacío: usa "Sistema" como fallback.</summary>
-    private string GetUsuarioFromToken()
-    {
-        var u = User.FindFirstValue("username")
-            ?? User.FindFirstValue("preferred_username")
-            ?? User.FindFirstValue("name")
-            ?? User.FindFirstValue("unique_name")
-            ?? User.Identity?.Name;
-        return string.IsNullOrWhiteSpace(u) ? "Sistema" : u.Trim();
     }
 
     private static object? ValidateCreate(CreateTarimaRequest r)

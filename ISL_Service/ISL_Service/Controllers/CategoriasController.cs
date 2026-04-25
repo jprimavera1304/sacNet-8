@@ -3,6 +3,7 @@ using ISL_Service.Application.DTOs.Categorias;
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Shared.Backend.Core.Abstractions;
 
 namespace ISL_Service.Controllers;
 
@@ -11,11 +12,14 @@ namespace ISL_Service.Controllers;
 [Authorize]
 public class CategoriasController : ControllerBase
 {
+    
     private readonly ICategoriasService _service;
+    private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public CategoriasController(ICategoriasService service)
+    public CategoriasController(ICategoriasService service, ICurrentUserAccessor currentUserAccessor)
     {
         _service = service;
+        _currentUserAccessor = currentUserAccessor;
     }
 
     [HttpGet]
@@ -54,7 +58,7 @@ public class CategoriasController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         var created = await _service.CrearAsync(new CreateCategoriaRequest
         {
@@ -80,7 +84,7 @@ public class CategoriasController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         var updated = await _service.ActualizarAsync(id, new UpdateCategoriaRequest
         {
@@ -99,7 +103,7 @@ public class CategoriasController : ControllerBase
     public async Task<IActionResult> Inhabilitar(Guid id, [FromBody] InhabilitarCategoriaRequest? request, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         var motivo = request?.Motivo?.Trim();
         if (motivo is { Length: > 200 })
@@ -117,7 +121,7 @@ public class CategoriasController : ControllerBase
     public async Task<IActionResult> Habilitar(Guid id, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         var enabled = await _service.HabilitarAsync(id, userId, ct);
         return Ok(enabled);
@@ -125,8 +129,9 @@ public class CategoriasController : ControllerBase
 
     private bool TryGetUserId(out Guid userId)
     {
-        var sub = User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.TryParse(sub, out userId);
+        var value = _currentUserAccessor.GetUserId(User);
+        userId = value ?? Guid.Empty;
+        return value.HasValue;
     }
 
     private static object? ValidateCreate(CreateCategoriaRequest request)

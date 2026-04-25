@@ -1,8 +1,8 @@
-using System.Security.Claims;
 using ISL_Service.Application.DTOs.AlmacenCascos;
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Shared.Backend.Core.Abstractions;
 
 namespace ISL_Service.Controllers;
 
@@ -15,10 +15,12 @@ namespace ISL_Service.Controllers;
 public class AlmacenCascosController : ControllerBase
 {
     private readonly IAlmacenCascosService _service;
+    private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public AlmacenCascosController(IAlmacenCascosService service)
+    public AlmacenCascosController(IAlmacenCascosService service, ICurrentUserAccessor currentUserAccessor)
     {
         _service = service;
+        _currentUserAccessor = currentUserAccessor;
     }
 
     /// <summary>
@@ -111,7 +113,7 @@ public class AlmacenCascosController : ControllerBase
         if (request == null)
             return BadRequest(new { message = "Body requerido." });
 
-        var usuario = GetUsuarioFromToken();
+        var usuario = _currentUserAccessor.GetUsername(User);
         var idMovimiento = await _service.CrearSalidaAsync(request, usuario, ct);
         return CreatedAtAction(nameof(GetMovimientos), new { idMovimiento }, new { idMovimiento });
     }
@@ -131,7 +133,7 @@ public class AlmacenCascosController : ControllerBase
         if (request == null)
             return BadRequest(new { message = "Body requerido." });
 
-        var usuario = GetUsuarioFromToken();
+        var usuario = _currentUserAccessor.GetUsername(User);
         await _service.AceptarEntradaAsync(request, usuario, ct);
         return Ok(new { message = "Entrada aceptada." });
     }
@@ -147,7 +149,7 @@ public class AlmacenCascosController : ControllerBase
         if (request == null)
             return BadRequest(new { message = "Body requerido." });
 
-        var usuario = GetUsuarioFromToken();
+        var usuario = _currentUserAccessor.GetUsername(User);
         var result = await _service.GuardarKilosTarimaAsync(idMovimiento, numeroTarima, request.Kilos, usuario, ct);
         return Ok(result);
     }
@@ -163,7 +165,7 @@ public class AlmacenCascosController : ControllerBase
         if (request == null)
             return BadRequest(new { message = "Body requerido." });
 
-        var usuario = GetUsuarioFromToken();
+        var usuario = _currentUserAccessor.GetUsername(User);
         await _service.ActualizarSalidaAsync(idMovimiento, request, usuario, ct);
         return Ok(new { message = "Salida actualizada." });
     }
@@ -179,7 +181,7 @@ public class AlmacenCascosController : ControllerBase
         if (request == null)
             return BadRequest(new { message = "Body requerido." });
 
-        var usuario = GetUsuarioFromToken();
+        var usuario = _currentUserAccessor.GetUsername(User);
         await _service.ActualizarEntradaAsync(idMovimiento, request, usuario, ct);
         return Ok(new { message = "Entrada actualizada." });
     }
@@ -199,20 +201,9 @@ public class AlmacenCascosController : ControllerBase
         if (body == null || string.IsNullOrWhiteSpace(body.MotivoCancelacion))
             return BadRequest(new { message = "motivoCancelacion es requerido." });
 
-        var usuario = GetUsuarioFromToken();
+        var usuario = _currentUserAccessor.GetUsername(User);
         await _service.CancelarMovimientoAsync(idMovimiento, body.MotivoCancelacion.Trim(), usuario, ct);
         return Ok(new { message = "Movimiento cancelado." });
     }
 
-    private static string GetUsuarioFromToken(ClaimsPrincipal user)
-    {
-        var u = user.FindFirstValue("username")
-            ?? user.FindFirstValue("preferred_username")
-            ?? user.FindFirstValue("name")
-            ?? user.FindFirstValue("unique_name")
-            ?? user.Identity?.Name;
-        return string.IsNullOrWhiteSpace(u) ? "Sistema" : u.Trim();
-    }
-
-    private string GetUsuarioFromToken() => GetUsuarioFromToken(User);
 }
