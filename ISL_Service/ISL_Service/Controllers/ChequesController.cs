@@ -3,6 +3,7 @@ using ISL_Service.Application.DTOs.Cheques;
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Shared.Backend.Core.Abstractions;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace ISL_Service.Controllers;
@@ -12,11 +13,14 @@ namespace ISL_Service.Controllers;
 [Authorize]
 public class ChequesController : ControllerBase
 {
+    
     private readonly IChequesService _service;
+    private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public ChequesController(IChequesService service)
+    public ChequesController(IChequesService service, ICurrentUserAccessor currentUserAccessor)
     {
         _service = service;
+        _currentUserAccessor = currentUserAccessor;
     }
 
     [HttpGet]
@@ -72,7 +76,7 @@ public class ChequesController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         var created = await _service.CrearAsync(new CreateChequeRequest
         {
@@ -104,7 +108,7 @@ public class ChequesController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         var updated = await _service.ActualizarAsync(id, new UpdateChequeRequest
         {
@@ -139,7 +143,7 @@ public class ChequesController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         var changed = await _service.CambiarEstatusAsync(
             id,
@@ -155,8 +159,9 @@ public class ChequesController : ControllerBase
 
     private bool TryGetUserId(out Guid userId)
     {
-        var sub = User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.TryParse(sub, out userId);
+        var value = _currentUserAccessor.GetUserId(User);
+        userId = value ?? Guid.Empty;
+        return value.HasValue;
     }
 
     private static object? ValidateCreate(CreateChequeRequest request)
@@ -176,7 +181,7 @@ public class ChequesController : ControllerBase
         if (!string.IsNullOrWhiteSpace(request.Observaciones) && request.Observaciones.Length > 500)
             return new { message = "observaciones max 500 caracteres." };
         if (request.ResponsableCobroId.HasValue && request.ResponsableCobroId.Value == Guid.Empty)
-            return new { message = "responsableCobroId inválido." };
+            return new { message = "responsableCobroId invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." };
         return null;
     }
 
@@ -197,14 +202,14 @@ public class ChequesController : ControllerBase
         if (!string.IsNullOrWhiteSpace(request.Observaciones) && request.Observaciones.Length > 500)
             return new { message = "observaciones max 500 caracteres." };
         if (request.ResponsableCobroId.HasValue && request.ResponsableCobroId.Value == Guid.Empty)
-            return new { message = "responsableCobroId inválido." };
+            return new { message = "responsableCobroId invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." };
         return null;
     }
 
     private static object? ValidateStatus(CambiarEstatusChequeRequest request)
     {
         if (request.EstatusChequeNuevo is < 2 or > 4)
-            return new { message = "estatusChequeNuevo inválido. Use 2, 3 o 4." };
+            return new { message = "estatusChequeNuevo invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido. Use 2, 3 o 4." };
         if ((request.EstatusChequeNuevo == 3 || request.EstatusChequeNuevo == 4) && string.IsNullOrWhiteSpace(request.Motivo))
             return new { message = "motivo es requerido para estatus devuelto o cancelado." };
         if (!string.IsNullOrWhiteSpace(request.Motivo) && request.Motivo.Length > 300)

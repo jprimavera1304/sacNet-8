@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup>
+    <SharedBackendCoreVersion>1.0.1</SharedBackendCoreVersion>
+  </PropertyGroup>
+</Project>

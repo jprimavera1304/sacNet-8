@@ -6,29 +6,38 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
+    <UseLocalSharedBack>false</UseLocalSharedBack>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
-    <PackageReference Include="ClosedXML" Version="0.104.2" />
-    <PackageReference Include="QuestPDF" Version="2024.7.1" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.22" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.22">
+    <PackageReference Include="BCrypt.Net-Next" />
+    <PackageReference Include="ClosedXML" />
+    <PackageReference Include="QuestPDF" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.22" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.22" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.22">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Application\DTOs\PagoProveedor\" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseLocalSharedBack)' != 'true'">
+    <PackageReference Include="Shared.Backend.Core" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseLocalSharedBack)' == 'true'">
+    <ProjectReference Include="..\..\..\shared-back\src\Shared.Backend.Core\Shared.Backend.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

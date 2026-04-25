@@ -3,6 +3,7 @@ using ISL_Service.Application.DTOs.Profesores;
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Shared.Backend.Core.Abstractions;
 
 namespace ISL_Service.Controllers;
 
@@ -11,11 +12,14 @@ namespace ISL_Service.Controllers;
 [Authorize]
 public class ProfesoresController : ControllerBase
 {
+    
     private readonly IProfesoresService _service;
+    private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public ProfesoresController(IProfesoresService service)
+    public ProfesoresController(IProfesoresService service, ICurrentUserAccessor currentUserAccessor)
     {
         _service = service;
+        _currentUserAccessor = currentUserAccessor;
     }
 
     [HttpGet]
@@ -54,7 +58,7 @@ public class ProfesoresController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         var created = await _service.CrearAsync(new CreateProfesorRequest
         {
@@ -82,7 +86,7 @@ public class ProfesoresController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         var updated = await _service.ActualizarAsync(id, new UpdateProfesorRequest
         {
@@ -103,7 +107,7 @@ public class ProfesoresController : ControllerBase
     public async Task<IActionResult> Inhabilitar(Guid id, [FromBody] InhabilitarProfesorRequest? request, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         // Motivo opcional: si no viene, no falla.
         var motivo = request?.Motivo?.Trim();
@@ -122,7 +126,7 @@ public class ProfesoresController : ControllerBase
     public async Task<IActionResult> Habilitar(Guid id, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         var enabled = await _service.HabilitarAsync(id, userId, ct);
         return Ok(enabled);
@@ -130,8 +134,9 @@ public class ProfesoresController : ControllerBase
 
     private bool TryGetUserId(out Guid userId)
     {
-        var sub = User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.TryParse(sub, out userId);
+        var value = _currentUserAccessor.GetUserId(User);
+        userId = value ?? Guid.Empty;
+        return value.HasValue;
     }
 
     private static object? ValidateCreate(CreateProfesorRequest request)

@@ -3,6 +3,7 @@ using ISL_Service.Application.DTOs.Equipos;
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Shared.Backend.Core.Abstractions;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace ISL_Service.Controllers;
@@ -12,11 +13,14 @@ namespace ISL_Service.Controllers;
 [Authorize]
 public class EquiposController : ControllerBase
 {
+    
     private readonly IEquiposService _service;
+    private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public EquiposController(IEquiposService service)
+    public EquiposController(IEquiposService service, ICurrentUserAccessor currentUserAccessor)
     {
         _service = service;
+        _currentUserAccessor = currentUserAccessor;
     }
 
     [HttpGet]
@@ -60,7 +64,7 @@ public class EquiposController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         var created = await _service.CrearAsync(new CreateEquipoRequest
         {
@@ -90,7 +94,7 @@ public class EquiposController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         var updated = await _service.ActualizarAsync(id, new UpdateEquipoRequest
         {
@@ -116,7 +120,7 @@ public class EquiposController : ControllerBase
         CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         // Motivo opcional: si no viene, no falla.
         var motivo = request?.Motivo?.Trim();
@@ -135,7 +139,7 @@ public class EquiposController : ControllerBase
     public async Task<IActionResult> Habilitar(Guid id, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token inválido." });
+            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
 
         var enabled = await _service.HabilitarAsync(id, userId, ct);
         return Ok(enabled);
@@ -143,8 +147,9 @@ public class EquiposController : ControllerBase
 
     private bool TryGetUserId(out Guid userId)
     {
-        var sub = User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.TryParse(sub, out userId);
+        var value = _currentUserAccessor.GetUserId(User);
+        userId = value ?? Guid.Empty;
+        return value.HasValue;
     }
 
     private static object? ValidateCreate(CreateEquipoRequest request)
@@ -156,7 +161,7 @@ public class EquiposController : ControllerBase
         if (request.CategoriaPredeterminadaId == Guid.Empty)
             return new { message = "categoriaPredeterminadaId es requerido." };
         if (request.DiaJuegoPredeterminado is < 1 or > 2)
-            return new { message = "diaJuegoPredeterminado inválido. Use 1 o 2." };
+            return new { message = "diaJuegoPredeterminado invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido. Use 1 o 2." };
         if (request.ProfesorTitularPredeterminadoId == Guid.Empty)
             return new { message = "profesorTitularPredeterminadoId es requerido." };
         if (request.ProfesorAuxiliarPredeterminadoId.HasValue &&
@@ -174,7 +179,7 @@ public class EquiposController : ControllerBase
         if (request.CategoriaPredeterminadaId == Guid.Empty)
             return new { message = "categoriaPredeterminadaId es requerido." };
         if (request.DiaJuegoPredeterminado is < 1 or > 2)
-            return new { message = "diaJuegoPredeterminado inválido. Use 1 o 2." };
+            return new { message = "diaJuegoPredeterminado invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido. Use 1 o 2." };
         if (request.ProfesorTitularPredeterminadoId == Guid.Empty)
             return new { message = "profesorTitularPredeterminadoId es requerido." };
         if (request.ProfesorAuxiliarPredeterminadoId.HasValue &&
