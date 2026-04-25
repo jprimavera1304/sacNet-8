@@ -22,6 +22,7 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: read
+      packages: read
 
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +31,21 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.x'
+
+      - name: Configure GitHub Packages source
+        shell: pwsh
+        run: |
+          $token = "${{ secrets.GH_PACKAGES_TOKEN }}"
+          if ([string]::IsNullOrWhiteSpace($token)) {
+            $token = "${{ secrets.GITHUB_TOKEN }}"
+          }
+          dotnet nuget remove source github-oakisland --configfile ./ISL_Service/ISL_Service/NuGet.Config 2>$null
+          dotnet nuget add source "https://nuget.pkg.github.com/OakIsland22/index.json" `
+            --name github-oakisland `
+            --username "OakIsland22" `
+            --password "$token" `
+            --store-password-in-clear-text `
+            --configfile ./ISL_Service/ISL_Service/NuGet.Config
 
       - name: Restore with dotnet
         run: dotnet restore ${{ env.SOLUTION_PATH }}
