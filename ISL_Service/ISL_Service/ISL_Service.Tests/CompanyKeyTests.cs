@@ -14,6 +14,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Caching.Memory;
+using Shared.Backend.Core.Abstractions;
 
 namespace ISL_Service.Tests;
 
@@ -40,7 +42,8 @@ public class CompanyKeyTests
 
         var empresaRepo = new FakeEmpresaRepository("tauro");
         var jwt = new CapturingJwtTokenGenerator();
-        var service = new UserService(userRepo, jwt, empresaRepo);
+        var cache = new MemoryCache(new MemoryCacheOptions());
+        var service = new UserService(userRepo, jwt, empresaRepo, cache);
 
         var response = await service.LoginAsync(new LoginRequest
         {
@@ -102,7 +105,8 @@ public class CompanyKeyTests
             users,
             new FakeUserAdminService(),
             new FakeEmpresaRepository("tauro"),
-            new FakePermissionService());
+            new FakePermissionService(),
+            new FakeCurrentUserAccessor());
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext
@@ -155,7 +159,7 @@ public class CompanyKeyTests
 
         public Task<Usuario?> GetByUsuarioAsync(string usuario, CancellationToken ct) => Task.FromResult<Usuario?>(null);
         public Task<Usuario?> GetByIdAsync(Guid id, CancellationToken ct) => Task.FromResult(UserById);
-        public Task<WebLoginFallbackResult?> LoginWithFallbackAsync(string usuario, string contrasenaPlano, string contrasenaHashWeb, CancellationToken ct) => Task.FromResult(LoginResult);
+        public Task<WebLoginFallbackResult?> LoginWithFallbackAsync(string usuario, string contrasenaPlano, string? contrasenaHashWeb, CancellationToken ct) => Task.FromResult(LoginResult);
         public Task<bool> ExistsByUsuarioAsync(string usuario, CancellationToken ct) => Task.FromResult(false);
         public Task<List<RoleCatalogItem>> ListRolesCatalogAsync(int empresaId, CancellationToken ct) => Task.FromResult(new List<RoleCatalogItem>());
         public Task<List<Usuario>> ListAsync(int? empresaId, CancellationToken ct) => Task.FromResult(new List<Usuario>());
@@ -165,6 +169,21 @@ public class CompanyKeyTests
         public Task<Usuario> UpdateUsuarioAndRolAsync(Guid userId, string usuarioNuevo, string rolNuevo, CancellationToken ct) => Task.FromResult(new Usuario());
         public Task<Usuario> UpdateEstadoWithLegacyAsync(Guid userId, int estado, CancellationToken ct) => Task.FromResult(new Usuario());
         public Task SaveChangesAsync(CancellationToken ct) => Task.CompletedTask;
+    }
+
+    private sealed class FakeCurrentUserAccessor : ICurrentUserAccessor
+    {
+        public Guid? GetUserId(ClaimsPrincipal user)
+        {
+            var raw = user.FindFirstValue("sub");
+            return Guid.TryParse(raw, out var value) ? value : null;
+        }
+
+        public int GetLegacyUserId(ClaimsPrincipal user) => 0;
+        public string GetUsername(ClaimsPrincipal user, string fallback = "Sistema") => fallback;
+        public int? GetCompanyId(ClaimsPrincipal user) => null;
+        public string? GetCompanyKey(ClaimsPrincipal user) => null;
+        public string GetRole(ClaimsPrincipal user) => string.Empty;
     }
 
     private sealed class FakeEmpresaRepository : IEmpresaRepository

@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
+#nullable disable
 
 namespace ISL_Service.Application.DTOs.Recaudacion
 {

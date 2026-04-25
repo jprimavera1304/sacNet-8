@@ -548,7 +548,7 @@ ORDER BY CASE WHEN m.ModuloClave = 'inicio' THEN 0 ELSE 1 END, m.ModuloClave;";
         }
 
         if (includeAllTenants && modules.Count == 0)
-            return BuildAllModulesFallback(companyKey);
+            return BuildAllModulesFallback(companyKey ?? string.Empty);
 
         return modules;
     }
