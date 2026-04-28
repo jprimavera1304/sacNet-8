@@ -11,7 +11,7 @@ namespace ISL_Service.Infrastructure.Repositories
     {
         private readonly AppDbContext _dbContext;
 
-        public DataTable dtRecaudaciones;
+        public DataTable dtRecaudaciones = new DataTable();
         public List<RecaudacionDTO> recaudacionDTOList = new List<RecaudacionDTO>();
         public List<DataRow> recaudacionDTOListUpd = new List<DataRow>();
 

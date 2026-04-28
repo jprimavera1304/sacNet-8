@@ -20,7 +20,7 @@ namespace ISL_Service.Infrastructure.Repositories
     {
         private readonly IConfiguration _configuration;
 
-        public DataTable dtProveedoresPagos;
+        public DataTable dtProveedoresPagos = new DataTable();
         public List<ProveedorPagoDTO> proveedorPagoDTOList = new List<ProveedorPagoDTO>();
 
         public string sp = "";

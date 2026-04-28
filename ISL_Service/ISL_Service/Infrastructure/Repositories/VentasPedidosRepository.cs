@@ -146,7 +146,7 @@ public class VentasPedidosRepository : IVentasPedidosRepository
 
     private static bool IsBatchArtifactsMissing(SqlException ex)
     {
-        var msg = ex?.Message ?? string.Empty;
+        var msg = ex.Message ?? string.Empty;
         return msg.Contains(SpProcesarPedidoBatch, StringComparison.OrdinalIgnoreCase)
                || msg.Contains(TvpPedidoIdsType, StringComparison.OrdinalIgnoreCase)
                || ex.Number is 208 or 2715 or 2812;

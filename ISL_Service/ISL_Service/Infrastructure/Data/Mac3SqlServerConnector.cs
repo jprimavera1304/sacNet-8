@@ -10,7 +10,7 @@ namespace ISL_Service.Infrastructure.Data
         //private string ConnectionString = ConfigurationManager.ConnectionStrings["Mac3"].ConnectionString;
         //private string ConnectionString = "";
 
-        private SqlConnection SqlConn = null;
+        private SqlConnection SqlConn;
 
 
         public SqlConnection GetConnection

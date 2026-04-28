@@ -1,4 +1,5 @@
-﻿using System.Net;
+using System.Net;
+#nullable disable
 
 namespace ISL_Service.Application.DTOs.GenericRequest
 {

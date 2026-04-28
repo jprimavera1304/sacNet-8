@@ -1,4 +1,5 @@
-﻿namespace ISL_Service.Application.DTOs.Recaudacion
+#nullable disable
+namespace ISL_Service.Application.DTOs.Recaudacion
 {
     public class RecaudacionResponse
     {

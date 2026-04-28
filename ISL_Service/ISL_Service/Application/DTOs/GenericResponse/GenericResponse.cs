@@ -1,4 +1,5 @@
-﻿using System.Data;
+using System.Data;
+#nullable disable
 
 namespace ISL_Service.Application.DTOs.GenericResponse
 {
