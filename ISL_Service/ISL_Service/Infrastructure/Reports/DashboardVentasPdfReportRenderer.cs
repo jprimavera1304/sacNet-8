@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using ISL_Service.Application.DTOs.DashboardVentas;
 using ISL_Service.Application.Interfaces;
 using QuestPDF.Fluent;
@@ -32,7 +32,7 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                         {
                             c.Item().Text("REPORTE DASHBOARD DE VENTAS").Bold().FontSize(16).FontColor("0B3D91");
                             c.Item().Text($"Generado: {DateTime.Now.ToString("dd/MM/yyyy HH:mm", EsMx)}").FontColor(Colors.Grey.Darken1);
-                            c.Item().Text($"Tipo: {(data.Tipo == "comparados" ? "Comparacion de a�os" : "A�o")}  |  A�os: {string.Join(", ", data.Years.Select(y => y.Year))}")
+                            c.Item().Text($"Tipo: {(data.Tipo == "comparados" ? "Comparacion de aÃ±os" : "AÃ±o")}  |  AÃ±os: {string.Join(", ", data.Years.Select(y => y.Year))}")
                                 .FontColor(Colors.Grey.Darken1);
                         });
                     });
@@ -55,13 +55,8 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                             });
                             r.RelativeItem().Element(KpiBox).Column(k =>
                             {
-                                k.Item().Text("Unidades").FontSize(9).FontColor(Colors.Grey.Darken1);
+                                k.Item().Text("Piezas").FontSize(9).FontColor(Colors.Grey.Darken1);
                                 k.Item().Text(ToNumber(data.KpisAcumulados.UnidadesVendidas)).Bold().FontSize(12);
-                            });
-                            r.RelativeItem().Element(KpiBox).Column(k =>
-                            {
-                                k.Item().Text("Tickets").FontSize(9).FontColor(Colors.Grey.Darken1);
-                                k.Item().Text(ToNumber(data.KpisAcumulados.Tickets)).Bold().FontSize(12);
                             });
                         });
                     });
@@ -72,7 +67,7 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                         {
                             c.Item().Text($"Comparativo {data.Comparativo.FromYear} vs {data.Comparativo.ToYear}").Bold().FontColor("1A2AA5");
                             c.Item().PaddingTop(4).Text($"Venta: {ToCurrency(data.Comparativo.DeltaVenta)} ({ToPercent(data.Comparativo.DeltaVentaPorcentaje)})");
-                            c.Item().Text($"Unidades: {ToNumber(data.Comparativo.DeltaUnidades)} ({ToPercent(data.Comparativo.DeltaUnidadesPorcentaje)})");
+                            c.Item().Text($"Piezas: {ToNumber(data.Comparativo.DeltaUnidades)} ({ToPercent(data.Comparativo.DeltaUnidadesPorcentaje)})");
                         });
                     }
 
@@ -81,13 +76,12 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                         col.Item().Element(Card).Column(c =>
                         {
                             c.Spacing(6);
-                            c.Item().Text($"A�o {year.Year}").Bold().FontSize(13).FontColor("0B3D91");
+                            c.Item().Text($"AÃ±o {year.Year}").Bold().FontSize(13).FontColor("0B3D91");
 
                             c.Item().Row(r =>
                             {
                                 r.RelativeItem().Element(KpiBox).Text($"Venta: {ToCurrency(year.Kpis.VentaTotal)}");
-                                r.RelativeItem().Element(KpiBox).Text($"Unidades: {ToNumber(year.Kpis.UnidadesVendidas)}");
-                                r.RelativeItem().Element(KpiBox).Text($"Tickets: {ToNumber(year.Kpis.Tickets)}");
+                                r.RelativeItem().Element(KpiBox).Text($"Piezas: {ToNumber(year.Kpis.UnidadesVendidas)}");
                             });
 
                             c.Item().Text("Evolucion mensual").Bold().FontColor("1A2AA5");
@@ -97,24 +91,18 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                                 {
                                     cols.RelativeColumn(2);
                                     cols.RelativeColumn(2);
-                                    cols.RelativeColumn(2);
-                                    cols.RelativeColumn(1);
                                 });
 
                                 table.Header(h =>
                                 {
                                     h.Cell().Element(TableHeader).Text("Mes");
                                     h.Cell().Element(TableHeader).Text("Venta");
-                                    h.Cell().Element(TableHeader).Text("Ganancia");
-                                    h.Cell().Element(TableHeader).Text("Tickets");
                                 });
 
                                 foreach (var mes in year.SerieMensual.OrderBy(x => x.Mes))
                                 {
-                                    table.Cell().Element(TableCell).Text(ToSpanishMonthName(mes.Mes, mes.MesNombre));
+                                    table.Cell().Element(TableCell).Text(GetMonthLabel(mes));
                                     table.Cell().Element(TableCell).Text(ToCurrency(mes.VentaTotal));
-                                    table.Cell().Element(TableCell).Text(ToCurrency(mes.GananciaTotal));
-                                    table.Cell().Element(TableCell).Text(ToNumber(mes.Tickets));
                                 }
                             });
 
@@ -146,9 +134,9 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
 
                                     foreach (var cmp in monthlyComparisons)
                                     {
-                                        table.Cell().Element(TableCell).Text(ToSpanishMonthName(cmp.CurrentMonth, null));
+                                        table.Cell().Element(TableCell).Text(cmp.CurrentLabel);
                                         table.Cell().Element(TableCell).Text(ToCurrency(cmp.CurrentVenta));
-                                        table.Cell().Element(TableCell).Text(ToSpanishMonthName(cmp.PreviousMonth, null));
+                                        table.Cell().Element(TableCell).Text(cmp.PreviousLabel);
                                         table.Cell().Element(TableCell).Text(ToCurrency(cmp.PreviousVenta));
                                         table.Cell().Element(cmp.DeltaVenta > 0 ? TableCellUp : cmp.DeltaVenta < 0 ? TableCellDown : TableCellNeutral)
                                             .Text(ToSignedCurrencyWithArrow(cmp.DeltaVenta));
@@ -231,7 +219,7 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                                     var barWidth = Math.Max(0f, (float)ratio * 220f);
                                     c.Item().Row(r =>
                                     {
-                                        r.ConstantItem(84).Text(ToSpanishMonthName(mes.Mes, mes.MesNombre)).FontSize(8).FontColor(Colors.Grey.Darken1);
+                                        r.ConstantItem(104).Text(GetMonthLabel(mes)).FontSize(8).FontColor(Colors.Grey.Darken1);
                                         r.RelativeItem().PaddingVertical(2).Element(track =>
                                         {
                                             track.Height(11)
@@ -306,6 +294,9 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
 
     private static string ToSpanishMonthName(int month, string? fallbackName)
     {
+        if (!string.IsNullOrWhiteSpace(fallbackName))
+            return fallbackName.Trim();
+
         if (month >= 1 && month <= 12)
         {
             var name = EsMx.DateTimeFormat.GetMonthName(month);
@@ -327,20 +318,26 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
             var curr = months[i];
             var delta = curr.VentaTotal - prev.VentaTotal;
             var pct = prev.VentaTotal == 0 ? 0m : (delta / prev.VentaTotal) * 100m;
-            rows.Add(new MonthlyComparisonRow(curr.Mes, curr.VentaTotal, prev.Mes, prev.VentaTotal, delta, pct));
+            rows.Add(new MonthlyComparisonRow(GetMonthLabel(curr), curr.VentaTotal, GetMonthLabel(prev), prev.VentaTotal, delta, pct));
         }
         return rows;
     }
 
+    private static string GetMonthLabel(DashboardVentasSerieMensualDto month)
+        => ToSpanishMonthName(month.Mes, month.MesNombre);
+
     private sealed record MonthlyComparisonRow(
-        int CurrentMonth,
+        string CurrentLabel,
         decimal CurrentVenta,
-        int PreviousMonth,
+        string PreviousLabel,
         decimal PreviousVenta,
         decimal DeltaVenta,
         decimal DeltaPorcentaje
     );
 
 }
+
+
+
 
 
