@@ -121,7 +121,7 @@ public class AutorizarPedidosAsyncCoordinator : IAutorizarPedidosAsyncCoordinato
         };
     }
 
-    private static AutorizarPedidosRequest CloneRequest(AutorizarPedidosRequest src, List<int> ids)
+    private static AutorizarPedidosRequest CloneRequest(AutorizarPedidosRequest? src, List<int> ids)
     {
         return new AutorizarPedidosRequest
         {

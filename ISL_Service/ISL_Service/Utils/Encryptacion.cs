@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
+#pragma warning disable SYSLIB0022
 
 namespace ISL_Service.Utils
 {
@@ -130,3 +131,5 @@ namespace ISL_Service.Utils
 
     }
 }
+
+#pragma warning restore SYSLIB0022

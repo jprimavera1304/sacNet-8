@@ -1,11 +1,13 @@
 using ISL_Service.Application.DTOs.DashboardVentas;
 using ISL_Service.Application.Interfaces;
 using Microsoft.Extensions.Caching.Memory;
+using System.Globalization;
 
 namespace ISL_Service.Application.Services;
 
 public class DashboardVentasService : IDashboardVentasService
 {
+    private static readonly CultureInfo EsMx = CultureInfo.GetCultureInfo("es-MX");
     private readonly IDashboardVentasRepository _repository;
     private readonly IMemoryCache _cache;
     private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(60);
@@ -31,7 +33,15 @@ public class DashboardVentasService : IDashboardVentasService
     public Task<List<DashboardVentasSerieMensualDto>> ConsultarSerieMensualAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
     {
         ValidateRequest(request);
-        return GetOrCreateAsync(CacheKey("serie_mensual", request), () => _repository.ConsultarSerieMensualAsync(request, ct));
+        return GetOrCreateAsync(CacheKey("serie_mensual", request), async () =>
+        {
+            var data = await _repository.ConsultarSerieMensualAsync(request, ct);
+            foreach (var item in data)
+            {
+                item.MesNombre = BuildMonthYearLabel(item.Anio, item.Mes, item.MesNombre);
+            }
+            return data;
+        });
     }
 
     public async Task<List<DashboardVentasSerieSemanalDto>> ConsultarSerieSemanalAsync(DashboardVentasSerieSemanalRequest request, CancellationToken ct = default)
@@ -247,5 +257,20 @@ public class DashboardVentasService : IDashboardVentasService
         }
 
         return semanas;
+    }
+
+    private static string BuildMonthYearLabel(int year, int month, string? fallback)
+    {
+        if (month is >= 1 and <= 12)
+        {
+            var monthName = EsMx.DateTimeFormat.GetMonthName(month);
+            if (!string.IsNullOrWhiteSpace(monthName))
+                return $"{char.ToUpper(monthName[0], EsMx)}{monthName[1..]} {year}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(fallback))
+            return $"{fallback.Trim()} {year}";
+
+        return $"{month} {year}";
     }
 }
