@@ -45,7 +45,7 @@ public class InscripcionesTorneoController : ControllerBase
     {
         var item = await _service.GetByIdAsync(id, ct);
         if (item is null)
-            return NotFound(new { message = "La inscripciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n no existe." });
+            return NotFound(new { message = "La inscripción no existe." });
         return Ok(item);
     }
 
@@ -64,7 +64,7 @@ public class InscripcionesTorneoController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var created = await _service.CrearAsync(new CreateInscripcionTorneoRequest
         {
@@ -95,7 +95,7 @@ public class InscripcionesTorneoController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var updated = await _service.ActualizarAsync(id, new UpdateInscripcionTorneoRequest
         {
@@ -120,7 +120,7 @@ public class InscripcionesTorneoController : ControllerBase
         CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var motivo = request?.Motivo?.Trim();
         if (motivo is { Length: > 200 })
@@ -138,7 +138,7 @@ public class InscripcionesTorneoController : ControllerBase
     public async Task<IActionResult> Habilitar(Guid id, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var enabled = await _service.HabilitarAsync(id, userId, ct);
         return Ok(enabled);
@@ -158,13 +158,13 @@ public class InscripcionesTorneoController : ControllerBase
         if (request.EquipoId == Guid.Empty)
             return new { message = "equipoId es requerido." };
         if (request.CategoriaId.HasValue && request.CategoriaId.Value == Guid.Empty)
-            return new { message = "categoriaId invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." };
+            return new { message = "categoriaId inválido." };
         if (request.DiaJuego.HasValue && request.DiaJuego is < 1 or > 2)
-            return new { message = "diaJuego invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido. Use 1 o 2." };
+            return new { message = "diaJuego inválido. Use 1 o 2." };
         if (request.ProfesorTitularId.HasValue && request.ProfesorTitularId.Value == Guid.Empty)
-            return new { message = "profesorTitularId invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." };
+            return new { message = "profesorTitularId inválido." };
         if (request.ProfesorAuxiliarId.HasValue && request.ProfesorAuxiliarId.Value == Guid.Empty)
-            return new { message = "profesorAuxiliarId invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." };
+            return new { message = "profesorAuxiliarId inválido." };
         if (request.ProfesorAuxiliarId.HasValue && request.ProfesorTitularId.HasValue &&
             request.ProfesorAuxiliarId.Value == request.ProfesorTitularId.Value)
             return new { message = "Titular y auxiliar no pueden ser el mismo profesor." };
@@ -174,13 +174,13 @@ public class InscripcionesTorneoController : ControllerBase
     private static object? ValidateUpdate(UpdateInscripcionTorneoRequest request)
     {
         if (request.CategoriaId.HasValue && request.CategoriaId.Value == Guid.Empty)
-            return new { message = "categoriaId invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." };
+            return new { message = "categoriaId inválido." };
         if (request.DiaJuego.HasValue && request.DiaJuego is < 1 or > 2)
-            return new { message = "diaJuego invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido. Use 1 o 2." };
+            return new { message = "diaJuego inválido. Use 1 o 2." };
         if (request.ProfesorTitularId.HasValue && request.ProfesorTitularId.Value == Guid.Empty)
-            return new { message = "profesorTitularId invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." };
+            return new { message = "profesorTitularId inválido." };
         if (request.ProfesorAuxiliarId.HasValue && request.ProfesorAuxiliarId.Value == Guid.Empty)
-            return new { message = "profesorAuxiliarId invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." };
+            return new { message = "profesorAuxiliarId inválido." };
         if (request.ProfesorAuxiliarId.HasValue && request.ProfesorTitularId.HasValue &&
             request.ProfesorAuxiliarId.Value == request.ProfesorTitularId.Value)
             return new { message = "Titular y auxiliar no pueden ser el mismo profesor." };

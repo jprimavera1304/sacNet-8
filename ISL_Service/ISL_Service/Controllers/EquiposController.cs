@@ -64,7 +64,7 @@ public class EquiposController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var created = await _service.CrearAsync(new CreateEquipoRequest
         {
@@ -94,7 +94,7 @@ public class EquiposController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var updated = await _service.ActualizarAsync(id, new UpdateEquipoRequest
         {
@@ -120,7 +120,7 @@ public class EquiposController : ControllerBase
         CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         // Motivo opcional: si no viene, no falla.
         var motivo = request?.Motivo?.Trim();
@@ -139,7 +139,7 @@ public class EquiposController : ControllerBase
     public async Task<IActionResult> Habilitar(Guid id, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var enabled = await _service.HabilitarAsync(id, userId, ct);
         return Ok(enabled);
@@ -161,7 +161,7 @@ public class EquiposController : ControllerBase
         if (request.CategoriaPredeterminadaId == Guid.Empty)
             return new { message = "categoriaPredeterminadaId es requerido." };
         if (request.DiaJuegoPredeterminado is < 1 or > 2)
-            return new { message = "diaJuegoPredeterminado invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido. Use 1 o 2." };
+            return new { message = "diaJuegoPredeterminado inválido. Use 1 o 2." };
         if (request.ProfesorTitularPredeterminadoId == Guid.Empty)
             return new { message = "profesorTitularPredeterminadoId es requerido." };
         if (request.ProfesorAuxiliarPredeterminadoId.HasValue &&
@@ -179,7 +179,7 @@ public class EquiposController : ControllerBase
         if (request.CategoriaPredeterminadaId == Guid.Empty)
             return new { message = "categoriaPredeterminadaId es requerido." };
         if (request.DiaJuegoPredeterminado is < 1 or > 2)
-            return new { message = "diaJuegoPredeterminado invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido. Use 1 o 2." };
+            return new { message = "diaJuegoPredeterminado inválido. Use 1 o 2." };
         if (request.ProfesorTitularPredeterminadoId == Guid.Empty)
             return new { message = "profesorTitularPredeterminadoId es requerido." };
         if (request.ProfesorAuxiliarPredeterminadoId.HasValue &&

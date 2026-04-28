@@ -46,7 +46,7 @@ public class GeneracionRolTorneoController : ControllerBase
     {
         var item = await _service.ObtenerAsync(id, ct);
         if (item is null)
-            return NotFound(new { message = "La generaciÃƒÆ’Ã‚Â³n no existe." });
+            return NotFound(new { message = "La generación no existe." });
         return Ok(item);
     }
 
@@ -65,7 +65,7 @@ public class GeneracionRolTorneoController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var created = await _service.CrearAsync(new CreateGeneracionRolTorneoRequest
         {
@@ -100,7 +100,7 @@ public class GeneracionRolTorneoController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var updated = await _service.ActualizarAsync(id, new UpdateGeneracionRolTorneoRequest
         {
@@ -130,7 +130,7 @@ public class GeneracionRolTorneoController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var motivo = request.Motivo?.Trim();
         if (string.IsNullOrWhiteSpace(motivo))
@@ -150,7 +150,7 @@ public class GeneracionRolTorneoController : ControllerBase
     public async Task<IActionResult> CargarEquipos(Guid id, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var equipos = await _service.CargarEquiposAsync(id, userId, ct);
         return Ok(equipos);
@@ -189,7 +189,7 @@ public class GeneracionRolTorneoController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var canchas = await _service.GuardarCanchasAsync(id, userId, request.Canchas, ct);
         return Ok(canchas);
@@ -220,7 +220,7 @@ public class GeneracionRolTorneoController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var updated = await _service.ActualizarParticipacionEquipoAsync(id, request, userId, ct);
         return Ok(updated);
@@ -234,7 +234,7 @@ public class GeneracionRolTorneoController : ControllerBase
     public async Task<IActionResult> GenerarPartidos(Guid id, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var response = await _service.GenerarPartidosAsync(id, userId, confirmarEstado: true, soloConfirmarEstado: false, ct: ct);
         return Ok(response);
@@ -248,7 +248,7 @@ public class GeneracionRolTorneoController : ControllerBase
     public async Task<IActionResult> PrevisualizarPartidos(Guid id, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var response = await _service.GenerarPartidosAsync(id, userId, confirmarEstado: false, soloConfirmarEstado: false, ct: ct);
         return Ok(response);
@@ -262,7 +262,7 @@ public class GeneracionRolTorneoController : ControllerBase
     public async Task<IActionResult> ConfirmarGeneracion(Guid id, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var response = await _service.GenerarPartidosAsync(id, userId, confirmarEstado: true, soloConfirmarEstado: true, ct: ct);
         return Ok(response);
@@ -292,7 +292,7 @@ public class GeneracionRolTorneoController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var partidos = await _service.ActualizarOrdenPartidosAsync(id, userId, request.Partidos, ct);
         return Ok(partidos);
@@ -313,7 +313,7 @@ public class GeneracionRolTorneoController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var updated = await _service.ActualizarObservacionPartidoAsync(partidoId, request.Observaciones, userId, ct);
         return Ok(updated);
@@ -391,7 +391,7 @@ public class GeneracionRolTorneoController : ControllerBase
             return new { message = "canchas es requerido." };
         foreach (var c in request.Canchas)
         {
-            if (c is null) return new { message = "canchas contiene elementos invÃƒÆ’Ã‚Â¡lidos." };
+            if (c is null) return new { message = "canchas contiene elementos inválidos." };
             if (c.CategoriaId == Guid.Empty) return new { message = "categoriaId es requerido." };
             if (string.IsNullOrWhiteSpace(c.NombreCancha)) return new { message = "nombreCancha es requerido." };
             if (c.NombreCancha.Length > 100) return new { message = "nombreCancha max 100 caracteres." };
@@ -405,7 +405,7 @@ public class GeneracionRolTorneoController : ControllerBase
             return new { message = "partidos es requerido." };
         foreach (var p in request.Partidos)
         {
-            if (p is null) return new { message = "partidos contiene elementos invÃƒÆ’Ã‚Â¡lidos." };
+            if (p is null) return new { message = "partidos contiene elementos inválidos." };
             if (p.PartidoId == Guid.Empty) return new { message = "partidoId es requerido." };
             if (p.Orden <= 0) return new { message = "orden debe ser mayor a cero." };
         }
