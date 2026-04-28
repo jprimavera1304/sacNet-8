@@ -27,7 +27,7 @@ public class TemporadasController : ControllerBase
     public async Task<IActionResult> List([FromQuery] byte? estado, [FromQuery] string? texto, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var list = await _service.ConsultarTemporadasListadoAsync(estado, texto, userId, ct);
         return Ok(list);
@@ -56,7 +56,7 @@ public class TemporadasController : ControllerBase
         if (validation is not null)
             return BadRequest(validation);
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var created = await _service.CrearTemporadaAsync(
             new CreateTemporadaRequest
@@ -84,7 +84,7 @@ public class TemporadasController : ControllerBase
         if (validation is not null)
             return BadRequest(validation);
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var updated = await _service.ActualizarTemporadaAsync(
             id,
@@ -108,7 +108,7 @@ public class TemporadasController : ControllerBase
     public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelTemporadaRequest? request, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var motivo = request?.Motivo?.Trim();
         if (motivo is { Length: > 200 })
@@ -126,7 +126,7 @@ public class TemporadasController : ControllerBase
     public async Task<IActionResult> Reactivar(Guid id, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var updated = await _service.ReactivarTemporadaAsync(id, userId, ct);
         return Ok(updated);

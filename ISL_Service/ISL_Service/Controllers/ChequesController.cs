@@ -76,7 +76,7 @@ public class ChequesController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var created = await _service.CrearAsync(new CreateChequeRequest
         {
@@ -108,7 +108,7 @@ public class ChequesController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var updated = await _service.ActualizarAsync(id, new UpdateChequeRequest
         {
@@ -143,7 +143,7 @@ public class ChequesController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var changed = await _service.CambiarEstatusAsync(
             id,
@@ -181,7 +181,7 @@ public class ChequesController : ControllerBase
         if (!string.IsNullOrWhiteSpace(request.Observaciones) && request.Observaciones.Length > 500)
             return new { message = "observaciones max 500 caracteres." };
         if (request.ResponsableCobroId.HasValue && request.ResponsableCobroId.Value == Guid.Empty)
-            return new { message = "responsableCobroId invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." };
+            return new { message = "responsableCobroId inválido." };
         return null;
     }
 
@@ -202,14 +202,14 @@ public class ChequesController : ControllerBase
         if (!string.IsNullOrWhiteSpace(request.Observaciones) && request.Observaciones.Length > 500)
             return new { message = "observaciones max 500 caracteres." };
         if (request.ResponsableCobroId.HasValue && request.ResponsableCobroId.Value == Guid.Empty)
-            return new { message = "responsableCobroId invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." };
+            return new { message = "responsableCobroId inválido." };
         return null;
     }
 
     private static object? ValidateStatus(CambiarEstatusChequeRequest request)
     {
         if (request.EstatusChequeNuevo is < 2 or > 4)
-            return new { message = "estatusChequeNuevo invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido. Use 2, 3 o 4." };
+            return new { message = "estatusChequeNuevo inválido. Use 2, 3 o 4." };
         if ((request.EstatusChequeNuevo == 3 || request.EstatusChequeNuevo == 4) && string.IsNullOrWhiteSpace(request.Motivo))
             return new { message = "motivo es requerido para estatus devuelto o cancelado." };
         if (!string.IsNullOrWhiteSpace(request.Motivo) && request.Motivo.Length > 300)

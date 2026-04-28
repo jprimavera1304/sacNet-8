@@ -32,7 +32,7 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                         {
                             c.Item().Text("REPORTE DASHBOARD DE VENTAS").Bold().FontSize(16).FontColor("0B3D91");
                             c.Item().Text($"Generado: {DateTime.Now.ToString("dd/MM/yyyy HH:mm", EsMx)}").FontColor(Colors.Grey.Darken1);
-                            c.Item().Text($"Tipo: {(data.Tipo == "comparados" ? "Comparacion de aÃ±os" : "AÃ±o")}  |  AÃ±os: {string.Join(", ", data.Years.Select(y => y.Year))}")
+                            c.Item().Text($"Tipo: {(data.Tipo == "comparados" ? "Comparación de años" : "Año")}  |  Años: {string.Join(", ", data.Years.Select(y => y.Year))}")
                                 .FontColor(Colors.Grey.Darken1);
                         });
                     });
@@ -76,7 +76,7 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                         col.Item().Element(Card).Column(c =>
                         {
                             c.Spacing(6);
-                            c.Item().Text($"AÃ±o {year.Year}").Bold().FontSize(13).FontColor("0B3D91");
+                            c.Item().Text($"Año {year.Year}").Bold().FontSize(13).FontColor("0B3D91");
 
                             c.Item().Row(r =>
                             {
@@ -109,7 +109,7 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                             var monthlyComparisons = BuildMonthlyComparisons(year.SerieMensual);
                             if (monthlyComparisons.Any())
                             {
-                                c.Item().Text("Comparacion mensual (mes vs mes anterior)").Bold().FontColor("1A2AA5");
+                                c.Item().Text("Comparación mensual (mes vs mes anterior)").Bold().FontColor("1A2AA5");
                                 c.Item().Table(table =>
                                 {
                                     table.ColumnsDefinition(cols =>

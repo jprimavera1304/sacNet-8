@@ -58,7 +58,7 @@ public class JornadasController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var created = await _service.CrearAsync(new CreateJornadaRequest
         {
@@ -84,7 +84,7 @@ public class JornadasController : ControllerBase
             return BadRequest(validation);
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var updated = await _service.ActualizarAsync(id, new UpdateJornadaRequest
         {
@@ -106,7 +106,7 @@ public class JornadasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var motivo = request.Motivo?.Trim();
         if (string.IsNullOrWhiteSpace(motivo))

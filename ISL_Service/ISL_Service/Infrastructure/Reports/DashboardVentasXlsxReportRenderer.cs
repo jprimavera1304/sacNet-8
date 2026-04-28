@@ -44,8 +44,8 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
         ws.Cell("A3").Value = "Generado";
         ws.Cell("B3").Value = DateTime.Now.ToString("dd/MM/yyyy HH:mm", EsMx);
         ws.Cell("A4").Value = "Tipo";
-        ws.Cell("B4").Value = data.Tipo == "comparados" ? "Comparacion de aÃ±os" : "AÃ±o";
-        ws.Cell("A5").Value = "aÃ±os";
+        ws.Cell("B4").Value = data.Tipo == "comparados" ? "Comparación de años" : "Año";
+        ws.Cell("A5").Value = "años";
         ws.Cell("B5").Value = string.Join(", ", data.Years.Select(x => x.Year));
 
         ws.Cell("A7").Value = "Indicadores acumulados";
@@ -64,13 +64,13 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
         ws.Range("D8:D8").Style.NumberFormat.Format = "#,##0";
         ws.Range("F8:F8").Style.NumberFormat.Format = "0.00%";
 
-        ws.Cell("A10").Value = "KPIs por aÃ±o";
+        ws.Cell("A10").Value = "KPIs por año";
         ws.Range("A10:H10").Merge().Style
             .Font.SetBold()
             .Fill.SetBackgroundColor(XLColor.FromHtml("#EAF1FF"));
 
         var row = 11;
-        ws.Cell(row, 1).Value = "AÃ±o";
+        ws.Cell(row, 1).Value = "Año";
         ws.Cell(row, 2).Value = "Venta";
         ws.Cell(row, 3).Value = "Piezas";
         ws.Cell(row, 4).Value = "Margen %";
@@ -116,7 +116,7 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
 
     private static void BuildYearSheet(XLWorkbook workbook, DashboardVentasReporteYearData year)
     {
-        var ws = workbook.Worksheets.Add($"AÃ±o {year.Year}");
+        var ws = workbook.Worksheets.Add($"Año {year.Year}");
         ws.Cell("A1").Value = $"Dashboard Ventas {year.Year}";
         ws.Range("A1:H1").Merge().Style
             .Font.SetBold()

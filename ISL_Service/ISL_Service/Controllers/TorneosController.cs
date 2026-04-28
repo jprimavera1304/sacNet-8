@@ -30,7 +30,7 @@ public class TorneosController : ControllerBase
         if (fechaInicio.HasValue && fechaFin.HasValue && fechaFin < fechaInicio)
             return BadRequest(new { message = "fechaFin no puede ser menor que fechaInicio." });
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var list = await _service.ConsultarTorneosListadoAsync(temporadaId, estado, texto, fechaInicio, fechaFin, userId, ct);
         return Ok(list);
@@ -59,7 +59,7 @@ public class TorneosController : ControllerBase
         if (validation is not null)
             return BadRequest(validation);
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var created = await _service.CrearTorneoAsync(
             new CreateTorneoRequest
@@ -89,7 +89,7 @@ public class TorneosController : ControllerBase
         if (validation is not null)
             return BadRequest(validation);
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var updated = await _service.ActualizarTorneoAsync(
             id,
@@ -115,7 +115,7 @@ public class TorneosController : ControllerBase
     public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelTorneoRequest? request, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var motivo = request?.Motivo?.Trim();
         if (motivo is { Length: > 200 })
@@ -133,7 +133,7 @@ public class TorneosController : ControllerBase
     public async Task<IActionResult> Activar(Guid id, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var activated = await _service.ActivarTorneoAsync(id, userId, ct);
         return Ok(activated);
@@ -147,7 +147,7 @@ public class TorneosController : ControllerBase
     public async Task<IActionResult> Cerrar(Guid id, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var closed = await _service.CerrarTorneoAsync(id, userId, ct);
         return Ok(closed);
@@ -161,7 +161,7 @@ public class TorneosController : ControllerBase
     public async Task<IActionResult> Reactivar(Guid id, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var reactivated = await _service.ReactivarTorneoAsync(id, userId, ct);
         return Ok(reactivated);
@@ -173,7 +173,7 @@ public class TorneosController : ControllerBase
     public async Task<IActionResult> CerrarVencidos([FromQuery] DateTime? fechaCorte, CancellationToken ct)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(new { message = "Token invÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido." });
+            return Unauthorized(new { message = "Token inválido." });
 
         var cerrados = await _service.CerrarTorneosVencidosAsync(userId, fechaCorte, ct);
         return Ok(new

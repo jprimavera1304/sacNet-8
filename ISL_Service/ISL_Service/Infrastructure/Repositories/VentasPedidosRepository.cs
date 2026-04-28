@@ -158,7 +158,7 @@ public class VentasPedidosRepository : IVentasPedidosRepository
         if (!string.IsNullOrWhiteSpace(response.IdsVenta)) return false;
         if (response.Pedidos == null || response.Pedidos.Count == 0) return false;
 
-        // Error clÃ¡sico cuando el SP interno usa INSERT...EXEC y el batch intenta hacer otro INSERT...EXEC.
+        // Error clásico cuando el SP interno usa INSERT...EXEC y el batch intenta hacer otro INSERT...EXEC.
         return response.Pedidos.All(p =>
             p?.Result == -1
             && !string.IsNullOrWhiteSpace(p.Mensaje)
