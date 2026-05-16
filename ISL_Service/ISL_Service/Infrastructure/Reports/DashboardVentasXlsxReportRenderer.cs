@@ -135,16 +135,28 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
         ws.Range("A5:H5").Merge().Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#EAF1FF"));
         ws.Cell("A6").Value = "Mes";
         ws.Cell("B6").Value = "Venta";
-        ws.Range("A6:B6").Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#DCE7FF"));
+        ws.Cell("C6").Value = "Productos";
+        ws.Range("A6:C6").Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#DCE7FF"));
 
         var row = 7;
-        foreach (var mes in year.SerieMensual.OrderBy(x => x.Mes))
+        var monthlyRows = year.SerieMensual.OrderBy(x => x.Mes).ToList();
+        foreach (var mes in monthlyRows)
         {
             ws.Cell(row, 1).Value = GetMonthLabel(mes);
             ws.Cell(row, 2).Value = mes.VentaTotal;
+            ws.Cell(row, 3).Value = mes.Tickets;
             row++;
         }
         ws.Range(7, 2, Math.Max(7, row - 1), 2).Style.NumberFormat.Format = "$ #,##0.00";
+        ws.Range(7, 3, Math.Max(7, row - 1), 3).Style.NumberFormat.Format = "#,##0";
+
+        ws.Cell(row, 1).Value = "TOTAL: SUMA";
+        ws.Cell(row, 2).Value = monthlyRows.Sum(x => x.VentaTotal);
+        ws.Cell(row, 3).Value = monthlyRows.Sum(x => x.Tickets);
+        ws.Range(row, 1, row, 3).Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#EAF1FF"));
+        ws.Range(row, 2, row, 2).Style.NumberFormat.Format = "$ #,##0.00";
+        ws.Range(row, 3, row, 3).Style.NumberFormat.Format = "#,##0";
+        row++;
         var monthlyStartRow = 7;
         var monthlyEndRow = Math.Max(monthlyStartRow, row - 1);
         if (monthlyEndRow >= monthlyStartRow)
@@ -210,12 +222,18 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
         ws.Range(row, 1, row, 3).Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#DCE7FF"));
 
         row++;
+        var topProductosStartRow = row;
         foreach (var item in year.TopProductos)
         {
             ws.Cell(row, 1).Value = item.Producto ?? "-";
             ws.Cell(row, 2).Value = item.CantidadVendida;
             ws.Cell(row, 3).Value = item.VentaTotal;
             row++;
+        }
+        if (row > topProductosStartRow)
+        {
+            ws.Range(topProductosStartRow, 2, row - 1, 2).Style.NumberFormat.Format = "#,##0";
+            ws.Range(topProductosStartRow, 3, row - 1, 3).Style.NumberFormat.Format = "$ #,##0.00";
         }
         ws.Range(1, 1, Math.Max(1, row), 8).Style.Alignment.SetVertical(XLAlignmentVerticalValues.Center);
         ws.Range(1, 1, Math.Max(1, row), 8).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;

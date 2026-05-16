@@ -10,6 +10,7 @@ namespace ISL_Service.Infrastructure.Reports;
 public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
 {
     private static readonly CultureInfo EsMx = CultureInfo.GetCultureInfo("es-MX");
+    private const bool ShowComparativoResumenCard = false;
     public string Formato => "pdf";
 
     public Task<DashboardVentasReporteFile> RenderAsync(DashboardVentasReporteData data, DashboardVentasReporteRequest request, CancellationToken ct = default)
@@ -61,7 +62,7 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                         });
                     });
 
-                    if (data.Comparativo is not null)
+                    if (ShowComparativoResumenCard && data.Comparativo is not null)
                     {
                         col.Item().Element(Card).Column(c =>
                         {
@@ -91,19 +92,27 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                                 {
                                     cols.RelativeColumn(2);
                                     cols.RelativeColumn(2);
+                                    cols.RelativeColumn(1.3f);
                                 });
 
                                 table.Header(h =>
                                 {
                                     h.Cell().Element(TableHeader).Text("Mes");
                                     h.Cell().Element(TableHeader).Text("Venta");
+                                    h.Cell().Element(TableHeader).Text("Productos");
                                 });
 
-                                foreach (var mes in year.SerieMensual.OrderBy(x => x.Mes))
+                                var monthlyRows = year.SerieMensual.OrderBy(x => x.Mes).ToList();
+                                foreach (var mes in monthlyRows)
                                 {
                                     table.Cell().Element(TableCell).Text(GetMonthLabel(mes));
                                     table.Cell().Element(TableCell).Text(ToCurrency(mes.VentaTotal));
+                                    table.Cell().Element(TableCell).Text(ToNumber(mes.Tickets));
                                 }
+
+                                table.Cell().Element(TableHeader).Text("TOTAL: SUMA");
+                                table.Cell().Element(TableHeader).Text(ToCurrency(monthlyRows.Sum(x => x.VentaTotal)));
+                                table.Cell().Element(TableHeader).Text(ToNumber(monthlyRows.Sum(x => x.Tickets)));
                             });
 
                             var monthlyComparisons = BuildMonthlyComparisons(year.SerieMensual);
