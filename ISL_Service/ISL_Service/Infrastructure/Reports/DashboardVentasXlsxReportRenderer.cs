@@ -95,8 +95,10 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
             ApplySignColor(ws.Cell(row, 4), data.Comparativo.DeltaUnidades);
             ApplySignColor(ws.Cell(row, 5), data.Comparativo.DeltaUnidadesPorcentaje);
             row++;
-            ws.Cell(row, 1).Value = "% Venta = ((Venta año actual - Venta año anterior) / Venta año anterior) x 100 | % Piezas = ((Piezas actual - Piezas anterior) / Piezas anterior) x 100";
+            ws.Cell(row, 1).Value = "% Venta = ((Venta año actual - Venta año anterior) / Venta año anterior) x 100\n% Piezas = ((Piezas actual - Piezas anterior) / Piezas anterior) x 100";
             ws.Range(row, 1, row, 8).Merge().Style.Font.SetFontColor(XLColor.FromHtml("#475569")).Font.SetItalic();
+            ws.Range(row, 1, row, 8).Style.Alignment.WrapText = true;
+            ws.Row(row).AdjustToContents();
         }
 
         ws.Columns(1, 8).AdjustToContents();
