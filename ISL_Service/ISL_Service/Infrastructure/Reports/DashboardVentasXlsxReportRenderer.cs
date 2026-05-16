@@ -44,14 +44,9 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
         ws.Cell("B8").Value = data.KpisAcumulados.VentaTotal;
         ws.Cell("C8").Value = "Piezas";
         ws.Cell("D8").Value = data.KpisAcumulados.UnidadesVendidas;
-        ws.Cell("E8").Value = "Margen %";
-        ws.Cell("F8").Value = data.KpisAcumulados.MargenPorcentaje / 100m;
 
         ws.Range("B8:B8").Style.NumberFormat.Format = "$ #,##0.00";
         ws.Range("D8:D8").Style.NumberFormat.Format = "#,##0";
-        ws.Range("F8:F8").Style.NumberFormat.Format = "0.00%";
-        ws.Cell("G8").Value = "Margen % = (GananciaTotal / VentaTotal) x 100";
-        ws.Range("G8:H8").Merge().Style.Font.SetFontColor(XLColor.FromHtml("#475569")).Font.SetItalic();
 
         ws.Cell("A10").Value = "KPIs por año";
         ws.Range("A10:H10").Merge().Style
@@ -62,9 +57,8 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
         ws.Cell(row, 1).Value = "Año";
         ws.Cell(row, 2).Value = "Venta";
         ws.Cell(row, 3).Value = "Piezas";
-        ws.Cell(row, 4).Value = "Margen %";
-        ws.Range(row, 1, row, 4).Style.Font.SetBold();
-        ws.Range(row, 1, row, 4).Style.Fill.SetBackgroundColor(XLColor.FromHtml("#DCE7FF"));
+        ws.Range(row, 1, row, 3).Style.Font.SetBold();
+        ws.Range(row, 1, row, 3).Style.Fill.SetBackgroundColor(XLColor.FromHtml("#DCE7FF"));
 
         row++;
         foreach (var year in data.Years)
@@ -72,16 +66,11 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
             ws.Cell(row, 1).Value = year.Year;
             ws.Cell(row, 2).Value = year.Kpis.VentaTotal;
             ws.Cell(row, 3).Value = year.Kpis.UnidadesVendidas;
-            ws.Cell(row, 4).Value = year.Kpis.MargenPorcentaje / 100m;
             row++;
         }
 
         ws.Range(12, 2, row - 1, 2).Style.NumberFormat.Format = "$ #,##0.00";
         ws.Range(12, 3, row - 1, 3).Style.NumberFormat.Format = "#,##0";
-        ws.Range(12, 4, row - 1, 4).Style.NumberFormat.Format = "0.00%";
-        ws.Cell(row, 1).Value = "Margen % por año = (GananciaTotal del año / VentaTotal del año) x 100";
-        ws.Range(row, 1, row, 8).Merge().Style.Font.SetFontColor(XLColor.FromHtml("#475569")).Font.SetItalic();
-        row++;
 
         if (data.Comparativo is not null)
         {
@@ -133,6 +122,7 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
         ws.Range("A10:C10").Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#DCE7FF"));
 
         var row = 11;
+        var monthlyStartRow = row;
         var monthlyRows = year.SerieMensual
             .Where(x => x.Mes >= 1 && x.Mes <= 12)
             .OrderBy(x => x.Mes)
@@ -144,8 +134,9 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
             ws.Cell(row, 3).Value = mes.Tickets;
             row++;
         }
-        ws.Range(11, 2, Math.Max(11, row - 1), 2).Style.NumberFormat.Format = "$ #,##0.00";
-        ws.Range(11, 3, Math.Max(11, row - 1), 3).Style.NumberFormat.Format = "#,##0";
+        var monthlyDataEndRow = Math.Max(monthlyStartRow, row - 1);
+        ws.Range(11, 2, monthlyDataEndRow, 2).Style.NumberFormat.Format = "$ #,##0.00";
+        ws.Range(11, 3, monthlyDataEndRow, 3).Style.NumberFormat.Format = "#,##0";
 
         ws.Cell(row, 1).Value = "TOTAL: SUMA";
         ws.Cell(row, 2).Value = monthlyRows.Sum(x => x.VentaTotal);
@@ -154,8 +145,7 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
         ws.Range(row, 2, row, 2).Style.NumberFormat.Format = "$ #,##0.00";
         ws.Range(row, 3, row, 3).Style.NumberFormat.Format = "#,##0";
         row++;
-        var monthlyStartRow = 11;
-        var monthlyEndRow = Math.Max(monthlyStartRow, row - 1);
+        var monthlyEndRow = monthlyDataEndRow;
         if (monthlyEndRow >= monthlyStartRow)
         {
             // Grafica separada (estilo front) para no pintar la columna numerica de venta.

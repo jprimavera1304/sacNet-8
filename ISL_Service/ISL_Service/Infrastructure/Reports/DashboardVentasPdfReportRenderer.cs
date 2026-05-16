@@ -234,8 +234,9 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                             var monthlySales = year.SerieMensual.OrderBy(x => x.Mes).ToList();
                             if (monthlySales.Any())
                             {
-                                c.Item().Text("Grafica de venta mensual").Bold().FontColor("1A2AA5");
+                                c.Item().Text("Grafica de venta mensual y piezas").Bold().FontColor("1A2AA5");
                                 var maxVenta = monthlySales.Max(x => x.VentaTotal);
+                                var maxPiezas = monthlySales.Max(x => x.Tickets);
                                 foreach (var mes in monthlySales)
                                 {
                                     var ratio = maxVenta <= 0 ? 0m : (mes.VentaTotal / maxVenta);
@@ -261,7 +262,39 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                                         });
                                         r.ConstantItem(95).AlignRight().Text(ToCurrency(mes.VentaTotal)).FontSize(8);
                                     });
+
+                                    var ratioPiezas = maxPiezas <= 0 ? 0m : (mes.Tickets / maxPiezas);
+                                    var piezasBarWidth = Math.Max(0f, (float)ratioPiezas * 220f);
+                                    c.Item().Row(r =>
+                                    {
+                                        r.ConstantItem(104).Text("Piezas").FontSize(8).FontColor(Colors.Black);
+                                        r.RelativeItem().PaddingVertical(1).Element(track =>
+                                        {
+                                            track.Height(11)
+                                                .Background("EEF8FF")
+                                                .Border(1)
+                                                .BorderColor("CFE7FA")
+                                                .Element(inner =>
+                                                {
+                                                    if (piezasBarWidth <= 0f)
+                                                        return;
+                                                    inner.AlignLeft()
+                                                        .Width(piezasBarWidth)
+                                                        .Height(9)
+                                                        .Background("0EA5E9");
+                                                });
+                                        });
+                                        r.ConstantItem(95).AlignRight().Text(ToNumber(mes.Tickets)).FontSize(8);
+                                    });
                                 }
+
+                                c.Item().PaddingTop(4).Row(r =>
+                                {
+                                    r.RelativeItem().Text($"TOTAL VENTA: {ToCurrency(monthlySales.Sum(x => x.VentaTotal))}")
+                                        .Bold().FontSize(8).FontColor("1A2AA5");
+                                    r.RelativeItem().AlignRight().Text($"TOTAL PIEZAS: {ToNumber(monthlySales.Sum(x => x.Tickets))}")
+                                        .Bold().FontSize(8).FontColor("0EA5E9");
+                                });
                             }
                         });
                     }
