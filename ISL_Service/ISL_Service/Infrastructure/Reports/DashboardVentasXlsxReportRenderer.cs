@@ -50,6 +50,8 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
         ws.Range("B8:B8").Style.NumberFormat.Format = "$ #,##0.00";
         ws.Range("D8:D8").Style.NumberFormat.Format = "#,##0";
         ws.Range("F8:F8").Style.NumberFormat.Format = "0.00%";
+        ws.Cell("G8").Value = "Margen % = (GananciaTotal / VentaTotal) x 100";
+        ws.Range("G8:H8").Merge().Style.Font.SetFontColor(XLColor.FromHtml("#475569")).Font.SetItalic();
 
         ws.Cell("A10").Value = "KPIs por año";
         ws.Range("A10:H10").Merge().Style
@@ -77,6 +79,9 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
         ws.Range(12, 2, row - 1, 2).Style.NumberFormat.Format = "$ #,##0.00";
         ws.Range(12, 3, row - 1, 3).Style.NumberFormat.Format = "#,##0";
         ws.Range(12, 4, row - 1, 4).Style.NumberFormat.Format = "0.00%";
+        ws.Cell(row, 1).Value = "Margen % por año = (GananciaTotal del año / VentaTotal del año) x 100";
+        ws.Range(row, 1, row, 8).Merge().Style.Font.SetFontColor(XLColor.FromHtml("#475569")).Font.SetItalic();
+        row++;
 
         if (data.Comparativo is not null)
         {
@@ -96,6 +101,13 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
             ws.Range(row, 3, row, 3).Style.NumberFormat.Format = "0.00%";
             ws.Range(row, 4, row, 4).Style.NumberFormat.Format = "#,##0";
             ws.Range(row, 5, row, 5).Style.NumberFormat.Format = "0.00%";
+            ApplySignColor(ws.Cell(row, 2), data.Comparativo.DeltaVenta);
+            ApplySignColor(ws.Cell(row, 3), data.Comparativo.DeltaVentaPorcentaje);
+            ApplySignColor(ws.Cell(row, 4), data.Comparativo.DeltaUnidades);
+            ApplySignColor(ws.Cell(row, 5), data.Comparativo.DeltaUnidadesPorcentaje);
+            row++;
+            ws.Cell(row, 1).Value = "% Venta = ((Venta año actual - Venta año anterior) / Venta año anterior) x 100 | % Piezas = ((Piezas actual - Piezas anterior) / Piezas anterior) x 100";
+            ws.Range(row, 1, row, 8).Merge().Style.Font.SetFontColor(XLColor.FromHtml("#475569")).Font.SetItalic();
         }
 
         ws.Columns(1, 8).AdjustToContents();
@@ -117,11 +129,14 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
         ws.Range("A9:H9").Merge().Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#EAF1FF"));
         ws.Cell("A10").Value = "Mes";
         ws.Cell("B10").Value = "Venta";
-        ws.Cell("C10").Value = "Productos";
+        ws.Cell("C10").Value = "Piezas";
         ws.Range("A10:C10").Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#DCE7FF"));
 
         var row = 11;
-        var monthlyRows = year.SerieMensual.OrderBy(x => x.Mes).ToList();
+        var monthlyRows = year.SerieMensual
+            .Where(x => x.Mes >= 1 && x.Mes <= 12)
+            .OrderBy(x => x.Mes)
+            .ToList();
         foreach (var mes in monthlyRows)
         {
             ws.Cell(row, 1).Value = GetMonthLabel(mes);
@@ -144,38 +159,53 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
         if (monthlyEndRow >= monthlyStartRow)
         {
             // Grafica separada (estilo front) para no pintar la columna numerica de venta.
-            ws.Cell("F5").Value = "Grafica venta mensual";
-            ws.Range("F5:H5").Merge().Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#EAF1FF"));
-            ws.Cell("F6").Value = "Mes";
-            ws.Cell("G6").Value = "Barra";
-            ws.Cell("H6").Value = "Venta";
-            ws.Range("F6:H6").Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#DCE7FF"));
+            ws.Cell("D5").Value = "Grafica venta mensual";
+            ws.Range("D5:F5").Merge().Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#EAF1FF"));
+            ws.Cell("D6").Value = "Mes";
+            ws.Cell("E6").Value = "Barra";
+            ws.Cell("F6").Value = "Venta";
+            ws.Range("D6:F6").Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#DCE7FF"));
+
+            ws.Cell("J5").Value = "Grafica piezas mensual";
+            ws.Range("J5:L5").Merge().Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#EAF1FF"));
+            ws.Cell("J6").Value = "Mes";
+            ws.Cell("K6").Value = "Barra";
+            ws.Cell("L6").Value = "Piezas";
+            ws.Range("J6:L6").Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#DCE7FF"));
 
             for (var r = monthlyStartRow; r <= monthlyEndRow; r++)
             {
-                ws.Cell(r, 6).Value = ws.Cell(r, 1).GetString();
-                ws.Cell(r, 7).Value = ws.Cell(r, 2).GetValue<decimal>();
-                ws.Cell(r, 8).Value = ws.Cell(r, 2).GetValue<decimal>();
+                ws.Cell(r, 4).Value = ws.Cell(r, 1).GetString();
+                ws.Cell(r, 5).Value = ws.Cell(r, 2).GetValue<decimal>();
+                ws.Cell(r, 6).Value = ws.Cell(r, 2).GetValue<decimal>();
+                ws.Cell(r, 10).Value = ws.Cell(r, 1).GetString();
+                ws.Cell(r, 11).Value = ws.Cell(r, 3).GetValue<decimal>();
+                ws.Cell(r, 12).Value = ws.Cell(r, 3).GetValue<decimal>();
             }
 
-            var graphBars = ws.Range(monthlyStartRow, 7, monthlyEndRow, 7);
+            var graphBars = ws.Range(monthlyStartRow, 5, monthlyEndRow, 5);
             graphBars.Style.NumberFormat.Format = ";;;";
             graphBars.AddConditionalFormat().DataBar(XLColor.FromHtml("#1A2AA5"));
-            ws.Range(monthlyStartRow, 8, monthlyEndRow, 8).Style.NumberFormat.Format = "$ #,##0.00";
+            ws.Range(monthlyStartRow, 6, monthlyEndRow, 6).Style.NumberFormat.Format = "$ #,##0.00";
+
+            var graphBarsPiezas = ws.Range(monthlyStartRow, 11, monthlyEndRow, 11);
+            graphBarsPiezas.Style.NumberFormat.Format = ";;;";
+            graphBarsPiezas.AddConditionalFormat().DataBar(XLColor.FromHtml("#0EA5E9"));
+            ws.Range(monthlyStartRow, 12, monthlyEndRow, 12).Style.NumberFormat.Format = "#,##0";
         }
-        var monthlyComparisons = BuildMonthlyComparisons(year.SerieMensual);
+        var monthlyComparisons = BuildMonthlyComparisons(monthlyRows);
         if (monthlyComparisons.Any())
         {
             row += 1;
-            ws.Cell(row, 1).Value = "Comparacion mensual (mes vs mes anterior)";
+            ws.Cell(row, 1).Value = $"Comparacion mensual {year.Year} (mes vs mes anterior)";
             ws.Range(row, 1, row, 8).Merge().Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#EAF1FF"));
             row++;
-            ws.Cell(row, 1).Value = "Mes actual";
-            ws.Cell(row, 2).Value = "Venta actual";
-            ws.Cell(row, 3).Value = "Mes anterior";
-            ws.Cell(row, 4).Value = "Venta anterior";
-            ws.Cell(row, 5).Value = "Cambio";
-            ws.Cell(row, 6).Value = "%";
+            ws.Cell(row, 1).Value = $"Mes actual {year.Year}";
+            ws.Cell(row, 2).Value = $"Venta actual {year.Year}";
+            ws.Cell(row, 3).Value = $"Mes anterior {year.Year}";
+            ws.Cell(row, 4).Value = $"Venta anterior {year.Year}";
+            ws.Cell(row, 5).Value = $"Cambio {year.Year}";
+            ws.Cell(row, 6).Value = $"% {year.Year}";
             ws.Range(row, 1, row, 6).Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#DCE7FF"));
             row++;
 
@@ -187,6 +217,8 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
                 ws.Cell(row, 4).Value = cmp.PreviousVenta;
                 ws.Cell(row, 5).Value = cmp.DeltaVenta;
                 ws.Cell(row, 6).Value = cmp.DeltaPorcentaje / 100m;
+                ApplySignColor(ws.Cell(row, 5), cmp.DeltaVenta);
+                ApplySignColor(ws.Cell(row, 6), cmp.DeltaPorcentaje);
                 row++;
             }
             ws.Range(row - monthlyComparisons.Count, 2, row - 1, 2).Style.NumberFormat.Format = "$ #,##0.00";
@@ -208,6 +240,8 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
             ws.Range(row, 2, row, 2).Style.NumberFormat.Format = "$ #,##0.00";
             ws.Range(row, 4, row, 5).Style.NumberFormat.Format = "$ #,##0.00";
             ws.Range(row, 6, row, 6).Style.NumberFormat.Format = "0.00%";
+            ApplySignColor(ws.Cell(row, 5), totalDelta);
+            ApplySignColor(ws.Cell(row, 6), totalPct * 100m);
             row++;
         }
 
@@ -340,6 +374,16 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
 
     private static string GetMonthLabel(DashboardVentasSerieMensualDto month)
         => ToSpanishMonthName(month.Mes, month.MesNombre);
+
+    private static void ApplySignColor(IXLCell cell, decimal value)
+    {
+        if (value > 0)
+            cell.Style.Font.FontColor = XLColor.FromHtml("#B91C1C"); // positivo rojo
+        else if (value < 0)
+            cell.Style.Font.FontColor = XLColor.FromHtml("#166534"); // negativo verde
+        else
+            cell.Style.Font.FontColor = XLColor.Black;
+    }
 
     private sealed record MonthlyComparisonRow(
         string CurrentLabel,
