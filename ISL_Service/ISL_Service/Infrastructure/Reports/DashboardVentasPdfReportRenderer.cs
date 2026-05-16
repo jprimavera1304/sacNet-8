@@ -123,9 +123,9 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                                 {
                                     table.ColumnsDefinition(cols =>
                                     {
-                                        cols.RelativeColumn(1.5f);
+                                        cols.RelativeColumn(1.9f);
                                         cols.RelativeColumn(1.8f);
-                                        cols.RelativeColumn(1.5f);
+                                        cols.RelativeColumn(1.9f);
                                         cols.RelativeColumn(1.8f);
                                         cols.RelativeColumn(1.8f);
                                         cols.RelativeColumn(1.2f);
@@ -143,19 +143,33 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
 
                                     foreach (var cmp in monthlyComparisons)
                                     {
-                                        table.Cell().Element(TableCell).Text(cmp.CurrentLabel);
+                                        table.Cell().Element(TableCellNoWrap).Text(cmp.CurrentLabel);
                                         table.Cell().Element(TableCell).Text(ToCurrency(cmp.CurrentVenta));
-                                        table.Cell().Element(TableCell).Text(cmp.PreviousLabel);
+                                        table.Cell().Element(TableCellNoWrap).Text(cmp.PreviousLabel);
                                         table.Cell().Element(TableCell).Text(ToCurrency(cmp.PreviousVenta));
                                         table.Cell().Element(cmp.DeltaVenta > 0 ? TableCellUp : cmp.DeltaVenta < 0 ? TableCellDown : TableCellNeutral)
                                             .Text(ToSignedCurrencyWithArrow(cmp.DeltaVenta));
                                         table.Cell().Element(cmp.DeltaPorcentaje > 0 ? TableCellUp : cmp.DeltaPorcentaje < 0 ? TableCellDown : TableCellNeutral)
                                             .Text(ToSignedPercent(cmp.DeltaPorcentaje));
                                     }
+
+                                    var totalCurrent = monthlyComparisons.Sum(x => x.CurrentVenta);
+                                    var totalPrevious = monthlyComparisons.Sum(x => x.PreviousVenta);
+                                    var totalDelta = totalCurrent - totalPrevious;
+                                    var totalPct = totalPrevious == 0 ? 0m : (totalDelta / totalPrevious) * 100m;
+
+                                    table.Cell().Element(TableHeader).Text("TOTAL SUMA");
+                                    table.Cell().Element(TableHeader).Text(ToCurrency(totalCurrent));
+                                    table.Cell().Element(TableHeader).Text("SUMA");
+                                    table.Cell().Element(TableHeader).Text(ToCurrency(totalPrevious));
+                                    table.Cell().Element(totalDelta > 0 ? TableCellUp : totalDelta < 0 ? TableCellDown : TableCellNeutral)
+                                        .Text(ToSignedCurrencyWithArrow(totalDelta));
+                                    table.Cell().Element(totalPct > 0 ? TableCellUp : totalPct < 0 ? TableCellDown : TableCellNeutral)
+                                        .Text(ToSignedPercent(totalPct));
                                 });
                             }
 
-                            c.Item().Text("Top productos").Bold().FontColor("1A2AA5");
+                            c.Item().Text($"Top 10 productos (Año {year.Year})").Bold().FontColor("1A2AA5");
                             c.Item().Table(table =>
                             {
                                 table.ColumnsDefinition(cols =>
@@ -167,9 +181,9 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
 
                                 table.Header(h =>
                                 {
-                                    h.Cell().Element(TableHeader).Text("Producto");
-                                    h.Cell().Element(TableHeader).Text("Cantidad");
-                                    h.Cell().Element(TableHeader).Text("Venta");
+                                    h.Cell().Element(TableHeader).Text($"Producto {year.Year}");
+                                    h.Cell().Element(TableHeader).Text($"Cantidad {year.Year}");
+                                    h.Cell().Element(TableHeader).Text($"Venta {year.Year}");
                                 });
 
                                 foreach (var p in year.TopProductos.Take(10))
@@ -228,7 +242,7 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
                                     var barWidth = Math.Max(0f, (float)ratio * 220f);
                                     c.Item().Row(r =>
                                     {
-                                        r.ConstantItem(104).Text(GetMonthLabel(mes)).FontSize(8).FontColor(Colors.Grey.Darken1);
+                                        r.ConstantItem(104).Text(GetMonthLabel(mes)).FontSize(8).FontColor(Colors.Black);
                                         r.RelativeItem().PaddingVertical(2).Element(track =>
                                         {
                                             track.Height(11)
@@ -283,6 +297,8 @@ public class DashboardVentasPdfReportRenderer : IDashboardVentasReportRenderer
 
     private static IContainer TableCell(IContainer container)
         => container.BorderBottom(1).BorderColor("E9EDF8").PaddingVertical(3).PaddingHorizontal(6);
+    private static IContainer TableCellNoWrap(IContainer container)
+        => container.BorderBottom(1).BorderColor("E9EDF8").PaddingVertical(3).PaddingHorizontal(6).DefaultTextStyle(x => x.FontSize(9));
     private static IContainer TableCellUp(IContainer container)
         => container.BorderBottom(1).BorderColor("D1FAE5").Background("ECFDF3").PaddingVertical(3).PaddingHorizontal(6).DefaultTextStyle(x => x.FontColor("166534").SemiBold());
     private static IContainer TableCellDown(IContainer container)

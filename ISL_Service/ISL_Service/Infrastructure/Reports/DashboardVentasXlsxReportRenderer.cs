@@ -210,15 +210,32 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
             ws.Range(row - monthlyComparisons.Count, 2, row - 1, 2).Style.NumberFormat.Format = "$ #,##0.00";
             ws.Range(row - monthlyComparisons.Count, 4, row - 1, 5).Style.NumberFormat.Format = "$ #,##0.00";
             ws.Range(row - monthlyComparisons.Count, 6, row - 1, 6).Style.NumberFormat.Format = "0.00%";
+
+            var totalCurrent = monthlyComparisons.Sum(x => x.CurrentVenta);
+            var totalPrevious = monthlyComparisons.Sum(x => x.PreviousVenta);
+            var totalDelta = totalCurrent - totalPrevious;
+            var totalPct = totalPrevious == 0 ? 0m : (totalDelta / totalPrevious);
+
+            ws.Cell(row, 1).Value = "TOTAL SUMA";
+            ws.Cell(row, 2).Value = totalCurrent;
+            ws.Cell(row, 3).Value = "SUMA";
+            ws.Cell(row, 4).Value = totalPrevious;
+            ws.Cell(row, 5).Value = totalDelta;
+            ws.Cell(row, 6).Value = totalPct;
+            ws.Range(row, 1, row, 6).Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#EAF1FF"));
+            ws.Range(row, 2, row, 2).Style.NumberFormat.Format = "$ #,##0.00";
+            ws.Range(row, 4, row, 5).Style.NumberFormat.Format = "$ #,##0.00";
+            ws.Range(row, 6, row, 6).Style.NumberFormat.Format = "0.00%";
+            row++;
         }
 
         row += 1;
-        ws.Cell(row, 1).Value = "Top productos";
+        ws.Cell(row, 1).Value = $"Top 10 productos (Año {year.Year})";
         ws.Range(row, 1, row, 8).Merge().Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#EAF1FF"));
         row++;
-        ws.Cell(row, 1).Value = "Producto";
-        ws.Cell(row, 2).Value = "Cantidad";
-        ws.Cell(row, 3).Value = "Venta";
+        ws.Cell(row, 1).Value = $"Producto {year.Year}";
+        ws.Cell(row, 2).Value = $"Cantidad {year.Year}";
+        ws.Cell(row, 3).Value = $"Venta {year.Year}";
         ws.Range(row, 1, row, 3).Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#DCE7FF"));
 
         row++;
