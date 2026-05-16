@@ -150,13 +150,16 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
         var monthlyEndRow = monthlyDataEndRow;
         if (monthlyEndRow >= monthlyStartRow)
         {
+            var graphTitleRow = Math.Max(1, monthlyStartRow - 2);
+            var graphHeaderRow = Math.Max(1, monthlyStartRow - 1);
+
             // Grafica separada (estilo front) para no pintar la columna numerica de venta.
-            ws.Cell("D5").Value = "Grafica venta mensual";
-            ws.Range("D5:F5").Merge().Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#EAF1FF"));
-            ws.Cell("D6").Value = "Mes";
-            ws.Cell("E6").Value = "Barra";
-            ws.Cell("F6").Value = "Venta";
-            ws.Range("D6:F6").Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#DCE7FF"));
+            ws.Cell(graphTitleRow, 4).Value = "Grafica venta mensual";
+            ws.Range(graphTitleRow, 4, graphTitleRow, 6).Merge().Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#EAF1FF"));
+            ws.Cell(graphHeaderRow, 4).Value = "Mes";
+            ws.Cell(graphHeaderRow, 5).Value = "Barra";
+            ws.Cell(graphHeaderRow, 6).Value = "Venta";
+            ws.Range(graphHeaderRow, 4, graphHeaderRow, 6).Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#DCE7FF"));
 
             for (var r = monthlyStartRow; r <= monthlyEndRow; r++)
             {
