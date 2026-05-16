@@ -33,20 +33,7 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
     private static void BuildResumenSheet(XLWorkbook workbook, DashboardVentasReporteData data)
     {
         var ws = workbook.Worksheets.Add("Resumen");
-        ws.Cell("A1").Value = "REPORTE DASHBOARD DE VENTAS";
-        ws.Range("A1:H1").Merge().Style
-            .Font.SetBold()
-            .Font.SetFontColor(XLColor.White)
-            .Fill.SetBackgroundColor(XLColor.FromHtml("#0B3D91"))
-            .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
-            .Alignment.SetVertical(XLAlignmentVerticalValues.Center);
-
-        ws.Cell("A3").Value = "Generado";
-        ws.Cell("B3").Value = DateTime.Now.ToString("dd/MM/yyyy HH:mm", EsMx);
-        ws.Cell("A4").Value = "Tipo";
-        ws.Cell("B4").Value = data.Tipo == "comparados" ? "Comparación de años" : "Año";
-        ws.Cell("A5").Value = "años";
-        ws.Cell("B5").Value = string.Join(", ", data.Years.Select(x => x.Year));
+        ApplyWorkbookHeader(ws, data);
 
         ws.Cell("A7").Value = "Indicadores acumulados";
         ws.Range("A7:H7").Merge().Style
@@ -117,28 +104,23 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
     private static void BuildYearSheet(XLWorkbook workbook, DashboardVentasReporteYearData year)
     {
         var ws = workbook.Worksheets.Add($"Año {year.Year}");
-        ws.Cell("A1").Value = $"Dashboard Ventas {year.Year}";
-        ws.Range("A1:H1").Merge().Style
-            .Font.SetBold()
-            .Font.SetFontColor(XLColor.White)
-            .Fill.SetBackgroundColor(XLColor.FromHtml("#1A2AA5"))
-            .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+        ApplyWorkbookHeader(ws, null, year.Year);
 
-        ws.Cell("A3").Value = "Venta";
-        ws.Cell("B3").Value = year.Kpis.VentaTotal;
-        ws.Cell("C3").Value = "Piezas";
-        ws.Cell("D3").Value = year.Kpis.UnidadesVendidas;
-        ws.Range("B3:B3").Style.NumberFormat.Format = "$ #,##0.00";
-        ws.Range("D3:D3").Style.NumberFormat.Format = "#,##0";
+        ws.Cell("A7").Value = "Venta";
+        ws.Cell("B7").Value = year.Kpis.VentaTotal;
+        ws.Cell("C7").Value = "Piezas";
+        ws.Cell("D7").Value = year.Kpis.UnidadesVendidas;
+        ws.Range("B7:B7").Style.NumberFormat.Format = "$ #,##0.00";
+        ws.Range("D7:D7").Style.NumberFormat.Format = "#,##0";
 
-        ws.Cell("A5").Value = "Evolucion mensual";
-        ws.Range("A5:H5").Merge().Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#EAF1FF"));
-        ws.Cell("A6").Value = "Mes";
-        ws.Cell("B6").Value = "Venta";
-        ws.Cell("C6").Value = "Productos";
-        ws.Range("A6:C6").Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#DCE7FF"));
+        ws.Cell("A9").Value = "Evolucion mensual";
+        ws.Range("A9:H9").Merge().Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#EAF1FF"));
+        ws.Cell("A10").Value = "Mes";
+        ws.Cell("B10").Value = "Venta";
+        ws.Cell("C10").Value = "Productos";
+        ws.Range("A10:C10").Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#DCE7FF"));
 
-        var row = 7;
+        var row = 11;
         var monthlyRows = year.SerieMensual.OrderBy(x => x.Mes).ToList();
         foreach (var mes in monthlyRows)
         {
@@ -147,8 +129,8 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
             ws.Cell(row, 3).Value = mes.Tickets;
             row++;
         }
-        ws.Range(7, 2, Math.Max(7, row - 1), 2).Style.NumberFormat.Format = "$ #,##0.00";
-        ws.Range(7, 3, Math.Max(7, row - 1), 3).Style.NumberFormat.Format = "#,##0";
+        ws.Range(11, 2, Math.Max(11, row - 1), 2).Style.NumberFormat.Format = "$ #,##0.00";
+        ws.Range(11, 3, Math.Max(11, row - 1), 3).Style.NumberFormat.Format = "#,##0";
 
         ws.Cell(row, 1).Value = "TOTAL: SUMA";
         ws.Cell(row, 2).Value = monthlyRows.Sum(x => x.VentaTotal);
@@ -157,7 +139,7 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
         ws.Range(row, 2, row, 2).Style.NumberFormat.Format = "$ #,##0.00";
         ws.Range(row, 3, row, 3).Style.NumberFormat.Format = "#,##0";
         row++;
-        var monthlyStartRow = 7;
+        var monthlyStartRow = 11;
         var monthlyEndRow = Math.Max(monthlyStartRow, row - 1);
         if (monthlyEndRow >= monthlyStartRow)
         {
@@ -245,6 +227,8 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
             ws.Cell(row, 1).Value = item.Producto ?? "-";
             ws.Cell(row, 2).Value = item.CantidadVendida;
             ws.Cell(row, 3).Value = item.VentaTotal;
+            ws.Cell(row, 2).Style.NumberFormat.Format = "#,##0";
+            ws.Cell(row, 3).Style.NumberFormat.Format = "$ #,##0.00";
             row++;
         }
         if (row > topProductosStartRow)
@@ -296,6 +280,31 @@ public class DashboardVentasXlsxReportRenderer : IDashboardVentasReportRenderer
         var lastDataRow = Math.Max(1, row);
         var scanUntilRow = Math.Min(lastDataRow, 300);
         ws.Columns(1, 10).AdjustToContents(1, scanUntilRow);
+    }
+
+    private static void ApplyWorkbookHeader(IXLWorksheet ws, DashboardVentasReporteData? data = null, int? singleYear = null)
+    {
+        ws.Cell("A1").Value = "REPORTE DASHBOARD DE VENTAS";
+        ws.Range("A1:H1").Merge().Style
+            .Font.SetBold()
+            .Font.SetFontColor(XLColor.White)
+            .Fill.SetBackgroundColor(XLColor.FromHtml("#0B3D91"))
+            .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+            .Alignment.SetVertical(XLAlignmentVerticalValues.Center);
+
+        ws.Cell("A3").Value = "Generado";
+        ws.Cell("B3").Value = DateTime.Now.ToString("dd/MM/yyyy HH:mm", EsMx);
+        ws.Cell("A4").Value = "Tipo";
+        ws.Cell("B4").Value = data?.Tipo == "comparados" ? "Comparación de años" : "Año";
+        ws.Cell("A5").Value = "Años";
+        ws.Cell("B5").Value = data is not null
+            ? string.Join(", ", data.Years.Select(x => x.Year))
+            : (singleYear?.ToString() ?? "-");
+
+        ws.Range("A3:A5").Style.Font.SetBold();
+        ws.Range("A3:H5").Style.Fill.SetBackgroundColor(XLColor.FromHtml("#F8FAFF"));
+        ws.Range("A3:H5").Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+        ws.Range("A3:H5").Style.Border.InsideBorder = XLBorderStyleValues.Thin;
     }
 
     private static string ToSpanishMonthName(int month, string? fallbackName)
