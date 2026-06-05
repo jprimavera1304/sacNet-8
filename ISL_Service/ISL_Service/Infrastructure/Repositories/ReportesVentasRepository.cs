@@ -14,6 +14,8 @@ public class ReportesVentasRepository : IReportesVentasRepository
     private const int ReporteVentaProductos = 15;
     private const int GrupoCategoriaAcumuladores = 1;
     private const int ProductoServicioDomicilio = 11807;
+    private const string FallbackLogoPath = "Assets/Logos/Logo_Zaragoza.png";
+    private static readonly Lazy<string> FallbackLogoDataUri = new(() => TryImageFileToDataUri(Path.Combine(AppContext.BaseDirectory, FallbackLogoPath)) ?? "");
 
     public ReportesVentasRepository(IConfiguration configuration)
     {
@@ -123,14 +125,15 @@ public class ReportesVentasRepository : IReportesVentasRepository
         if (ResolvePresentacion(request.Salida) == 0)
         {
             var constants = await ConsultarConstantesAsync(conn, ct);
+            var logo = ResolveLogoForHtml(constants.Logo);
             var templateReportId = config.IDReporteMaster > 0 ? config.IDReporteMaster : idReporte;
             var templates = await ConsultarTemplatesAsync(conn, templateReportId, ct);
             template = BuildTemplateInfo(templates);
             reportHtml = !string.IsNullOrWhiteSpace(errorParams)
-                ? GenerateSinInformacionHtml(constants.Logo, templates, config.NombreReporte, request, errorParams)
+                ? GenerateSinInformacionHtml(logo, templates, config.NombreReporte, request, errorParams)
                 : string.Equals(config.Aspx, "3columnas", StringComparison.OrdinalIgnoreCase)
-                    ? GenerateFormatoColumnas3Html(constants.Logo, config.NombreReporte, data, templates, template, request)
-                    : GenerateFormatoNormalHtml(constants.Logo, constants.LogoWatermark, config.NombreReporte, data, templates, template, request);
+                    ? GenerateFormatoColumnas3Html(logo, config.NombreReporte, data, templates, template, request)
+                    : GenerateFormatoNormalHtml(logo, constants.LogoWatermark, config.NombreReporte, data, templates, template, request);
         }
 
         if (!string.IsNullOrWhiteSpace(errorParams) && string.IsNullOrWhiteSpace(reportHtml))
@@ -587,6 +590,47 @@ public class ReportesVentasRepository : IReportesVentasRepository
             Logo = pathImagenes + (Convert.ToString(row["LogoMacReportes"]) ?? ""),
             LogoWatermark = pathImagenes + (Convert.ToString(row["LogoMacWM"]) ?? "")
         };
+    }
+
+    private static string ResolveLogoForHtml(string logo)
+    {
+        var trimmed = (logo ?? "").Trim();
+        if (trimmed.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        {
+            return trimmed;
+        }
+
+        if (!string.IsNullOrWhiteSpace(trimmed))
+        {
+            var localLogo = TryImageFileToDataUri(trimmed);
+            if (!string.IsNullOrWhiteSpace(localLogo))
+                return localLogo;
+        }
+
+        return FallbackLogoDataUri.Value;
+    }
+
+    private static string? TryImageFileToDataUri(string path)
+    {
+        try
+        {
+            if (!File.Exists(path))
+                return null;
+
+            var extension = Path.GetExtension(path).ToLowerInvariant();
+            var mimeType = extension switch
+            {
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".svg" => "image/svg+xml",
+                ".webp" => "image/webp",
+                _ => "image/png"
+            };
+            return $"data:{mimeType};base64,{Convert.ToBase64String(File.ReadAllBytes(path))}";
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static async Task<DataTable> ConsultarTemplatesAsync(

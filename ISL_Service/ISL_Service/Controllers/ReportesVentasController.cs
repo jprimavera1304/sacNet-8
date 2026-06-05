@@ -1,5 +1,6 @@
 using ISL_Service.Application.DTOs.Reportes;
 using ISL_Service.Application.Interfaces;
+using ISL_Service.Infrastructure.Reports;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,7 +12,6 @@ namespace ISL_Service.Controllers;
 public class ReportesVentasController : ControllerBase
 {
     private readonly IReportesVentasService _service;
-    private static readonly System.Text.UTF8Encoding HtmlEncoding = new(false);
 
     public ReportesVentasController(IReportesVentasService service)
     {
@@ -48,7 +48,7 @@ public class ReportesVentasController : ControllerBase
         var result = await _service.GenerarAcumuladoresProductosAsync(request, ct);
         result.Url = Url.ActionLink(
             nameof(VerAcumuladoresProductosPantalla),
-            values: new { psp = result.ParametrosLegacy }) ?? $"/api/reportes/ventas/acumuladores-productos/pantalla?psp={Uri.EscapeDataString(result.ParametrosLegacy)}";
+            values: new { psp = result.ParametrosLegacy }) ?? $"/api/reportes/ventas/ReportesV2?psp={Uri.EscapeDataString(result.ParametrosLegacy)}";
 
         Response.Headers["Cache-Control"] = "no-store";
         return Ok(result);
@@ -70,16 +70,18 @@ public class ReportesVentasController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("ReportesV2")]
     [HttpGet("acumuladores-productos/pantalla")]
     [AllowAnonymous]
-    [Produces("text/html")]
+    [Produces("application/pdf")]
     public async Task<IActionResult> VerAcumuladoresProductosPantalla([FromQuery] int psp, CancellationToken ct)
     {
         if (psp <= 0)
             return BadRequest("psp requerido.");
 
         var result = await _service.ConsultarAcumuladoresProductosPorParametrosAsync(psp, ct);
+        var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(result.Html, result.Orientacion, ct);
         Response.Headers["Cache-Control"] = "no-store";
-        return Content(result.Html, "text/html", HtmlEncoding);
+        return File(pdf, "application/pdf");
     }
 }
