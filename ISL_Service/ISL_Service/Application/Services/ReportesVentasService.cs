@@ -12,12 +12,30 @@ public class ReportesVentasService : IReportesVentasService
         _repository = repository;
     }
 
+    public Task<ReportesVentasGenerateResponse> GenerarAcumuladoresProductosAsync(
+        ReportesVentasAcumuladoresProductosRequest request,
+        CancellationToken ct = default)
+    {
+        Validate(request);
+        return _repository.GenerarAcumuladoresProductosAsync(request, ct);
+    }
+
     public Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
         CancellationToken ct = default)
     {
         Validate(request);
         return _repository.ConsultarAcumuladoresProductosAsync(request, ct);
+    }
+
+    public Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosPorParametrosAsync(
+        int parametrosLegacy,
+        CancellationToken ct = default)
+    {
+        if (parametrosLegacy <= 0)
+            throw new ArgumentException("psp requerido.");
+
+        return _repository.ConsultarAcumuladoresProductosPorParametrosAsync(parametrosLegacy, ct);
     }
 
     private static void Validate(ReportesVentasAcumuladoresProductosRequest request)

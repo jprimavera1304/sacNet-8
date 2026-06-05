@@ -20,6 +20,29 @@ public class ReportesVentasRepository : IReportesVentasRepository
         _configuration = configuration;
     }
 
+    public async Task<ReportesVentasGenerateResponse> GenerarAcumuladoresProductosAsync(
+        ReportesVentasAcumuladoresProductosRequest request,
+        CancellationToken ct = default)
+    {
+        var idReporte = ResolveReporte(request);
+        var legacyParams = BuildLegacyParams(idReporte, request);
+
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        var parametroId = await GuardarParametrosAsync(conn, idReporte, legacyParams, ct);
+        var config = await ConsultarConfiguracionAsync(conn, idReporte, ct);
+
+        return new ReportesVentasGenerateResponse
+        {
+            IDReporte = idReporte,
+            NombreReporte = config.NombreReporte,
+            StoredProcedure = config.StoredProcedure,
+            ParametrosLegacy = parametroId.ToString(),
+            Salida = (request.Salida ?? "pantalla").Trim().ToLowerInvariant()
+        };
+    }
+
     public async Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
         CancellationToken ct = default)
@@ -31,6 +54,27 @@ public class ReportesVentasRepository : IReportesVentasRepository
         await conn.OpenAsync(ct);
 
         var parametroId = await GuardarParametrosAsync(conn, idReporte, legacyParams, ct);
+        return await ConsultarAcumuladoresProductosPorParametrosAsync(conn, parametroId, request, ct);
+    }
+
+    public async Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosPorParametrosAsync(
+        int parametrosLegacy,
+        CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        var legacy = await ConsultarParametrosAsync(conn, parametrosLegacy, ct);
+        return await ConsultarAcumuladoresProductosPorParametrosAsync(conn, parametrosLegacy, legacy.Request, ct);
+    }
+
+    private static async Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosPorParametrosAsync(
+        SqlConnection conn,
+        int parametroId,
+        ReportesVentasAcumuladoresProductosRequest request,
+        CancellationToken ct)
+    {
+        var idReporte = ResolveReporte(request);
         var config = await ConsultarConfiguracionAsync(conn, idReporte, ct);
         var data = await ExecuteLegacySpAsync(conn, config.StoredProcedure, parametroId.ToString(), ct);
 
@@ -151,6 +195,23 @@ public class ReportesVentasRepository : IReportesVentasRepository
         };
     }
 
+    private static string ResolveDocumento(string? tipoDocumento)
+    {
+        return (tipoDocumento ?? "").Trim() switch
+        {
+            "1" => "mayoristas",
+            "2" => "ajustes",
+            "3" => "locales",
+            "4" => "devoluciones",
+            _ => "ventas"
+        };
+    }
+
+    private static string ResolveSalida(string? presentacion)
+    {
+        return (presentacion ?? "").Trim() == "3" ? "excel" : "pantalla";
+    }
+
     private static string JoinIds(IEnumerable<int>? ids)
     {
         var clean = (ids ?? Enumerable.Empty<int>())
@@ -207,6 +268,48 @@ public class ReportesVentasRepository : IReportesVentasRepository
             return id;
 
         throw new InvalidOperationException("No se pudo leer el ID de parametros legacy.");
+    }
+
+    private static async Task<LegacyStoredParams> ConsultarParametrosAsync(
+        SqlConnection conn,
+        int parametroId,
+        CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("sp_n_ConsultaParametros", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = 500
+        };
+        cmd.Parameters.AddWithValue("@ID", parametroId);
+
+        var ds = await FillDataSetAsync(cmd, ct);
+        if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+            throw new InvalidOperationException("No se encontraron parametros legacy para el psp.");
+
+        var row = ds.Tables[0].Rows[0];
+        var idReporte = ReadInt(row, "IDReporte");
+        if (idReporte != ReporteVentaAcumuladores && idReporte != ReporteVentaProductos)
+            throw new InvalidOperationException("El psp no corresponde a Acumuladores y Productos.");
+
+        return new LegacyStoredParams
+        {
+            IDReporte = idReporte,
+            Request = new ReportesVentasAcumuladoresProductosRequest
+            {
+                Categoria = idReporte == ReporteVentaAcumuladores ? "acumuladores" : "productos",
+                Documento = ResolveDocumento(ReadString(row, "Param7")),
+                FechaInicial = ReadLegacyDate(row, "Param10"),
+                FechaFinal = ReadLegacyDate(row, "Param11"),
+                Salida = ResolveSalida(ReadString(row, "Param12")),
+                SoloServiciosDomicilio = ReadString(row, "Param13") == ProductoServicioDomicilio.ToString(),
+                IDEmpresas = SplitLegacyIds(ReadString(row, "Param2")),
+                IDAlmacenes = SplitLegacyIds(ReadString(row, "Param6")),
+                IDSubcategorias = SplitLegacyIds(ReadString(row, "Param4")),
+                IDMarcas = SplitLegacyIds(ReadString(row, "Param5")),
+                IDAgentes = SplitLegacyIds(ReadString(row, "Param9")),
+                IDClientes = SplitLegacyIds(ReadString(row, "Param8"))
+            }
+        };
     }
 
     private static async Task<LegacyReportConfig> ConsultarConfiguracionAsync(
@@ -684,6 +787,27 @@ public class ReportesVentasRepository : IReportesVentasRepository
             : 0;
     }
 
+    private static string ReadString(DataRow row, string column)
+    {
+        return row.Table.Columns.Contains(column) ? Convert.ToString(row[column]) ?? "" : "";
+    }
+
+    private static DateTime ReadLegacyDate(DataRow row, string column)
+    {
+        var value = ReadString(row, column);
+        return DateTime.TryParse(value, out var date) ? date : DateTime.Today;
+    }
+
+    private static List<int> SplitLegacyIds(string value)
+    {
+        return (value ?? "")
+            .Split('~', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(item => int.TryParse(item, out var id) ? id : 0)
+            .Where(id => id > 0)
+            .Distinct()
+            .ToList();
+    }
+
     private static async Task<DataSet> ExecuteLegacySpAsync(
         SqlConnection conn,
         string spNames,
@@ -815,6 +939,12 @@ public class ReportesVentasRepository : IReportesVentasRepository
         public string Param11 { get; set; } = "";
         public string Param12 { get; set; } = "";
         public string Param13 { get; set; } = "";
+    }
+
+    private sealed class LegacyStoredParams
+    {
+        public int IDReporte { get; set; }
+        public ReportesVentasAcumuladoresProductosRequest Request { get; set; } = new();
     }
 
     private sealed class LegacyReportConfig

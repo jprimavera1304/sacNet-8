@@ -36,6 +36,16 @@ public class ReportesVentasPreviewResponse
     public int Total { get; set; }
 }
 
+public class ReportesVentasGenerateResponse
+{
+    public int IDReporte { get; set; }
+    public string NombreReporte { get; set; } = "";
+    public string StoredProcedure { get; set; } = "";
+    public string ParametrosLegacy { get; set; } = "";
+    public string Url { get; set; } = "";
+    public string Salida { get; set; } = "pantalla";
+}
+
 public class ReportesVentasColumnDto
 {
     public string Key { get; set; } = "";

@@ -4,7 +4,15 @@ namespace ISL_Service.Application.Interfaces;
 
 public interface IReportesVentasRepository
 {
+    Task<ReportesVentasGenerateResponse> GenerarAcumuladoresProductosAsync(
+        ReportesVentasAcumuladoresProductosRequest request,
+        CancellationToken ct = default);
+
     Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
+        CancellationToken ct = default);
+
+    Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosPorParametrosAsync(
+        int parametrosLegacy,
         CancellationToken ct = default);
 }
