@@ -46,9 +46,7 @@ public class ReportesVentasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.GenerarAcumuladoresProductosAsync(request, ct);
-        result.Url = Url.ActionLink(
-            nameof(VerAcumuladoresProductosPantalla),
-            values: new { psp = result.ParametrosLegacy }) ?? $"/api/reportes/ventas/ReportesV2?psp={Uri.EscapeDataString(result.ParametrosLegacy)}";
+        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
 
         Response.Headers["Cache-Control"] = "no-store";
         return Ok(result);
@@ -70,6 +68,7 @@ public class ReportesVentasController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("ReportesV3W")]
     [HttpGet("ReportesV2")]
     [HttpGet("acumuladores-productos/pantalla")]
     [AllowAnonymous]
@@ -83,5 +82,12 @@ public class ReportesVentasController : ControllerBase
         var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(result.Html, result.Orientacion, ct);
         Response.Headers["Cache-Control"] = "no-store";
         return File(pdf, "application/pdf");
+    }
+
+    private string BuildReportesV3WUrl(string parametrosLegacy)
+    {
+        var psp = Uri.EscapeDataString(parametrosLegacy);
+        var pathBase = Request.PathBase.HasValue ? Request.PathBase.Value : "";
+        return $"{Request.Scheme}://{Request.Host}{pathBase}/api/reportes/ventas/ReportesV3W?psp={psp}";
     }
 }
