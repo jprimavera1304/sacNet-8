@@ -157,6 +157,9 @@ builder.Services.AddScoped<IDashboardVentasReportRenderer, DashboardVentasPdfRep
 builder.Services.AddScoped<IDashboardVentasReportRenderer, DashboardVentasXlsxReportRenderer>();
 builder.Services.AddHostedService<ReportEngineWarmupHostedService>();
 
+builder.Services.AddScoped<IReportesVentasRepository, ReportesVentasRepository>();
+builder.Services.AddScoped<IReportesVentasService, ReportesVentasService>();
+
 builder.Services.AddScoped<IVentasPedidosRepository, VentasPedidosRepository>();
 builder.Services.AddScoped<IVentasPedidosService, VentasPedidosService>();
 builder.Services.AddSingleton<IAutorizarPedidosAsyncCoordinator, AutorizarPedidosAsyncCoordinator>();
