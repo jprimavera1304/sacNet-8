@@ -12,6 +12,14 @@ public class ReportesVentasService : IReportesVentasService
         _repository = repository;
     }
 
+    public Task<ReportesVentasCatalogosResponse> ConsultarCatalogosAcumuladoresProductosAsync(
+        int? idGrupoCategoria,
+        IReadOnlyCollection<int>? idCategorias,
+        CancellationToken ct = default)
+    {
+        return _repository.ConsultarCatalogosAcumuladoresProductosAsync(idGrupoCategoria, idCategorias, ct);
+    }
+
     public Task<ReportesVentasGenerateResponse> GenerarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
         CancellationToken ct = default)

@@ -18,6 +18,22 @@ public class ReportesVentasController : ControllerBase
         _service = service;
     }
 
+    [HttpGet("acumuladores-productos/catalogos")]
+    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [ProducesResponseType(typeof(ReportesVentasCatalogosResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ConsultarCatalogosAcumuladoresProductos(
+        [FromQuery] int? idGrupoCategoria,
+        [FromQuery] int[]? idCategorias,
+        CancellationToken ct)
+    {
+        var result = await _service.ConsultarCatalogosAcumuladoresProductosAsync(
+            idGrupoCategoria,
+            idCategorias ?? Array.Empty<int>(),
+            ct);
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(result);
+    }
+
     [HttpPost("acumuladores-productos/generar")]
     [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]

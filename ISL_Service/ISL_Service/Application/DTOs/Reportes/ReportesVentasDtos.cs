@@ -5,6 +5,7 @@ public class ReportesVentasAcumuladoresProductosRequest
     public DateTime FechaInicial { get; set; }
     public DateTime FechaFinal { get; set; }
     public string Categoria { get; set; } = "acumuladores";
+    public int IDGrupoCategoria { get; set; } = 1;
     public string TipoReporte { get; set; } = "empresa";
     public string Documento { get; set; } = "ventas";
     public bool SoloServiciosDomicilio { get; set; }
@@ -51,4 +52,33 @@ public class ReportesVentasColumnDto
     public string Key { get; set; } = "";
     public string Label { get; set; } = "";
     public string Type { get; set; } = "text";
+}
+
+public class ReportesVentasCatalogosResponse
+{
+    public string FechaOperacion { get; set; } = "";
+    public List<ReportesVentasCatalogoItem> Empresas { get; set; } = new();
+    public List<ReportesVentasCatalogoItem> Almacenes { get; set; } = new();
+    public List<ReportesVentasCatalogoItem> Agentes { get; set; } = new();
+    public List<ReportesVentasCatalogoItem> Categorias { get; set; } = new();
+    public List<ReportesVentasProductoItem> Subcategorias { get; set; } = new();
+    public List<ReportesVentasProductoItem> Marcas { get; set; } = new();
+    public List<ReportesVentasCatalogoItem> Documentos { get; set; } = new();
+}
+
+public class ReportesVentasCatalogoItem
+{
+    public int Id { get; set; }
+    public string Nombre { get; set; } = "";
+    public string? Clave { get; set; }
+}
+
+public class ReportesVentasProductoItem
+{
+    public int IDGrupoCategoria { get; set; }
+    public string GrupoCategoria { get; set; } = "";
+    public int IDCategoria { get; set; }
+    public string Categoria { get; set; } = "";
+    public int IDMarca { get; set; }
+    public string Marca { get; set; } = "";
 }

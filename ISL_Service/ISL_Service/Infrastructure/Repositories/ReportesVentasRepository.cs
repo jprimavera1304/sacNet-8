@@ -20,6 +20,41 @@ public class ReportesVentasRepository : IReportesVentasRepository
         _configuration = configuration;
     }
 
+    public async Task<ReportesVentasCatalogosResponse> ConsultarCatalogosAcumuladoresProductosAsync(
+        int? idGrupoCategoria,
+        IReadOnlyCollection<int>? idCategorias,
+        CancellationToken ct = default)
+    {
+        var grupoCategoria = idGrupoCategoria.GetValueOrDefault(GrupoCategoriaAcumuladores);
+        if (grupoCategoria <= 0) grupoCategoria = GrupoCategoriaAcumuladores;
+
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        var constants = await ConsultarConstantesAsync(conn, ct);
+        var empresas = await ConsultarEmpresasAsync(conn, ct);
+        var almacenes = await ConsultarAlmacenesAsync(conn, ct);
+        var agentes = await ConsultarAgentesAsync(conn, ct);
+        var categorias = await ConsultarGruposCategoriasAsync(conn, ct);
+        var subcategorias = await ConsultarSubcategoriasAsync(conn, grupoCategoria, ct);
+        var selectedCategorias = NormalizeCatalogIds(idCategorias);
+        if (selectedCategorias.Count == 0)
+            selectedCategorias = subcategorias.Select(x => x.IDCategoria).Distinct().ToList();
+        var marcas = await ConsultarMarcasPorCategoriasAsync(conn, grupoCategoria, selectedCategorias, ct);
+
+        return new ReportesVentasCatalogosResponse
+        {
+            FechaOperacion = constants.FechaOperacion,
+            Empresas = empresas,
+            Almacenes = almacenes,
+            Agentes = agentes,
+            Categorias = categorias,
+            Subcategorias = subcategorias,
+            Marcas = marcas,
+            Documentos = BuildDocumentos()
+        };
+    }
+
     public async Task<ReportesVentasGenerateResponse> GenerarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
         CancellationToken ct = default)
@@ -134,8 +169,196 @@ public class ReportesVentasRepository : IReportesVentasRepository
         return connector.GetConnection;
     }
 
+    private static async Task<List<ReportesVentasCatalogoItem>> ConsultarEmpresasAsync(SqlConnection conn, CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("sp_n_ConsultaEmpresas", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = 500
+        };
+        cmd.Parameters.AddWithValue("@IDEmpresa", 0);
+        cmd.Parameters.AddWithValue("@IDStatus", 1);
+        cmd.Parameters.AddWithValue("@RazonSocial", "");
+        cmd.Parameters.AddWithValue("@Formato", 0);
+        cmd.Parameters.AddWithValue("@Identico", 0);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return table.AsEnumerable()
+            .Select(row => new ReportesVentasCatalogoItem
+            {
+                Id = ReadInt(row, "IDEmpresa"),
+                Nombre = ReadString(row, "NombreCorto", "RazonSocial", "Empresa"),
+                Clave = ReadString(row, "Clave", "NombreCorto")
+            })
+            .Where(x => x.Id > 0 && !string.IsNullOrWhiteSpace(x.Nombre))
+            .ToList();
+    }
+
+    private static async Task<List<ReportesVentasCatalogoItem>> ConsultarAlmacenesAsync(SqlConnection conn, CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("sp_n_ConsultaAlmacenes", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = 500
+        };
+        cmd.Parameters.AddWithValue("@IDAlmacen", 0);
+        cmd.Parameters.AddWithValue("@IDStatus", 1);
+        cmd.Parameters.AddWithValue("@Almacen", "");
+        cmd.Parameters.AddWithValue("@Identico", 0);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return table.AsEnumerable()
+            .Select(row => new ReportesVentasCatalogoItem
+            {
+                Id = ReadInt(row, "IDAlmacen"),
+                Nombre = ReadString(row, "Almacen"),
+                Clave = ReadString(row, "Almacen")
+            })
+            .Where(x => x.Id > 0 && !string.IsNullOrWhiteSpace(x.Nombre))
+            .ToList();
+    }
+
+    private static async Task<List<ReportesVentasCatalogoItem>> ConsultarAgentesAsync(SqlConnection conn, CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("sp_n_ConsultaAgentes", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = 500
+        };
+        cmd.Parameters.AddWithValue("@IDAgente", 0);
+        cmd.Parameters.AddWithValue("@IDStatus", 1);
+        cmd.Parameters.AddWithValue("@NumeroAgente", 0);
+        cmd.Parameters.AddWithValue("@NombreAgente", "");
+        cmd.Parameters.AddWithValue("@Formato", 0);
+        cmd.Parameters.AddWithValue("@Identico", 0);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return table.AsEnumerable()
+            .Select(row => new ReportesVentasCatalogoItem
+            {
+                Id = ReadInt(row, "IDAgente"),
+                Nombre = ReadString(row, "NombreAgente"),
+                Clave = ReadString(row, "NumeroAgente")
+            })
+            .Where(x => x.Id > 0 && !string.IsNullOrWhiteSpace(x.Nombre))
+            .OrderBy(x => x.Nombre)
+            .ToList();
+    }
+
+    private static async Task<List<ReportesVentasCatalogoItem>> ConsultarGruposCategoriasAsync(SqlConnection conn, CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("sp_n_ConsultaGrupoCategorias", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = 500
+        };
+        cmd.Parameters.AddWithValue("@IDsGrupoCategoria", "");
+        cmd.Parameters.AddWithValue("@IDStatus", 1);
+        cmd.Parameters.AddWithValue("@GrupoCategoria", "");
+        cmd.Parameters.AddWithValue("@Identico", 0);
+        cmd.Parameters.AddWithValue("@Formato", 0);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return table.AsEnumerable()
+            .Select(row => new ReportesVentasCatalogoItem
+            {
+                Id = ReadInt(row, "IDGrupoCategoria"),
+                Nombre = ReadString(row, "GrupoCategoria"),
+                Clave = ReadString(row, "GrupoCategoria")
+            })
+            .Where(x => x.Id > 0 && !string.IsNullOrWhiteSpace(x.Nombre))
+            .ToList();
+    }
+
+    private static async Task<List<ReportesVentasProductoItem>> ConsultarSubcategoriasAsync(
+        SqlConnection conn,
+        int idGrupoCategoria,
+        CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("sp_n_ConsultaCategorias", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = 500
+        };
+        cmd.Parameters.AddWithValue("@IDsCategoria", "");
+        cmd.Parameters.AddWithValue("@IDsGrupoCategoria", idGrupoCategoria.ToString());
+        cmd.Parameters.AddWithValue("@IDStatus", 1);
+        cmd.Parameters.AddWithValue("@Categoria", "");
+        cmd.Parameters.AddWithValue("@Identico", 0);
+        cmd.Parameters.AddWithValue("@Formato", 0);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return table.AsEnumerable()
+            .Select(row => new ReportesVentasProductoItem
+            {
+                IDGrupoCategoria = ReadInt(row, "IDGrupoCategoria"),
+                GrupoCategoria = ReadString(row, "GrupoCategoria"),
+                IDCategoria = ReadInt(row, "IDCategoria"),
+                Categoria = ReadString(row, "Categoria")
+            })
+            .Where(x => x.IDGrupoCategoria > 0 && x.IDCategoria > 0 && !string.IsNullOrWhiteSpace(x.Categoria))
+            .ToList();
+    }
+
+    private static async Task<List<ReportesVentasProductoItem>> ConsultarMarcasPorCategoriasAsync(
+        SqlConnection conn,
+        int idGrupoCategoria,
+        IReadOnlyCollection<int> idCategorias,
+        CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("sp_n_ConsultaGrupoCategoriasMarcas", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = 500
+        };
+        cmd.Parameters.AddWithValue("@IDsMarca", "");
+        cmd.Parameters.AddWithValue("@IDsCategoria", JoinIds(idCategorias));
+        cmd.Parameters.AddWithValue("@IDsGrupoCategoria", idGrupoCategoria.ToString());
+        cmd.Parameters.AddWithValue("@IDStatus", 1);
+        cmd.Parameters.AddWithValue("@Marca", "");
+        cmd.Parameters.AddWithValue("@Identico", 0);
+        cmd.Parameters.AddWithValue("@Formato", 0);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return table.AsEnumerable()
+            .Select(row => new ReportesVentasProductoItem
+            {
+                IDGrupoCategoria = ReadInt(row, "IDGrupoCategoria"),
+                GrupoCategoria = ReadString(row, "GrupoCategoria"),
+                IDCategoria = ReadInt(row, "IDCategoria"),
+                Categoria = ReadString(row, "Categoria"),
+                IDMarca = ReadInt(row, "IDMarca"),
+                Marca = ReadString(row, "Marca")
+            })
+            .Where(x => x.IDGrupoCategoria > 0 && x.IDCategoria > 0 && x.IDMarca > 0 && !string.IsNullOrWhiteSpace(x.Marca))
+            .ToList();
+    }
+
+    private static List<ReportesVentasCatalogoItem> BuildDocumentos()
+    {
+        return new List<ReportesVentasCatalogoItem>
+        {
+            new() { Id = 10, Nombre = "VENTAS", Clave = "ventas" },
+            new() { Id = 1, Nombre = "MAYORISTAS", Clave = "mayoristas" },
+            new() { Id = 2, Nombre = "AJUSTES", Clave = "ajustes" },
+            new() { Id = 3, Nombre = "LOCALES", Clave = "locales" },
+            new() { Id = 4, Nombre = "DEVOLUCIONES", Clave = "devoluciones" }
+        };
+    }
+
+    private static List<int> NormalizeCatalogIds(IEnumerable<int>? ids)
+    {
+        return (ids ?? Enumerable.Empty<int>())
+            .Where(x => x > 0)
+            .Distinct()
+            .ToList();
+    }
+
     private static int ResolveReporte(ReportesVentasAcumuladoresProductosRequest request)
     {
+        if (request.IDGrupoCategoria == GrupoCategoriaAcumuladores)
+            return ReporteVentaAcumuladores;
+
         var categoria = (request.Categoria ?? "").Trim().ToLowerInvariant();
         return categoria == "acumuladores" || categoria == "acumulador"
             ? ReporteVentaAcumuladores
@@ -144,7 +367,7 @@ public class ReportesVentasRepository : IReportesVentasRepository
 
     private static LegacyReportParams BuildLegacyParams(int idReporte, ReportesVentasAcumuladoresProductosRequest request)
     {
-        var idGrupoCategoria = idReporte == ReporteVentaAcumuladores ? GrupoCategoriaAcumuladores : 0;
+        var idGrupoCategoria = request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria : GrupoCategoriaAcumuladores;
         var idCliente = ResolveCliente(request);
 
         return new LegacyReportParams
@@ -297,6 +520,7 @@ public class ReportesVentasRepository : IReportesVentasRepository
             Request = new ReportesVentasAcumuladoresProductosRequest
             {
                 Categoria = idReporte == ReporteVentaAcumuladores ? "acumuladores" : "productos",
+                IDGrupoCategoria = ReadInt(row, "Param3"),
                 Documento = ResolveDocumento(ReadString(row, "Param7")),
                 FechaInicial = ReadLegacyDate(row, "Param10"),
                 FechaFinal = ReadLegacyDate(row, "Param11"),
@@ -357,6 +581,9 @@ public class ReportesVentasRepository : IReportesVentasRepository
         var pathImagenes = Convert.ToString(row["PathImagenes"]) ?? "";
         return new LegacyConstants
         {
+            FechaOperacion = DateTime.TryParse(ReadString(row, "FechaOperacion"), out var fechaOperacion)
+                ? fechaOperacion.ToString("yyyy-MM-dd")
+                : DateTime.Today.ToString("yyyy-MM-dd"),
             Logo = pathImagenes + (Convert.ToString(row["LogoMacReportes"]) ?? ""),
             LogoWatermark = pathImagenes + (Convert.ToString(row["LogoMacWM"]) ?? "")
         };
@@ -792,9 +1019,21 @@ public class ReportesVentasRepository : IReportesVentasRepository
         return row.Table.Columns.Contains(column) ? Convert.ToString(row[column]) ?? "" : "";
     }
 
+    private static string ReadString(DataRow row, params string[] columns)
+    {
+        foreach (var column in columns)
+        {
+            var value = ReadString(row, column);
+            if (!string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        return "";
+    }
+
     private static DateTime ReadLegacyDate(DataRow row, string column)
     {
-        var value = ReadString(row, column);
+        var value = ReadString(row, column).Replace("@", " ");
         return DateTime.TryParse(value, out var date) ? date : DateTime.Today;
     }
 
@@ -871,6 +1110,12 @@ public class ReportesVentasRepository : IReportesVentasRepository
         adapter.Fill(ds);
         await Task.CompletedTask;
         return ds;
+    }
+
+    private static async Task<DataTable> ExecuteFirstTableAsync(SqlCommand cmd, CancellationToken ct)
+    {
+        var ds = await FillDataSetAsync(cmd, ct);
+        return ds.Tables.Count > 0 ? ds.Tables[0] : new DataTable();
     }
 
     private static List<ReportesVentasColumnDto> BuildColumns(DataTable table)
@@ -957,6 +1202,7 @@ public class ReportesVentasRepository : IReportesVentasRepository
 
     private sealed class LegacyConstants
     {
+        public string FechaOperacion { get; set; } = DateTime.Today.ToString("yyyy-MM-dd");
         public string Logo { get; set; } = "";
         public string LogoWatermark { get; set; } = "";
     }

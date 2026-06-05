@@ -4,6 +4,11 @@ namespace ISL_Service.Application.Interfaces;
 
 public interface IReportesVentasService
 {
+    Task<ReportesVentasCatalogosResponse> ConsultarCatalogosAcumuladoresProductosAsync(
+        int? idGrupoCategoria,
+        IReadOnlyCollection<int>? idCategorias,
+        CancellationToken ct = default);
+
     Task<ReportesVentasGenerateResponse> GenerarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
         CancellationToken ct = default);
