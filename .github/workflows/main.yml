@@ -16,6 +16,7 @@ env:
   SOLUTION_PATH: ./ISL_Service/ISL_Service.sln
   PROJECT_PATH: ./ISL_Service/ISL_Service/ISL_Service.csproj
   PUBLISH_PATH: ./publish
+  NUGET_XMLDOC_MODE: skip
 
 jobs:
   build:
@@ -31,6 +32,12 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.x'
+          cache: true
+          cache-dependency-path: |
+            ISL_Service/ISL_Service/Directory.Packages.props
+            ISL_Service/ISL_Service/NuGet.Config
+            ISL_Service/ISL_Service/ISL_Service.csproj
+            ISL_Service/ISL_Service.sln
 
       - name: Configure GitHub Packages source
         shell: pwsh
@@ -48,10 +55,10 @@ jobs:
             --configfile ./ISL_Service/ISL_Service/NuGet.Config
 
       - name: Restore with dotnet
-        run: dotnet restore ${{ env.SOLUTION_PATH }}
+        run: dotnet restore ${{ env.PROJECT_PATH }}
 
       - name: Build with dotnet
-        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Release --no-restore
+        run: dotnet build ${{ env.PROJECT_PATH }} --configuration Release --no-restore -m /p:ContinuousIntegrationBuild=true
 
       - name: Dotnet publish (project path)
         run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -o ${{ env.PUBLISH_PATH }} --no-build

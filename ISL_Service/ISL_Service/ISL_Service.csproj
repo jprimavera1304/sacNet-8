@@ -45,6 +45,11 @@
     <None Remove="ISL_Service.Tests\**\*" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Assets\Logos\Logo_Zaragoza.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Wkhtmltopdf\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
 
 
