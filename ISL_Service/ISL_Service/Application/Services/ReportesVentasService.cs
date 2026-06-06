@@ -20,6 +20,17 @@ public class ReportesVentasService : IReportesVentasService
         return _repository.ConsultarCatalogosAcumuladoresProductosAsync(idGrupoCategoria, idCategorias, ct);
     }
 
+    public Task<List<ReportesVentasClienteItem>> ConsultarClientesAsync(
+        int? numero,
+        int? idCliente,
+        CancellationToken ct = default)
+    {
+        if (numero.GetValueOrDefault() <= 0 && idCliente.GetValueOrDefault() <= 0)
+            throw new ArgumentException("numero o idCliente requerido.");
+
+        return _repository.ConsultarClientesAsync(numero, idCliente, ct);
+    }
+
     public Task<ReportesVentasGenerateResponse> GenerarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
         CancellationToken ct = default)
@@ -64,5 +75,7 @@ public class ReportesVentasService : IReportesVentasService
         var tipoReporte = (request.TipoReporte ?? "empresa").Trim().ToLowerInvariant();
         if (tipoReporte == "agente" && (request.IDAgentes ?? new List<int>()).Where(id => id > 0).Distinct().Count() == 0)
             throw new ArgumentException("seleccione al menos un agente.");
+        if (tipoReporte == "cliente" && (request.IDClientes ?? new List<int>()).Where(id => id > 0).Distinct().Count() == 0)
+            throw new ArgumentException("seleccione el cliente.");
     }
 }

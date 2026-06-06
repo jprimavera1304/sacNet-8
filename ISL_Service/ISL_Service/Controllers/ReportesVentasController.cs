@@ -34,6 +34,20 @@ public class ReportesVentasController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("acumuladores-productos/clientes")]
+    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [ProducesResponseType(typeof(List<ReportesVentasClienteItem>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConsultarClientes(
+        [FromQuery] int? numero,
+        [FromQuery] int? idCliente,
+        CancellationToken ct)
+    {
+        var result = await _service.ConsultarClientesAsync(numero, idCliente, ct);
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(result);
+    }
+
     [HttpPost("acumuladores-productos/generar")]
     [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]

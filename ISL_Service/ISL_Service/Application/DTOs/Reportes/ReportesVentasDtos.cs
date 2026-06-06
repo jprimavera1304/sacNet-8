@@ -73,6 +73,14 @@ public class ReportesVentasCatalogoItem
     public string? Clave { get; set; }
 }
 
+public class ReportesVentasClienteItem
+{
+    public int IDCliente { get; set; }
+    public int Numero { get; set; }
+    public string NombreCliente { get; set; } = "";
+    public string Nombre { get; set; } = "";
+}
+
 public class ReportesVentasProductoItem
 {
     public int IDGrupoCategoria { get; set; }

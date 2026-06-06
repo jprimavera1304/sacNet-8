@@ -9,6 +9,11 @@ public interface IReportesVentasService
         IReadOnlyCollection<int>? idCategorias,
         CancellationToken ct = default);
 
+    Task<List<ReportesVentasClienteItem>> ConsultarClientesAsync(
+        int? numero,
+        int? idCliente,
+        CancellationToken ct = default);
+
     Task<ReportesVentasGenerateResponse> GenerarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
         CancellationToken ct = default);

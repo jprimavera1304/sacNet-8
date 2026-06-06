@@ -57,6 +57,17 @@ public class ReportesVentasRepository : IReportesVentasRepository
         };
     }
 
+    public async Task<List<ReportesVentasClienteItem>> ConsultarClientesAsync(
+        int? numero,
+        int? idCliente,
+        CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        return await ConsultarClientesAsync(conn, numero, idCliente, ct);
+    }
+
     public async Task<ReportesVentasGenerateResponse> GenerarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
         CancellationToken ct = default)
@@ -248,6 +259,51 @@ public class ReportesVentasRepository : IReportesVentasRepository
             .ToList();
     }
 
+    private static async Task<List<ReportesVentasClienteItem>> ConsultarClientesAsync(
+        SqlConnection conn,
+        int? numero,
+        int? idCliente,
+        CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("sp_n_ConsultaClientes", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = 500
+        };
+
+        cmd.Parameters.AddWithValue("@IDCliente", idCliente.GetValueOrDefault());
+        cmd.Parameters.AddWithValue("@IDCondicionesCredito", 0);
+        cmd.Parameters.AddWithValue("@IDCondicionesCreditoAceites", 0);
+        cmd.Parameters.AddWithValue("@IDCondicionesCreditoCascos", 0);
+        cmd.Parameters.AddWithValue("@IDDescuento", 0);
+        cmd.Parameters.AddWithValue("@IDAgente", 0);
+        cmd.Parameters.AddWithValue("@IDStatus", 0);
+        cmd.Parameters.AddWithValue("@Numero", numero.GetValueOrDefault() > 0 ? numero.GetValueOrDefault().ToString() : "");
+        cmd.Parameters.AddWithValue("@Nombre", "");
+        cmd.Parameters.AddWithValue("@ApellidoPaterno", "");
+        cmd.Parameters.AddWithValue("@ApellidoMaterno", "");
+        cmd.Parameters.AddWithValue("@RFC", "");
+        cmd.Parameters.AddWithValue("@IDTipoCliente", 0);
+        cmd.Parameters.AddWithValue("@ConHuella", 0);
+        cmd.Parameters.AddWithValue("@IDEmpresaCS", 1);
+        cmd.Parameters.AddWithValue("@EsMostrador", 0);
+        cmd.Parameters.AddWithValue("@Referencia", "");
+        cmd.Parameters.AddWithValue("@Formato", 0);
+        cmd.Parameters.AddWithValue("@Identico", 0);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return table.AsEnumerable()
+            .Select(row => new ReportesVentasClienteItem
+            {
+                IDCliente = ReadInt(row, "IDCliente"),
+                Numero = ReadInt(row, "Numero"),
+                NombreCliente = ReadString(row, "NombreCliente"),
+                Nombre = ReadString(row, "Nombre")
+            })
+            .Where(x => x.IDCliente > 0 && x.Numero > 0)
+            .ToList();
+    }
+
     private static async Task<List<ReportesVentasCatalogoItem>> ConsultarGruposCategoriasAsync(SqlConnection conn, CancellationToken ct)
     {
         await using var cmd = new SqlCommand("sp_n_ConsultaGrupoCategorias", conn)
@@ -399,7 +455,7 @@ public class ReportesVentasRepository : IReportesVentasRepository
             return -1;
 
         if ((request.TipoReporte ?? "").Trim().Equals("cliente", StringComparison.OrdinalIgnoreCase))
-            return request.IDClientes.FirstOrDefault();
+            return (request.IDClientes ?? new List<int>()).FirstOrDefault();
 
         return 0;
     }
@@ -444,6 +500,24 @@ public class ReportesVentasRepository : IReportesVentasRepository
         var value = string.IsNullOrWhiteSpace(textoAgente) ? "" : $"Agente: <b>{textoAgente}</b>";
         html = html.Replace("#Agente#", value);
         html = html.Replace("#agente#", value);
+        return html;
+    }
+
+    private static string ReplaceClientHeader(string html, DataTable? table, DataRow? row)
+    {
+        if (table is null || row is null)
+        {
+            html = html.Replace("#Cliente#", "");
+            html = html.Replace("#cliente#", "");
+            return html;
+        }
+
+        var idCliente = ReadString(row, "idCliente", "IDCliente");
+        var cliente = ReadString(row, "cliente", "Cliente");
+        var hasCliente = int.TryParse(idCliente, out var id) && id != 0 && !string.IsNullOrWhiteSpace(cliente);
+        var value = hasCliente ? $"Cliente: <b>{cliente}</b>" : "";
+        html = html.Replace("#Cliente#", value);
+        html = html.Replace("#cliente#", value);
         return html;
     }
 
@@ -962,6 +1036,7 @@ public class ReportesVentasRepository : IReportesVentasRepository
         }
 
         html = ReplaceAgentHeader(html, table, row, request);
+        html = ReplaceClientHeader(html, table, row);
         return ReplaceValues(table, row, html);
     }
 
@@ -1056,6 +1131,7 @@ public class ReportesVentasRepository : IReportesVentasRepository
             html = html.Replace("#topWM#", Convert.ToString(row["topWM"]) ?? "");
 
         html = ReplaceAgentHeader(html, table, row, request);
+        html = ReplaceClientHeader(html, table, row);
         return ReplaceValues(table, row, html);
     }
 
