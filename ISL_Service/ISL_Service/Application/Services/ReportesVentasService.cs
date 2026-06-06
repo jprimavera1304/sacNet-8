@@ -60,5 +60,9 @@ public class ReportesVentasService : IReportesVentasService
         var salida = (request.Salida ?? "pantalla").Trim().ToLowerInvariant();
         if (salida != "pantalla" && salida != "excel")
             throw new ArgumentException("salida debe ser 'pantalla' o 'excel'.");
+
+        var tipoReporte = (request.TipoReporte ?? "empresa").Trim().ToLowerInvariant();
+        if (tipoReporte == "agente" && (request.IDAgentes ?? new List<int>()).Where(id => id > 0).Distinct().Count() == 0)
+            throw new ArgumentException("seleccione al menos un agente.");
     }
 }

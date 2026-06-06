@@ -404,6 +404,49 @@ public class ReportesVentasRepository : IReportesVentasRepository
         return 0;
     }
 
+    private static bool IsAgentReport(ReportesVentasAcumuladoresProductosRequest request)
+    {
+        return (request.TipoReporte ?? "").Trim().Equals("agente", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? ResolveAgentGroupColumn(DataTable table, ReportesVentasAcumuladoresProductosRequest request)
+    {
+        if (!IsAgentReport(request))
+            return null;
+
+        if (table.Columns.Contains("IDAgente"))
+            return "IDAgente";
+        if (table.Columns.Contains("Agente"))
+            return "Agente";
+
+        return null;
+    }
+
+    private static string ReplaceAgentHeader(string html, DataTable? table, DataRow? row, ReportesVentasAcumuladoresProductosRequest request)
+    {
+        if (!IsAgentReport(request) || table is null || row is null)
+        {
+            html = html.Replace("#Agente#", "");
+            html = html.Replace("#agente#", "");
+            return html;
+        }
+
+        var idAgente = ReadString(row, "IDAgente");
+        var nombreAgente = ReadString(row, "Nombre Agente", "NombreAgente");
+        var agente = ReadString(row, "Agente");
+        var textoAgente = "";
+
+        if (!string.IsNullOrWhiteSpace(idAgente) && idAgente != "0")
+            textoAgente = string.IsNullOrWhiteSpace(nombreAgente) ? idAgente : $"{idAgente} - {nombreAgente}";
+        else if (!string.IsNullOrWhiteSpace(agente) && agente != "0")
+            textoAgente = agente;
+
+        var value = string.IsNullOrWhiteSpace(textoAgente) ? "" : $"Agente: <b>{textoAgente}</b>";
+        html = html.Replace("#Agente#", value);
+        html = html.Replace("#agente#", value);
+        return html;
+    }
+
     private static int ResolvePresentacion(string? salida)
     {
         return (salida ?? "").Trim().Equals("excel", StringComparison.OrdinalIgnoreCase) ? 3 : 0;
@@ -524,6 +567,7 @@ public class ReportesVentasRepository : IReportesVentasRepository
             {
                 Categoria = idReporte == ReporteVentaAcumuladores ? "acumuladores" : "productos",
                 IDGrupoCategoria = ReadInt(row, "Param3"),
+                TipoReporte = ResolveTipoReporteFromParams(row),
                 Documento = ResolveDocumento(ReadString(row, "Param7")),
                 FechaInicial = ReadLegacyDate(row, "Param10"),
                 FechaFinal = ReadLegacyDate(row, "Param11"),
@@ -537,6 +581,19 @@ public class ReportesVentasRepository : IReportesVentasRepository
                 IDClientes = SplitLegacyIds(ReadString(row, "Param8"))
             }
         };
+    }
+
+    private static string ResolveTipoReporteFromParams(DataRow row)
+    {
+        var clientes = SplitLegacyIds(ReadString(row, "Param8"));
+        if (clientes.Any(id => id > 0))
+            return "cliente";
+
+        var agentes = SplitLegacyIds(ReadString(row, "Param9"));
+        if (agentes.Any(id => id > 0))
+            return "agente";
+
+        return "empresa";
     }
 
     private static async Task<LegacyReportConfig> ConsultarConfiguracionAsync(
@@ -689,7 +746,7 @@ public class ReportesVentasRepository : IReportesVentasRepository
         var totalesTemplate = ReadTemplateHtml(templates, "totales");
         var htmlFinal = "";
 
-        var groupColumn = table.Columns.Contains("Agente") ? "Agente" : null;
+        var groupColumn = ResolveAgentGroupColumn(table, request);
         var groups = groupColumn is null
             ? new[] { "" }
             : table.AsEnumerable()
@@ -723,7 +780,7 @@ public class ReportesVentasRepository : IReportesVentasRepository
                 if (lineas == 0)
                 {
                     htmlCuerpo = "<p style='page-break-before: always'></p>";
-                    htmlCuerpo += BuildFormatoNormalHeader(cuerpoTemplate, logo, reporteNombre, numPagina, totalPaginas, table, row, numRegistro);
+                    htmlCuerpo += BuildFormatoNormalHeader(cuerpoTemplate, logo, reporteNombre, numPagina, totalPaginas, table, row, numRegistro, request);
                 }
 
                 htmlDetalle += ReplaceValues(table, row, detalleTemplate);
@@ -779,7 +836,7 @@ public class ReportesVentasRepository : IReportesVentasRepository
         var totalesTemplate = ReadTemplateHtml(templates, "totales");
         var htmlFinal = "";
 
-        var groupColumn = table.Columns.Contains("Agente") ? "Agente" : null;
+        var groupColumn = ResolveAgentGroupColumn(table, request);
         var groups = groupColumn is null
             ? new[] { "" }
             : table.AsEnumerable()
@@ -893,6 +950,10 @@ public class ReportesVentasRepository : IReportesVentasRepository
         {
             html = html.Replace("#almacen#", "----");
             html = html.Replace("#categorias#", "----");
+            html = html.Replace("#Agente#", "");
+            html = html.Replace("#agente#", "");
+            html = html.Replace("#Cliente#", "");
+            html = html.Replace("#cliente#", "");
             html = html.Replace("#fechaInicial#", request.FechaInicial.ToString("dd/MM/yyyy"));
             html = html.Replace("#fechaFinal#", request.FechaFinal.ToString("dd/MM/yyyy"));
             html = html.Replace("#ParametrosTexto#", "");
@@ -900,6 +961,7 @@ public class ReportesVentasRepository : IReportesVentasRepository
             return html;
         }
 
+        html = ReplaceAgentHeader(html, table, row, request);
         return ReplaceValues(table, row, html);
     }
 
@@ -946,7 +1008,9 @@ public class ReportesVentasRepository : IReportesVentasRepository
         html = html.Replace("#NumPagina#", "1");
         html = html.Replace("#TotalPaginas#", "1");
         html = html.Replace("#Agente#", "");
+        html = html.Replace("#agente#", "");
         html = html.Replace("#Cliente#", "");
+        html = html.Replace("#cliente#", "");
         html = html.Replace("#Totales#", "");
         html = html.Replace("#FormatoTexto#", "");
         html = html.Replace("#ParametrosTexto#", "");
@@ -966,7 +1030,8 @@ public class ReportesVentasRepository : IReportesVentasRepository
         int totalPaginas,
         DataTable? table,
         DataRow? row,
-        int numRegistro)
+        int numRegistro,
+        ReportesVentasAcumuladoresProductosRequest request)
     {
         var html = cuerpoTemplate;
         html = html.Replace("#Logo#", logo);
@@ -977,7 +1042,9 @@ public class ReportesVentasRepository : IReportesVentasRepository
         if (table is null || row is null)
         {
             html = html.Replace("#Agente#", "");
+            html = html.Replace("#agente#", "");
             html = html.Replace("#Cliente#", "");
+            html = html.Replace("#cliente#", "");
             html = html.Replace("#Totales#", "");
             html = html.Replace("#FormatoTexto#", "");
             html = html.Replace("#ParametrosTexto#", "");
@@ -988,6 +1055,7 @@ public class ReportesVentasRepository : IReportesVentasRepository
         if (table.Columns.Contains("topWM") && numRegistro > 0)
             html = html.Replace("#topWM#", Convert.ToString(row["topWM"]) ?? "");
 
+        html = ReplaceAgentHeader(html, table, row, request);
         return ReplaceValues(table, row, html);
     }
 
