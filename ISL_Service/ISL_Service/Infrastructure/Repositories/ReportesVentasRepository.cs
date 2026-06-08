@@ -127,11 +127,11 @@ public class ReportesVentasRepository : IReportesVentasRepository
         CancellationToken ct = default)
     {
         var idReporte = ResolveReporte(request);
-        var legacyParams = BuildLegacyParams(idReporte, request);
 
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
 
+        var legacyParams = await BuildLegacyParamsAsync(conn, idReporte, request, ct);
         var parametroId = await GuardarParametrosAsync(conn, idReporte, legacyParams, ct);
         var config = await ConsultarConfiguracionAsync(conn, idReporte, ct);
 
@@ -150,11 +150,11 @@ public class ReportesVentasRepository : IReportesVentasRepository
         CancellationToken ct = default)
     {
         var idReporte = ResolveReporte(request);
-        var legacyParams = BuildLegacyParams(idReporte, request);
 
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
 
+        var legacyParams = await BuildLegacyParamsAsync(conn, idReporte, request, ct);
         var parametroId = await GuardarParametrosAsync(conn, idReporte, legacyParams, ct);
         return await ConsultarAcumuladoresProductosPorParametrosAsync(conn, parametroId, request, ct);
     }
@@ -503,10 +503,14 @@ public class ReportesVentasRepository : IReportesVentasRepository
             : ReporteVentaProductos;
     }
 
-    private static LegacyReportParams BuildLegacyParams(int idReporte, ReportesVentasAcumuladoresProductosRequest request)
+    private static async Task<LegacyReportParams> BuildLegacyParamsAsync(
+        SqlConnection conn,
+        int idReporte,
+        ReportesVentasAcumuladoresProductosRequest request,
+        CancellationToken ct)
     {
         var idGrupoCategoria = request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria : GrupoCategoriaAcumuladores;
-        var idCliente = ResolveCliente(request);
+        var idCliente = await ResolveClienteAsync(conn, request, ct);
 
         return new LegacyReportParams
         {
@@ -528,13 +532,26 @@ public class ReportesVentasRepository : IReportesVentasRepository
         };
     }
 
-    private static int ResolveCliente(ReportesVentasAcumuladoresProductosRequest request)
+    private static async Task<int> ResolveClienteAsync(
+        SqlConnection conn,
+        ReportesVentasAcumuladoresProductosRequest request,
+        CancellationToken ct)
     {
         if ((request.Salida ?? "").Trim().Equals("excel", StringComparison.OrdinalIgnoreCase))
             return -1;
 
         if ((request.TipoReporte ?? "").Trim().Equals("cliente", StringComparison.OrdinalIgnoreCase))
-            return (request.IDClientes ?? new List<int>()).FirstOrDefault();
+        {
+            var candidate = (request.IDClientes ?? new List<int>()).FirstOrDefault(id => id > 0);
+            if (candidate <= 0) return 0;
+
+            var byId = await ConsultarClientesAsync(conn, null, candidate, ct);
+            if (byId.Any(cliente => cliente.IDCliente == candidate))
+                return candidate;
+
+            var byNumero = await ConsultarClientesAsync(conn, candidate, null, ct);
+            return byNumero.FirstOrDefault()?.IDCliente ?? candidate;
+        }
 
         return 0;
     }
