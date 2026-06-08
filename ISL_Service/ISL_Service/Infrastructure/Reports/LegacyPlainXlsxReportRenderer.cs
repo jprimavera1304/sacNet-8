@@ -30,6 +30,8 @@ public static class LegacyPlainXlsxReportRenderer
             }
         }
 
+        ApplyColumnSizing(worksheet, table.Columns.Count, table.Rows.Count + 1);
+
         using var ms = new MemoryStream();
         workbook.SaveAs(ms);
 
@@ -39,6 +41,24 @@ public static class LegacyPlainXlsxReportRenderer
             ContentType = ContentType,
             FileName = $"{SanitizeFileName(nombreReporte)}_{DateTime.Now:ddMMyyyy_HHmmss}.xlsx"
         };
+    }
+
+    private static void ApplyColumnSizing(IXLWorksheet worksheet, int columnCount, int lastRow)
+    {
+        if (columnCount <= 0)
+            return;
+
+        var scanUntilRow = Math.Max(1, lastRow);
+        worksheet.Columns(1, columnCount).AdjustToContents(1, scanUntilRow);
+
+        for (var columnIndex = 1; columnIndex <= columnCount; columnIndex++)
+        {
+            var column = worksheet.Column(columnIndex);
+            if (column.Width < 10)
+                column.Width = 10;
+            if (column.Width > 64)
+                column.Width = 64;
+        }
     }
 
     private static string SanitizeSheetName(string value)
