@@ -47,6 +47,13 @@ public class ReportesVentasGenerateResponse
     public string Salida { get; set; } = "pantalla";
 }
 
+public class ReportesVentasFileResponse
+{
+    public byte[] Content { get; set; } = Array.Empty<byte>();
+    public string ContentType { get; set; } = "";
+    public string FileName { get; set; } = "";
+}
+
 public class ReportesVentasColumnDto
 {
     public string Key { get; set; } = "";

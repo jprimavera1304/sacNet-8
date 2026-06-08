@@ -86,11 +86,20 @@ public class ReportesVentasController : ControllerBase
     [HttpGet("ReportesV2")]
     [HttpGet("acumuladores-productos/pantalla")]
     [AllowAnonymous]
-    [Produces("application/pdf")]
     public async Task<IActionResult> VerAcumuladoresProductosPantalla([FromQuery] int psp, CancellationToken ct)
     {
         if (psp <= 0)
             return BadRequest("psp requerido.");
+
+        try
+        {
+            var excel = await _service.GenerarAcumuladoresProductosExcelPorParametrosAsync(psp, ct);
+            Response.Headers["Cache-Control"] = "no-store";
+            return File(excel.Content, excel.ContentType, excel.FileName);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("salida Excel", StringComparison.OrdinalIgnoreCase))
+        {
+        }
 
         var result = await _service.ConsultarAcumuladoresProductosPorParametrosAsync(psp, ct);
         var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(result.Html, result.Orientacion, ct);

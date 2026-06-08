@@ -57,6 +57,16 @@ public class ReportesVentasService : IReportesVentasService
         return _repository.ConsultarAcumuladoresProductosPorParametrosAsync(parametrosLegacy, ct);
     }
 
+    public Task<ReportesVentasFileResponse> GenerarAcumuladoresProductosExcelPorParametrosAsync(
+        int parametrosLegacy,
+        CancellationToken ct = default)
+    {
+        if (parametrosLegacy <= 0)
+            throw new ArgumentException("psp requerido.");
+
+        return _repository.GenerarAcumuladoresProductosExcelPorParametrosAsync(parametrosLegacy, ct);
+    }
+
     private static void Validate(ReportesVentasAcumuladoresProductosRequest request)
     {
         if (request is null)

@@ -2,6 +2,7 @@ using System.Data;
 using ISL_Service.Application.DTOs.Reportes;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Data;
+using ISL_Service.Infrastructure.Reports;
 using Microsoft.Data.SqlClient;
 
 namespace ISL_Service.Infrastructure.Repositories;
@@ -16,6 +17,59 @@ public class ReportesVentasRepository : IReportesVentasRepository
     private const int ProductoServicioDomicilio = 11807;
     private const string FallbackLogoPath = "Assets/Logos/Logo_Zaragoza.png";
     private static readonly Lazy<string> FallbackLogoDataUri = new(() => TryImageFileToDataUri(Path.Combine(AppContext.BaseDirectory, FallbackLogoPath)) ?? "");
+    private static readonly LegacyExcelColumn[] VentaAcumuladoresExcelColumns =
+    {
+        new("No", typeof(int)),
+        new("FechaInicial", typeof(string)),
+        new("FechaFinal", typeof(string)),
+        new("Empresa", typeof(string)),
+        new("Almacen", typeof(string)),
+        new("Documento", typeof(string)),
+        new("Agente", typeof(string)),
+        new("Numero", typeof(int)),
+        new("Cliente", typeof(string)),
+        new("Categoria", typeof(string)),
+        new("Marca", typeof(string)),
+        new("FechaEmision", typeof(string)),
+        new("HoraEmision", typeof(string)),
+        new("Folio", typeof(string)),
+        new("Clave", typeof(string)),
+        new("UnidadMedida", typeof(string)),
+        new("Ventas", typeof(decimal)),
+        new("Garantias", typeof(decimal)),
+        new("Devolucion", typeof(decimal)),
+        new("Logistica", typeof(string)),
+        new("Servicios", typeof(string)),
+        new("Garantia", typeof(string)),
+        new("CentroServicio", typeof(string))
+    };
+    private static readonly LegacyExcelColumn[] VentaProductosExcelColumns =
+    {
+        new("No", typeof(int)),
+        new("FechaInicial", typeof(string)),
+        new("FechaFinal", typeof(string)),
+        new("Empresa", typeof(string)),
+        new("Almacen", typeof(string)),
+        new("Documento", typeof(string)),
+        new("Agente", typeof(string)),
+        new("Numero", typeof(int)),
+        new("Cliente", typeof(string)),
+        new("Categoria", typeof(string)),
+        new("SubCategoria", typeof(string)),
+        new("Marca", typeof(string)),
+        new("FechaEmision", typeof(string)),
+        new("HoraEmision", typeof(string)),
+        new("Folio", typeof(string)),
+        new("Clave", typeof(string)),
+        new("Descripcion", typeof(string)),
+        new("UnidadMedida", typeof(string)),
+        new("TotalLitros", typeof(decimal)),
+        new("Ventas", typeof(decimal)),
+        new("Mayorista", typeof(decimal)),
+        new("Local", typeof(decimal)),
+        new("Ajuste", typeof(decimal)),
+        new("Devolucion", typeof(decimal))
+    };
 
     public ReportesVentasRepository(IConfiguration configuration)
     {
@@ -114,6 +168,31 @@ public class ReportesVentasRepository : IReportesVentasRepository
 
         var legacy = await ConsultarParametrosAsync(conn, parametrosLegacy, ct);
         return await ConsultarAcumuladoresProductosPorParametrosAsync(conn, parametrosLegacy, legacy.Request, ct);
+    }
+
+    public async Task<ReportesVentasFileResponse> GenerarAcumuladoresProductosExcelPorParametrosAsync(
+        int parametrosLegacy,
+        CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        var legacy = await ConsultarParametrosAsync(conn, parametrosLegacy, ct);
+        if (ResolvePresentacion(legacy.Request.Salida) != 3)
+            throw new InvalidOperationException("El psp no corresponde a una salida Excel.");
+
+        var idReporte = legacy.IDReporte;
+        var config = await ConsultarConfiguracionAsync(conn, idReporte, ct);
+        var data = await ExecuteLegacySpAsync(conn, config.StoredProcedure, parametrosLegacy.ToString(), ct);
+        var source = data.Tables.Count > 0 ? data.Tables[0] : new DataTable();
+        var errorParams = source.Columns.Contains("ErrorParams") && source.Rows.Count > 0
+            ? Convert.ToString(source.Rows[0]["ErrorParams"]) ?? "Error de parametros legacy."
+            : "";
+        if (!string.IsNullOrWhiteSpace(errorParams))
+            throw new InvalidOperationException(errorParams);
+
+        var excelTable = BuildLegacyExcelTable(idReporte, source);
+        return LegacyPlainXlsxReportRenderer.Render(excelTable, config.NombreReporte);
     }
 
     private static async Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosPorParametrosAsync(
@@ -1356,6 +1435,56 @@ public class ReportesVentasRepository : IReportesVentasRepository
             return "date";
         return "text";
     }
+
+    private static DataTable BuildLegacyExcelTable(int idReporte, DataTable source)
+    {
+        var columns = idReporte == ReporteVentaProductos
+            ? VentaProductosExcelColumns
+            : VentaAcumuladoresExcelColumns;
+
+        var table = new DataTable(source.TableName);
+        foreach (var column in columns)
+            table.Columns.Add(column.Name, column.Type);
+
+        foreach (DataRow sourceRow in source.Rows)
+        {
+            var values = new object?[columns.Length];
+            for (var i = 0; i < columns.Length; i++)
+                values[i] = ReadLegacyExcelValue(sourceRow, columns[i]);
+            table.Rows.Add(values);
+        }
+
+        return table;
+    }
+
+    private static object ReadLegacyExcelValue(DataRow row, LegacyExcelColumn column)
+    {
+        if (row.Table.Columns.Contains(column.Name) && row[column.Name] != DBNull.Value)
+            return CoerceLegacyExcelValue(row[column.Name], column.Type);
+
+        if (column.Type == typeof(string))
+            return DBNull.Value;
+        if (column.Type == typeof(decimal))
+            return 0m;
+        if (column.Type == typeof(int))
+            return 0;
+
+        return DBNull.Value;
+    }
+
+    private static object CoerceLegacyExcelValue(object value, Type type)
+    {
+        if (type == typeof(string))
+            return Convert.ToString(value) ?? "";
+        if (type == typeof(decimal))
+            return decimal.TryParse(Convert.ToString(value), out var decimalValue) ? decimalValue : 0m;
+        if (type == typeof(int))
+            return int.TryParse(Convert.ToString(value), out var intValue) ? intValue : 0;
+
+        return value;
+    }
+
+    private sealed record LegacyExcelColumn(string Name, Type Type);
 
     private sealed class LegacyReportParams
     {

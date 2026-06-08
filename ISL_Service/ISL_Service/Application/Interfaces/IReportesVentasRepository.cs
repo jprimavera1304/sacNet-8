@@ -25,4 +25,8 @@ public interface IReportesVentasRepository
     Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosPorParametrosAsync(
         int parametrosLegacy,
         CancellationToken ct = default);
+
+    Task<ReportesVentasFileResponse> GenerarAcumuladoresProductosExcelPorParametrosAsync(
+        int parametrosLegacy,
+        CancellationToken ct = default);
 }
