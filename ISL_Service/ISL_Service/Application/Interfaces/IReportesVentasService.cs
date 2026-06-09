@@ -36,6 +36,10 @@ public interface IReportesVentasService
         ReportesVentasConcentradosRequest request,
         CancellationToken ct = default);
 
+    Task<ReportesVentasGenerateResponse> GenerarCobranzaAsync(
+        ReportesVentasCobranzaRequest request,
+        CancellationToken ct = default);
+
     Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
         CancellationToken ct = default);

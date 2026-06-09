@@ -56,6 +56,11 @@ public partial class ReportesVentasRepository
         return ReporteVentasConcentradosDetalle;
     }
 
+    private static int ResolveReporteCobranza(ReportesVentasCobranzaRequest request)
+    {
+        return ReporteVentasCobranzaDetalladoZara;
+    }
+
     private static bool IsAcumuladoresProductosReporte(int idReporte)
     {
         return idReporte == ReporteVentaAcumuladores || idReporte == ReporteVentaProductos;
@@ -82,6 +87,15 @@ public partial class ReportesVentasRepository
     private static bool IsConcentradosReporte(int idReporte)
     {
         return idReporte == ReporteVentasConcentradosDetalle;
+    }
+
+    private static bool IsCobranzaReporte(int idReporte)
+    {
+        return idReporte == ReporteVentasCobranzaDetalladoZara
+            || idReporte == ReporteVentasCobranzaPagadasDetalladoZara
+            || idReporte == ReporteVentasCobranzaPagadasTotalizadoZara
+            || idReporte == ReporteVentasCobranzaDesglosado
+            || idReporte == ReporteVentasCobranzaZaragoza;
     }
 
     private static async Task<LegacyReportParams> BuildLegacyParamsAsync(
@@ -167,6 +181,38 @@ public partial class ReportesVentasRepository
             Param3 = FormatLegacyStartDateTime(request.FechaInicial),
             Param4 = FormatLegacyEndDateTime(request.FechaFinal),
             Param5 = ResolvePresentacion(request.Salida).ToString()
+        };
+    }
+
+    private static async Task<LegacyReportParams> BuildCobranzaLegacyParamsAsync(
+        SqlConnection conn,
+        ReportesVentasCobranzaRequest request,
+        CancellationToken ct)
+    {
+        var idCliente = await ResolveClienteLegacyAsync(conn, request, ct);
+        var idsCliente = ResolveCobranzaStatus(request.CobranzaStatus) == 4
+            ? JoinIds(request.IDClientes)
+            : idCliente.ToString();
+        if (string.IsNullOrWhiteSpace(idsCliente))
+            idsCliente = idCliente.ToString();
+
+        return new LegacyReportParams
+        {
+            NombreEquipo = ResolveLegacyNombreEquipo(request),
+            IDUsuario = ResolveLegacyIDUsuario(request),
+            Param1 = BuildLegacyUsuarioParam(request),
+            Param2 = JoinIds(request.IDEmpresas),
+            Param3 = idCliente.ToString(),
+            Param4 = JoinIds(request.IDAgentes),
+            Param5 = "0",
+            Param6 = ResolveCobranzaStatus(request.CobranzaStatus).ToString(),
+            Param7 = "1",
+            Param8 = FormatLegacyStartDateTime(request.FechaInicial),
+            Param9 = FormatLegacyEndDateTime(request.FechaFinal),
+            Param10 = ResolvePresentacion(request.Salida).ToString(),
+            Param11 = idsCliente,
+            Param12 = "0",
+            Param13 = ""
         };
     }
 
@@ -331,6 +377,17 @@ public partial class ReportesVentasRepository
         return clean.Count == 0 ? "" : string.Join("~", clean);
     }
 
+    private static int ResolveCobranzaStatus(string? cobranzaStatus)
+    {
+        return (cobranzaStatus ?? "pagadas").Trim().ToLowerInvariant() switch
+        {
+            "vigentes" or "pendientes" => 1,
+            "vencidas" => 3,
+            "vigentes_vencidas" or "vigentes y vencidas" or "pendientes_vencidas" => 4,
+            _ => 2
+        };
+    }
+
     private static string ResolveLegacyNombreEquipo(ReportesVentasAcumuladoresProductosRequest request)
     {
         return string.IsNullOrWhiteSpace(request.LegacyNombreEquipo)
@@ -493,6 +550,21 @@ public partial class ReportesVentasRepository
         };
     }
 
+    private static ReportesVentasCobranzaRequest BuildCobranzaStoredRequest(DataRow row)
+    {
+        return new ReportesVentasCobranzaRequest
+        {
+            TipoReporte = ResolveTipoReporteFromCobranzaParams(row),
+            CobranzaStatus = ResolveCobranzaStatusKey(ReadString(row, "Param6")),
+            FechaInicial = ReadLegacyDate(row, "Param8"),
+            FechaFinal = ReadLegacyDate(row, "Param9"),
+            Salida = ResolveSalida(ReadString(row, "Param10")),
+            IDEmpresas = SplitLegacyIds(ReadString(row, "Param2")),
+            IDAgentes = SplitLegacyIds(ReadString(row, "Param4")),
+            IDClientes = SplitLegacyIds(ReadString(row, "Param11"))
+        };
+    }
+
     private static string ResolveTipoReporteFromParams(DataRow row)
     {
         var clientes = SplitLegacyIds(ReadString(row, "Param8"));
@@ -519,6 +591,19 @@ public partial class ReportesVentasRepository
         return "empresa";
     }
 
+    private static string ResolveTipoReporteFromCobranzaParams(DataRow row)
+    {
+        var clientes = SplitLegacyIds(ReadString(row, "Param11"));
+        if (clientes.Any(id => id > 0))
+            return "cliente";
+
+        var agentes = SplitLegacyIds(ReadString(row, "Param4"));
+        if (agentes.Any(id => id > 0))
+            return "agente";
+
+        return "empresa";
+    }
+
     private static string ResolveStatusFolioKey(string? statusFolio)
     {
         return (statusFolio ?? "").Trim() switch
@@ -527,6 +612,17 @@ public partial class ReportesVentasRepository
             "2" => "cancelados",
             "4" => "saldo_favor",
             _ => "todos"
+        };
+    }
+
+    private static string ResolveCobranzaStatusKey(string? status)
+    {
+        return (status ?? "").Trim() switch
+        {
+            "1" => "vigentes",
+            "3" => "vencidas",
+            "4" => "vigentes_vencidas",
+            _ => "pagadas"
         };
     }
 

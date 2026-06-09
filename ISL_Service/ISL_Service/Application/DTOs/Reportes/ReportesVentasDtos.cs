@@ -47,6 +47,11 @@ public class ReportesVentasConcentradosRequest : ReportesVentasAcumuladoresProdu
     public List<int> IDRepartidores { get; set; } = new();
 }
 
+public class ReportesVentasCobranzaRequest : ReportesVentasAcumuladoresProductosRequest
+{
+    public string CobranzaStatus { get; set; } = "pagadas";
+}
+
 public class ReportesVentasPreviewResponse
 {
     public int IDReporte { get; set; }

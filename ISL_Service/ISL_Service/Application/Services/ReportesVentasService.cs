@@ -85,6 +85,14 @@ public class ReportesVentasService : IReportesVentasService
         return _repository.GenerarConcentradosAsync(request, ct);
     }
 
+    public Task<ReportesVentasGenerateResponse> GenerarCobranzaAsync(
+        ReportesVentasCobranzaRequest request,
+        CancellationToken ct = default)
+    {
+        Validate(request);
+        return _repository.GenerarCobranzaAsync(request, ct);
+    }
+
     public Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
         CancellationToken ct = default)

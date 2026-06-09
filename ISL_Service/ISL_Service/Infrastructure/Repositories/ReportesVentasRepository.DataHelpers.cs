@@ -183,6 +183,10 @@ public partial class ReportesVentasRepository
             ReporteVentasRemisionesImpuestos => VentasRemisionesImpuestosExcelColumns,
             ReporteVentasFacturas => VentasFacturasExcelColumns,
             ReporteVentasConcentradosDetalle => VentasConcentradosDetalleExcelColumns,
+            ReporteVentasCobranzaDetalladoZara => VentasCobranzaDetalladoZaraExcelColumns,
+            ReporteVentasCobranzaPagadasDetalladoZara => VentasCobranzaPagadasDetalladoZaraExcelColumns,
+            ReporteVentasCobranzaPagadasTotalizadoZara => VentasCobranzaPagadasTotalizadoZaraExcelColumns,
+            ReporteVentasCobranzaDesglosado or ReporteVentasCobranzaZaragoza => VentasCobranzaDesglosadoExcelColumns,
             _ => VentaAcumuladoresExcelColumns
         };
 

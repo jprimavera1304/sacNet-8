@@ -17,6 +17,11 @@ public partial class ReportesVentasRepository
     private const int ReporteVentasRemisionesImpuestos = 22;
     private const int ReporteVentasFoliosDineroUsados = 23;
     private const int ReporteVentasFacturas = 24;
+    private const int ReporteVentasCobranzaDetalladoZara = 1161;
+    private const int ReporteVentasCobranzaPagadasDetalladoZara = 1162;
+    private const int ReporteVentasCobranzaPagadasTotalizadoZara = 1166;
+    private const int ReporteVentasCobranzaDesglosado = 1170;
+    private const int ReporteVentasCobranzaZaragoza = 1172;
     private const int ReporteVentasConcentradosDetalle = 1185;
     private const int GrupoCategoriaAcumuladores = 1;
     private const int ProductoServicioDomicilio = 11807;
@@ -225,5 +230,79 @@ public partial class ReportesVentasRepository
         new("Saldo", typeof(decimal)),
         new("DiasVencidos", typeof(int)),
         new("FechaCancelacionConcentrado", typeof(string))
+    };
+    private static readonly LegacyExcelColumn[] VentasCobranzaDetalladoZaraExcelColumns =
+    {
+        new("No", typeof(int)),
+        new("FechaInicial", typeof(string)),
+        new("FechaFinal", typeof(string)),
+        new("Agente", typeof(string)),
+        new("Estatus", typeof(string)),
+        new("Empresa", typeof(string)),
+        new("Folio", typeof(string)),
+        new("FechaEmision", typeof(string)),
+        new("FechaVencimiento", typeof(string)),
+        new("Numero", typeof(int)),
+        new("Nombre", typeof(string)),
+        new("Dinero", typeof(decimal)),
+        new("Cargos", typeof(decimal)),
+        new("Abonos", typeof(decimal)),
+        new("Descuentos", typeof(decimal)),
+        new("SaldoDinero", typeof(decimal)),
+        new("Cascos", typeof(decimal)),
+        new("PagosCascos", typeof(decimal)),
+        new("PagosDiferenciaCascos", typeof(decimal)),
+        new("SaldoCascos", typeof(decimal)),
+        new("DiasVencimiento", typeof(int)),
+        new("FechaPago", typeof(string))
+    };
+    private static readonly LegacyExcelColumn[] VentasCobranzaPagadasDetalladoZaraExcelColumns =
+    {
+        new("No", typeof(int)),
+        new("FechaInicial", typeof(string)),
+        new("FechaFinal", typeof(string)),
+        new("Agente", typeof(string)),
+        new("Estatus", typeof(string)),
+        new("Empresa", typeof(string)),
+        new("Folio", typeof(string)),
+        new("FechaEmision", typeof(string)),
+        new("FechaVencimiento", typeof(string)),
+        new("Numero", typeof(int)),
+        new("Nombre", typeof(string)),
+        new("DineroConIva", typeof(decimal)),
+        new("DineroSinIva", typeof(decimal)),
+        new("FechaPago", typeof(string))
+    };
+    private static readonly LegacyExcelColumn[] VentasCobranzaPagadasTotalizadoZaraExcelColumns =
+    {
+        new("FechaInicial", typeof(string)),
+        new("FechaFinal", typeof(string)),
+        new("NumeroAgente", typeof(int)),
+        new("NombreAgente", typeof(string)),
+        new("Dinero", typeof(decimal)),
+        new("DineroSinIva", typeof(decimal))
+    };
+    private static readonly LegacyExcelColumn[] VentasCobranzaDesglosadoExcelColumns =
+    {
+        new("No", typeof(int)),
+        new("FechaReporte", typeof(string)),
+        new("Agente", typeof(string)),
+        new("Empresa", typeof(string)),
+        new("FechaEmision", typeof(string)),
+        new("FechaVencimiento", typeof(string)),
+        new("Folio", typeof(string)),
+        new("Cliente", typeof(string)),
+        new("Dinero", typeof(decimal)),
+        new("Cargos", typeof(decimal)),
+        new("Abonos", typeof(decimal)),
+        new("Descuentos", typeof(decimal)),
+        new("SaldoDinero", typeof(decimal)),
+        new("Cascos", typeof(decimal)),
+        new("PagosCascos", typeof(decimal)),
+        new("PagosDiffCascos", typeof(decimal)),
+        new("SaldoCasco", typeof(decimal)),
+        new("SaldoTotal", typeof(decimal)),
+        new("DiasVencimientoCredito", typeof(int)),
+        new("Estatus", typeof(string))
     };
 }
