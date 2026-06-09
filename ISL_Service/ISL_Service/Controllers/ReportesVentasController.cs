@@ -48,6 +48,16 @@ public class ReportesVentasController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("remisiones/catalogos")]
+    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [ProducesResponseType(typeof(ReportesVentasCatalogosResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ConsultarCatalogosRemisiones(CancellationToken ct)
+    {
+        var result = await _service.ConsultarCatalogosRemisionesAsync(ct);
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(result);
+    }
+
     [HttpPost("acumuladores-productos/generar")]
     [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
@@ -60,6 +70,24 @@ public class ReportesVentasController : ControllerBase
             return BadRequest(new { message = "Body requerido." });
 
         var result = await _service.GenerarAcumuladoresProductosAsync(request, ct);
+        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
+
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(result);
+    }
+
+    [HttpPost("remisiones/generar")]
+    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GenerarRemisiones(
+        [FromBody] ReportesVentasRemisionesRequest request,
+        CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var result = await _service.GenerarRemisionesAsync(request, ct);
         result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
 
         Response.Headers["Cache-Control"] = "no-store";
@@ -93,7 +121,7 @@ public class ReportesVentasController : ControllerBase
 
         try
         {
-            var excel = await _service.GenerarAcumuladoresProductosExcelPorParametrosAsync(psp, ct);
+            var excel = await _service.GenerarReporteVentasExcelPorParametrosAsync(psp, ct);
             Response.Headers["Cache-Control"] = "no-store";
             return File(excel.Content, excel.ContentType, excel.FileName);
         }
@@ -101,7 +129,7 @@ public class ReportesVentasController : ControllerBase
         {
         }
 
-        var result = await _service.ConsultarAcumuladoresProductosPorParametrosAsync(psp, ct);
+        var result = await _service.ConsultarReporteVentasPorParametrosAsync(psp, ct);
         var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(result.Html, result.Orientacion, ct);
         Response.Headers["Cache-Control"] = "no-store";
         return File(pdf, "application/pdf");

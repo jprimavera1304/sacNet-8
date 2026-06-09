@@ -31,12 +31,28 @@ public class ReportesVentasService : IReportesVentasService
         return _repository.ConsultarClientesAsync(numero, idCliente, ct);
     }
 
+    public Task<ReportesVentasCatalogosResponse> ConsultarCatalogosRemisionesAsync(CancellationToken ct = default)
+    {
+        return _repository.ConsultarCatalogosRemisionesAsync(ct);
+    }
+
     public Task<ReportesVentasGenerateResponse> GenerarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
         CancellationToken ct = default)
     {
         Validate(request);
         return _repository.GenerarAcumuladoresProductosAsync(request, ct);
+    }
+
+    public Task<ReportesVentasGenerateResponse> GenerarRemisionesAsync(
+        ReportesVentasRemisionesRequest request,
+        CancellationToken ct = default)
+    {
+        Validate(request);
+        if ((request.IDUsuarios ?? new List<int>()).Where(id => id > 0).Distinct().Count() == 0)
+            throw new ArgumentException("seleccione al menos un usuario.");
+
+        return _repository.GenerarRemisionesAsync(request, ct);
     }
 
     public Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosAsync(
@@ -65,6 +81,26 @@ public class ReportesVentasService : IReportesVentasService
             throw new ArgumentException("psp requerido.");
 
         return _repository.GenerarAcumuladoresProductosExcelPorParametrosAsync(parametrosLegacy, ct);
+    }
+
+    public Task<ReportesVentasPreviewResponse> ConsultarReporteVentasPorParametrosAsync(
+        int parametrosLegacy,
+        CancellationToken ct = default)
+    {
+        if (parametrosLegacy <= 0)
+            throw new ArgumentException("psp requerido.");
+
+        return _repository.ConsultarReporteVentasPorParametrosAsync(parametrosLegacy, ct);
+    }
+
+    public Task<ReportesVentasFileResponse> GenerarReporteVentasExcelPorParametrosAsync(
+        int parametrosLegacy,
+        CancellationToken ct = default)
+    {
+        if (parametrosLegacy <= 0)
+            throw new ArgumentException("psp requerido.");
+
+        return _repository.GenerarReporteVentasExcelPorParametrosAsync(parametrosLegacy, ct);
     }
 
     private static void Validate(ReportesVentasAcumuladoresProductosRequest request)

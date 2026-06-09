@@ -14,8 +14,14 @@ public interface IReportesVentasRepository
         int? idCliente,
         CancellationToken ct = default);
 
+    Task<ReportesVentasCatalogosResponse> ConsultarCatalogosRemisionesAsync(CancellationToken ct = default);
+
     Task<ReportesVentasGenerateResponse> GenerarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
+        CancellationToken ct = default);
+
+    Task<ReportesVentasGenerateResponse> GenerarRemisionesAsync(
+        ReportesVentasRemisionesRequest request,
         CancellationToken ct = default);
 
     Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosAsync(
@@ -27,6 +33,14 @@ public interface IReportesVentasRepository
         CancellationToken ct = default);
 
     Task<ReportesVentasFileResponse> GenerarAcumuladoresProductosExcelPorParametrosAsync(
+        int parametrosLegacy,
+        CancellationToken ct = default);
+
+    Task<ReportesVentasPreviewResponse> ConsultarReporteVentasPorParametrosAsync(
+        int parametrosLegacy,
+        CancellationToken ct = default);
+
+    Task<ReportesVentasFileResponse> GenerarReporteVentasExcelPorParametrosAsync(
         int parametrosLegacy,
         CancellationToken ct = default);
 }

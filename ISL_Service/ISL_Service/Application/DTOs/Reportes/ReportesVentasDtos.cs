@@ -18,6 +18,12 @@ public class ReportesVentasAcumuladoresProductosRequest
     public string Salida { get; set; } = "pantalla";
 }
 
+public class ReportesVentasRemisionesRequest : ReportesVentasAcumuladoresProductosRequest
+{
+    public string EstatusFolio { get; set; } = "todos";
+    public List<int> IDUsuarios { get; set; } = new();
+}
+
 public class ReportesVentasPreviewResponse
 {
     public int IDReporte { get; set; }
@@ -71,6 +77,8 @@ public class ReportesVentasCatalogosResponse
     public List<ReportesVentasProductoItem> Subcategorias { get; set; } = new();
     public List<ReportesVentasProductoItem> Marcas { get; set; } = new();
     public List<ReportesVentasCatalogoItem> Documentos { get; set; } = new();
+    public List<ReportesVentasCatalogoItem> StatusFolios { get; set; } = new();
+    public List<ReportesVentasCatalogoItem> Usuarios { get; set; } = new();
 }
 
 public class ReportesVentasCatalogoItem
