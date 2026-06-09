@@ -24,6 +24,11 @@ public class ReportesVentasRemisionesRequest : ReportesVentasAcumuladoresProduct
     public List<int> IDUsuarios { get; set; } = new();
 }
 
+public class ReportesVentasFoliosRequest : ReportesVentasRemisionesRequest
+{
+    public bool FoliosDineroCascos { get; set; }
+}
+
 public class ReportesVentasPreviewResponse
 {
     public int IDReporte { get; set; }

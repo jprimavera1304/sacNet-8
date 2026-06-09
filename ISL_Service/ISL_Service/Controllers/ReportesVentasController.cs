@@ -94,6 +94,24 @@ public class ReportesVentasController : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost("folios/generar")]
+    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GenerarFolios(
+        [FromBody] ReportesVentasFoliosRequest request,
+        CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        var result = await _service.GenerarFoliosAsync(request, ct);
+        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
+
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(result);
+    }
+
     [HttpPost("acumuladores-productos/vista-previa")]
     [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
     [ProducesResponseType(typeof(ReportesVentasPreviewResponse), StatusCodes.Status200OK)]

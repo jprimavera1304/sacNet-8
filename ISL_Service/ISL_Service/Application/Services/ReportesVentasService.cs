@@ -49,10 +49,19 @@ public class ReportesVentasService : IReportesVentasService
         CancellationToken ct = default)
     {
         Validate(request);
-        if ((request.IDUsuarios ?? new List<int>()).Where(id => id > 0).Distinct().Count() == 0)
-            throw new ArgumentException("seleccione al menos un usuario.");
+        ValidateUsuarios(request);
 
         return _repository.GenerarRemisionesAsync(request, ct);
+    }
+
+    public Task<ReportesVentasGenerateResponse> GenerarFoliosAsync(
+        ReportesVentasFoliosRequest request,
+        CancellationToken ct = default)
+    {
+        Validate(request);
+        ValidateUsuarios(request);
+
+        return _repository.GenerarFoliosAsync(request, ct);
     }
 
     public Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosAsync(
@@ -123,5 +132,11 @@ public class ReportesVentasService : IReportesVentasService
             throw new ArgumentException("seleccione al menos un agente.");
         if (tipoReporte == "cliente" && (request.IDClientes ?? new List<int>()).Where(id => id > 0).Distinct().Count() == 0)
             throw new ArgumentException("seleccione el cliente.");
+    }
+
+    private static void ValidateUsuarios(ReportesVentasRemisionesRequest request)
+    {
+        if ((request.IDUsuarios ?? new List<int>()).Where(id => id > 0).Distinct().Count() == 0)
+            throw new ArgumentException("seleccione al menos un usuario.");
     }
 }
