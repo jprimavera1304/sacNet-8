@@ -1,4 +1,5 @@
-﻿using System.Data;
+using System.Data;
+using System.Globalization;
 using ISL_Service.Application.DTOs.Reportes;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Data;
@@ -94,7 +95,9 @@ public partial class ReportesVentasRepository
 
         return new LegacyReportParams
         {
-            Param1 = "WEB[0",
+            NombreEquipo = ResolveLegacyNombreEquipo(request),
+            IDUsuario = ResolveLegacyIDUsuario(request),
+            Param1 = BuildLegacyUsuarioParam(request),
             Param2 = JoinIds(request.IDEmpresas),
             Param3 = idGrupoCategoria.ToString(),
             Param4 = JoinIds(request.IDSubcategorias),
@@ -132,7 +135,9 @@ public partial class ReportesVentasRepository
         var idCliente = await ResolveClienteLegacyAsync(conn, request, ct);
         return new LegacyReportParams
         {
-            Param1 = "WEB[0",
+            NombreEquipo = ResolveLegacyNombreEquipo(request),
+            IDUsuario = ResolveLegacyIDUsuario(request),
+            Param1 = BuildLegacyUsuarioParam(request),
             Param2 = JoinIds(request.IDEmpresas),
             Param3 = JoinIds(request.IDAlmacenes),
             Param4 = ResolveTipoDocumento(request.Documento).ToString(),
@@ -155,10 +160,12 @@ public partial class ReportesVentasRepository
     {
         return new LegacyReportParams
         {
-            Param1 = "WEB[0",
+            NombreEquipo = ResolveLegacyNombreEquipo(request),
+            IDUsuario = ResolveLegacyIDUsuario(request),
+            Param1 = BuildLegacyUsuarioParam(request),
             Param2 = JoinIds(request.IDRepartidores),
-            Param3 = request.FechaInicial.ToString("yyyy-MM-dd"),
-            Param4 = request.FechaFinal.ToString("yyyy-MM-dd"),
+            Param3 = FormatLegacyStartDateTime(request.FechaInicial),
+            Param4 = FormatLegacyEndDateTime(request.FechaFinal),
             Param5 = ResolvePresentacion(request.Salida).ToString()
         };
     }
@@ -324,6 +331,33 @@ public partial class ReportesVentasRepository
         return clean.Count == 0 ? "" : string.Join("~", clean);
     }
 
+    private static string ResolveLegacyNombreEquipo(ReportesVentasAcumuladoresProductosRequest request)
+    {
+        return string.IsNullOrWhiteSpace(request.LegacyNombreEquipo)
+            ? "WEB"
+            : request.LegacyNombreEquipo.Trim();
+    }
+
+    private static int ResolveLegacyIDUsuario(ReportesVentasAcumuladoresProductosRequest request)
+    {
+        return request.LegacyIDUsuario > 0 ? request.LegacyIDUsuario : 0;
+    }
+
+    private static string BuildLegacyUsuarioParam(ReportesVentasAcumuladoresProductosRequest request)
+    {
+        return $"{ResolveLegacyNombreEquipo(request)}[{ResolveLegacyIDUsuario(request)}";
+    }
+
+    private static string FormatLegacyStartDateTime(DateTime date)
+    {
+        return $"{date.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture)}@00:00:00";
+    }
+
+    private static string FormatLegacyEndDateTime(DateTime date)
+    {
+        return $"{date.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture)}@23:59:59";
+    }
+
     private static async Task<int> GuardarParametrosAsync(
         SqlConnection conn,
         int idReporte,
@@ -336,8 +370,8 @@ public partial class ReportesVentasRepository
             CommandTimeout = 500
         };
 
-        cmd.Parameters.AddWithValue("@NombreEquipo", "WEB");
-        cmd.Parameters.AddWithValue("@IDUsuario", 0);
+        cmd.Parameters.AddWithValue("@NombreEquipo", legacyParams.NombreEquipo);
+        cmd.Parameters.AddWithValue("@IDUsuario", legacyParams.IDUsuario);
         cmd.Parameters.AddWithValue("@IDReporte", idReporte);
         cmd.Parameters.AddWithValue("@Param1", legacyParams.Param1);
         cmd.Parameters.AddWithValue("@Param2", legacyParams.Param2);

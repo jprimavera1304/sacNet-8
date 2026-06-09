@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace ISL_Service.Application.DTOs.Reportes;
 
 public class ReportesVentasAcumuladoresProductosRequest
@@ -16,6 +18,12 @@ public class ReportesVentasAcumuladoresProductosRequest
     public List<int> IDAgentes { get; set; } = new();
     public List<int> IDClientes { get; set; } = new();
     public string Salida { get; set; } = "pantalla";
+
+    [JsonIgnore]
+    public int LegacyIDUsuario { get; set; }
+
+    [JsonIgnore]
+    public string LegacyNombreEquipo { get; set; } = "WEB";
 }
 
 public class ReportesVentasRemisionesRequest : ReportesVentasAcumuladoresProductosRequest

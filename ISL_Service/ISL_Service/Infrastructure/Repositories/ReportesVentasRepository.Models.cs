@@ -13,6 +13,8 @@ public partial class ReportesVentasRepository
 
     private sealed class LegacyReportParams
     {
+        public string NombreEquipo { get; set; } = "WEB";
+        public int IDUsuario { get; set; }
         public string Param1 { get; set; } = "";
         public string Param2 { get; set; } = "";
         public string Param3 { get; set; } = "";

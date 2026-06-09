@@ -3,6 +3,7 @@ using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Reports;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Shared.Backend.Core.Abstractions;
 
 namespace ISL_Service.Controllers;
 
@@ -12,10 +13,12 @@ namespace ISL_Service.Controllers;
 public class ReportesVentasController : ControllerBase
 {
     private readonly IReportesVentasService _service;
+    private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public ReportesVentasController(IReportesVentasService service)
+    public ReportesVentasController(IReportesVentasService service, ICurrentUserAccessor currentUserAccessor)
     {
         _service = service;
+        _currentUserAccessor = currentUserAccessor;
     }
 
     [HttpGet("acumuladores-productos/catalogos")]
@@ -69,6 +72,7 @@ public class ReportesVentasController : ControllerBase
         if (request is null)
             return BadRequest(new { message = "Body requerido." });
 
+        HydrateLegacyContext(request);
         var result = await _service.GenerarAcumuladoresProductosAsync(request, ct);
         result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
 
@@ -87,6 +91,7 @@ public class ReportesVentasController : ControllerBase
         if (request is null)
             return BadRequest(new { message = "Body requerido." });
 
+        HydrateLegacyContext(request);
         var result = await _service.GenerarRemisionesAsync(request, ct);
         result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
 
@@ -105,6 +110,7 @@ public class ReportesVentasController : ControllerBase
         if (request is null)
             return BadRequest(new { message = "Body requerido." });
 
+        HydrateLegacyContext(request);
         var result = await _service.GenerarFoliosAsync(request, ct);
         result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
 
@@ -123,6 +129,7 @@ public class ReportesVentasController : ControllerBase
         if (request is null)
             return BadRequest(new { message = "Body requerido." });
 
+        HydrateLegacyContext(request);
         var result = await _service.GenerarFacturasAsync(request, ct);
         result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
 
@@ -141,6 +148,7 @@ public class ReportesVentasController : ControllerBase
         if (request is null)
             return BadRequest(new { message = "Body requerido." });
 
+        HydrateLegacyContext(request);
         var result = await _service.GenerarConcentradosAsync(request, ct);
         result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
 
@@ -159,6 +167,7 @@ public class ReportesVentasController : ControllerBase
         if (request is null)
             return BadRequest(new { message = "Body requerido." });
 
+        HydrateLegacyContext(request);
         var result = await _service.ConsultarAcumuladoresProductosAsync(request, ct);
         Response.Headers["Cache-Control"] = "no-store";
         return Ok(result);
@@ -194,5 +203,11 @@ public class ReportesVentasController : ControllerBase
         var psp = Uri.EscapeDataString(parametrosLegacy);
         var pathBase = Request.PathBase.HasValue ? Request.PathBase.Value : "";
         return $"{Request.Scheme}://{Request.Host}{pathBase}/api/reportes/ventas/ReportesV3W?psp={psp}";
+    }
+
+    private void HydrateLegacyContext(ReportesVentasAcumuladoresProductosRequest request)
+    {
+        request.LegacyIDUsuario = _currentUserAccessor.GetLegacyUserId(User);
+        request.LegacyNombreEquipo = "WEB";
     }
 }
