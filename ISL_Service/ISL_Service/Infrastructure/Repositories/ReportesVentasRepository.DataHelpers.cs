@@ -181,6 +181,7 @@ public partial class ReportesVentasRepository
             ReporteVentasRemisiones => VentasRemisionesExcelColumns,
             ReporteVentasRemisionesSaldoFavor => VentasRemisionesSaldoFavorExcelColumns,
             ReporteVentasRemisionesImpuestos => VentasRemisionesImpuestosExcelColumns,
+            ReporteVentasFacturas => VentasFacturasExcelColumns,
             _ => VentaAcumuladoresExcelColumns
         };
 

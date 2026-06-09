@@ -64,6 +64,16 @@ public class ReportesVentasService : IReportesVentasService
         return _repository.GenerarFoliosAsync(request, ct);
     }
 
+    public Task<ReportesVentasGenerateResponse> GenerarFacturasAsync(
+        ReportesVentasFacturasRequest request,
+        CancellationToken ct = default)
+    {
+        Validate(request);
+        ValidateUsuarios(request);
+
+        return _repository.GenerarFacturasAsync(request, ct);
+    }
+
     public Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
         CancellationToken ct = default)

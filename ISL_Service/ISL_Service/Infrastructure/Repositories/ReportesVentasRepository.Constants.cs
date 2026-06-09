@@ -16,6 +16,7 @@ public partial class ReportesVentasRepository
     private const int ReporteVentasRemisiones = 21;
     private const int ReporteVentasRemisionesImpuestos = 22;
     private const int ReporteVentasFoliosDineroUsados = 23;
+    private const int ReporteVentasFacturas = 24;
     private const int GrupoCategoriaAcumuladores = 1;
     private const int ProductoServicioDomicilio = 11807;
     private const string FallbackLogoPath = "Assets/Logos/Logo_Zaragoza.png";
@@ -166,5 +167,42 @@ public partial class ReportesVentasRepository
         new("ImporteConIva", typeof(decimal)),
         new("ImporteCostoConIva", typeof(decimal)),
         new("Impuestos", typeof(decimal))
+    };
+    private static readonly LegacyExcelColumn[] VentasFacturasExcelColumns =
+    {
+        new("No", typeof(int)),
+        new("FechaInicial", typeof(string)),
+        new("FechaFinal", typeof(string)),
+        new("Usuario", typeof(string)),
+        new("Tipo", typeof(string)),
+        new("Folio", typeof(string)),
+        new("Uuid", typeof(string)),
+        new("Fecha", typeof(string)),
+        new("Numero", typeof(int)),
+        new("NombreCliente", typeof(string)),
+        new("NombreFacturacion", typeof(string)),
+        new("RFC", typeof(string)),
+        new("RegimenFiscal", typeof(string)),
+        new("UsoCFDI", typeof(string)),
+        new("FormaPago", typeof(string)),
+        new("MetodoPago", typeof(string)),
+        new("SubTotal", typeof(decimal)),
+        new("Iva", typeof(decimal)),
+        new("TotalFacturado", typeof(decimal)),
+        new("DineroRemision", typeof(decimal)),
+        new("CascosRemision", typeof(decimal)),
+        new("TotalRemision", typeof(decimal)),
+        new("FoliosRelacionados", typeof(string)),
+        new("DineroRelacionados", typeof(string)),
+        new("CascosRelacionados", typeof(string)),
+        new("TotalPagarRelacionados", typeof(string)),
+        new("TotalRemisionesDinero", typeof(decimal)),
+        new("TotalRemisionesCascos", typeof(decimal)),
+        new("TotalRemisionesTotalPagar", typeof(decimal)),
+        new("NumRemisiones", typeof(int)),
+        new("TotalComplementos", typeof(decimal)),
+        new("FechaCancelacion", typeof(string)),
+        new("UsuarioCancelacion", typeof(string)),
+        new("EquipoCancelacion", typeof(string))
     };
 }

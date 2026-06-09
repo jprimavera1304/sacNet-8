@@ -29,6 +29,11 @@ public class ReportesVentasFoliosRequest : ReportesVentasRemisionesRequest
     public bool FoliosDineroCascos { get; set; }
 }
 
+public class ReportesVentasFacturasRequest : ReportesVentasRemisionesRequest
+{
+    public string TipoFactura { get; set; } = "factura";
+}
+
 public class ReportesVentasPreviewResponse
 {
     public int IDReporte { get; set; }

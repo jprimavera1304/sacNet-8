@@ -45,6 +45,11 @@ public partial class ReportesVentasRepository
             : ReporteVentasFoliosGlobal;
     }
 
+    private static int ResolveReporteFacturas(ReportesVentasFacturasRequest request)
+    {
+        return ReporteVentasFacturas;
+    }
+
     private static bool IsAcumuladoresProductosReporte(int idReporte)
     {
         return idReporte == ReporteVentaAcumuladores || idReporte == ReporteVentaProductos;
@@ -61,6 +66,11 @@ public partial class ReportesVentasRepository
     {
         return idReporte == ReporteVentasFoliosGlobal
             || idReporte == ReporteVentasFoliosDineroUsados;
+    }
+
+    private static bool IsFacturasReporte(int idReporte)
+    {
+        return idReporte == ReporteVentasFacturas;
     }
 
     private static async Task<LegacyReportParams> BuildLegacyParamsAsync(
@@ -105,7 +115,9 @@ public partial class ReportesVentasRepository
         SqlConnection conn,
         int idReporte,
         ReportesVentasRemisionesRequest request,
-        CancellationToken ct)
+        CancellationToken ct,
+        int formato = 1,
+        int tipo = 0)
     {
         var idCliente = await ResolveClienteLegacyAsync(conn, request, ct);
         return new LegacyReportParams
@@ -121,8 +133,8 @@ public partial class ReportesVentasRepository
             Param9 = request.FechaFinal.ToString("yyyy-MM-dd"),
             Param10 = ResolvePresentacion(request.Salida).ToString(),
             Param11 = JoinIds(request.IDUsuarios),
-            Param12 = "1",
-            Param13 = "0",
+            Param12 = formato.ToString(),
+            Param13 = tipo.ToString(),
             Param14 = idReporte == ReporteVentasRemisiones && request.SoloServiciosDomicilio
                 ? ProductoServicioDomicilio.ToString()
                 : ""
@@ -448,6 +460,16 @@ public partial class ReportesVentasRepository
             "2" => "cancelados",
             "4" => "saldo_favor",
             _ => "todos"
+        };
+    }
+
+    private static int ResolveTipoFactura(string? tipoFactura)
+    {
+        return (tipoFactura ?? "factura").Trim().ToLowerInvariant() switch
+        {
+            "nota_credito" or "nota credito" => 1,
+            "complemento_pago" or "complemento pago" => 4,
+            _ => 0
         };
     }
 }
