@@ -34,6 +34,11 @@ public class ReportesVentasFacturasRequest : ReportesVentasRemisionesRequest
     public string TipoFactura { get; set; } = "factura";
 }
 
+public class ReportesVentasConcentradosRequest : ReportesVentasAcumuladoresProductosRequest
+{
+    public List<int> IDRepartidores { get; set; } = new();
+}
+
 public class ReportesVentasPreviewResponse
 {
     public int IDReporte { get; set; }
@@ -89,6 +94,7 @@ public class ReportesVentasCatalogosResponse
     public List<ReportesVentasCatalogoItem> Documentos { get; set; } = new();
     public List<ReportesVentasCatalogoItem> StatusFolios { get; set; } = new();
     public List<ReportesVentasCatalogoItem> Usuarios { get; set; } = new();
+    public List<ReportesVentasCatalogoItem> Repartidores { get; set; } = new();
 }
 
 public class ReportesVentasCatalogoItem

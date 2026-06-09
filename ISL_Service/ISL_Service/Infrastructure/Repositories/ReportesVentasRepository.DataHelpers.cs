@@ -182,6 +182,7 @@ public partial class ReportesVentasRepository
             ReporteVentasRemisionesSaldoFavor => VentasRemisionesSaldoFavorExcelColumns,
             ReporteVentasRemisionesImpuestos => VentasRemisionesImpuestosExcelColumns,
             ReporteVentasFacturas => VentasFacturasExcelColumns,
+            ReporteVentasConcentradosDetalle => VentasConcentradosDetalleExcelColumns,
             _ => VentaAcumuladoresExcelColumns
         };
 

@@ -60,6 +60,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         var empresas = await ConsultarEmpresasAsync(conn, ct);
         var agentes = await ConsultarAgentesAsync(conn, ct);
         var usuarios = await ConsultarUsuariosAsync(conn, ct);
+        var repartidores = await ConsultarRepartidoresAsync(conn, ct);
 
         return new ReportesVentasCatalogosResponse
         {
@@ -67,6 +68,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
             Empresas = empresas,
             Agentes = agentes,
             Usuarios = usuarios,
+            Repartidores = repartidores,
             Documentos = BuildDocumentosConTodos(),
             StatusFolios = BuildStatusFolios()
         };
@@ -181,6 +183,29 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         };
     }
 
+    public async Task<ReportesVentasGenerateResponse> GenerarConcentradosAsync(
+        ReportesVentasConcentradosRequest request,
+        CancellationToken ct = default)
+    {
+        var idReporte = ResolveReporteConcentrados(request);
+
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        var legacyParams = BuildConcentradosLegacyParams(request);
+        var parametroId = await GuardarParametrosAsync(conn, idReporte, legacyParams, ct);
+        var config = await ConsultarConfiguracionAsync(conn, idReporte, ct);
+
+        return new ReportesVentasGenerateResponse
+        {
+            IDReporte = idReporte,
+            NombreReporte = config.NombreReporte,
+            StoredProcedure = config.StoredProcedure,
+            ParametrosLegacy = parametroId.ToString(),
+            Salida = (request.Salida ?? "pantalla").Trim().ToLowerInvariant()
+        };
+    }
+
     public async Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
         CancellationToken ct = default)
@@ -260,6 +285,11 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
             var request = BuildRemisionesStoredRequest(row);
             return await ConsultarReportePorParametrosAsync(conn, parametrosLegacy, idReporte, request, ct);
         }
+        if (IsConcentradosReporte(idReporte))
+        {
+            var request = BuildConcentradosStoredRequest(row);
+            return await ConsultarReportePorParametrosAsync(conn, parametrosLegacy, idReporte, request, ct);
+        }
 
         throw new InvalidOperationException("El psp no corresponde a un reporte soportado.");
     }
@@ -276,11 +306,13 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         var salida = ResolveSalida(ReadString(row, "Param10"));
         if (IsAcumuladoresProductosReporte(idReporte))
             salida = ResolveSalida(ReadString(row, "Param12"));
+        if (IsConcentradosReporte(idReporte))
+            salida = ResolveSalida(ReadString(row, "Param5"));
 
         if (salida != "excel")
             throw new InvalidOperationException("El psp no corresponde a una salida Excel.");
 
-        if (!IsAcumuladoresProductosReporte(idReporte) && !IsRemisionesReporte(idReporte) && !IsFoliosReporte(idReporte) && !IsFacturasReporte(idReporte))
+        if (!IsAcumuladoresProductosReporte(idReporte) && !IsRemisionesReporte(idReporte) && !IsFoliosReporte(idReporte) && !IsFacturasReporte(idReporte) && !IsConcentradosReporte(idReporte))
             throw new InvalidOperationException("El psp no corresponde a un reporte soportado.");
 
         var config = await ConsultarConfiguracionAsync(conn, idReporte, ct);

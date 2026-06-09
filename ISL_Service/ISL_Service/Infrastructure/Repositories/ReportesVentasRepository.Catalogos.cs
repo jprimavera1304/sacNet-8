@@ -112,6 +112,32 @@ public partial class ReportesVentasRepository
             .ToList();
     }
 
+    private static async Task<List<ReportesVentasCatalogoItem>> ConsultarRepartidoresAsync(SqlConnection conn, CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("sp_n_ConsultaRepartidores", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = 500
+        };
+        cmd.Parameters.AddWithValue("@IDRepartidor", 0);
+        cmd.Parameters.AddWithValue("@IDZona", 0);
+        cmd.Parameters.AddWithValue("@IDStatus", 1);
+        cmd.Parameters.AddWithValue("@Repartidor", "");
+        cmd.Parameters.AddWithValue("@Identico", 0);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return table.AsEnumerable()
+            .Select(row => new ReportesVentasCatalogoItem
+            {
+                Id = ReadInt(row, "IDRepartidor"),
+                Nombre = ReadString(row, "Repartidor"),
+                Clave = ReadString(row, "Repartidor")
+            })
+            .Where(x => x.Id > 0 && !string.IsNullOrWhiteSpace(x.Nombre))
+            .OrderBy(x => x.Nombre)
+            .ToList();
+    }
+
 
     private static async Task<List<ReportesVentasClienteItem>> ConsultarClientesAsync(
         SqlConnection conn,

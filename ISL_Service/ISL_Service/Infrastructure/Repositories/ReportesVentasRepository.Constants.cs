@@ -17,6 +17,7 @@ public partial class ReportesVentasRepository
     private const int ReporteVentasRemisionesImpuestos = 22;
     private const int ReporteVentasFoliosDineroUsados = 23;
     private const int ReporteVentasFacturas = 24;
+    private const int ReporteVentasConcentradosDetalle = 1185;
     private const int GrupoCategoriaAcumuladores = 1;
     private const int ProductoServicioDomicilio = 11807;
     private const string FallbackLogoPath = "Assets/Logos/Logo_Zaragoza.png";
@@ -204,5 +205,25 @@ public partial class ReportesVentasRepository
         new("FechaCancelacion", typeof(string)),
         new("UsuarioCancelacion", typeof(string)),
         new("EquipoCancelacion", typeof(string))
+    };
+    private static readonly LegacyExcelColumn[] VentasConcentradosDetalleExcelColumns =
+    {
+        new("No", typeof(int)),
+        new("FechaInicial", typeof(string)),
+        new("FechaFinal", typeof(string)),
+        new("FolioConcentrado", typeof(int)),
+        new("UsuarioConcentrado", typeof(string)),
+        new("FechaConcentrado", typeof(string)),
+        new("Repartidor", typeof(string)),
+        new("Empresa", typeof(string)),
+        new("FolioNota", typeof(string)),
+        new("FechaNota", typeof(string)),
+        new("Cliente", typeof(string)),
+        new("NumProductos", typeof(int)),
+        new("PesoKg", typeof(decimal)),
+        new("TotalPagar", typeof(decimal)),
+        new("Saldo", typeof(decimal)),
+        new("DiasVencidos", typeof(int)),
+        new("FechaCancelacionConcentrado", typeof(string))
     };
 }

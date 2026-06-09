@@ -74,6 +74,17 @@ public class ReportesVentasService : IReportesVentasService
         return _repository.GenerarFacturasAsync(request, ct);
     }
 
+    public Task<ReportesVentasGenerateResponse> GenerarConcentradosAsync(
+        ReportesVentasConcentradosRequest request,
+        CancellationToken ct = default)
+    {
+        Validate(request);
+        if ((request.IDRepartidores ?? new List<int>()).Where(id => id > 0).Distinct().Count() == 0)
+            throw new ArgumentException("seleccione al menos un repartidor.");
+
+        return _repository.GenerarConcentradosAsync(request, ct);
+    }
+
     public Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
         CancellationToken ct = default)

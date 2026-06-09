@@ -50,6 +50,11 @@ public partial class ReportesVentasRepository
         return ReporteVentasFacturas;
     }
 
+    private static int ResolveReporteConcentrados(ReportesVentasConcentradosRequest request)
+    {
+        return ReporteVentasConcentradosDetalle;
+    }
+
     private static bool IsAcumuladoresProductosReporte(int idReporte)
     {
         return idReporte == ReporteVentaAcumuladores || idReporte == ReporteVentaProductos;
@@ -71,6 +76,11 @@ public partial class ReportesVentasRepository
     private static bool IsFacturasReporte(int idReporte)
     {
         return idReporte == ReporteVentasFacturas;
+    }
+
+    private static bool IsConcentradosReporte(int idReporte)
+    {
+        return idReporte == ReporteVentasConcentradosDetalle;
     }
 
     private static async Task<LegacyReportParams> BuildLegacyParamsAsync(
@@ -138,6 +148,18 @@ public partial class ReportesVentasRepository
             Param14 = idReporte == ReporteVentasRemisiones && request.SoloServiciosDomicilio
                 ? ProductoServicioDomicilio.ToString()
                 : ""
+        };
+    }
+
+    private static LegacyReportParams BuildConcentradosLegacyParams(ReportesVentasConcentradosRequest request)
+    {
+        return new LegacyReportParams
+        {
+            Param1 = "WEB[0",
+            Param2 = JoinIds(request.IDRepartidores),
+            Param3 = request.FechaInicial.ToString("yyyy-MM-dd"),
+            Param4 = request.FechaFinal.ToString("yyyy-MM-dd"),
+            Param5 = ResolvePresentacion(request.Salida).ToString()
         };
     }
 
@@ -423,6 +445,17 @@ public partial class ReportesVentasRepository
             IDUsuarios = SplitLegacyIds(ReadString(row, "Param11")),
             IDAgentes = SplitLegacyIds(ReadString(row, "Param6")),
             IDClientes = SplitLegacyIds(ReadString(row, "Param5"))
+        };
+    }
+
+    private static ReportesVentasConcentradosRequest BuildConcentradosStoredRequest(DataRow row)
+    {
+        return new ReportesVentasConcentradosRequest
+        {
+            FechaInicial = ReadLegacyDate(row, "Param3"),
+            FechaFinal = ReadLegacyDate(row, "Param4"),
+            Salida = ResolveSalida(ReadString(row, "Param5")),
+            IDRepartidores = SplitLegacyIds(ReadString(row, "Param2"))
         };
     }
 
