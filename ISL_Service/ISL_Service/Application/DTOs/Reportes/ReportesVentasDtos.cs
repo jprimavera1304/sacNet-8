@@ -52,6 +52,28 @@ public class ReportesVentasCobranzaRequest : ReportesVentasAcumuladoresProductos
     public string CobranzaStatus { get; set; } = "pagadas";
 }
 
+public class ReportesVentasLegacyRequest : ReportesVentasAcumuladoresProductosRequest
+{
+    public string ReporteKey { get; set; } = "";
+    public int IDReporte { get; set; }
+    public string EstatusFolio { get; set; } = "todos";
+    public string TipoFactura { get; set; } = "factura";
+    public string Formato { get; set; } = "detallado";
+    public string FormatoMotobaterias { get; set; } = "cliente";
+    public string TipoPago { get; set; } = "todos";
+    public List<int> IDTiposPago { get; set; } = new();
+    public bool PagosPorDia { get; set; }
+    public bool PagosExcedentes { get; set; }
+    public string TransferenciaEstatus { get; set; } = "todas";
+    public string DineroCascos { get; set; } = "dinero";
+    public bool FiltrarFechas { get; set; }
+    public decimal Gastos { get; set; }
+    public List<int> IDUsuarios { get; set; } = new();
+    public List<int> IDRepartidores { get; set; } = new();
+    public List<int> IDCentros { get; set; } = new();
+    public List<int> IDStatusGarantias { get; set; } = new();
+}
+
 public class ReportesVentasPreviewResponse
 {
     public int IDReporte { get; set; }

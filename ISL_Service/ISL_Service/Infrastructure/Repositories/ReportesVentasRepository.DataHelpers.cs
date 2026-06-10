@@ -187,8 +187,11 @@ public partial class ReportesVentasRepository
             ReporteVentasCobranzaPagadasDetalladoZara => VentasCobranzaPagadasDetalladoZaraExcelColumns,
             ReporteVentasCobranzaPagadasTotalizadoZara => VentasCobranzaPagadasTotalizadoZaraExcelColumns,
             ReporteVentasCobranzaDesglosado or ReporteVentasCobranzaZaragoza => VentasCobranzaDesglosadoExcelColumns,
-            _ => VentaAcumuladoresExcelColumns
+            _ => Array.Empty<LegacyExcelColumn>()
         };
+
+        if (columns.Length == 0)
+            return source.Copy();
 
         var table = new DataTable(source.TableName);
         foreach (var column in columns)

@@ -98,6 +98,124 @@ public partial class ReportesVentasRepository
             || idReporte == ReporteVentasCobranzaZaragoza;
     }
 
+    private static int ResolveReporteLegacyVentas(ReportesVentasLegacyRequest request)
+    {
+        if (request.IDReporte > 0)
+            return request.IDReporte;
+
+        return (request.ReporteKey ?? "").Trim().ToLowerInvariant() switch
+        {
+            "motobaterias" => ResolveReporteMotobaterias(request.FormatoMotobaterias),
+            "cobranza_detallado" => ReporteVentasCobranzaZaragoza,
+            "cobranza_pagadas" => ResolveFormatoDetallado(request.Formato) ? ReporteVentasCobranzaPagadasDetalladoZara : ReporteVentasCobranzaPagadasTotalizadoZara,
+            "estado_de_cuenta" => ResolveReporteEstadoCuenta(request.DineroCascos),
+            "rutas_de_agentes" => ReporteVentasCobranzaDesglosado,
+            "pagos" => ResolveFormatoDetallado(request.Formato) ? ReporteVentasPagosDetallado : ReporteVentasPagosTotalizado,
+            "descuentos" => ReporteVentasPagosDescuentos,
+            "transferencias_duplicadas" => ReporteVentasPagosTransferenciasDuplicadas,
+            "transferencias_clientes" => ReporteTransferenciasClientes,
+            "transferencias_estatus" => ReporteTransferenciasEstatus,
+            "transferencias_folios" => ReporteTransferenciasFolios,
+            "ventas_y_pagos" => ReporteVentasPagosComparativo,
+            "utilidad" => request.IDGrupoCategoria == GrupoCategoriaAcumuladores ? ReporteVentasUtilidadAcumuladores : ReporteVentasUtilidadProductos,
+            "clientes_globales" => ReporteClientesGlobal,
+            "clientes_con_descuentos" => ReporteClientesDescuentos,
+            "clientes_sin_descuentos" => ReporteClientesDescuentosSin,
+            "clientes_compras" => ReporteClientesConSinCompra,
+            "clientes_con_compra" => ReporteClientesConCompra,
+            "clientes_con_compra_por_dia" => ReporteClientesConCompraPorDia,
+            "clientes_sin_compra" => ReporteClientesSinCompra,
+            "clientes_facturas_rfc" => ReporteClientesFacturasRFC,
+            "clientes_acum_moto_lub" => ReporteClientesAcumMotoLub,
+            "clientes_acum_moto_lub_clarios" => ReporteClientesAcumMotoLubClarios,
+            "cascos" => ReporteVentasUsadosCreditos,
+            "cascos_excedentes" => ReporteVentasCascosExcedentes,
+            "liquidaciones" => ReporteVentasLiquidaciones,
+            "cobros_dinero_y_cascos" => (request.DineroCascos ?? "").Trim().Equals("cascos", StringComparison.OrdinalIgnoreCase) ? ReporteVentasCobrosCascos : ReporteVentasCobrosDinero,
+            "movimientos_centros" => ReporteCentrosRemisiones,
+            "centros_de_servicio" => ReporteCentrosCompleto,
+            "hoja_de_cobro_total_cobrado" => ResolveFormatoDetallado(request.Formato) ? ReporteHojaCobroTotalCobradoDetallado : ReporteHojaCobroTotalCobradoTotalizado,
+            "hoja_de_cobro_total_cascos" => ReporteHojaCobroTotalCascos,
+            "hoja_de_cobro_cheques" => ReporteHojaCobroCheques,
+            "garantias" => ReporteGarantias,
+            _ => throw new InvalidOperationException("Reporte de ventas no soportado.")
+        };
+    }
+
+    private static int ResolveReporteMotobaterias(string? formato)
+    {
+        return (formato ?? "cliente").Trim().ToLowerInvariant() switch
+        {
+            "folio" => ReporteVentasMotoBateriasPorFolio,
+            "codigo" => ReporteVentasMotoBateriasPorCodigo,
+            "marca" => ReporteVentasMotoBateriasPorMarca,
+            _ => ReporteVentasMotoBateriasPorCliente
+        };
+    }
+
+    private static int ResolveReporteEstadoCuenta(string? formato)
+    {
+        return ReporteVentasEstadoCuenta;
+    }
+
+    private static string ResolveFormatoEstadoCuenta(string? formato)
+    {
+        return (formato ?? "").Trim().ToLowerInvariant() switch
+        {
+            "dinero" => "1",
+            "cascos" => "2",
+            _ => "0"
+        };
+    }
+
+    private static bool IsGenericVentasReporte(int idReporte)
+    {
+        return idReporte is
+            ReporteVentasMotoBateriasPorCliente or
+            ReporteVentasMotoBateriasPorFolio or
+            ReporteVentasMotoBateriasPorCodigo or
+            ReporteVentasMotoBateriasPorMarca or
+            ReporteVentasPagosDetallado or
+            ReporteVentasPagosDetalladoCS or
+            ReporteVentasPagosDescuentos or
+            ReporteVentasPagosTransferenciasDuplicadas or
+            ReporteVentasPagosTotalizado or
+            ReporteVentasPagosTotalizadoCS or
+            ReporteVentasPagosDetalladoTauro or
+            ReporteClientesGlobal or
+            ReporteClientesConCompra or
+            ReporteClientesConCompraPorDia or
+            ReporteClientesSinCompra or
+            ReporteClientesConSinCompra or
+            ReporteClientesDescuentos or
+            ReporteClientesDescuentosSin or
+            ReporteClientesAcumMotoLub or
+            ReporteClientesAcumMotoLubClarios or
+            ReporteClientesFacturasRFC or
+            ReporteVentasUtilidadAcumuladores or
+            ReporteVentasUtilidadProductos or
+            ReporteVentasPagosComparativo or
+            ReporteVentasDescuentosAjustes or
+            ReporteVentasUsadosCreditos or
+            ReporteGarantias or
+            ReporteVentasCascosExcedentes or
+            ReporteVentasLiquidaciones or
+            ReporteVentasCobrosDinero or
+            ReporteVentasCobrosCascos or
+            ReporteVentasEstadoCuenta or
+            ReporteVentasEstadoCuentaDinero or
+            ReporteVentasEstadoCuentaCascos or
+            ReporteTransferenciasClientes or
+            ReporteTransferenciasEstatus or
+            ReporteTransferenciasFolios or
+            ReporteCentrosRemisiones or
+            ReporteCentrosCompleto or
+            ReporteHojaCobroTotalCobradoDetallado or
+            ReporteHojaCobroTotalCobradoTotalizado or
+            ReporteHojaCobroTotalCascos or
+            ReporteHojaCobroCheques;
+    }
+
     private static async Task<LegacyReportParams> BuildLegacyParamsAsync(
         SqlConnection conn,
         int idReporte,
@@ -214,6 +332,317 @@ public partial class ReportesVentasRepository
             Param12 = "0",
             Param13 = ""
         };
+    }
+
+    private static async Task<LegacyReportParams> BuildLegacyVentasParamsAsync(
+        SqlConnection conn,
+        int idReporte,
+        ReportesVentasLegacyRequest request,
+        CancellationToken ct)
+    {
+        var idCliente = await ResolveClienteLegacyAsync(conn, request, ct);
+        var idsCliente = JoinIds(request.IDClientes);
+        if (string.IsNullOrWhiteSpace(idsCliente))
+            idsCliente = idCliente.ToString();
+
+        var idsEmpresa = JoinIds(request.IDEmpresas);
+        var idsAgente = JoinIds(request.IDAgentes);
+        var presentacion = ResolvePresentacion(request.Salida).ToString();
+        var fechaInicial = request.FechaInicial.ToString("yyyy-MM-dd");
+        var fechaFinal = request.FechaFinal.ToString("yyyy-MM-dd");
+        var formato = ResolveFormatoDetallado(request.Formato) ? "1" : "0";
+
+        var legacy = new LegacyReportParams
+        {
+            NombreEquipo = ResolveLegacyNombreEquipo(request),
+            IDUsuario = ResolveLegacyIDUsuario(request),
+            Param1 = BuildLegacyUsuarioParam(request)
+        };
+
+        switch (idReporte)
+        {
+            case ReporteVentasMotoBateriasPorCliente:
+            case ReporteVentasMotoBateriasPorFolio:
+            case ReporteVentasMotoBateriasPorCodigo:
+            case ReporteVentasMotoBateriasPorMarca:
+                legacy.Param2 = idsEmpresa;
+                legacy.Param3 = JoinIds(request.IDAlmacenes);
+                legacy.Param4 = idCliente.ToString();
+                legacy.Param5 = idsAgente;
+                legacy.Param6 = fechaInicial;
+                legacy.Param7 = fechaFinal;
+                legacy.Param8 = presentacion;
+                break;
+
+            case ReporteVentasPagosDetallado:
+            case ReporteVentasPagosTotalizado:
+            case ReporteVentasPagosDetalladoTauro:
+            case ReporteVentasPagosDetalladoCS:
+            case ReporteVentasPagosTotalizadoCS:
+                legacy.Param2 = idsEmpresa;
+                legacy.Param3 = ResolveTiposPago(request);
+                legacy.Param4 = idsAgente;
+                legacy.Param5 = idCliente.ToString();
+                legacy.Param6 = fechaInicial;
+                legacy.Param7 = fechaFinal;
+                legacy.Param8 = "0";
+                legacy.Param9 = formato;
+                legacy.Param10 = "0";
+                legacy.Param11 = presentacion;
+                legacy.Param12 = request.PagosExcedentes ? "3" : "0";
+                break;
+
+            case ReporteVentasPagosDescuentos:
+                legacy.Param2 = idsEmpresa;
+                legacy.Param3 = "12";
+                legacy.Param4 = idsAgente;
+                legacy.Param5 = idCliente.ToString();
+                legacy.Param6 = fechaInicial;
+                legacy.Param7 = fechaFinal;
+                legacy.Param8 = "0";
+                legacy.Param9 = "1";
+                legacy.Param10 = presentacion;
+                break;
+
+            case ReporteVentasPagosTransferenciasDuplicadas:
+                legacy.Param2 = idsEmpresa;
+                legacy.Param3 = idsAgente;
+                legacy.Param4 = fechaInicial;
+                legacy.Param5 = fechaFinal;
+                legacy.Param6 = presentacion;
+                break;
+
+            case ReporteVentasCobranzaZaragoza:
+                legacy.Param2 = idsEmpresa;
+                legacy.Param3 = idCliente.ToString();
+                legacy.Param4 = idsAgente;
+                legacy.Param5 = "0";
+                legacy.Param6 = "4";
+                legacy.Param7 = "1";
+                legacy.Param8 = FormatLegacyStartDateTime(request.FechaInicial);
+                legacy.Param9 = FormatLegacyEndDateTime(request.FechaFinal);
+                legacy.Param10 = presentacion;
+                legacy.Param11 = idsCliente;
+                legacy.Param12 = request.FiltrarFechas ? "1" : "0";
+                legacy.Param13 = "";
+                break;
+
+            case ReporteVentasCobranzaPagadasDetalladoZara:
+            case ReporteVentasCobranzaPagadasTotalizadoZara:
+                legacy.Param2 = idsEmpresa;
+                legacy.Param3 = idCliente.ToString();
+                legacy.Param4 = idsAgente;
+                legacy.Param5 = "0";
+                legacy.Param6 = "2";
+                legacy.Param7 = formato;
+                legacy.Param8 = FormatLegacyStartDateTime(request.FechaInicial);
+                legacy.Param9 = FormatLegacyEndDateTime(request.FechaFinal);
+                legacy.Param10 = presentacion;
+                legacy.Param11 = idsCliente;
+                legacy.Param12 = request.FiltrarFechas ? "1" : "0";
+                legacy.Param13 = "";
+                break;
+
+            case ReporteVentasCobranzaDesglosado:
+                legacy.Param2 = idsEmpresa;
+                legacy.Param3 = idCliente.ToString();
+                legacy.Param4 = idsAgente;
+                legacy.Param5 = "1";
+                legacy.Param6 = presentacion;
+                break;
+
+            case ReporteTransferenciasClientes:
+                legacy.Param2 = "0";
+                legacy.Param3 = "0";
+                legacy.Param4 = idsCliente;
+                legacy.Param5 = "";
+                legacy.Param6 = "0";
+                legacy.Param7 = "0";
+                legacy.Param8 = "0";
+                legacy.Param9 = "0";
+                legacy.Param10 = fechaInicial;
+                legacy.Param11 = fechaFinal;
+                legacy.Param12 = presentacion;
+                break;
+
+            case ReporteTransferenciasEstatus:
+                legacy.Param2 = "0";
+                legacy.Param3 = ResolveTransferenciaEstatus(request.TransferenciaEstatus).ToString();
+                legacy.Param4 = idsCliente;
+                legacy.Param5 = "";
+                legacy.Param6 = "0";
+                legacy.Param7 = "0";
+                legacy.Param8 = "0";
+                legacy.Param9 = "0";
+                legacy.Param10 = fechaInicial;
+                legacy.Param11 = fechaFinal;
+                legacy.Param12 = presentacion;
+                break;
+
+            case ReporteTransferenciasFolios:
+                legacy.Param2 = "0";
+                legacy.Param3 = string.IsNullOrWhiteSpace(idsEmpresa) ? "1" : idsEmpresa;
+                legacy.Param4 = idsCliente;
+                legacy.Param5 = "0";
+                legacy.Param6 = fechaInicial;
+                legacy.Param7 = fechaFinal;
+                legacy.Param8 = presentacion;
+                break;
+
+            case ReporteVentasPagosComparativo:
+            case ReporteClientesConSinCompra:
+            case ReporteClientesConCompra:
+            case ReporteClientesSinCompra:
+            case ReporteClientesFacturasRFC:
+            case ReporteClientesAcumMotoLub:
+            case ReporteClientesAcumMotoLubClarios:
+                legacy.Param2 = idsEmpresa;
+                legacy.Param3 = fechaInicial;
+                legacy.Param4 = fechaFinal;
+                legacy.Param5 = idsAgente;
+                legacy.Param6 = idCliente.ToString();
+                legacy.Param7 = presentacion;
+                if (idReporte == ReporteClientesAcumMotoLubClarios)
+                {
+                    legacy.Param8 = request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria.ToString() : "1";
+                    legacy.Param9 = request.FechaFinal.Year.ToString();
+                }
+                break;
+
+            case ReporteClientesGlobal:
+                legacy.Param2 = idsEmpresa;
+                legacy.Param3 = idsAgente;
+                legacy.Param4 = idCliente.ToString();
+                legacy.Param5 = presentacion;
+                break;
+
+            case ReporteClientesDescuentos:
+            case ReporteClientesDescuentosSin:
+                legacy.Param2 = "1";
+                legacy.Param3 = request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria.ToString() : GrupoCategoriaAcumuladores.ToString();
+                legacy.Param4 = idsAgente;
+                legacy.Param5 = idCliente.ToString();
+                legacy.Param6 = idReporte == ReporteClientesDescuentos ? "1" : "0";
+                legacy.Param7 = presentacion;
+                break;
+
+            case ReporteClientesConCompraPorDia:
+                legacy.Param2 = idsEmpresa;
+                legacy.Param3 = fechaInicial;
+                legacy.Param4 = fechaFinal;
+                legacy.Param5 = idsAgente;
+                legacy.Param6 = "1~2~3~4~5~6";
+                legacy.Param7 = idCliente.ToString();
+                legacy.Param8 = presentacion;
+                break;
+
+            case ReporteVentasUtilidadAcumuladores:
+            case ReporteVentasUtilidadProductos:
+                legacy.Param2 = idsEmpresa;
+                legacy.Param3 = (request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria : GrupoCategoriaAcumuladores).ToString();
+                legacy.Param4 = JoinIds(request.IDSubcategorias);
+                legacy.Param5 = JoinIds(request.IDMarcas);
+                legacy.Param6 = JoinIds(request.IDAlmacenes);
+                legacy.Param7 = "0";
+                legacy.Param8 = idCliente.ToString();
+                legacy.Param9 = idsAgente;
+                legacy.Param10 = fechaInicial;
+                legacy.Param11 = fechaFinal;
+                legacy.Param12 = request.Gastos.ToString(CultureInfo.InvariantCulture);
+                legacy.Param13 = presentacion;
+                break;
+
+            case ReporteVentasCascosExcedentes:
+                legacy.Param2 = idsEmpresa;
+                legacy.Param3 = idCliente.ToString();
+                legacy.Param4 = idsAgente;
+                legacy.Param5 = fechaInicial;
+                legacy.Param6 = fechaFinal;
+                legacy.Param7 = presentacion;
+                legacy.Param8 = JoinIds(request.IDUsuarios);
+                legacy.Param9 = formato;
+                break;
+
+            case ReporteVentasUsadosCreditos:
+                legacy.Param2 = idsEmpresa;
+                legacy.Param3 = fechaInicial;
+                legacy.Param4 = fechaFinal;
+                legacy.Param5 = idsAgente;
+                legacy.Param6 = idCliente.ToString();
+                legacy.Param7 = "0";
+                legacy.Param8 = "2";
+                legacy.Param9 = presentacion;
+                break;
+
+            case ReporteVentasLiquidaciones:
+                legacy.Param2 = fechaInicial;
+                legacy.Param3 = fechaFinal;
+                legacy.Param4 = "1";
+                legacy.Param5 = JoinIds(request.IDRepartidores);
+                legacy.Param6 = presentacion;
+                break;
+
+            case ReporteVentasCobrosDinero:
+            case ReporteVentasCobrosCascos:
+                legacy.Param2 = fechaInicial;
+                legacy.Param3 = fechaFinal;
+                legacy.Param4 = idReporte == ReporteVentasCobrosCascos ? "2" : "1";
+                legacy.Param5 = "1";
+                legacy.Param6 = presentacion;
+                break;
+
+            case ReporteVentasEstadoCuenta:
+            case ReporteVentasEstadoCuentaDinero:
+            case ReporteVentasEstadoCuentaCascos:
+                legacy.Param2 = idsEmpresa;
+                legacy.Param3 = idCliente.ToString();
+                legacy.Param4 = idsAgente;
+                legacy.Param5 = fechaInicial;
+                legacy.Param6 = fechaFinal;
+                legacy.Param7 = ResolveFormatoEstadoCuenta(request.DineroCascos);
+                legacy.Param8 = presentacion;
+                legacy.Param9 = idsCliente;
+                break;
+
+            case ReporteCentrosRemisiones:
+            case ReporteCentrosCompleto:
+                legacy.Param2 = fechaInicial;
+                legacy.Param3 = fechaFinal;
+                legacy.Param4 = JoinIds(request.IDCentros);
+                legacy.Param5 = presentacion;
+                break;
+
+            case ReporteHojaCobroTotalCobradoDetallado:
+            case ReporteHojaCobroTotalCobradoTotalizado:
+            case ReporteHojaCobroTotalCascos:
+            case ReporteHojaCobroCheques:
+                legacy.Param2 = "0";
+                legacy.Param3 = "0";
+                legacy.Param4 = "0";
+                legacy.Param5 = "0";
+                legacy.Param6 = "0";
+                legacy.Param7 = fechaInicial;
+                legacy.Param8 = fechaFinal;
+                legacy.Param9 = presentacion;
+                legacy.Param10 = formato;
+                break;
+
+            case ReporteGarantias:
+                legacy.Param2 = idsCliente;
+                legacy.Param3 = JoinIds(request.IDRepartidores);
+                legacy.Param4 = JoinIds(request.IDStatusGarantias);
+                legacy.Param5 = "";
+                legacy.Param6 = fechaInicial;
+                legacy.Param7 = fechaFinal;
+                legacy.Param8 = idsCliente;
+                legacy.Param9 = presentacion;
+                break;
+
+            default:
+                throw new InvalidOperationException("Reporte de ventas no soportado.");
+        }
+
+        return legacy;
     }
 
     private static int ResolveStatusFolio(string? estatusFolio)
@@ -385,6 +814,64 @@ public partial class ReportesVentasRepository
             "vencidas" => 3,
             "vigentes_vencidas" or "vigentes y vencidas" or "pendientes_vencidas" => 4,
             _ => 2
+        };
+    }
+
+    private static bool ResolveFormatoDetallado(string? formato)
+    {
+        return !(formato ?? "detallado").Trim().Equals("totalizado", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int ResolveTipoPago(string? tipoPago)
+    {
+        return (tipoPago ?? "todos").Trim().ToLowerInvariant() switch
+        {
+            "efectivo" => 1,
+            "cheque" => 2,
+            "descuento" or "descuentos" => 3,
+            "transferencia" => 5,
+            "cargo" => 7,
+            "tarjeta" => 9,
+            "deposito_efectivo" or "deposito en efectivo" => 10,
+            "excedente_usados" or "excedente de usados" => 11,
+            "saldo_dinero" or "saldo dinero" => 13,
+            "saldo_cascos" or "saldo cascos" => 14,
+            "bonificacion" or "bonificación" => 15,
+            "nota_credito" or "nota de credito" or "nota de crédito" => 16,
+            "casco_kilo" or "casco kilo" => 17,
+            _ => 0
+        };
+    }
+
+    private static string ResolveTiposPago(ReportesVentasLegacyRequest request)
+    {
+        if (request.IDTiposPago?.Count > 0)
+        {
+            return string.Join("|", request.IDTiposPago.Where(id => id != 0).Distinct());
+        }
+
+        var raw = (request.TipoPago ?? "").Trim();
+        if (raw.Length > 0 && raw.Any(char.IsDigit) && raw.All(ch => char.IsDigit(ch) || ch == '|' || ch == ',' || ch == ';' || char.IsWhiteSpace(ch)))
+        {
+            return string.Join("|", raw
+                .Replace(",", "|", StringComparison.Ordinal)
+                .Replace(";", "|", StringComparison.Ordinal)
+                .Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(value => int.TryParse(value, out var id) ? id : 0)
+                .Where(id => id != 0)
+                .Distinct());
+        }
+
+        return ResolveTipoPago(raw).ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static int ResolveTransferenciaEstatus(string? transferenciaEstatus)
+    {
+        return (transferenciaEstatus ?? "todas").Trim().ToLowerInvariant() switch
+        {
+            "liquidadas" => -2,
+            "saldo_pendiente" or "con saldo pendiente" => -3,
+            _ => -1
         };
     }
 
@@ -563,6 +1050,65 @@ public partial class ReportesVentasRepository
             IDAgentes = SplitLegacyIds(ReadString(row, "Param4")),
             IDClientes = SplitLegacyIds(ReadString(row, "Param11"))
         };
+    }
+
+    private static ReportesVentasAcumuladoresProductosRequest BuildGenericVentasStoredRequest(DataRow row)
+    {
+        var idReporte = ReadInt(row, "IDReporte");
+        var fechaInicialColumn = idReporte switch
+        {
+            ReporteVentasPagosTransferenciasDuplicadas => "Param4",
+            ReporteTransferenciasClientes or ReporteTransferenciasEstatus => "Param10",
+            ReporteTransferenciasFolios => "Param6",
+            ReporteVentasCobrosDinero or ReporteVentasCobrosCascos => "Param2",
+            ReporteCentrosRemisiones or ReporteCentrosCompleto => "Param2",
+            ReporteHojaCobroTotalCobradoDetallado or ReporteHojaCobroTotalCobradoTotalizado or ReporteHojaCobroTotalCascos or ReporteHojaCobroCheques => "Param7",
+            _ => "Param3"
+        };
+        var fechaFinalColumn = idReporte switch
+        {
+            ReporteVentasPagosTransferenciasDuplicadas => "Param5",
+            ReporteTransferenciasClientes or ReporteTransferenciasEstatus => "Param11",
+            ReporteTransferenciasFolios => "Param7",
+            ReporteVentasCobrosDinero or ReporteVentasCobrosCascos => "Param3",
+            ReporteCentrosRemisiones or ReporteCentrosCompleto => "Param3",
+            ReporteHojaCobroTotalCobradoDetallado or ReporteHojaCobroTotalCobradoTotalizado or ReporteHojaCobroTotalCascos or ReporteHojaCobroCheques => "Param8",
+            _ => "Param4"
+        };
+
+        return new ReportesVentasAcumuladoresProductosRequest
+        {
+            TipoReporte = ResolveTipoReporteFromParams(row),
+            FechaInicial = ReadLegacyDate(row, fechaInicialColumn),
+            FechaFinal = ReadLegacyDate(row, fechaFinalColumn),
+            Salida = ResolveGenericVentasSalida(idReporte, row),
+            IDEmpresas = SplitLegacyIds(ReadString(row, "Param2")),
+            IDAgentes = SplitLegacyIds(ReadString(row, "Param4", "Param5")),
+            IDClientes = SplitLegacyIds(ReadString(row, "Param3", "Param4", "Param5", "Param6"))
+        };
+    }
+
+    private static string ResolveGenericVentasSalida(int idReporte, DataRow row)
+    {
+        var column = idReporte switch
+        {
+            ReporteVentasPagosDetallado or ReporteVentasPagosTotalizado or ReporteVentasPagosDetalladoCS or ReporteVentasPagosTotalizadoCS or ReporteVentasPagosDetalladoTauro => "Param11",
+            ReporteTransferenciasClientes or ReporteTransferenciasEstatus => "Param12",
+            ReporteTransferenciasFolios => "Param8",
+            ReporteClientesConCompraPorDia => "Param8",
+            ReporteVentasUtilidadAcumuladores or ReporteVentasUtilidadProductos => "Param13",
+            ReporteVentasCascosExcedentes => "Param7",
+            ReporteVentasCobrosDinero or ReporteVentasCobrosCascos => "Param6",
+            ReporteVentasEstadoCuenta or ReporteVentasEstadoCuentaDinero or ReporteVentasEstadoCuentaCascos => "Param8",
+            ReporteCentrosRemisiones or ReporteCentrosCompleto => "Param5",
+            ReporteHojaCobroTotalCobradoDetallado or ReporteHojaCobroTotalCobradoTotalizado or ReporteHojaCobroTotalCascos or ReporteHojaCobroCheques => "Param9",
+            ReporteGarantias => "Param9",
+            ReporteClientesGlobal => "Param5",
+            ReporteClientesDescuentos or ReporteClientesDescuentosSin => "Param7",
+            _ => "Param7"
+        };
+
+        return ResolveSalida(ReadString(row, column));
     }
 
     private static string ResolveTipoReporteFromParams(DataRow row)

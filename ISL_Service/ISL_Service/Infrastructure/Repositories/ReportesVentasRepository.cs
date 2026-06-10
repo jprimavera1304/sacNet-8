@@ -229,6 +229,29 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         };
     }
 
+    public async Task<ReportesVentasGenerateResponse> GenerarLegacyVentasAsync(
+        ReportesVentasLegacyRequest request,
+        CancellationToken ct = default)
+    {
+        var idReporte = ResolveReporteLegacyVentas(request);
+
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        var legacyParams = await BuildLegacyVentasParamsAsync(conn, idReporte, request, ct);
+        var parametroId = await GuardarParametrosAsync(conn, idReporte, legacyParams, ct);
+        var config = await ConsultarConfiguracionAsync(conn, idReporte, ct);
+
+        return new ReportesVentasGenerateResponse
+        {
+            IDReporte = idReporte,
+            NombreReporte = config.NombreReporte,
+            StoredProcedure = config.StoredProcedure,
+            ParametrosLegacy = parametroId.ToString(),
+            Salida = (request.Salida ?? "pantalla").Trim().ToLowerInvariant()
+        };
+    }
+
     public async Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
         CancellationToken ct = default)
@@ -318,6 +341,11 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
             var request = BuildCobranzaStoredRequest(row);
             return await ConsultarReportePorParametrosAsync(conn, parametrosLegacy, idReporte, request, ct);
         }
+        if (IsGenericVentasReporte(idReporte))
+        {
+            var request = BuildGenericVentasStoredRequest(row);
+            return await ConsultarReportePorParametrosAsync(conn, parametrosLegacy, idReporte, request, ct);
+        }
 
         throw new InvalidOperationException("El psp no corresponde a un reporte soportado.");
     }
@@ -336,11 +364,13 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
             salida = ResolveSalida(ReadString(row, "Param12"));
         if (IsConcentradosReporte(idReporte))
             salida = ResolveSalida(ReadString(row, "Param5"));
+        if (IsGenericVentasReporte(idReporte))
+            salida = ResolveGenericVentasSalida(idReporte, row);
 
         if (salida != "excel")
             throw new InvalidOperationException("El psp no corresponde a una salida Excel.");
 
-        if (!IsAcumuladoresProductosReporte(idReporte) && !IsRemisionesReporte(idReporte) && !IsFoliosReporte(idReporte) && !IsFacturasReporte(idReporte) && !IsConcentradosReporte(idReporte) && !IsCobranzaReporte(idReporte))
+        if (!IsAcumuladoresProductosReporte(idReporte) && !IsRemisionesReporte(idReporte) && !IsFoliosReporte(idReporte) && !IsFacturasReporte(idReporte) && !IsConcentradosReporte(idReporte) && !IsCobranzaReporte(idReporte) && !IsGenericVentasReporte(idReporte))
             throw new InvalidOperationException("El psp no corresponde a un reporte soportado.");
 
         var config = await ConsultarConfiguracionAsync(conn, idReporte, ct);

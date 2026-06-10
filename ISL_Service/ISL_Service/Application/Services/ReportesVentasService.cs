@@ -93,6 +93,17 @@ public class ReportesVentasService : IReportesVentasService
         return _repository.GenerarCobranzaAsync(request, ct);
     }
 
+    public Task<ReportesVentasGenerateResponse> GenerarLegacyVentasAsync(
+        ReportesVentasLegacyRequest request,
+        CancellationToken ct = default)
+    {
+        Validate(request);
+        if (string.IsNullOrWhiteSpace(request.ReporteKey) && request.IDReporte <= 0)
+            throw new ArgumentException("reporteKey o idReporte requerido.");
+
+        return _repository.GenerarLegacyVentasAsync(request, ct);
+    }
+
     public Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
         CancellationToken ct = default)
