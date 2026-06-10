@@ -218,6 +218,24 @@ public partial class ReportesVentasRepository
         new("ImporteCostoConIva", typeof(decimal)),
         new("Impuestos", typeof(decimal))
     };
+    private static readonly LegacyExcelColumn[] HojaCobroTotalCascosExcelColumns =
+    {
+        new("FechaInicial", typeof(string)),
+        new("FechaFinal", typeof(string)),
+        new("FechaCobro", typeof(string)),
+        new("FolioCobro", typeof(int)),
+        new("Repartidor", typeof(string)),
+        new("CantidadG1", typeof(int)),
+        new("CantidadG2", typeof(int)),
+        new("CantidadG3", typeof(int)),
+        new("CantidadG4", typeof(int)),
+        new("CantidadG5", typeof(int)),
+        new("CantidadG6", typeof(int)),
+        new("CantidadG7", typeof(int)),
+        new("CantidadMoto", typeof(int)),
+        new("TotalCascos", typeof(decimal)),
+        new("Cancelada", typeof(string))
+    };
     private static readonly LegacyExcelColumn[] VentasFacturasExcelColumns =
     {
         new("No", typeof(int)),

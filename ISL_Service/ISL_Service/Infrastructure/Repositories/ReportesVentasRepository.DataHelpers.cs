@@ -187,6 +187,7 @@ public partial class ReportesVentasRepository
             ReporteVentasCobranzaPagadasDetalladoZara => VentasCobranzaPagadasDetalladoZaraExcelColumns,
             ReporteVentasCobranzaPagadasTotalizadoZara => VentasCobranzaPagadasTotalizadoZaraExcelColumns,
             ReporteVentasCobranzaDesglosado or ReporteVentasCobranzaZaragoza => VentasCobranzaDesglosadoExcelColumns,
+            ReporteHojaCobroTotalCascos => HojaCobroTotalCascosExcelColumns,
             _ => Array.Empty<LegacyExcelColumn>()
         };
 

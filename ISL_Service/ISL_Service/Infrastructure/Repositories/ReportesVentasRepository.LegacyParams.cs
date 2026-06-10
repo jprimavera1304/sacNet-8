@@ -505,7 +505,7 @@ public partial class ReportesVentasRepository
                 if (idReporte == ReporteClientesAcumMotoLubClarios)
                 {
                     legacy.Param8 = request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria.ToString() : "1";
-                    legacy.Param9 = request.FechaFinal.Year.ToString();
+                    legacy.Param9 = "2025";
                 }
                 break;
 
@@ -531,7 +531,7 @@ public partial class ReportesVentasRepository
                 legacy.Param3 = fechaInicial;
                 legacy.Param4 = fechaFinal;
                 legacy.Param5 = idsAgente;
-                legacy.Param6 = "1~2~3~4~5~6";
+                legacy.Param6 = JoinIds(request.IDDiasSemana);
                 legacy.Param7 = idCliente.ToString();
                 legacy.Param8 = presentacion;
                 break;
@@ -577,7 +577,7 @@ public partial class ReportesVentasRepository
             case ReporteVentasLiquidaciones:
                 legacy.Param2 = fechaInicial;
                 legacy.Param3 = fechaFinal;
-                legacy.Param4 = "1";
+                legacy.Param4 = ResolveTipoLiquidacion(request.TipoReporte).ToString();
                 legacy.Param5 = JoinIds(request.IDRepartidores);
                 legacy.Param6 = presentacion;
                 break;
@@ -1062,7 +1062,9 @@ public partial class ReportesVentasRepository
             ReporteTransferenciasFolios => "Param6",
             ReporteVentasCobrosDinero or ReporteVentasCobrosCascos => "Param2",
             ReporteCentrosRemisiones or ReporteCentrosCompleto => "Param2",
+            ReporteVentasLiquidaciones => "Param2",
             ReporteHojaCobroTotalCobradoDetallado or ReporteHojaCobroTotalCobradoTotalizado or ReporteHojaCobroTotalCascos or ReporteHojaCobroCheques => "Param7",
+            ReporteGarantias => "Param6",
             _ => "Param3"
         };
         var fechaFinalColumn = idReporte switch
@@ -1072,9 +1074,37 @@ public partial class ReportesVentasRepository
             ReporteTransferenciasFolios => "Param7",
             ReporteVentasCobrosDinero or ReporteVentasCobrosCascos => "Param3",
             ReporteCentrosRemisiones or ReporteCentrosCompleto => "Param3",
+            ReporteVentasLiquidaciones => "Param3",
             ReporteHojaCobroTotalCobradoDetallado or ReporteHojaCobroTotalCobradoTotalizado or ReporteHojaCobroTotalCascos or ReporteHojaCobroCheques => "Param8",
+            ReporteGarantias => "Param7",
             _ => "Param4"
         };
+
+        if (idReporte == ReporteVentasLiquidaciones)
+        {
+            return new ReportesVentasLegacyRequest
+            {
+                TipoReporte = ResolveTipoReporteFromLiquidacionesParams(row),
+                FechaInicial = ReadLegacyDate(row, fechaInicialColumn),
+                FechaFinal = ReadLegacyDate(row, fechaFinalColumn),
+                Salida = ResolveGenericVentasSalida(idReporte, row),
+                IDRepartidores = SplitLegacyIds(ReadString(row, "Param5"))
+            };
+        }
+
+        if (idReporte == ReporteGarantias)
+        {
+            return new ReportesVentasLegacyRequest
+            {
+                TipoReporte = ResolveTipoReporteFromGarantiasParams(row),
+                FechaInicial = ReadLegacyDate(row, fechaInicialColumn),
+                FechaFinal = ReadLegacyDate(row, fechaFinalColumn),
+                Salida = ResolveGenericVentasSalida(idReporte, row),
+                IDClientes = SplitLegacyIds(ReadString(row, "Param8")),
+                IDRepartidores = SplitLegacyIds(ReadString(row, "Param3")),
+                IDStatusGarantias = SplitLegacyIds(ReadString(row, "Param4"))
+            };
+        }
 
         return new ReportesVentasAcumuladoresProductosRequest
         {
@@ -1101,6 +1131,7 @@ public partial class ReportesVentasRepository
             ReporteVentasCobrosDinero or ReporteVentasCobrosCascos => "Param6",
             ReporteVentasEstadoCuenta or ReporteVentasEstadoCuentaDinero or ReporteVentasEstadoCuentaCascos => "Param8",
             ReporteCentrosRemisiones or ReporteCentrosCompleto => "Param5",
+            ReporteVentasLiquidaciones => "Param6",
             ReporteHojaCobroTotalCobradoDetallado or ReporteHojaCobroTotalCobradoTotalizado or ReporteHojaCobroTotalCascos or ReporteHojaCobroCheques => "Param9",
             ReporteGarantias => "Param9",
             ReporteClientesGlobal => "Param5",
@@ -1109,6 +1140,29 @@ public partial class ReportesVentasRepository
         };
 
         return ResolveSalida(ReadString(row, column));
+    }
+
+    private static int ResolveTipoLiquidacion(string? tipoReporte)
+    {
+        return (tipoReporte ?? "").Trim().ToLowerInvariant() switch
+        {
+            "liquidacion_agente" or "agente" => 2,
+            _ => 1
+        };
+    }
+
+    private static string ResolveTipoReporteFromLiquidacionesParams(DataRow row)
+    {
+        return ReadString(row, "Param4").Trim() == "2" ? "liquidacion_agente" : "camioneta";
+    }
+
+    private static string ResolveTipoReporteFromGarantiasParams(DataRow row)
+    {
+        var clientes = SplitLegacyIds(ReadString(row, "Param8"));
+        if (clientes.Any(id => id > 0))
+            return "cliente";
+
+        return "empresa";
     }
 
     private static string ResolveTipoReporteFromParams(DataRow row)

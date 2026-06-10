@@ -68,6 +68,7 @@ public class ReportesVentasLegacyRequest : ReportesVentasAcumuladoresProductosRe
     public string DineroCascos { get; set; } = "dinero";
     public bool FiltrarFechas { get; set; }
     public decimal Gastos { get; set; }
+    public List<int> IDDiasSemana { get; set; } = new();
     public List<int> IDUsuarios { get; set; } = new();
     public List<int> IDRepartidores { get; set; } = new();
     public List<int> IDCentros { get; set; } = new();
