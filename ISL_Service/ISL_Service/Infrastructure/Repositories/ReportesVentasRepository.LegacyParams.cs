@@ -130,6 +130,10 @@ public partial class ReportesVentasRepository
             "clientes_acum_moto_lub_clarios" => ReporteClientesAcumMotoLubClarios,
             "compras_acumuladores_y_productos" => request.IDGrupoCategoria == GrupoCategoriaAcumuladores ? ReporteCompraAcumuladores : ReporteCompraProductos,
             "compras_facturas" => ReporteComprasFacturas,
+            "inventario_actual" => ResolveReporteInventarioActual(request),
+            "inventario_faltante" => ResolveReporteInventarioFaltante(request.IDGrupoCategoria),
+            "ajustes_al_inventario" => ReporteAjustesInventario,
+            "movimientos" => ReporteMovimientosAlmacen,
             "cascos" => ReporteVentasUsadosCreditos,
             "cascos_excedentes" => ReporteVentasCascosExcedentes,
             "liquidaciones" => ReporteVentasLiquidaciones,
@@ -158,6 +162,44 @@ public partial class ReportesVentasRepository
     private static int ResolveReporteEstadoCuenta(string? formato)
     {
         return ReporteVentasEstadoCuenta;
+    }
+
+    private static int ResolveReporteInventarioActual(ReportesVentasLegacyRequest request)
+    {
+        var idGrupoCategoria = request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria : GrupoCategoriaAcumuladores;
+        if (request.InventarioConCostos)
+        {
+            return idGrupoCategoria switch
+            {
+                2 => ReporteInventarioFiltrosCosto,
+                GrupoCategoriaAcumuladores => ReporteInventarioAcumuladoresCosto,
+                _ => ReporteInventarioProductosCosto
+            };
+        }
+
+        if (request.InventarioGenerarPedido)
+        {
+            return idGrupoCategoria == GrupoCategoriaAcumuladores
+                ? ReportePedidoAcumuladores
+                : ReportePedidoProductos;
+        }
+
+        return idGrupoCategoria switch
+        {
+            2 => ReporteInventarioFiltros,
+            GrupoCategoriaAcumuladores => ReporteInventarioAcumuladores,
+            _ => ReporteInventarioProductos
+        };
+    }
+
+    private static int ResolveReporteInventarioFaltante(int idGrupoCategoria)
+    {
+        return idGrupoCategoria switch
+        {
+            2 => ReporteInventarioFaltanteFiltros,
+            GrupoCategoriaAcumuladores => ReporteInventarioFaltanteAcumuladores,
+            _ => ReporteInventarioFaltanteProductos
+        };
     }
 
     private static string ResolveFormatoEstadoCuenta(string? formato)
@@ -196,6 +238,19 @@ public partial class ReportesVentasRepository
             ReporteCompraAcumuladores or
             ReporteCompraProductos or
             ReporteComprasFacturas or
+            ReporteInventarioAcumuladores or
+            ReporteInventarioProductos or
+            ReporteInventarioFiltros or
+            ReporteInventarioAcumuladoresCosto or
+            ReporteInventarioProductosCosto or
+            ReporteInventarioFiltrosCosto or
+            ReportePedidoAcumuladores or
+            ReportePedidoProductos or
+            ReporteInventarioFaltanteAcumuladores or
+            ReporteInventarioFaltanteProductos or
+            ReporteInventarioFaltanteFiltros or
+            ReporteAjustesInventario or
+            ReporteMovimientosAlmacen or
             ReporteClientesFacturasRFC or
             ReporteVentasUtilidadAcumuladores or
             ReporteVentasUtilidadProductos or
@@ -591,6 +646,61 @@ public partial class ReportesVentasRepository
                 legacy.Param13 = presentacion;
                 break;
 
+            case ReporteInventarioAcumuladores:
+            case ReporteInventarioProductos:
+            case ReporteInventarioFiltros:
+            case ReporteInventarioAcumuladoresCosto:
+            case ReporteInventarioProductosCosto:
+            case ReporteInventarioFiltrosCosto:
+            case ReportePedidoAcumuladores:
+            case ReportePedidoProductos:
+                var constants = await ConsultarConstantesAsync(conn, ct);
+                legacy.Param2 = (request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria : GrupoCategoriaAcumuladores).ToString();
+                legacy.Param3 = JoinIds(request.IDSubcategorias);
+                legacy.Param4 = JoinIds(request.IDMarcas);
+                legacy.Param5 = JoinIds(request.IDAlmacenes);
+                legacy.Param6 = constants.IDDescuentoCompra.ToString(CultureInfo.InvariantCulture);
+                legacy.Param7 = presentacion;
+                legacy.Param8 = request.InventarioHistorico ? fechaInicial : "";
+                break;
+
+            case ReporteInventarioFaltanteAcumuladores:
+            case ReporteInventarioFaltanteProductos:
+            case ReporteInventarioFaltanteFiltros:
+                legacy.Param2 = (request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria : GrupoCategoriaAcumuladores).ToString();
+                legacy.Param3 = JoinIdsPreserveOrder(request.IDSubcategorias);
+                legacy.Param4 = JoinIds(request.IDMarcas);
+                legacy.Param5 = JoinIds(request.IDAlmacenes);
+                legacy.Param6 = idsEmpresa;
+                legacy.Param7 = presentacion;
+                legacy.Param8 = FormatLegacyStartDateTime(request.FechaInicial);
+                legacy.Param9 = FormatLegacyEndDateTime(request.FechaFinal);
+                break;
+
+            case ReporteAjustesInventario:
+                legacy.Param2 = (request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria : GrupoCategoriaAcumuladores).ToString();
+                legacy.Param3 = JoinIds(request.IDSubcategorias);
+                legacy.Param4 = JoinIds(request.IDMarcas);
+                legacy.Param5 = JoinIds(request.IDAlmacenes);
+                legacy.Param6 = fechaInicial;
+                legacy.Param7 = fechaFinal;
+                legacy.Param8 = presentacion;
+                break;
+
+            case ReporteMovimientosAlmacen:
+                legacy.Param2 = idsEmpresa;
+                legacy.Param3 = (request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria : GrupoCategoriaAcumuladores).ToString();
+                legacy.Param4 = JoinIds(request.IDSubcategorias);
+                legacy.Param5 = JoinIds(request.IDMarcas);
+                legacy.Param6 = JoinIds(request.IDAlmacenes);
+                legacy.Param7 = "0";
+                legacy.Param8 = "0";
+                legacy.Param9 = idsAgente;
+                legacy.Param10 = fechaInicial;
+                legacy.Param11 = fechaFinal;
+                legacy.Param12 = presentacion;
+                break;
+
             case ReporteVentasCascosExcedentes:
                 legacy.Param2 = idsEmpresa;
                 legacy.Param3 = idCliente.ToString();
@@ -839,6 +949,16 @@ public partial class ReportesVentasRepository
         var clean = (ids ?? Enumerable.Empty<int>())
             .Where(x => x > 0)
             .Distinct()
+            .Select(x => x.ToString())
+            .ToList();
+
+        return clean.Count == 0 ? "" : string.Join("~", clean);
+    }
+
+    private static string JoinIdsPreserveOrder(IEnumerable<int>? ids)
+    {
+        var clean = (ids ?? Enumerable.Empty<int>())
+            .Where(x => x > 0)
             .Select(x => x.ToString())
             .ToList();
 
@@ -1132,6 +1252,10 @@ public partial class ReportesVentasRepository
             ReporteCentrosRemisiones or ReporteCentrosCompleto => "Param2",
             ReporteVentasLiquidaciones => "Param2",
             ReporteCompraAcumuladores or ReporteCompraProductos => "Param8",
+            ReporteInventarioAcumuladores or ReporteInventarioProductos or ReporteInventarioFiltros or ReporteInventarioAcumuladoresCosto or ReporteInventarioProductosCosto or ReporteInventarioFiltrosCosto or ReportePedidoAcumuladores or ReportePedidoProductos => "Param8",
+            ReporteInventarioFaltanteAcumuladores or ReporteInventarioFaltanteProductos or ReporteInventarioFaltanteFiltros => "Param8",
+            ReporteAjustesInventario => "Param6",
+            ReporteMovimientosAlmacen => "Param10",
             ReporteHojaCobroTotalCobradoDetallado or ReporteHojaCobroTotalCobradoTotalizado or ReporteHojaCobroTotalCascos or ReporteHojaCobroCheques => "Param7",
             ReporteGarantias => "Param6",
             _ => "Param3"
@@ -1145,6 +1269,10 @@ public partial class ReportesVentasRepository
             ReporteCentrosRemisiones or ReporteCentrosCompleto => "Param3",
             ReporteVentasLiquidaciones => "Param3",
             ReporteCompraAcumuladores or ReporteCompraProductos => "Param9",
+            ReporteInventarioAcumuladores or ReporteInventarioProductos or ReporteInventarioFiltros or ReporteInventarioAcumuladoresCosto or ReporteInventarioProductosCosto or ReporteInventarioFiltrosCosto or ReportePedidoAcumuladores or ReportePedidoProductos => "Param8",
+            ReporteInventarioFaltanteAcumuladores or ReporteInventarioFaltanteProductos or ReporteInventarioFaltanteFiltros => "Param9",
+            ReporteAjustesInventario => "Param7",
+            ReporteMovimientosAlmacen => "Param11",
             ReporteHojaCobroTotalCobradoDetallado or ReporteHojaCobroTotalCobradoTotalizado or ReporteHojaCobroTotalCascos or ReporteHojaCobroCheques => "Param8",
             ReporteGarantias => "Param7",
             _ => "Param4"
@@ -1211,6 +1339,56 @@ public partial class ReportesVentasRepository
             };
         }
 
+        if (idReporte is ReporteInventarioAcumuladores or ReporteInventarioProductos or ReporteInventarioFiltros or ReporteInventarioAcumuladoresCosto or ReporteInventarioProductosCosto or ReporteInventarioFiltrosCosto or ReportePedidoAcumuladores or ReportePedidoProductos)
+        {
+            return new ReportesVentasLegacyRequest
+            {
+                TipoReporte = "empresa",
+                IDGrupoCategoria = ReadInt(row, "Param2"),
+                FechaInicial = ReadLegacyDate(row, fechaInicialColumn),
+                FechaFinal = ReadLegacyDate(row, fechaFinalColumn),
+                Salida = ResolveGenericVentasSalida(idReporte, row),
+                IDAlmacenes = SplitLegacyIds(ReadString(row, "Param5")),
+                IDSubcategorias = SplitLegacyIds(ReadString(row, "Param3")),
+                IDMarcas = SplitLegacyIds(ReadString(row, "Param4")),
+                InventarioConCostos = idReporte is ReporteInventarioAcumuladoresCosto or ReporteInventarioProductosCosto or ReporteInventarioFiltrosCosto,
+                InventarioGenerarPedido = idReporte is ReportePedidoAcumuladores or ReportePedidoProductos,
+                InventarioHistorico = !string.IsNullOrWhiteSpace(ReadString(row, "Param8"))
+            };
+        }
+
+        if (idReporte is ReporteInventarioFaltanteAcumuladores or ReporteInventarioFaltanteProductos or ReporteInventarioFaltanteFiltros)
+        {
+            return new ReportesVentasLegacyRequest
+            {
+                TipoReporte = "empresa",
+                IDGrupoCategoria = ReadInt(row, "Param2"),
+                FechaInicial = ReadLegacyDate(row, "Param8"),
+                FechaFinal = ReadLegacyDate(row, "Param9"),
+                Salida = ResolveGenericVentasSalida(idReporte, row),
+                IDEmpresas = SplitLegacyIds(ReadString(row, "Param6")),
+                IDAlmacenes = SplitLegacyIds(ReadString(row, "Param5")),
+                IDSubcategorias = SplitLegacyIds(ReadString(row, "Param3")),
+                IDMarcas = SplitLegacyIds(ReadString(row, "Param4"))
+            };
+        }
+
+        if (idReporte == ReporteAjustesInventario || idReporte == ReporteMovimientosAlmacen)
+        {
+            return new ReportesVentasLegacyRequest
+            {
+                TipoReporte = "empresa",
+                IDGrupoCategoria = ReadInt(row, idReporte == ReporteMovimientosAlmacen ? "Param3" : "Param2"),
+                FechaInicial = ReadLegacyDate(row, fechaInicialColumn),
+                FechaFinal = ReadLegacyDate(row, fechaFinalColumn),
+                Salida = ResolveGenericVentasSalida(idReporte, row),
+                IDEmpresas = SplitLegacyIds(ReadString(row, "Param2")),
+                IDAlmacenes = SplitLegacyIds(ReadString(row, idReporte == ReporteMovimientosAlmacen ? "Param6" : "Param5")),
+                IDSubcategorias = SplitLegacyIds(ReadString(row, idReporte == ReporteMovimientosAlmacen ? "Param4" : "Param3")),
+                IDMarcas = SplitLegacyIds(ReadString(row, idReporte == ReporteMovimientosAlmacen ? "Param5" : "Param4"))
+            };
+        }
+
         return new ReportesVentasAcumuladoresProductosRequest
         {
             TipoReporte = ResolveTipoReporteFromParams(row),
@@ -1234,6 +1412,10 @@ public partial class ReportesVentasRepository
             ReporteVentasUtilidadAcumuladores or ReporteVentasUtilidadProductos => "Param13",
             ReporteCompraAcumuladores or ReporteCompraProductos => "Param10",
             ReporteComprasFacturas => "Param13",
+            ReporteInventarioAcumuladores or ReporteInventarioProductos or ReporteInventarioFiltros or ReporteInventarioAcumuladoresCosto or ReporteInventarioProductosCosto or ReporteInventarioFiltrosCosto or ReportePedidoAcumuladores or ReportePedidoProductos => "Param7",
+            ReporteInventarioFaltanteAcumuladores or ReporteInventarioFaltanteProductos or ReporteInventarioFaltanteFiltros => "Param7",
+            ReporteAjustesInventario => "Param8",
+            ReporteMovimientosAlmacen => "Param12",
             ReporteVentasCascosExcedentes => "Param7",
             ReporteVentasCobrosDinero or ReporteVentasCobrosCascos => "Param6",
             ReporteVentasEstadoCuenta or ReporteVentasEstadoCuentaDinero or ReporteVentasEstadoCuentaCascos => "Param8",

@@ -61,6 +61,9 @@ public class ReportesVentasLegacyRequest : ReportesVentasAcumuladoresProductosRe
     public string TipoFactura { get; set; } = "factura";
     public string TipoFechaCompras { get; set; } = "captura";
     public string EstatusComprasFacturas { get; set; } = "vigentes";
+    public bool InventarioConCostos { get; set; }
+    public bool InventarioHistorico { get; set; }
+    public bool InventarioGenerarPedido { get; set; }
     public string Formato { get; set; } = "detallado";
     public string FormatoMotobaterias { get; set; } = "cliente";
     public string TipoPago { get; set; } = "todos";

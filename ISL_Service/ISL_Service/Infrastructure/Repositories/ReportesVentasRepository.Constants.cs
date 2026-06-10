@@ -39,6 +39,15 @@ public partial class ReportesVentasRepository
     private const int ReporteVentasUtilidadAcumuladores = 140;
     private const int ReporteVentasUtilidadProductos = 145;
     private const int ReporteVentasUsadosCreditos = 150;
+    private const int ReporteInventarioAcumuladores = 205;
+    private const int ReporteInventarioProductos = 210;
+    private const int ReporteInventarioFiltros = 212;
+    private const int ReporteInventarioAcumuladoresCosto = 220;
+    private const int ReporteInventarioProductosCosto = 225;
+    private const int ReporteInventarioFiltrosCosto = 227;
+    private const int ReporteAjustesInventario = 230;
+    private const int ReportePedidoAcumuladores = 235;
+    private const int ReportePedidoProductos = 240;
     private const int ReporteVentasPagosComparativo = 493;
     private const int ReporteVentasDescuentosAjustes = 1030;
     private const int ReporteVentasCobranzaDetalladoZara = 1161;
@@ -47,9 +56,13 @@ public partial class ReportesVentasRepository
     private const int ReporteVentasCobranzaDesglosado = 1170;
     private const int ReporteVentasCobranzaZaragoza = 1172;
     private const int ReporteVentasConcentradosDetalle = 1185;
+    private const int ReporteInventarioFaltanteAcumuladores = 1135;
+    private const int ReporteInventarioFaltanteProductos = 1140;
+    private const int ReporteInventarioFaltanteFiltros = 1141;
     private const int ReporteGarantias = 1235;
     private const int ReporteVentasCascosExcedentes = 1305;
     private const int ReporteVentasLiquidaciones = 1319;
+    private const int ReporteMovimientosAlmacen = 1325;
     private const int ReporteVentasCobrosDineroCascos = 1355;
     private const int ReporteVentasCobrosDinero = 1360;
     private const int ReporteVentasCobrosCascos = 1365;
@@ -345,6 +358,112 @@ public partial class ReportesVentasRepository
         new("Saldo", typeof(decimal)),
         new("DiasVencidos", typeof(int)),
         new("FechaCancelacionConcentrado", typeof(string))
+    };
+    private static readonly LegacyExcelColumn[] InventarioActualExcelColumns =
+    {
+        new("No", typeof(int)),
+        new("Fecha", typeof(string)),
+        new("Almacen", typeof(string)),
+        new("Categoria", typeof(string)),
+        new("SubCategoria", typeof(string)),
+        new("Marca", typeof(string)),
+        new("Clave", typeof(string)),
+        new("ClaveClarios", typeof(string)),
+        new("UnidadMedida", typeof(string)),
+        new("Existencia", typeof(decimal)),
+        new("TipoUsado", typeof(string))
+    };
+    private static readonly LegacyExcelColumn[] InventarioActualCostoExcelColumns =
+    {
+        new("No", typeof(int)),
+        new("Fecha", typeof(string)),
+        new("Almacen", typeof(string)),
+        new("Categoria", typeof(string)),
+        new("SubCategoria", typeof(string)),
+        new("Marca", typeof(string)),
+        new("Clave", typeof(string)),
+        new("UnidadMedida", typeof(string)),
+        new("Existencia", typeof(decimal)),
+        new("PrecioLista", typeof(decimal)),
+        new("CostoUnitario", typeof(decimal)),
+        new("CostoTotal", typeof(decimal))
+    };
+    private static readonly LegacyExcelColumn[] InventarioFaltanteExcelColumns =
+    {
+        new("No", typeof(int)),
+        new("FechaInicial", typeof(string)),
+        new("FechaFinal", typeof(string)),
+        new("Almacen", typeof(string)),
+        new("Categoria", typeof(string)),
+        new("SubCategoria", typeof(string)),
+        new("Marca", typeof(string)),
+        new("Clave", typeof(string)),
+        new("UnidadMedida", typeof(string)),
+        new("Inventario", typeof(decimal)),
+        new("Ventas", typeof(decimal)),
+        new("Faltante", typeof(decimal)),
+        new("Litros", typeof(decimal)),
+        new("Prioridad", typeof(string)),
+        new("PesoKg", typeof(decimal)),
+        new("ProductosPesoKg", typeof(decimal)),
+        new("TotalKg", typeof(decimal)),
+        new("FechaUltimaVenta", typeof(string)),
+        new("FechaPenultimaVenta", typeof(string))
+    };
+    private static readonly LegacyExcelColumn[] AjustesInventarioExcelColumns =
+    {
+        new("No", typeof(int)),
+        new("FechaInicial", typeof(string)),
+        new("FechaFinal", typeof(string)),
+        new("Fecha", typeof(string)),
+        new("Almacen", typeof(string)),
+        new("Categoria", typeof(string)),
+        new("SubCategoria", typeof(string)),
+        new("Marca", typeof(string)),
+        new("Clave", typeof(string)),
+        new("UnidadMedida", typeof(string)),
+        new("Moviento", typeof(string)),
+        new("ExistenciaInicial", typeof(decimal)),
+        new("Entrada", typeof(decimal)),
+        new("Salida", typeof(decimal)),
+        new("ExistenciaFinal", typeof(decimal)),
+        new("Motivo", typeof(string)),
+        new("FechaCancelacion", typeof(string))
+    };
+    private static readonly LegacyExcelColumn[] MovimientosAlmacenExcelColumns =
+    {
+        new("FechaInicial", typeof(string)),
+        new("FechaFinal", typeof(string)),
+        new("Categoria", typeof(string)),
+        new("SubCategoria", typeof(string)),
+        new("Marca", typeof(string)),
+        new("Clave", typeof(string)),
+        new("PrecioLista", typeof(decimal)),
+        new("PesoKg", typeof(decimal)),
+        new("TipoCasco", typeof(string)),
+        new("Compras", typeof(int)),
+        new("Ventas", typeof(int)),
+        new("Garantias", typeof(int)),
+        new("Devoluciones", typeof(int)),
+        new("AjustesEntrada", typeof(int)),
+        new("AjustesSalida", typeof(int))
+    };
+    private static readonly LegacyExcelColumn[] PedidoInventarioExcelColumns =
+    {
+        new("No", typeof(int)),
+        new("Fecha", typeof(string)),
+        new("Almacen", typeof(string)),
+        new("Categoria", typeof(string)),
+        new("SubCategoria", typeof(string)),
+        new("Marca", typeof(string)),
+        new("Clave", typeof(string)),
+        new("UnidadMedida", typeof(string)),
+        new("Inventario", typeof(decimal)),
+        new("Ventas", typeof(decimal)),
+        new("Faltante", typeof(decimal)),
+        new("Litros", typeof(decimal)),
+        new("Prioridad", typeof(string)),
+        new("Pedido", typeof(decimal))
     };
     private static readonly LegacyExcelColumn[] VentasCobranzaDetalladoZaraExcelColumns =
     {

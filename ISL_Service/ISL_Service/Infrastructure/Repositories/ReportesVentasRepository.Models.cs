@@ -50,6 +50,7 @@ public partial class ReportesVentasRepository
         public string FechaOperacion { get; set; } = DateTime.Today.ToString("yyyy-MM-dd");
         public string Logo { get; set; } = "";
         public string LogoWatermark { get; set; } = "";
+        public int IDDescuentoCompra { get; set; }
     }
 
     private sealed class LegacyTemplate

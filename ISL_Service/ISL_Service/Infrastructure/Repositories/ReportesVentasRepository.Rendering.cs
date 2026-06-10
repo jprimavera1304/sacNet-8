@@ -58,7 +58,8 @@ public partial class ReportesVentasRepository
                 ? fechaOperacion.ToString("yyyy-MM-dd")
                 : DateTime.Today.ToString("yyyy-MM-dd"),
             Logo = pathImagenes + (Convert.ToString(row["LogoMacReportes"]) ?? ""),
-            LogoWatermark = pathImagenes + (Convert.ToString(row["LogoMacWM"]) ?? "")
+            LogoWatermark = pathImagenes + (Convert.ToString(row["LogoMacWM"]) ?? ""),
+            IDDescuentoCompra = ReadInt(row, "IDDescuentoCompra")
         };
     }
 
