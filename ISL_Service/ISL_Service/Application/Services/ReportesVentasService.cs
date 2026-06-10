@@ -31,12 +31,77 @@ public class ReportesVentasService : IReportesVentasService
         return _repository.ConsultarClientesAsync(numero, idCliente, ct);
     }
 
+    public Task<ReportesVentasCatalogosResponse> ConsultarCatalogosRemisionesAsync(CancellationToken ct = default)
+    {
+        return _repository.ConsultarCatalogosRemisionesAsync(ct);
+    }
+
     public Task<ReportesVentasGenerateResponse> GenerarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
         CancellationToken ct = default)
     {
         Validate(request);
         return _repository.GenerarAcumuladoresProductosAsync(request, ct);
+    }
+
+    public Task<ReportesVentasGenerateResponse> GenerarRemisionesAsync(
+        ReportesVentasRemisionesRequest request,
+        CancellationToken ct = default)
+    {
+        Validate(request);
+        ValidateUsuarios(request);
+
+        return _repository.GenerarRemisionesAsync(request, ct);
+    }
+
+    public Task<ReportesVentasGenerateResponse> GenerarFoliosAsync(
+        ReportesVentasFoliosRequest request,
+        CancellationToken ct = default)
+    {
+        Validate(request);
+        ValidateUsuarios(request);
+
+        return _repository.GenerarFoliosAsync(request, ct);
+    }
+
+    public Task<ReportesVentasGenerateResponse> GenerarFacturasAsync(
+        ReportesVentasFacturasRequest request,
+        CancellationToken ct = default)
+    {
+        Validate(request);
+        ValidateUsuarios(request);
+
+        return _repository.GenerarFacturasAsync(request, ct);
+    }
+
+    public Task<ReportesVentasGenerateResponse> GenerarConcentradosAsync(
+        ReportesVentasConcentradosRequest request,
+        CancellationToken ct = default)
+    {
+        Validate(request);
+        if ((request.IDRepartidores ?? new List<int>()).Where(id => id > 0).Distinct().Count() == 0)
+            throw new ArgumentException("seleccione al menos un repartidor.");
+
+        return _repository.GenerarConcentradosAsync(request, ct);
+    }
+
+    public Task<ReportesVentasGenerateResponse> GenerarCobranzaAsync(
+        ReportesVentasCobranzaRequest request,
+        CancellationToken ct = default)
+    {
+        Validate(request);
+        return _repository.GenerarCobranzaAsync(request, ct);
+    }
+
+    public Task<ReportesVentasGenerateResponse> GenerarLegacyVentasAsync(
+        ReportesVentasLegacyRequest request,
+        CancellationToken ct = default)
+    {
+        Validate(request);
+        if (string.IsNullOrWhiteSpace(request.ReporteKey) && request.IDReporte <= 0)
+            throw new ArgumentException("reporteKey o idReporte requerido.");
+
+        return _repository.GenerarLegacyVentasAsync(request, ct);
     }
 
     public Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosAsync(
@@ -55,6 +120,36 @@ public class ReportesVentasService : IReportesVentasService
             throw new ArgumentException("psp requerido.");
 
         return _repository.ConsultarAcumuladoresProductosPorParametrosAsync(parametrosLegacy, ct);
+    }
+
+    public Task<ReportesVentasFileResponse> GenerarAcumuladoresProductosExcelPorParametrosAsync(
+        int parametrosLegacy,
+        CancellationToken ct = default)
+    {
+        if (parametrosLegacy <= 0)
+            throw new ArgumentException("psp requerido.");
+
+        return _repository.GenerarAcumuladoresProductosExcelPorParametrosAsync(parametrosLegacy, ct);
+    }
+
+    public Task<ReportesVentasPreviewResponse> ConsultarReporteVentasPorParametrosAsync(
+        int parametrosLegacy,
+        CancellationToken ct = default)
+    {
+        if (parametrosLegacy <= 0)
+            throw new ArgumentException("psp requerido.");
+
+        return _repository.ConsultarReporteVentasPorParametrosAsync(parametrosLegacy, ct);
+    }
+
+    public Task<ReportesVentasFileResponse> GenerarReporteVentasExcelPorParametrosAsync(
+        int parametrosLegacy,
+        CancellationToken ct = default)
+    {
+        if (parametrosLegacy <= 0)
+            throw new ArgumentException("psp requerido.");
+
+        return _repository.GenerarReporteVentasExcelPorParametrosAsync(parametrosLegacy, ct);
     }
 
     private static void Validate(ReportesVentasAcumuladoresProductosRequest request)
@@ -77,5 +172,11 @@ public class ReportesVentasService : IReportesVentasService
             throw new ArgumentException("seleccione al menos un agente.");
         if (tipoReporte == "cliente" && (request.IDClientes ?? new List<int>()).Where(id => id > 0).Distinct().Count() == 0)
             throw new ArgumentException("seleccione el cliente.");
+    }
+
+    private static void ValidateUsuarios(ReportesVentasRemisionesRequest request)
+    {
+        if ((request.IDUsuarios ?? new List<int>()).Where(id => id > 0).Distinct().Count() == 0)
+            throw new ArgumentException("seleccione al menos un usuario.");
     }
 }

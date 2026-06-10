@@ -14,8 +14,34 @@ public interface IReportesVentasService
         int? idCliente,
         CancellationToken ct = default);
 
+    Task<ReportesVentasCatalogosResponse> ConsultarCatalogosRemisionesAsync(CancellationToken ct = default);
+
     Task<ReportesVentasGenerateResponse> GenerarAcumuladoresProductosAsync(
         ReportesVentasAcumuladoresProductosRequest request,
+        CancellationToken ct = default);
+
+    Task<ReportesVentasGenerateResponse> GenerarRemisionesAsync(
+        ReportesVentasRemisionesRequest request,
+        CancellationToken ct = default);
+
+    Task<ReportesVentasGenerateResponse> GenerarFoliosAsync(
+        ReportesVentasFoliosRequest request,
+        CancellationToken ct = default);
+
+    Task<ReportesVentasGenerateResponse> GenerarFacturasAsync(
+        ReportesVentasFacturasRequest request,
+        CancellationToken ct = default);
+
+    Task<ReportesVentasGenerateResponse> GenerarConcentradosAsync(
+        ReportesVentasConcentradosRequest request,
+        CancellationToken ct = default);
+
+    Task<ReportesVentasGenerateResponse> GenerarCobranzaAsync(
+        ReportesVentasCobranzaRequest request,
+        CancellationToken ct = default);
+
+    Task<ReportesVentasGenerateResponse> GenerarLegacyVentasAsync(
+        ReportesVentasLegacyRequest request,
         CancellationToken ct = default);
 
     Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosAsync(
@@ -23,6 +49,18 @@ public interface IReportesVentasService
         CancellationToken ct = default);
 
     Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosPorParametrosAsync(
+        int parametrosLegacy,
+        CancellationToken ct = default);
+
+    Task<ReportesVentasFileResponse> GenerarAcumuladoresProductosExcelPorParametrosAsync(
+        int parametrosLegacy,
+        CancellationToken ct = default);
+
+    Task<ReportesVentasPreviewResponse> ConsultarReporteVentasPorParametrosAsync(
+        int parametrosLegacy,
+        CancellationToken ct = default);
+
+    Task<ReportesVentasFileResponse> GenerarReporteVentasExcelPorParametrosAsync(
         int parametrosLegacy,
         CancellationToken ct = default);
 }

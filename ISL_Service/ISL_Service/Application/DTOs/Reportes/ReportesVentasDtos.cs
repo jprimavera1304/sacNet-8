@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace ISL_Service.Application.DTOs.Reportes;
 
 public class ReportesVentasAcumuladoresProductosRequest
@@ -16,6 +18,61 @@ public class ReportesVentasAcumuladoresProductosRequest
     public List<int> IDAgentes { get; set; } = new();
     public List<int> IDClientes { get; set; } = new();
     public string Salida { get; set; } = "pantalla";
+
+    [JsonIgnore]
+    public int LegacyIDUsuario { get; set; }
+
+    [JsonIgnore]
+    public string LegacyNombreEquipo { get; set; } = "WEB";
+}
+
+public class ReportesVentasRemisionesRequest : ReportesVentasAcumuladoresProductosRequest
+{
+    public string EstatusFolio { get; set; } = "todos";
+    public List<int> IDUsuarios { get; set; } = new();
+}
+
+public class ReportesVentasFoliosRequest : ReportesVentasRemisionesRequest
+{
+    public bool FoliosDineroCascos { get; set; }
+}
+
+public class ReportesVentasFacturasRequest : ReportesVentasRemisionesRequest
+{
+    public string TipoFactura { get; set; } = "factura";
+}
+
+public class ReportesVentasConcentradosRequest : ReportesVentasAcumuladoresProductosRequest
+{
+    public List<int> IDRepartidores { get; set; } = new();
+}
+
+public class ReportesVentasCobranzaRequest : ReportesVentasAcumuladoresProductosRequest
+{
+    public string CobranzaStatus { get; set; } = "pagadas";
+}
+
+public class ReportesVentasLegacyRequest : ReportesVentasAcumuladoresProductosRequest
+{
+    public string ReporteKey { get; set; } = "";
+    public int IDReporte { get; set; }
+    public string EstatusFolio { get; set; } = "todos";
+    public string TipoFactura { get; set; } = "factura";
+    public string Formato { get; set; } = "detallado";
+    public string FormatoMotobaterias { get; set; } = "cliente";
+    public string TipoPago { get; set; } = "todos";
+    public List<int> IDTiposPago { get; set; } = new();
+    public bool PagosPorDia { get; set; }
+    public bool PagosExcedentes { get; set; }
+    public string TransferenciaEstatus { get; set; } = "todas";
+    public string DineroCascos { get; set; } = "dinero";
+    public bool FiltrarFechas { get; set; }
+    public decimal Gastos { get; set; }
+    public List<int> IDDiasSemana { get; set; } = new();
+    public List<int> IDUsuarios { get; set; } = new();
+    public List<int> IDRepartidores { get; set; } = new();
+    public List<int> IDCentros { get; set; } = new();
+    public List<int> IDStatusGarantias { get; set; } = new();
 }
 
 public class ReportesVentasPreviewResponse
@@ -47,6 +104,13 @@ public class ReportesVentasGenerateResponse
     public string Salida { get; set; } = "pantalla";
 }
 
+public class ReportesVentasFileResponse
+{
+    public byte[] Content { get; set; } = Array.Empty<byte>();
+    public string ContentType { get; set; } = "";
+    public string FileName { get; set; } = "";
+}
+
 public class ReportesVentasColumnDto
 {
     public string Key { get; set; } = "";
@@ -64,6 +128,9 @@ public class ReportesVentasCatalogosResponse
     public List<ReportesVentasProductoItem> Subcategorias { get; set; } = new();
     public List<ReportesVentasProductoItem> Marcas { get; set; } = new();
     public List<ReportesVentasCatalogoItem> Documentos { get; set; } = new();
+    public List<ReportesVentasCatalogoItem> StatusFolios { get; set; } = new();
+    public List<ReportesVentasCatalogoItem> Usuarios { get; set; } = new();
+    public List<ReportesVentasCatalogoItem> Repartidores { get; set; } = new();
 }
 
 public class ReportesVentasCatalogoItem

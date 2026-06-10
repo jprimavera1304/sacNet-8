@@ -3,6 +3,7 @@ using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Reports;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Shared.Backend.Core.Abstractions;
 
 namespace ISL_Service.Controllers;
 
@@ -12,10 +13,12 @@ namespace ISL_Service.Controllers;
 public class ReportesVentasController : ControllerBase
 {
     private readonly IReportesVentasService _service;
+    private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public ReportesVentasController(IReportesVentasService service)
+    public ReportesVentasController(IReportesVentasService service, ICurrentUserAccessor currentUserAccessor)
     {
         _service = service;
+        _currentUserAccessor = currentUserAccessor;
     }
 
     [HttpGet("acumuladores-productos/catalogos")]
@@ -48,6 +51,16 @@ public class ReportesVentasController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("remisiones/catalogos")]
+    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [ProducesResponseType(typeof(ReportesVentasCatalogosResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ConsultarCatalogosRemisiones(CancellationToken ct)
+    {
+        var result = await _service.ConsultarCatalogosRemisionesAsync(ct);
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(result);
+    }
+
     [HttpPost("acumuladores-productos/generar")]
     [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
@@ -59,7 +72,122 @@ public class ReportesVentasController : ControllerBase
         if (request is null)
             return BadRequest(new { message = "Body requerido." });
 
+        HydrateLegacyContext(request);
         var result = await _service.GenerarAcumuladoresProductosAsync(request, ct);
+        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
+
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(result);
+    }
+
+    [HttpPost("remisiones/generar")]
+    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GenerarRemisiones(
+        [FromBody] ReportesVentasRemisionesRequest request,
+        CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        HydrateLegacyContext(request);
+        var result = await _service.GenerarRemisionesAsync(request, ct);
+        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
+
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(result);
+    }
+
+    [HttpPost("folios/generar")]
+    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GenerarFolios(
+        [FromBody] ReportesVentasFoliosRequest request,
+        CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        HydrateLegacyContext(request);
+        var result = await _service.GenerarFoliosAsync(request, ct);
+        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
+
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(result);
+    }
+
+    [HttpPost("facturas/generar")]
+    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GenerarFacturas(
+        [FromBody] ReportesVentasFacturasRequest request,
+        CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        HydrateLegacyContext(request);
+        var result = await _service.GenerarFacturasAsync(request, ct);
+        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
+
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(result);
+    }
+
+    [HttpPost("concentrados/generar")]
+    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GenerarConcentrados(
+        [FromBody] ReportesVentasConcentradosRequest request,
+        CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        HydrateLegacyContext(request);
+        var result = await _service.GenerarConcentradosAsync(request, ct);
+        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
+
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(result);
+    }
+
+    [HttpPost("cobranza/generar")]
+    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GenerarCobranza(
+        [FromBody] ReportesVentasCobranzaRequest request,
+        CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        HydrateLegacyContext(request);
+        var result = await _service.GenerarCobranzaAsync(request, ct);
+        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
+
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(result);
+    }
+
+    [HttpPost("legacy/generar")]
+    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GenerarLegacyVentas(
+        [FromBody] ReportesVentasLegacyRequest request,
+        CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Body requerido." });
+
+        HydrateLegacyContext(request);
+        var result = await _service.GenerarLegacyVentasAsync(request, ct);
         result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
 
         Response.Headers["Cache-Control"] = "no-store";
@@ -77,6 +205,7 @@ public class ReportesVentasController : ControllerBase
         if (request is null)
             return BadRequest(new { message = "Body requerido." });
 
+        HydrateLegacyContext(request);
         var result = await _service.ConsultarAcumuladoresProductosAsync(request, ct);
         Response.Headers["Cache-Control"] = "no-store";
         return Ok(result);
@@ -86,13 +215,22 @@ public class ReportesVentasController : ControllerBase
     [HttpGet("ReportesV2")]
     [HttpGet("acumuladores-productos/pantalla")]
     [AllowAnonymous]
-    [Produces("application/pdf")]
     public async Task<IActionResult> VerAcumuladoresProductosPantalla([FromQuery] int psp, CancellationToken ct)
     {
         if (psp <= 0)
             return BadRequest("psp requerido.");
 
-        var result = await _service.ConsultarAcumuladoresProductosPorParametrosAsync(psp, ct);
+        try
+        {
+            var excel = await _service.GenerarReporteVentasExcelPorParametrosAsync(psp, ct);
+            Response.Headers["Cache-Control"] = "no-store";
+            return File(excel.Content, excel.ContentType, excel.FileName);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("salida Excel", StringComparison.OrdinalIgnoreCase))
+        {
+        }
+
+        var result = await _service.ConsultarReporteVentasPorParametrosAsync(psp, ct);
         var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(result.Html, result.Orientacion, ct);
         Response.Headers["Cache-Control"] = "no-store";
         return File(pdf, "application/pdf");
@@ -103,5 +241,11 @@ public class ReportesVentasController : ControllerBase
         var psp = Uri.EscapeDataString(parametrosLegacy);
         var pathBase = Request.PathBase.HasValue ? Request.PathBase.Value : "";
         return $"{Request.Scheme}://{Request.Host}{pathBase}/api/reportes/ventas/ReportesV3W?psp={psp}";
+    }
+
+    private void HydrateLegacyContext(ReportesVentasAcumuladoresProductosRequest request)
+    {
+        request.LegacyIDUsuario = _currentUserAccessor.GetLegacyUserId(User);
+        request.LegacyNombreEquipo = "WEB";
     }
 }
