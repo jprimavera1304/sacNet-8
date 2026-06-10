@@ -64,6 +64,8 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         var usuarios = await ConsultarUsuariosAsync(conn, ct);
         var repartidores = await ConsultarRepartidoresAsync(conn, ct);
         var proveedores = await ConsultarProveedoresAsync(conn, ct);
+        var autos = await ConsultarAutosAsync(conn, ct);
+        var tiposGasto = await ConsultarTiposGastoAsync(conn, ct);
 
         return new ReportesVentasCatalogosResponse
         {
@@ -72,6 +74,8 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
             Agentes = agentes,
             Usuarios = usuarios,
             Repartidores = repartidores,
+            Autos = autos,
+            TiposGasto = tiposGasto,
             Documentos = BuildDocumentosConTodos(),
             StatusFolios = BuildStatusFolios(),
             Proveedores = proveedores
@@ -424,11 +428,22 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
             var templateReportId = config.IDReporteMaster > 0 ? config.IDReporteMaster : idReporte;
             var templates = await ConsultarTemplatesAsync(conn, templateReportId, ct);
             template = BuildTemplateInfo(templates);
-            reportHtml = !string.IsNullOrWhiteSpace(errorParams)
-                ? GenerateSinInformacionHtml(logo, templates, config.NombreReporte, request, errorParams)
-                : string.Equals(config.Aspx, "3columnas", StringComparison.OrdinalIgnoreCase)
-                    ? GenerateFormatoColumnas3Html(logo, config.NombreReporte, data, templates, template, request)
-                    : GenerateFormatoNormalHtml(logo, constants.LogoWatermark, config.NombreReporte, data, templates, template, request);
+            if (!string.IsNullOrWhiteSpace(errorParams))
+            {
+                reportHtml = GenerateSinInformacionHtml(logo, templates, config.NombreReporte, request, errorParams);
+            }
+            else if (idReporte == ReporteListasPreciosZaragoza)
+            {
+                reportHtml = GenerateListasPreciosZaragozaHtml(logo, config.NombreReporte, data, templates, request);
+            }
+            else if (string.Equals(config.Aspx, "3columnas", StringComparison.OrdinalIgnoreCase))
+            {
+                reportHtml = GenerateFormatoColumnas3Html(logo, config.NombreReporte, data, templates, template, request);
+            }
+            else
+            {
+                reportHtml = GenerateFormatoNormalHtml(logo, constants.LogoWatermark, config.NombreReporte, data, templates, template, request);
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(errorParams) && string.IsNullOrWhiteSpace(reportHtml))

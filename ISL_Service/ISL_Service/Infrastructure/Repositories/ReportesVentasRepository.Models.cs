@@ -29,6 +29,9 @@ public partial class ReportesVentasRepository
         public string Param12 { get; set; } = "";
         public string Param13 { get; set; } = "";
         public string Param14 { get; set; } = "";
+        public string Param15 { get; set; } = "";
+        public string Param16 { get; set; } = "";
+        public string Param17 { get; set; } = "";
     }
 
     private sealed class LegacyStoredParams
@@ -51,6 +54,8 @@ public partial class ReportesVentasRepository
         public string Logo { get; set; } = "";
         public string LogoWatermark { get; set; } = "";
         public int IDDescuentoCompra { get; set; }
+        public int IDDescuentoListaPrecios { get; set; }
+        public int IDEmpresaCS { get; set; }
     }
 
     private sealed class LegacyTemplate

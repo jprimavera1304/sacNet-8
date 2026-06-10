@@ -170,6 +170,56 @@ public partial class ReportesVentasRepository
             .ToList();
     }
 
+    private static async Task<List<ReportesVentasCatalogoItem>> ConsultarAutosAsync(SqlConnection conn, CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("sp_n_ConsultaAutos", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = 500
+        };
+        cmd.Parameters.AddWithValue("@IDAuto", 0);
+        cmd.Parameters.AddWithValue("@IDStatus", 1);
+        cmd.Parameters.AddWithValue("@Nombre", "");
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return table.AsEnumerable()
+            .Select(row => new ReportesVentasCatalogoItem
+            {
+                Id = ReadInt(row, "IDAuto"),
+                Nombre = ReadString(row, "Nombre", "Auto"),
+                Clave = ReadString(row, "Placas", "Nombre")
+            })
+            .Where(x => x.Id > 0 && !string.IsNullOrWhiteSpace(x.Nombre))
+            .OrderBy(x => x.Nombre)
+            .ToList();
+    }
+
+    private static async Task<List<ReportesVentasCatalogoItem>> ConsultarTiposGastoAsync(SqlConnection conn, CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("sp_n_ConsultaTiposGastos", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = 500
+        };
+        cmd.Parameters.AddWithValue("@IDTipoGasto", 0);
+        cmd.Parameters.AddWithValue("@IDStatus", 1);
+        cmd.Parameters.AddWithValue("@TipoGasto", "");
+        cmd.Parameters.AddWithValue("@Formato", 0);
+        cmd.Parameters.AddWithValue("@Identico", 0);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return table.AsEnumerable()
+            .Select(row => new ReportesVentasCatalogoItem
+            {
+                Id = ReadInt(row, "IDTipoGasto"),
+                Nombre = ReadString(row, "TipoGasto"),
+                Clave = ReadString(row, "TipoGasto")
+            })
+            .Where(x => x.Id > 0 && !string.IsNullOrWhiteSpace(x.Nombre))
+            .OrderBy(x => x.Nombre)
+            .ToList();
+    }
+
 
     private static async Task<List<ReportesVentasClienteItem>> ConsultarClientesAsync(
         SqlConnection conn,

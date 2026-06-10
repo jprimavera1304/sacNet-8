@@ -74,9 +74,14 @@ public class ReportesVentasLegacyRequest : ReportesVentasAcumuladoresProductosRe
     public string DineroCascos { get; set; } = "dinero";
     public bool FiltrarFechas { get; set; }
     public decimal Gastos { get; set; }
+    public int IDTipoGasto { get; set; }
+    public string Comentarios { get; set; } = "";
+    public bool Redondear { get; set; }
+    public bool IncluirDescuentos { get; set; } = true;
     public List<int> IDDiasSemana { get; set; } = new();
     public List<int> IDUsuarios { get; set; } = new();
     public List<int> IDRepartidores { get; set; } = new();
+    public List<int> IDAutos { get; set; } = new();
     public List<int> IDCentros { get; set; } = new();
     public List<int> IDStatusGarantias { get; set; } = new();
 }
@@ -138,6 +143,8 @@ public class ReportesVentasCatalogosResponse
     public List<ReportesVentasCatalogoItem> Usuarios { get; set; } = new();
     public List<ReportesVentasCatalogoItem> Repartidores { get; set; } = new();
     public List<ReportesVentasCatalogoItem> Proveedores { get; set; } = new();
+    public List<ReportesVentasCatalogoItem> Autos { get; set; } = new();
+    public List<ReportesVentasCatalogoItem> TiposGasto { get; set; } = new();
 }
 
 public class ReportesVentasCatalogoItem

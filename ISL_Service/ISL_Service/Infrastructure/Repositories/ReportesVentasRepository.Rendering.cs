@@ -59,7 +59,9 @@ public partial class ReportesVentasRepository
                 : DateTime.Today.ToString("yyyy-MM-dd"),
             Logo = pathImagenes + (Convert.ToString(row["LogoMacReportes"]) ?? ""),
             LogoWatermark = pathImagenes + (Convert.ToString(row["LogoMacWM"]) ?? ""),
-            IDDescuentoCompra = ReadInt(row, "IDDescuentoCompra")
+            IDDescuentoCompra = ReadInt(row, "IDDescuentoCompra"),
+            IDDescuentoListaPrecios = ReadInt(row, "IDDescuentoListaPrecios"),
+            IDEmpresaCS = ReadInt(row, "IDEmpresaCS")
         };
     }
 
@@ -327,6 +329,63 @@ public partial class ReportesVentasRepository
         }
 
         return htmlFinal;
+    }
+
+    private static string GenerateListasPreciosZaragozaHtml(
+        string logo,
+        string reporteNombre,
+        DataSet data,
+        DataTable templates,
+        ReportesVentasAcumuladoresProductosRequest request)
+    {
+        var table = data.Tables.Count > 0 ? data.Tables[0] : new DataTable();
+        if (table.Rows.Count == 0)
+            return GenerateEmptyFormatoNormalHtml(logo, templates, reporteNombre, request);
+
+        var cuerpoTemplate = ReadTemplateHtml(templates, "cuerpo_n");
+        var detalleTemplate = ReadTemplateHtml(templates, "detalle");
+        var detalleMotoTemplate = ReadTemplateHtml(templates, "detalleMoto");
+
+        var html = ReplaceValues(table, table.Rows[0], cuerpoTemplate);
+        html = html.Replace("#Logo#", logo);
+        html = html.Replace("#Titulo#", reporteNombre);
+
+        var ordenes = new (int Orden, string Tag, string Template)[]
+        {
+            (1, "#DetalleLTH#", detalleTemplate),
+            (2, "#DetalleAME#", detalleTemplate),
+            (3, "#DetalleFP#", detalleTemplate),
+            (4, "#DetalleDiener#", detalleTemplate),
+            (5, "#DetalleOptima#", detalleTemplate),
+            (6, "#DetalleAGM#", detalleTemplate),
+            (20, "#DetalleEvolutionAux#", detalleTemplate),
+            (21, "#DetalleProtect#", detalleTemplate),
+            (7, "#DetalleHeavyDuty#", detalleTemplate),
+            (8, "#DetalleEspeciales#", detalleTemplate),
+            (9, "#DetalleCale#", detalleTemplate),
+            (10, "#DetalleHiTec#", detalleTemplate),
+            (11, "#DetalleDynamo#", detalleTemplate),
+            (100, "#DetalleCascos#", detalleTemplate),
+            (15, "#DetalleMotoLTH#", detalleMotoTemplate),
+            (16, "#DetalleMotoAME#", detalleMotoTemplate)
+        };
+
+        foreach (var item in ordenes)
+            html = html.Replace(item.Tag, BuildListasPreciosDetalle(table, item.Orden, item.Template));
+
+        return ReplaceRemainingTags(html) + "<p style='page-break-before: always'></p>";
+    }
+
+    private static string BuildListasPreciosDetalle(DataTable table, int orden, string detalleTemplate)
+    {
+        var rows = table.AsEnumerable()
+            .Where(row => ReadInt(row, "Orden") == orden)
+            .ToArray();
+
+        if (rows.Length == 0)
+            return "";
+
+        return string.Concat(rows.Select(row => ReplaceValues(table, row, detalleTemplate)));
     }
 
     private static string GenerateEmptyColumnas3Html(
