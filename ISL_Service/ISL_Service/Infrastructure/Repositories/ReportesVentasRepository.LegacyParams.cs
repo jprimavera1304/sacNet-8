@@ -693,7 +693,7 @@ public partial class ReportesVentasRepository
                 legacy.Param3 = (request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria : GrupoCategoriaAcumuladores).ToString();
                 legacy.Param4 = JoinIds(request.IDSubcategorias);
                 legacy.Param5 = JoinIds(request.IDMarcas);
-                legacy.Param6 = JoinIds(request.IDAlmacenes);
+                legacy.Param6 = "";
                 legacy.Param7 = "0";
                 legacy.Param8 = "0";
                 legacy.Param9 = idsAgente;
