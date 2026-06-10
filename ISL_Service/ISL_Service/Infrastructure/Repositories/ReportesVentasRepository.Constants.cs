@@ -32,7 +32,10 @@ public partial class ReportesVentasRepository
     private const int ReporteClientesDescuentos = 113;
     private const int ReporteClientesDescuentosSin = 114;
     private const int ReporteClientesAcumMotoLub = 116;
+    private const int ReporteCompraAcumuladores = 120;
     private const int ReporteClientesAcumMotoLubClarios = 121;
+    private const int ReporteCompraProductos = 125;
+    private const int ReporteComprasFacturas = 130;
     private const int ReporteVentasUtilidadAcumuladores = 140;
     private const int ReporteVentasUtilidadProductos = 145;
     private const int ReporteVentasUsadosCreditos = 150;
@@ -272,6 +275,56 @@ public partial class ReportesVentasRepository
         new("FechaCancelacion", typeof(string)),
         new("UsuarioCancelacion", typeof(string)),
         new("EquipoCancelacion", typeof(string))
+    };
+    private static readonly LegacyExcelColumn[] CompraAcumuladoresExcelColumns =
+    {
+        new("No", typeof(int)),
+        new("FechaInicial", typeof(string)),
+        new("FechaFinal", typeof(string)),
+        new("Empresa", typeof(string)),
+        new("Almacen", typeof(string)),
+        new("Proveedor", typeof(string)),
+        new("Categoria", typeof(string)),
+        new("Marca", typeof(string)),
+        new("Clave", typeof(string)),
+        new("UnidadMedida", typeof(string)),
+        new("Compras", typeof(decimal))
+    };
+    private static readonly LegacyExcelColumn[] CompraProductosExcelColumns =
+    {
+        new("No", typeof(int)),
+        new("FechaInicial", typeof(string)),
+        new("FechaFinal", typeof(string)),
+        new("Empresa", typeof(string)),
+        new("Almacen", typeof(string)),
+        new("Proveedor", typeof(string)),
+        new("Categoria", typeof(string)),
+        new("SubCategoria", typeof(string)),
+        new("Marca", typeof(string)),
+        new("Clave", typeof(string)),
+        new("UnidadMedida", typeof(string)),
+        new("Compras", typeof(decimal))
+    };
+    private static readonly LegacyExcelColumn[] ComprasFacturasExcelColumns =
+    {
+        new("No", typeof(int)),
+        new("PorFecha", typeof(string)),
+        new("FechaInicial", typeof(string)),
+        new("FechaFinal", typeof(string)),
+        new("Estatus", typeof(string)),
+        new("Empresa", typeof(string)),
+        new("Usuario", typeof(string)),
+        new("FechaCaptura", typeof(string)),
+        new("FechaDocumento", typeof(string)),
+        new("Factura", typeof(string)),
+        new("Proveedor", typeof(string)),
+        new("Productos", typeof(int)),
+        new("Importe", typeof(decimal)),
+        new("Bonificacion", typeof(decimal)),
+        new("Subtotal", typeof(decimal)),
+        new("Iva", typeof(decimal)),
+        new("TotalPagar", typeof(decimal)),
+        new("Cancelada", typeof(string))
     };
     private static readonly LegacyExcelColumn[] VentasConcentradosDetalleExcelColumns =
     {

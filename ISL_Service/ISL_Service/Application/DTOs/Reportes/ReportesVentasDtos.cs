@@ -56,8 +56,11 @@ public class ReportesVentasLegacyRequest : ReportesVentasAcumuladoresProductosRe
 {
     public string ReporteKey { get; set; } = "";
     public int IDReporte { get; set; }
+    public int IDProveedor { get; set; }
     public string EstatusFolio { get; set; } = "todos";
     public string TipoFactura { get; set; } = "factura";
+    public string TipoFechaCompras { get; set; } = "captura";
+    public string EstatusComprasFacturas { get; set; } = "vigentes";
     public string Formato { get; set; } = "detallado";
     public string FormatoMotobaterias { get; set; } = "cliente";
     public string TipoPago { get; set; } = "todos";
@@ -131,6 +134,7 @@ public class ReportesVentasCatalogosResponse
     public List<ReportesVentasCatalogoItem> StatusFolios { get; set; } = new();
     public List<ReportesVentasCatalogoItem> Usuarios { get; set; } = new();
     public List<ReportesVentasCatalogoItem> Repartidores { get; set; } = new();
+    public List<ReportesVentasCatalogoItem> Proveedores { get; set; } = new();
 }
 
 public class ReportesVentasCatalogoItem

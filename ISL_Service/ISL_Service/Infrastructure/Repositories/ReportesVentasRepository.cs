@@ -31,6 +31,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         var empresas = await ConsultarEmpresasAsync(conn, ct);
         var almacenes = await ConsultarAlmacenesAsync(conn, ct);
         var agentes = await ConsultarAgentesAsync(conn, ct);
+        var proveedores = await ConsultarProveedoresAsync(conn, ct);
         var categorias = await ConsultarGruposCategoriasAsync(conn, ct);
         var subcategorias = await ConsultarSubcategoriasAsync(conn, grupoCategoria, ct);
         var selectedCategorias = NormalizeCatalogIds(idCategorias);
@@ -47,7 +48,8 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
             Categorias = categorias,
             Subcategorias = subcategorias,
             Marcas = marcas,
-            Documentos = BuildDocumentos()
+            Documentos = BuildDocumentos(),
+            Proveedores = proveedores
         };
     }
 
@@ -61,6 +63,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         var agentes = await ConsultarAgentesAsync(conn, ct);
         var usuarios = await ConsultarUsuariosAsync(conn, ct);
         var repartidores = await ConsultarRepartidoresAsync(conn, ct);
+        var proveedores = await ConsultarProveedoresAsync(conn, ct);
 
         return new ReportesVentasCatalogosResponse
         {
@@ -70,7 +73,8 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
             Usuarios = usuarios,
             Repartidores = repartidores,
             Documentos = BuildDocumentosConTodos(),
-            StatusFolios = BuildStatusFolios()
+            StatusFolios = BuildStatusFolios(),
+            Proveedores = proveedores
         };
     }
 
