@@ -678,12 +678,13 @@ public partial class ReportesVentasRepository
                 break;
 
             case ReporteAjustesInventario:
-                legacy.Param2 = (request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria : GrupoCategoriaAcumuladores).ToString();
-                legacy.Param3 = JoinIds(request.IDSubcategorias);
-                legacy.Param4 = JoinIds(request.IDMarcas);
+                var ajustesTodos = request.IDGrupoCategoria <= 0;
+                legacy.Param2 = ajustesTodos ? "0" : request.IDGrupoCategoria.ToString();
+                legacy.Param3 = ajustesTodos ? "" : JoinIds(request.IDSubcategorias);
+                legacy.Param4 = ajustesTodos ? "" : JoinIds(request.IDMarcas);
                 legacy.Param5 = JoinIds(request.IDAlmacenes);
-                legacy.Param6 = fechaInicial;
-                legacy.Param7 = fechaFinal;
+                legacy.Param6 = FormatLegacyStartDateTime(request.FechaInicial);
+                legacy.Param7 = FormatLegacyEndDateTime(request.FechaFinal);
                 legacy.Param8 = presentacion;
                 break;
 
