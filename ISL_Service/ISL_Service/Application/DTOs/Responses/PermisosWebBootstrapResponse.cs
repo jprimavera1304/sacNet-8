@@ -28,6 +28,13 @@ public class PermisosWebPermissionItem
 {
     public string Code { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    public string ModuleKey { get; set; } = string.Empty;
+    public string ModuleName { get; set; } = string.Empty;
+    public string CategoryKey { get; set; } = string.Empty;
+    public string CategoryName { get; set; } = string.Empty;
+    public int? LegacyFormId { get; set; }
+    public int? LegacyProcessId { get; set; }
+    public bool IsLegacyReport { get; set; }
 }
 
 public class PermisosWebModuleItem

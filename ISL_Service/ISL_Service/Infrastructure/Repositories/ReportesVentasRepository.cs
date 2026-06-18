@@ -307,7 +307,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
             throw new InvalidOperationException(errorParams);
 
         var excelTable = BuildLegacyExcelTable(idReporte, source);
-        return LegacyPlainXlsxReportRenderer.Render(excelTable, config.NombreReporte);
+        return LegacyPlainXlsxReportRenderer.Render(excelTable, config.NombreReporte, legacy.Request);
     }
 
     public async Task<ReportesVentasPreviewResponse> ConsultarReporteVentasPorParametrosAsync(
@@ -381,6 +381,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         if (!IsAcumuladoresProductosReporte(idReporte) && !IsRemisionesReporte(idReporte) && !IsFoliosReporte(idReporte) && !IsFacturasReporte(idReporte) && !IsConcentradosReporte(idReporte) && !IsCobranzaReporte(idReporte) && !IsGenericVentasReporte(idReporte))
             throw new InvalidOperationException("El psp no corresponde a un reporte soportado.");
 
+        var request = BuildStoredExcelRequest(idReporte, row);
         var config = await ConsultarConfiguracionAsync(conn, idReporte, ct);
         var data = await ExecuteLegacySpAsync(conn, config.StoredProcedure, parametrosLegacy.ToString(), ct);
         var source = data.Tables.Count > 0 ? data.Tables[0] : new DataTable();
@@ -391,7 +392,23 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
             throw new InvalidOperationException(errorParams);
 
         var excelTable = BuildLegacyExcelTable(idReporte, source);
-        return LegacyPlainXlsxReportRenderer.Render(excelTable, config.NombreReporte);
+        return LegacyPlainXlsxReportRenderer.Render(excelTable, config.NombreReporte, request);
+    }
+
+    private static ReportesVentasAcumuladoresProductosRequest BuildStoredExcelRequest(int idReporte, DataRow row)
+    {
+        if (IsAcumuladoresProductosReporte(idReporte))
+            return BuildAcumuladoresProductosStoredParams(row).Request;
+        if (IsRemisionesReporte(idReporte) || IsFoliosReporte(idReporte) || IsFacturasReporte(idReporte))
+            return BuildRemisionesStoredRequest(row);
+        if (IsConcentradosReporte(idReporte))
+            return BuildConcentradosStoredRequest(row);
+        if (IsCobranzaReporte(idReporte))
+            return BuildCobranzaStoredRequest(row);
+        if (IsGenericVentasReporte(idReporte))
+            return BuildGenericVentasStoredRequest(row);
+
+        return new ReportesVentasAcumuladoresProductosRequest();
     }
 
     private static async Task<ReportesVentasPreviewResponse> ConsultarAcumuladoresProductosPorParametrosAsync(
