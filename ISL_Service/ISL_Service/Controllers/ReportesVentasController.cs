@@ -22,7 +22,7 @@ public class ReportesVentasController : ControllerBase
     }
 
     [HttpGet("acumuladores-productos/catalogos")]
-    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [Authorize(Policy = "perm:reportes.ver_modulo")]
     [ProducesResponseType(typeof(ReportesVentasCatalogosResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> ConsultarCatalogosAcumuladoresProductos(
         [FromQuery] int? idGrupoCategoria,
@@ -38,7 +38,7 @@ public class ReportesVentasController : ControllerBase
     }
 
     [HttpGet("acumuladores-productos/clientes")]
-    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [Authorize(Policy = "perm:reportes.ver_modulo")]
     [ProducesResponseType(typeof(List<ReportesVentasClienteItem>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ConsultarClientes(
@@ -52,7 +52,7 @@ public class ReportesVentasController : ControllerBase
     }
 
     [HttpGet("remisiones/catalogos")]
-    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [Authorize(Policy = "perm:reportes.ver_modulo")]
     [ProducesResponseType(typeof(ReportesVentasCatalogosResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> ConsultarCatalogosRemisiones(CancellationToken ct)
     {
@@ -62,7 +62,7 @@ public class ReportesVentasController : ControllerBase
     }
 
     [HttpPost("acumuladores-productos/generar")]
-    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [Authorize(Policy = "perm:reportes.ver_modulo")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerarAcumuladoresProductos(
@@ -81,7 +81,7 @@ public class ReportesVentasController : ControllerBase
     }
 
     [HttpPost("remisiones/generar")]
-    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [Authorize(Policy = "perm:reportes.ver_modulo")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerarRemisiones(
@@ -100,7 +100,7 @@ public class ReportesVentasController : ControllerBase
     }
 
     [HttpPost("folios/generar")]
-    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [Authorize(Policy = "perm:reportes.ver_modulo")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerarFolios(
@@ -119,7 +119,7 @@ public class ReportesVentasController : ControllerBase
     }
 
     [HttpPost("facturas/generar")]
-    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [Authorize(Policy = "perm:reportes.ver_modulo")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerarFacturas(
@@ -138,7 +138,7 @@ public class ReportesVentasController : ControllerBase
     }
 
     [HttpPost("concentrados/generar")]
-    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [Authorize(Policy = "perm:reportes.ver_modulo")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerarConcentrados(
@@ -157,7 +157,7 @@ public class ReportesVentasController : ControllerBase
     }
 
     [HttpPost("cobranza/generar")]
-    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [Authorize(Policy = "perm:reportes.ver_modulo")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerarCobranza(
@@ -176,7 +176,7 @@ public class ReportesVentasController : ControllerBase
     }
 
     [HttpPost("legacy/generar")]
-    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [Authorize(Policy = "perm:reportes.ver_modulo")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerarLegacyVentas(
@@ -195,7 +195,7 @@ public class ReportesVentasController : ControllerBase
     }
 
     [HttpPost("acumuladores-productos/vista-previa")]
-    [Authorize(Policy = "perm:reportes_acumuladores_productos.ver")]
+    [Authorize(Policy = "perm:reportes.ver_modulo")]
     [ProducesResponseType(typeof(ReportesVentasPreviewResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ConsultarAcumuladoresProductos(
