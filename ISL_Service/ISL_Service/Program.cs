@@ -163,6 +163,8 @@ builder.Services.AddScoped<IReportesVentasService, ReportesVentasService>();
 builder.Services.AddScoped<IVentasPedidosRepository, VentasPedidosRepository>();
 builder.Services.AddScoped<IVentasPedidosService, VentasPedidosService>();
 builder.Services.AddSingleton<IAutorizarPedidosAsyncCoordinator, AutorizarPedidosAsyncCoordinator>();
+builder.Services.AddScoped<IVentasConsultaRepository, VentasConsultaRepository>();
+builder.Services.AddScoped<IVentasConsultaService, VentasConsultaService>();
 
 // -------------------- ALMACEN CASCOS --------------------
 builder.Services.AddScoped<IAlmacenCascosRepository, AlmacenCascosRepository>();
