@@ -26,7 +26,6 @@ public class VentasConsultaService : IVentasConsultaService
     public Task<VentasConsultaRowsResponse> ConsultarPedidosAsync(VentasConsultaRequest request, int idUsuarioToken, CancellationToken ct)
     {
         var safe = Prepare(request, idUsuarioToken);
-        if (safe.IDStatusPedido <= 0) safe.IDStatusPedido = 1;
         safe.Formato = 0;
         return _repository.ConsultarPedidosAsync(safe, ct);
     }
