@@ -44,7 +44,9 @@ public class VentasConsultaRepository : IVentasConsultaRepository
         };
 
         AddVentasCommonParams(cmd, request);
-        return ApplyAccumulatedFilters(await ExecuteRowsAsync(cmd, ct), request);
+        var response = ApplyAccumulatedFilters(await ExecuteRowsAsync(cmd, ct), request);
+        await EnrichPedidoTimelineAsync(conn, response, ct);
+        return response;
     }
 
     public async Task<VentasConsultaRowsResponse> ConsultarPedidosAsync(VentasConsultaRequest request, CancellationToken ct)
@@ -308,6 +310,73 @@ public class VentasConsultaRepository : IVentasConsultaRepository
         return string.Join(",", values.Where(x => x > 0).Distinct());
     }
 
+    private static async Task EnrichPedidoTimelineAsync(SqlConnection conn, VentasConsultaRowsResponse response, CancellationToken ct)
+    {
+        var idsVenta = response.Rows
+            .Select(row => ReadRowInt(row, "IDVenta", "idVenta"))
+            .Where(id => id > 0)
+            .Distinct()
+            .Take(1800)
+            .ToList();
+
+        if (idsVenta.Count == 0) return;
+
+        var paramNames = idsVenta.Select((_, index) => $"@id{index}").ToArray();
+        var sql = $@"
+WITH PedidoTimeline AS (
+    SELECT
+        Ped.IDVenta,
+        CASE WHEN Ped.[Fecha Impreso] IS NULL THEN '----'
+             ELSE FORMAT(Ped.[Fecha Impreso], 'dd-MM-yyyy HH:mm') + ' - ' + ISNULL(UsuImp.Usuario, '') + ' - ' + ISNULL(Ped.EquipoImpresion, '') END AS FechaImpresoFtm,
+        CASE WHEN Ped.[Fecha Proceso] IS NULL THEN '----'
+             ELSE FORMAT(Ped.[Fecha Proceso], 'dd-MM-yyyy HH:mm') + ' - ' + ISNULL(UsuProc.Usuario, '') + ' - ' + ISNULL(Ped.EquipoProceso, '') END AS FechaProcesoFtm,
+        CASE WHEN Ped.[Fecha Autorizo] IS NULL THEN '----'
+             ELSE FORMAT(Ped.[Fecha Autorizo], 'dd-MM-yyyy HH:mm') + ' - ' + ISNULL(UsuAut.Usuario, '') + ' - ' + ISNULL(Ped.EquipoAutorizo, '') END AS FechaAutorizoFtm,
+        ROW_NUMBER() OVER (PARTITION BY Ped.IDVenta ORDER BY Ped.IDPedido DESC) AS rn
+    FROM Pedidos Ped
+    LEFT JOIN Usuarios UsuImp ON UsuImp.IDUsuario = Ped.IDUsuarioImpreso
+    LEFT JOIN Usuarios UsuProc ON UsuProc.IDUsuario = Ped.IDUsuarioProceso
+    LEFT JOIN Usuarios UsuAut ON UsuAut.IDUsuario = Ped.IDUsuarioAutorizo
+    WHERE Ped.IDVenta IN ({string.Join(",", paramNames)})
+)
+SELECT IDVenta, FechaImpresoFtm, FechaProcesoFtm, FechaAutorizoFtm
+FROM PedidoTimeline
+WHERE rn = 1;";
+
+        await using var cmd = new SqlCommand(sql, conn)
+        {
+            CommandType = CommandType.Text,
+            CommandTimeout = CommandTimeoutSeconds
+        };
+
+        for (var i = 0; i < idsVenta.Count; i++)
+            cmd.Parameters.AddWithValue(paramNames[i], idsVenta[i]);
+
+        var timelineByVenta = new Dictionary<int, Dictionary<string, object?>>();
+        await using (var reader = await cmd.ExecuteReaderAsync(ct))
+        {
+            while (await reader.ReadAsync(ct))
+            {
+                var idVenta = reader.GetInt32(reader.GetOrdinal("IDVenta"));
+                timelineByVenta[idVenta] = new Dictionary<string, object?>
+                {
+                    ["FechaImpresoFtm"] = reader["FechaImpresoFtm"],
+                    ["FechaProcesoFtm"] = reader["FechaProcesoFtm"],
+                    ["FechaAutorizoFtm"] = reader["FechaAutorizoFtm"]
+                };
+            }
+        }
+
+        foreach (var row in response.Rows)
+        {
+            var idVenta = ReadRowInt(row, "IDVenta", "idVenta");
+            if (idVenta <= 0 || !timelineByVenta.TryGetValue(idVenta, out var timeline)) continue;
+            row["FechaImpresoFtm"] = timeline["FechaImpresoFtm"];
+            row["FechaProcesoFtm"] = timeline["FechaProcesoFtm"];
+            row["FechaAutorizoFtm"] = timeline["FechaAutorizoFtm"];
+        }
+    }
+
     private static VentasConsultaRowsResponse ApplyAccumulatedFilters(VentasConsultaRowsResponse response, VentasConsultaRequest request)
     {
         var folios = request.FoliosLst.Where(x => x > 0).Select(x => x.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -346,5 +415,15 @@ public class VentasConsultaRepository : IVentasConsultaRepository
     private static string NormalizeText(object? value)
     {
         return Convert.ToString(value)?.Trim().ToUpperInvariant() ?? string.Empty;
+    }
+
+    private static int ReadRowInt(Dictionary<string, object?> row, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (!row.TryGetValue(key, out var value) || value == null) continue;
+            if (int.TryParse(Convert.ToString(value), out var parsed)) return parsed;
+        }
+        return 0;
     }
 }
