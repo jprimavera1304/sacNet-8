@@ -29,7 +29,8 @@ public class VentasConsultaRepository : IVentasConsultaRepository
             Almacenes = await ConsultarAlmacenesAsync(conn, ct),
             Agentes = await ConsultarAgentesAsync(conn, ct),
             TiposDocumento = BuildTiposDocumento(),
-            EstatusVenta = BuildEstatusVenta()
+            EstatusVenta = BuildEstatusVenta(),
+            FechasOperacion = await ConsultarFechasOperacionAsync(conn, ct)
         };
     }
 
@@ -255,6 +256,34 @@ public class VentasConsultaRepository : IVentasConsultaRepository
         };
     }
 
+    private static async Task<VentasConsultaFechasOperacion> ConsultarFechasOperacionAsync(SqlConnection conn, CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("sp_n_ConsultaConstantes", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = CommandTimeoutSeconds
+        };
+        cmd.Parameters.AddWithValue("@ValidaActividad", 0);
+        cmd.Parameters.AddWithValue("@IDUsuario", 0);
+        cmd.Parameters.AddWithValue("@Equipo", "");
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        if (table.Rows.Count == 0)
+            return new VentasConsultaFechasOperacion();
+
+        var row = table.Rows[0];
+        var fechaOperacion = ReadDateIso(row, "FechaOperacion");
+        var fechaPagos = ReadDateIso(row, "FechaOperacionPagosUsuario", "FechaOperacionPagos");
+
+        return new VentasConsultaFechasOperacion
+        {
+            FechaOperacion = fechaOperacion,
+            FechaOperacionFtm = ReadString(row, "FechaOperacionFtm"),
+            FechaOperacionPagos = fechaPagos,
+            FechaOperacionPagosFtm = ReadString(row, "FechaOperacionPagosFtm")
+        };
+    }
+
     private static async Task<VentasConsultaRowsResponse> ExecuteRowsAsync(SqlCommand cmd, CancellationToken ct)
     {
         var table = await ExecuteFirstTableAsync(cmd, ct);
@@ -304,6 +333,21 @@ public class VentasConsultaRepository : IVentasConsultaRepository
             if (value == DBNull.Value || value == null) continue;
             var text = Convert.ToString(value)?.Trim() ?? string.Empty;
             if (!string.IsNullOrWhiteSpace(text)) return text;
+        }
+        return string.Empty;
+    }
+
+    private static string ReadDateIso(DataRow row, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (!row.Table.Columns.Contains(name)) continue;
+            var value = row[name];
+            if (value == DBNull.Value || value == null) continue;
+            if (value is DateTime date)
+                return date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            if (DateTime.TryParse(Convert.ToString(value), out var parsed))
+                return parsed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         }
         return string.Empty;
     }

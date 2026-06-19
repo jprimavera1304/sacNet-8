@@ -14,6 +14,15 @@ public class VentasConsultaCatalogosResponse
     public List<VentasConsultaCatalogoItem> Agentes { get; set; } = new();
     public List<VentasConsultaCatalogoItem> TiposDocumento { get; set; } = new();
     public List<VentasConsultaCatalogoItem> EstatusVenta { get; set; } = new();
+    public VentasConsultaFechasOperacion FechasOperacion { get; set; } = new();
+}
+
+public class VentasConsultaFechasOperacion
+{
+    public string FechaOperacion { get; set; } = string.Empty;
+    public string FechaOperacionFtm { get; set; } = string.Empty;
+    public string FechaOperacionPagos { get; set; } = string.Empty;
+    public string FechaOperacionPagosFtm { get; set; } = string.Empty;
 }
 
 public class VentasConsultaRequest
