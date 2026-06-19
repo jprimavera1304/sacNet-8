@@ -77,7 +77,11 @@ public class VentasConsultaRepository : IVentasConsultaRepository
         cmd.Parameters.AddWithValue("@Formato", 0);
         cmd.Parameters.AddWithValue("@IDUsuarioActual", request.IDUsuarioActual);
 
-        return ApplyAccumulatedFilters(await ExecuteRowsAsync(cmd, ct), request);
+        var response = ApplyAccumulatedFilters(await ExecuteRowsAsync(cmd, ct), request);
+        if (request.IDStatusPedido == 2)
+            await EnrichPedidoTimelineAsync(conn, response, ct);
+
+        return response;
     }
 
     public async Task<VentasConsultaRowsResponse> ConsultarPendientesImprimirAsync(VentasConsultaRequest request, CancellationToken ct)
