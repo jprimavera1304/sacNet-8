@@ -56,6 +56,7 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         if (idCliente > 0)
         {
             domicilios = DataTableToRows(await ConsultarDomiciliosAsync(conn, idCliente, request.IDEmpresaCS, ct));
+            saldos = DataTableToRows(await ConsultarSaldosClienteWebAsync(conn, idCliente, ct));
         }
 
         return new PedidoClienteContextResponse
@@ -298,9 +299,98 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         var table = new DataTable();
         table.Columns.Add("saldoPendiente", typeof(decimal));
         table.Columns.Add("saldoVencido", typeof(decimal));
+        table.Columns.Add("saldo", typeof(decimal));
         table.Columns.Add("diasVencimientoMostrar", typeof(string));
-        table.Rows.Add(0m, 0m, "0/0/0");
+        table.Rows.Add(0m, 0m, 0m, "0/0/0");
         return table;
+    }
+
+    private async Task<DataTable> ConsultarSaldosClienteWebAsync(SqlConnection conn, int idCliente, CancellationToken ct)
+    {
+        var fecha = await ConsultarFechaOperacionAsync(conn, ct);
+        var fechaOperacion = DateTime.TryParse(fecha.FechaOperacion, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+            ? parsed.Date
+            : DateTime.Today;
+
+        const string sql = """
+            DECLARE @Funcionalidad varchar(100) = '';
+            SELECT TOP 1 @Funcionalidad = UPPER(ISNULL(Funcionalidad, '')) FROM Constantes;
+
+            ;WITH Base AS
+            (
+                SELECT
+                    V.IDVenta,
+                    V.IDTipoDocumento,
+                    V.SoloAceites,
+                    V.[Fecha de Vencimiento] AS FechaVencimiento,
+                    V.FechaVencimientoAceites,
+                    V.FechaVencimientoCascos,
+                    V.[Fecha Pago] AS FechaPago,
+                    CAST(ISNULL(V.Cargos, 0) AS decimal(18, 2)) AS Cargos,
+                    CAST(ISNULL(V.Abonos, 0) AS decimal(18, 2)) AS Abonos,
+                    CAST(ISNULL(V.Descuentos, 0) AS decimal(18, 2)) AS Descuentos,
+                    CAST(ISNULL(V.Creditos, 0) + ISNULL(V.[Iva Creditos], 0) AS decimal(18, 2)) AS Creditos,
+                    CAST(ISNULL(V.TotalCostoUsadoCargoConIva, 0) AS decimal(18, 2)) AS Cascos,
+                    CAST(CASE WHEN @Funcionalidad = 'ZARA' THEN ISNULL(V.ImporteConIvaRnd, V.Importe) ELSE ISNULL(V.Importe, 0) END AS decimal(18, 2)) AS Importe,
+                    CASE WHEN V.[Fecha Pago] IS NOT NULL THEN 0 ELSE DATEDIFF(day, V.[Fecha de Vencimiento], @FechaOperacion) END AS DiasVencimiento,
+                    CASE WHEN V.[Fecha Pago] IS NOT NULL AND ISNULL(V.SoloAceites, 0) = 0 THEN 0 ELSE DATEDIFF(day, V.[Fecha de Vencimiento], @FechaOperacion) END AS DiasVencimientoAcumuladores,
+                    CASE WHEN V.[Fecha Pago] IS NOT NULL AND ISNULL(V.SoloAceites, 0) = 1 THEN 0 ELSE DATEDIFF(day, V.FechaVencimientoAceites, @FechaOperacion) END AS DiasVencimientoAceites,
+                    CASE WHEN V.[Fecha Pago] IS NOT NULL AND ISNULL(V.SoloAceites, 0) = 0 THEN 0 ELSE DATEDIFF(day, V.FechaVencimientoCascos, @FechaOperacion) END AS DiasVencimientoCascos
+                FROM Ventas V
+                WHERE V.IDCliente = @IDCliente
+                  AND V.[Fecha Cancelacion] IS NULL
+                  AND V.[Fecha Pago] IS NULL
+                  AND V.[Fecha de Emision] BETWEEN @FechaInicial AND @FechaOperacion
+            ),
+            Saldos AS
+            (
+                SELECT
+                    *,
+                    CAST(Importe + Cargos - Abonos - Descuentos AS decimal(18, 2)) AS SaldoDinero,
+                    CAST(CASE WHEN Cascos - Creditos < 0 THEN 0 ELSE Cascos - Creditos END AS decimal(18, 2)) AS SaldoCascos
+                FROM Base
+            ),
+            Final AS
+            (
+                SELECT
+                    *,
+                    CAST(CASE WHEN IDTipoDocumento = 6 THEN SaldoDinero - Creditos ELSE SaldoDinero + SaldoCascos END AS decimal(18, 2)) AS SaldoTotal
+                FROM Saldos
+            )
+            SELECT
+                CAST(ISNULL(SUM(CASE WHEN DiasVencimiento > 0 THEN SaldoTotal ELSE 0 END), 0) AS decimal(18, 2)) AS saldoVencido,
+                CAST(ISNULL(SUM(CASE WHEN DiasVencimiento <= 0 THEN SaldoTotal ELSE 0 END), 0) AS decimal(18, 2)) AS saldoPendiente,
+                CAST(ISNULL(SUM(SaldoTotal), 0) AS decimal(18, 2)) AS saldo,
+                CAST(ISNULL(MAX(CASE WHEN DiasVencimiento > 0 THEN DiasVencimiento ELSE 0 END), 0) AS int) AS maxDiasVencidos,
+                CAST(ISNULL(MAX(CASE WHEN SoloAceites = 0 AND SaldoDinero > 0 AND DiasVencimientoAcumuladores > 0 THEN DiasVencimientoAcumuladores ELSE 0 END), 0) AS int) AS maxDiasVencidosAcumuladores,
+                CAST(ISNULL(MAX(CASE WHEN SoloAceites = 0 AND SaldoCascos > 0 AND DiasVencimientoCascos > 0 THEN DiasVencimientoCascos ELSE 0 END), 0) AS int) AS maxDiasVencidosCascos,
+                CAST(ISNULL(MAX(CASE WHEN SoloAceites = 1 AND DiasVencimientoAceites > 0 THEN DiasVencimientoAceites ELSE 0 END), 0) AS int) AS maxDiasVencidosAceites,
+                CAST(
+                    CASE WHEN @Funcionalidad = 'ZARA'
+                        THEN CONCAT(
+                            ISNULL(MAX(CASE WHEN SoloAceites = 0 AND SaldoDinero > 0 AND DiasVencimientoAcumuladores > 0 THEN DiasVencimientoAcumuladores ELSE 0 END), 0),
+                            '/',
+                            ISNULL(MAX(CASE WHEN SoloAceites = 0 AND SaldoCascos > 0 AND DiasVencimientoCascos > 0 THEN DiasVencimientoCascos ELSE 0 END), 0),
+                            '/',
+                            ISNULL(MAX(CASE WHEN SoloAceites = 1 AND DiasVencimientoAceites > 0 THEN DiasVencimientoAceites ELSE 0 END), 0)
+                        )
+                        ELSE CAST(ISNULL(MAX(CASE WHEN DiasVencimiento > 0 THEN DiasVencimiento ELSE 0 END), 0) AS varchar(20))
+                    END AS varchar(100)
+                ) AS diasVencimientoMostrar
+            FROM Final;
+            """;
+
+        await using var cmd = new SqlCommand(sql, conn)
+        {
+            CommandType = CommandType.Text,
+            CommandTimeout = CommandTimeoutSeconds
+        };
+        cmd.Parameters.Add("@IDCliente", SqlDbType.Int).Value = idCliente;
+        cmd.Parameters.Add("@FechaOperacion", SqlDbType.DateTime).Value = fechaOperacion;
+        cmd.Parameters.Add("@FechaInicial", SqlDbType.DateTime).Value = new DateTime(2023, 1, 1);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return table.Rows.Count > 0 ? table : CrearSaldosClienteFallbackTable();
     }
 
     private static async Task<List<PedidoCatalogoItemDto>> ConsultarUsuarioAlmacenesAsync(SqlConnection conn, int idUsuario, CancellationToken ct)
