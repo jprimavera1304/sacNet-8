@@ -37,6 +37,7 @@ public class PedidoClienteContextResponse
     public List<Dictionary<string, object?>> Clientes { get; set; } = new();
     public List<Dictionary<string, object?>> Domicilios { get; set; } = new();
     public List<Dictionary<string, object?>> Saldos { get; set; } = new();
+    public string? Warning { get; set; }
 }
 
 public class PedidoRowsResponse

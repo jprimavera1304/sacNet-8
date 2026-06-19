@@ -29,7 +29,7 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
             Almacenes = await ConsultarUsuarioAlmacenesAsync(conn, idUsuario, ct),
             Agentes = await ConsultarAgentesAsync(conn, ct),
             FechaOperacion = fecha,
-            Pedido = await ConsultarPedidoAsync(conn, 0, ct)
+            Pedido = new PedidoSnapshotDto()
         };
     }
 
@@ -50,11 +50,19 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
             ? request.IDCliente
             : ReadInt(clientes.Rows.Count > 0 ? clientes.Rows[0] : null, "IDCliente", "idCliente");
 
+        var domicilios = new List<Dictionary<string, object?>>();
+        var saldos = DataTableToRows(CrearSaldosClienteFallbackTable());
+
+        if (idCliente > 0)
+        {
+            domicilios = DataTableToRows(await ConsultarDomiciliosAsync(conn, idCliente, request.IDEmpresaCS, ct));
+        }
+
         return new PedidoClienteContextResponse
         {
             Clientes = DataTableToRows(clientes),
-            Domicilios = idCliente > 0 ? DataTableToRows(await ConsultarDomiciliosAsync(conn, idCliente, request.IDEmpresaCS, ct)) : new(),
-            Saldos = idCliente > 0 ? DataTableToRows(await ConsultarSaldosAsync(conn, idCliente, ct)) : new()
+            Domicilios = domicilios,
+            Saldos = saldos
         };
     }
 
@@ -285,25 +293,14 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         return await ExecuteFirstTableAsync(cmd, ct);
     }
 
-    private async Task<DataTable> ConsultarSaldosAsync(SqlConnection conn, int idCliente, CancellationToken ct)
+    private static DataTable CrearSaldosClienteFallbackTable()
     {
-        var fecha = await ConsultarFechaOperacionAsync(conn, ct);
-        await using var cmd = CreateStoredProcedureCommand("sp_n_rptVentasSaldosPrincipal", conn);
-        cmd.Parameters.AddWithValue("@IDEmpresa", 0);
-        cmd.Parameters.AddWithValue("@FechaOperacion", fecha.FechaOperacionFtm);
-        cmd.Parameters.AddWithValue("@FechaInicial", "01-01-2023");
-        cmd.Parameters.AddWithValue("@FechaFinal", fecha.FechaOperacionFtm);
-        cmd.Parameters.AddWithValue("@DiasVencimiento", 0);
-        cmd.Parameters.AddWithValue("@FormatoMostrar", 0);
-        cmd.Parameters.AddWithValue("@Status", 0);
-        cmd.Parameters.AddWithValue("@Mostrar", 0);
-        cmd.Parameters.AddWithValue("@Formato", 0);
-        cmd.Parameters.AddWithValue("@IDAgente", 0);
-        cmd.Parameters.AddWithValue("@IDCliente", idCliente);
-        cmd.Parameters.AddWithValue("@IDTipoDocumento", 0);
-        cmd.Parameters.AddWithValue("@IDAlmacen", 0);
-        cmd.Parameters.AddWithValue("@Criterio", 0);
-        return await ExecuteFirstTableAsync(cmd, ct);
+        var table = new DataTable();
+        table.Columns.Add("saldoPendiente", typeof(decimal));
+        table.Columns.Add("saldoVencido", typeof(decimal));
+        table.Columns.Add("diasVencimientoMostrar", typeof(string));
+        table.Rows.Add(0m, 0m, "0/0/0");
+        return table;
     }
 
     private static async Task<List<PedidoCatalogoItemDto>> ConsultarUsuarioAlmacenesAsync(SqlConnection conn, int idUsuario, CancellationToken ct)
