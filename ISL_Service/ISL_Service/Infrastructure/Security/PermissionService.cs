@@ -21,6 +21,41 @@ public sealed class PermissionService : IPermissionService
     private const string UserPermColumnsCacheKey = "permissions:userperm-columns:v1";
     private const string ReportesModuleKey = "reportes";
     private const string ReportesViewPermission = "reportes.ver_modulo";
+    private const string VentasModuleKey = "ventas";
+    private const string VentasViewPermission = "ventas.ver_modulo";
+    private const string VentasLegacyForm = "CONSULTA DE VENTAS";
+    private static readonly Dictionary<string, (string Key, string Name)> VentasLegacyPermissionMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["btnBuscar"] = ("ventas.consultar", "Ventas - Consultar"),
+        ["btnNuevoPedido"] = ("ventas.pedidos.crear", "Ventas - Crear pedido"),
+        ["btnAceites"] = ("ventas.aceites", "Ventas - Aceites"),
+        ["btnAjustePedido"] = ("ventas.garantias", "Ventas - Garantias"),
+        ["btnProcesarPedido"] = ("ventas.pedidos.procesar", "Ventas - Procesar pedido"),
+        ["btnModificarPedido"] = ("ventas.pedidos.modificar", "Ventas - Modificar pedido"),
+        ["btnCancelarPedido"] = ("ventas.pedidos.cancelar", "Ventas - Cancelar pedido"),
+        ["btnPantallaPedido"] = ("ventas.pedidos.pantalla", "Ventas - Pantalla pedido"),
+        ["btnAutorizarPedido"] = ("ventas.pedidos.autorizar", "Ventas - Autorizar pedido"),
+        ["btnRechazarPedido"] = ("ventas.pedidos.rechazar", "Ventas - Rechazar pedido"),
+        ["btnCancelarVenta"] = ("ventas.cancelar", "Ventas - Cancelar"),
+        ["btnDevolucion"] = ("ventas.devolucion", "Ventas - Devolucion"),
+        ["btnUsados"] = ("ventas.usados", "Ventas - Usados"),
+        ["btnPagos"] = ("ventas.pagos.ver", "Ventas - Pagos"),
+        ["btnMultiPago"] = ("ventas.pagos.multi", "Ventas - Multi pago"),
+        ["btnDescargar"] = ("ventas.descargar", "Ventas - Descargar"),
+        ["btnPantalla"] = ("ventas.pantalla", "Ventas - Pantalla"),
+        ["btnReimprimir"] = ("ventas.reimprimir", "Ventas - Reimprimir"),
+        ["btnImprimir"] = ("ventas.imprimir", "Ventas - Imprimir"),
+        ["btnSimular"] = ("ventas.simular.con_remision", "Ventas - Simular con remision"),
+        ["btnSimularSin"] = ("ventas.simular.sin_remision", "Ventas - Simular sin remision"),
+        ["btnFacturar"] = ("ventas.facturar", "Ventas - Facturar"),
+        ["btnPedidosFaltantes"] = ("ventas.pedidos.faltantes", "Ventas - Pedidos faltantes")
+    };
+    private static readonly List<PermissionSeed> VentasWebPermissionSeeds = new()
+    {
+        new(VentasViewPermission, "Ventas - Ver modulo", VentasModuleKey),
+        new("ventas.ver", "Ventas - Ver", VentasModuleKey),
+        new("ventas.cliente.ver", "Ventas - Ver cliente", VentasModuleKey)
+    };
     private static readonly TimeSpan ActiveCacheTtl = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan StaleCacheTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan SchemaCacheTtl = TimeSpan.FromMinutes(15);
@@ -217,6 +252,7 @@ public sealed class PermissionService : IPermissionService
 
         var schema = await GetSchemaAsync(conn, ct);
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
+        var ventasCatalog = await EnsureLegacyVentasPermissionsSyncedAsync(conn, empresaId, ct);
 
         var response = new PermisosWebBootstrapResponse { PermissionsEnabled = true };
         var activeModules = await GetActiveModulesAsync(conn, empresaId, ct);
@@ -251,7 +287,7 @@ ORDER BY Clave;", conn))
             {
                 var code = reader.GetString(reader.GetOrdinal("Clave"));
                 if (!IsPermissionInActiveModule(code, activeModules)) continue;
-                response.Permissions.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog));
+                response.Permissions.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog, ventasCatalog));
             }
         }
 
@@ -351,7 +387,8 @@ WHERE up.EmpresaId = @EmpresaId;";
         foreach (var user in response.Users)
         {
             var legacyReports = await LoadLegacyReportPermissionsForUserAsync(conn, empresaId, user.UserId, reportCatalog, ct);
-            if (legacyReports.Allow.Count == 0 && legacyReports.Deny.Count == 0)
+            var legacyVentas = await LoadLegacyVentasPermissionsForUserAsync(conn, empresaId, user.UserId, ventasCatalog, ct);
+            if (legacyReports.Allow.Count == 0 && legacyReports.Deny.Count == 0 && legacyVentas.Allow.Count == 0 && legacyVentas.Deny.Count == 0)
                 continue;
 
             if (!overrides.TryGetValue(user.UserId, out var row))
@@ -364,6 +401,10 @@ WHERE up.EmpresaId = @EmpresaId;";
             row.Deny.RemoveAll(x => x.StartsWith($"{ReportesModuleKey}.", StringComparison.OrdinalIgnoreCase));
             row.Allow.AddRange(legacyReports.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
             row.Deny.AddRange(legacyReports.Deny.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+            row.Allow.RemoveAll(x => x.StartsWith($"{VentasModuleKey}.", StringComparison.OrdinalIgnoreCase) && !VentasWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
+            row.Deny.RemoveAll(x => x.StartsWith($"{VentasModuleKey}.", StringComparison.OrdinalIgnoreCase) && !VentasWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
+            row.Allow.AddRange(legacyVentas.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+            row.Deny.AddRange(legacyVentas.Deny.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
         }
 
         response.UserOverrides = overrides.Values.OrderBy(x => x.UserId).ToList();
@@ -380,6 +421,7 @@ WHERE up.EmpresaId = @EmpresaId;";
 
         var schema = await GetSchemaAsync(conn, ct);
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
+        var ventasCatalog = await EnsureLegacyVentasPermissionsSyncedAsync(conn, empresaId, ct);
         var response = new PermisosWebRolesBootstrapResponse { PermissionsEnabled = true };
         var activeModules = await GetActiveModulesAsync(conn, empresaId, ct);
 
@@ -413,7 +455,7 @@ ORDER BY Clave;", conn))
             {
                 var code = reader.GetString(reader.GetOrdinal("Clave"));
                 if (!IsPermissionInActiveModule(code, activeModules)) continue;
-                response.Permissions.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog));
+                response.Permissions.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog, ventasCatalog));
             }
         }
 
@@ -459,6 +501,7 @@ ORDER BY r.Codigo, p.Clave;";
             return Array.Empty<PermisosWebPermissionItem>();
 
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
+        var ventasCatalog = await EnsureLegacyVentasPermissionsSyncedAsync(conn, empresaId, ct);
         var response = new List<PermisosWebPermissionItem>();
         await using var permsCmd = new SqlCommand(@"
 SELECT Clave, Nombre
@@ -470,7 +513,7 @@ ORDER BY Clave;", conn);
         while (await reader.ReadAsync(ct))
         {
             var code = reader.GetString(reader.GetOrdinal("Clave"));
-            response.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog));
+            response.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog, ventasCatalog));
         }
 
         return response;
@@ -604,6 +647,7 @@ ORDER BY CASE WHEN m.ModuloClave = 'inicio' THEN 0 ELSE 1 END, m.ModuloClave;";
             return Array.Empty<PermisosWebModuleItem>();
 
         await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
+        await EnsureLegacyVentasPermissionsSyncedAsync(conn, empresaId, ct);
 
         if (!await TableExistsAsync(conn, "WModulo", ct))
             return Array.Empty<PermisosWebModuleItem>();
@@ -796,6 +840,7 @@ VALUES ({string.Join(", ", insertValues)});";
 
         var schema = await GetSchemaAsync(conn, ct);
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
+        var ventasCatalog = await EnsureLegacyVentasPermissionsSyncedAsync(conn, empresaId, ct);
         var normalizedPermissions = permissions
             .Where(p => !string.IsNullOrWhiteSpace(p))
             .Select(p => p.Trim())
@@ -814,6 +859,7 @@ VALUES ({string.Join(", ", insertValues)});";
             spCmd.Parameters.Add(new SqlParameter("@ClavesCsv", SqlDbType.NVarChar, -1) { Value = string.Join(",", normalizedPermissions) });
             await spCmd.ExecuteNonQueryAsync(ct);
             await SyncLegacyReportPermissionsForRoleAsync(conn, schema, empresaId, roleCode ?? string.Empty, reportCatalog, ct);
+            await SyncLegacyVentasPermissionsForRoleAsync(conn, schema, empresaId, roleCode ?? string.Empty, ventasCatalog, ct);
             InvalidateEmpresaPermissionCache(empresaId);
             return;
         }
@@ -867,6 +913,7 @@ VALUES ({string.Join(", ", insertValues)});";
 
         await tx.CommitAsync(ct);
         await SyncLegacyReportPermissionsForRoleAsync(conn, schema, empresaId, roleCode ?? string.Empty, reportCatalog, ct);
+        await SyncLegacyVentasPermissionsForRoleAsync(conn, schema, empresaId, roleCode ?? string.Empty, ventasCatalog, ct);
         InvalidateEmpresaPermissionCache(empresaId);
     }
 
@@ -880,6 +927,7 @@ VALUES ({string.Join(", ", insertValues)});";
 
         var schema = await GetSchemaAsync(conn, ct);
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
+        var ventasCatalog = await EnsureLegacyVentasPermissionsSyncedAsync(conn, empresaId, ct);
         var overrideTypes = await GetOverrideTypeTokensAsync(conn, ct);
         var userPermCols = await GetUserPermColumnsAsync(conn, null, ct);
 
@@ -927,6 +975,7 @@ WHERE EmpresaId = @EmpresaId
         await tx.CommitAsync(ct);
         var userRole = await GetUserRoleAsync(conn, empresaId, userId, ct);
         await SyncLegacyReportPermissionsForUserAsync(conn, schema, empresaId, userId, userRole, reportCatalog, ct);
+        await SyncLegacyVentasPermissionsForUserAsync(conn, schema, empresaId, userId, userRole, ventasCatalog, ct);
         InvalidateUserPermissionCache(userId, empresaId);
     }
 
@@ -1128,11 +1177,18 @@ WHERE t.name = 'WUsuarioPermiso';";
         var schema = await GetSchemaAsync(conn, ct);
         var permissions = await LoadEffectivePermissionsAsync(conn, schema, userId, empresaId, rolLegacy, ct);
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
+        var ventasCatalog = await EnsureLegacyVentasPermissionsSyncedAsync(conn, empresaId, ct);
         if (reportCatalog.Count > 0)
         {
             var legacyReports = await LoadLegacyReportPermissionsForUserAsync(conn, empresaId, userId, reportCatalog, ct);
             permissions.RemoveAll(x => x.StartsWith($"{ReportesModuleKey}.", StringComparison.OrdinalIgnoreCase));
             permissions.AddRange(legacyReports.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+        }
+        if (ventasCatalog.Count > 0)
+        {
+            var legacyVentas = await LoadLegacyVentasPermissionsForUserAsync(conn, empresaId, userId, ventasCatalog, ct);
+            permissions.RemoveAll(x => x.StartsWith($"{VentasModuleKey}.", StringComparison.OrdinalIgnoreCase) && !VentasWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
+            permissions.AddRange(legacyVentas.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
         }
         return new PermissionSnapshot
         {
@@ -1853,6 +1909,221 @@ WHERE EmpresaId = @EmpresaId
             await SyncLegacyReportPermissionsForUserAsync(conn, schema, empresaId, user.UserId, user.Rol, reportCatalog, ct);
     }
 
+    private async Task<Dictionary<string, VentasPermissionInfo>> EnsureLegacyVentasPermissionsSyncedAsync(
+        SqlConnection conn,
+        int empresaId,
+        CancellationToken ct)
+    {
+        var ventasCatalog = await LoadLegacyVentasCatalogAsync(conn, ct);
+        if (!await TableExistsAsync(conn, "WPermiso", ct))
+            return ventasCatalog.ToDictionary(x => x.Key, StringComparer.OrdinalIgnoreCase);
+
+        if (await TableExistsAsync(conn, "WModulo", ct))
+        {
+            await using var moduleCmd = new SqlCommand(@"
+IF EXISTS (SELECT 1 FROM dbo.WModulo WHERE EmpresaId = @EmpresaId AND ModuloClave = @ModuloClave)
+BEGIN
+    UPDATE dbo.WModulo
+       SET Nombre = @Nombre,
+           IdStatus = CASE WHEN IdStatus = 2 THEN 2 ELSE 1 END,
+           FechaActualizacion = CASE WHEN COL_LENGTH('dbo.WModulo','FechaActualizacion') IS NOT NULL THEN SYSUTCDATETIME() ELSE FechaActualizacion END
+     WHERE EmpresaId = @EmpresaId
+       AND ModuloClave = @ModuloClave;
+END
+ELSE
+BEGIN
+    INSERT INTO dbo.WModulo (EmpresaId, ModuloClave, Nombre, IdStatus, FechaCreacion, FechaActualizacion)
+    VALUES (@EmpresaId, @ModuloClave, @Nombre, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
+END", conn);
+            moduleCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+            moduleCmd.Parameters.Add(new SqlParameter("@ModuloClave", SqlDbType.NVarChar, 120) { Value = VentasModuleKey });
+            moduleCmd.Parameters.Add(new SqlParameter("@Nombre", SqlDbType.NVarChar, 200) { Value = "Ventas" });
+            await moduleCmd.ExecuteNonQueryAsync(ct);
+        }
+
+        var permissionRows = ventasCatalog
+            .Select(x => new PermissionSeed(x.Key, x.Name, VentasModuleKey))
+            .Concat(VentasWebPermissionSeeds)
+            .GroupBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(x => x.First())
+            .ToList();
+
+        foreach (var seed in permissionRows)
+        {
+            await using var cmd = new SqlCommand(@"
+IF EXISTS (SELECT 1 FROM dbo.WPermiso WHERE EmpresaId = @EmpresaId AND Clave = @Clave)
+BEGIN
+    UPDATE dbo.WPermiso
+       SET Nombre = @Nombre,
+           Descripcion = CASE WHEN COL_LENGTH('dbo.WPermiso','Descripcion') IS NOT NULL THEN @Descripcion ELSE Descripcion END
+     WHERE EmpresaId = @EmpresaId
+       AND Clave = @Clave;
+END
+ELSE
+BEGIN
+    INSERT INTO dbo.WPermiso (EmpresaId, Clave, Nombre, Descripcion, FechaCreacion)
+    VALUES (@EmpresaId, @Clave, @Nombre, @Descripcion, SYSUTCDATETIME());
+END", conn);
+            cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+            cmd.Parameters.Add(new SqlParameter("@Clave", SqlDbType.NVarChar, 200) { Value = seed.Key });
+            cmd.Parameters.Add(new SqlParameter("@Nombre", SqlDbType.NVarChar, 200) { Value = seed.Name });
+            cmd.Parameters.Add(new SqlParameter("@Descripcion", SqlDbType.NVarChar, 500) { Value = VentasWebPermissionSeeds.Any(x => x.Key.Equals(seed.Key, StringComparison.OrdinalIgnoreCase)) ? "ventas.web" : "ventas.legacy" });
+            await cmd.ExecuteNonQueryAsync(ct);
+        }
+
+        return ventasCatalog.ToDictionary(x => x.Key, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static async Task<List<VentasPermissionInfo>> LoadLegacyVentasCatalogAsync(SqlConnection conn, CancellationToken ct)
+    {
+        if (!await TableExistsAsync(conn, "n_Formas", ct) || !await TableExistsAsync(conn, "n_Procesos", ct))
+            return new List<VentasPermissionInfo>();
+
+        await using var cmd = new SqlCommand(@"
+SELECT
+    f.IDForma,
+    p.IDProceso,
+    p.Proceso,
+    p.Descripcion AS ProcesoDescripcion,
+    COALESCE(p.Orden, 0) AS ProcesoOrden
+FROM dbo.n_Formas f
+INNER JOIN dbo.n_Procesos p
+    ON p.IDForma = f.IDForma
+WHERE UPPER(LTRIM(RTRIM(f.Descripcion))) = @Forma
+  AND ISNULL(p.IDStatus, 1) = 1
+ORDER BY COALESCE(p.Orden, 0), p.IDProceso;", conn);
+        cmd.Parameters.Add(new SqlParameter("@Forma", SqlDbType.NVarChar, 200) { Value = VentasLegacyForm });
+
+        var list = new List<VentasPermissionInfo>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            var processCode = reader.IsDBNull(reader.GetOrdinal("Proceso"))
+                ? string.Empty
+                : reader.GetString(reader.GetOrdinal("Proceso"));
+            if (!VentasLegacyPermissionMap.TryGetValue(processCode, out var mapped))
+                continue;
+
+            var info = new VentasPermissionInfo(
+                Key: mapped.Key,
+                Name: mapped.Name,
+                CategoryKey: "acciones",
+                CategoryName: "Acciones",
+                LegacyFormId: reader.GetInt32(reader.GetOrdinal("IDForma")),
+                LegacyProcessId: reader.GetInt32(reader.GetOrdinal("IDProceso")),
+                SortOrder: reader.GetInt32(reader.GetOrdinal("ProcesoOrden"))
+            );
+            if (!list.Any(x => x.Key.Equals(info.Key, StringComparison.OrdinalIgnoreCase)))
+                list.Add(info);
+        }
+
+        return list;
+    }
+
+    private static async Task<(HashSet<string> Allow, HashSet<string> Deny)> LoadLegacyVentasPermissionsForUserAsync(
+        SqlConnection conn,
+        int empresaId,
+        Guid userId,
+        IReadOnlyDictionary<string, VentasPermissionInfo> ventasCatalog,
+        CancellationToken ct)
+    {
+        var allow = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var deny = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (ventasCatalog.Count == 0)
+            return (allow, deny);
+
+        var legacyUserId = await ResolveLegacyUserIdAsync(conn, empresaId, userId, ct);
+        if (legacyUserId is null)
+            return (allow, deny);
+
+        var byProcessId = ventasCatalog.Values.ToDictionary(x => x.LegacyProcessId, x => x.Key);
+        await using var cmd = new SqlCommand(@"
+SELECT p.IDProceso, CASE WHEN ufp.IDStatus = 1 THEN 1 ELSE 0 END AS Permitido
+FROM dbo.n_Formas f
+INNER JOIN dbo.n_Procesos p
+    ON p.IDForma = f.IDForma
+LEFT JOIN dbo.[Usuario Forma Procesos] ufp
+    ON ufp.IDProceso = p.IDProceso
+   AND ufp.IDUsuario = @IDUsuario
+WHERE UPPER(LTRIM(RTRIM(f.Descripcion))) = @Forma
+  AND ISNULL(p.IDStatus, 1) = 1;", conn);
+        cmd.Parameters.Add(new SqlParameter("@IDUsuario", SqlDbType.Int) { Value = legacyUserId.Value });
+        cmd.Parameters.Add(new SqlParameter("@Forma", SqlDbType.NVarChar, 200) { Value = VentasLegacyForm });
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            var processId = reader.GetInt32(reader.GetOrdinal("IDProceso"));
+            if (!byProcessId.TryGetValue(processId, out var key))
+                continue;
+            var permitted = reader.GetInt32(reader.GetOrdinal("Permitido")) == 1;
+            if (permitted) allow.Add(key);
+            else deny.Add(key);
+        }
+
+        return (allow, deny);
+    }
+
+    private async Task SyncLegacyVentasPermissionsForUserAsync(
+        SqlConnection conn,
+        CapabilitySchema schema,
+        int empresaId,
+        Guid userId,
+        string rolLegacy,
+        IReadOnlyDictionary<string, VentasPermissionInfo> ventasCatalog,
+        CancellationToken ct)
+    {
+        if (ventasCatalog.Count == 0)
+            return;
+
+        var legacyUserId = await ResolveLegacyUserIdAsync(conn, empresaId, userId, ct);
+        if (legacyUserId is null)
+            return;
+
+        var effective = await LoadEffectivePermissionsFromWebAsync(conn, schema, userId, empresaId, rolLegacy, ct);
+        var movementUserId = await ResolveMovementLegacyUserIdAsync(conn, ct);
+        foreach (var action in ventasCatalog.Values)
+        {
+            await using var cmd = new SqlCommand("dbo.sp_n_ActualizarUsuarioFormaProceso", conn)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+            cmd.Parameters.Add(new SqlParameter("@IDUsuario", SqlDbType.Int) { Value = legacyUserId.Value });
+            cmd.Parameters.Add(new SqlParameter("@IDProceso", SqlDbType.Int) { Value = action.LegacyProcessId });
+            cmd.Parameters.Add(new SqlParameter("@IDStatus", SqlDbType.Int) { Value = effective.Contains(action.Key) ? 1 : 2 });
+            cmd.Parameters.Add(new SqlParameter("@IDUsuarioMovimiento", SqlDbType.Int) { Value = movementUserId });
+            await cmd.ExecuteNonQueryAsync(ct);
+        }
+    }
+
+    private async Task SyncLegacyVentasPermissionsForRoleAsync(
+        SqlConnection conn,
+        CapabilitySchema schema,
+        int empresaId,
+        string roleCode,
+        IReadOnlyDictionary<string, VentasPermissionInfo> ventasCatalog,
+        CancellationToken ct)
+    {
+        if (ventasCatalog.Count == 0)
+            return;
+
+        await using var cmd = new SqlCommand(@"
+SELECT Id, Rol
+FROM dbo.UsuarioWeb
+WHERE EmpresaId = @EmpresaId
+  AND UPPER(Rol) = @Rol;", conn);
+        cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+        cmd.Parameters.Add(new SqlParameter("@Rol", SqlDbType.NVarChar, 80) { Value = ToRoleCode(roleCode) });
+        var users = new List<(Guid UserId, string Rol)>();
+        await using (var reader = await cmd.ExecuteReaderAsync(ct))
+        {
+            while (await reader.ReadAsync(ct))
+                users.Add((reader.GetGuid(reader.GetOrdinal("Id")), reader.GetString(reader.GetOrdinal("Rol"))));
+        }
+
+        foreach (var user in users)
+            await SyncLegacyVentasPermissionsForUserAsync(conn, schema, empresaId, user.UserId, user.Rol, ventasCatalog, ct);
+    }
+
     private static async Task<HashSet<string>> LoadEffectivePermissionsFromWebAsync(
         SqlConnection conn,
         CapabilitySchema schema,
@@ -1932,7 +2203,11 @@ WHERE t.name = @TableName
         return raw is not null && raw != DBNull.Value;
     }
 
-    private static PermisosWebPermissionItem EnrichPermissionItem(string code, string name, IReadOnlyDictionary<string, ReportPermissionInfo> reportCatalog)
+    private static PermisosWebPermissionItem EnrichPermissionItem(
+        string code,
+        string name,
+        IReadOnlyDictionary<string, ReportPermissionInfo> reportCatalog,
+        IReadOnlyDictionary<string, VentasPermissionInfo> ventasCatalog)
     {
         if (reportCatalog.TryGetValue(code, out var report))
         {
@@ -1947,6 +2222,21 @@ WHERE t.name = @TableName
                 LegacyFormId = report.LegacyFormId,
                 LegacyProcessId = report.LegacyProcessId,
                 IsLegacyReport = true
+            };
+        }
+
+        if (ventasCatalog.TryGetValue(code, out var venta))
+        {
+            return new PermisosWebPermissionItem
+            {
+                Code = venta.Key,
+                Name = venta.Name,
+                ModuleKey = VentasModuleKey,
+                ModuleName = "Ventas",
+                CategoryKey = venta.CategoryKey,
+                CategoryName = venta.CategoryName,
+                LegacyFormId = venta.LegacyFormId,
+                LegacyProcessId = venta.LegacyProcessId
             };
         }
 
@@ -2176,6 +2466,14 @@ WHERE EmpresaId = @EmpresaId
 
     private sealed record PermissionSeed(string Key, string Name, string Module);
     private sealed record ReportPermissionInfo(
+        string Key,
+        string Name,
+        string CategoryKey,
+        string CategoryName,
+        int LegacyFormId,
+        int LegacyProcessId,
+        int SortOrder);
+    private sealed record VentasPermissionInfo(
         string Key,
         string Name,
         string CategoryKey,
