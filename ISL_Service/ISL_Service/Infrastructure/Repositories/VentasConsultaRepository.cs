@@ -44,7 +44,7 @@ public class VentasConsultaRepository : IVentasConsultaRepository
         };
 
         AddVentasCommonParams(cmd, request);
-        return await ExecuteRowsAsync(cmd, ct);
+        return ApplyAccumulatedFilters(await ExecuteRowsAsync(cmd, ct), request);
     }
 
     public async Task<VentasConsultaRowsResponse> ConsultarPedidosAsync(VentasConsultaRequest request, CancellationToken ct)
@@ -75,7 +75,7 @@ public class VentasConsultaRepository : IVentasConsultaRepository
         cmd.Parameters.AddWithValue("@Formato", 0);
         cmd.Parameters.AddWithValue("@IDUsuarioActual", request.IDUsuarioActual);
 
-        return await ExecuteRowsAsync(cmd, ct);
+        return ApplyAccumulatedFilters(await ExecuteRowsAsync(cmd, ct), request);
     }
 
     public async Task<VentasConsultaRowsResponse> ConsultarPendientesImprimirAsync(VentasConsultaRequest request, CancellationToken ct)
@@ -306,5 +306,45 @@ public class VentasConsultaRepository : IVentasConsultaRepository
         if (!string.IsNullOrWhiteSpace(raw)) return raw.Trim();
         if (values == null) return string.Empty;
         return string.Join(",", values.Where(x => x > 0).Distinct());
+    }
+
+    private static VentasConsultaRowsResponse ApplyAccumulatedFilters(VentasConsultaRowsResponse response, VentasConsultaRequest request)
+    {
+        var folios = request.FoliosLst.Where(x => x > 0).Select(x => x.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var numerosCliente = request.NumerosClienteLst.Where(x => x > 0).Select(x => x.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var clavesProducto = request.ClavesProductoLst
+            .Append(request.ClaveProducto ?? string.Empty)
+            .Select(NormalizeText)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (folios.Count == 0 && numerosCliente.Count == 0 && clavesProducto.Count == 0)
+            return response;
+
+        var rows = response.Rows.Where(row =>
+            MatchesAny(row, folios, "FolioFtm", "Folio", "folioFtm", "folio") &&
+            MatchesAny(row, numerosCliente, "NumeroCliente", "Numero", "No", "NO", "numeroCliente", "numero") &&
+            MatchesAny(row, clavesProducto, "ClaveProducto", "Clave", "Producto", "DescripcionProducto", "claveProducto", "clave")
+        ).ToList();
+
+        return new VentasConsultaRowsResponse { Rows = rows, Total = rows.Count };
+    }
+
+    private static bool MatchesAny(Dictionary<string, object?> row, HashSet<string> accepted, params string[] keys)
+    {
+        if (accepted.Count == 0) return true;
+        foreach (var key in keys)
+        {
+            if (!row.TryGetValue(key, out var value) || value == null) continue;
+            var normalized = NormalizeText(value);
+            if (accepted.Contains(normalized)) return true;
+            if (accepted.Any(x => !string.IsNullOrWhiteSpace(x) && normalized.Contains(x, StringComparison.OrdinalIgnoreCase))) return true;
+        }
+        return false;
+    }
+
+    private static string NormalizeText(object? value)
+    {
+        return Convert.ToString(value)?.Trim().ToUpperInvariant() ?? string.Empty;
     }
 }

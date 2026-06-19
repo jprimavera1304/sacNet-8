@@ -21,9 +21,13 @@ public class VentasConsultaRequest
     public List<int> IDsVentaLst { get; set; } = new();
     public List<int> IDsClientesLst { get; set; } = new();
     public List<int> IDsProductoLst { get; set; } = new();
+    public List<int> FoliosLst { get; set; } = new();
+    public List<int> NumerosClienteLst { get; set; } = new();
+    public List<string> ClavesProductoLst { get; set; } = new();
     public string? IDsVenta { get; set; }
     public string? IDsClientes { get; set; }
     public string? IDsProducto { get; set; }
+    public string? ClaveProducto { get; set; }
     public int IDVenta { get; set; }
     public int IDEmpresa { get; set; }
     public int IDCliente { get; set; }
