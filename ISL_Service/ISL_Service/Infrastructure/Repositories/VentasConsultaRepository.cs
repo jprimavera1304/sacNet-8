@@ -3,6 +3,7 @@ using ISL_Service.Application.DTOs.VentasConsulta;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Data;
 using Microsoft.Data.SqlClient;
+using System.Globalization;
 
 namespace ISL_Service.Infrastructure.Repositories;
 
@@ -68,12 +69,12 @@ public class VentasConsultaRepository : IVentasConsultaRepository
         cmd.Parameters.AddWithValue("@IDAgente", request.IDAgente);
         cmd.Parameters.AddWithValue("@IDTipoDocumento", request.IDTipoDocumento);
         cmd.Parameters.AddWithValue("@IDStatusPedido", request.IDStatusPedido);
-        cmd.Parameters.AddWithValue("@FolioInicial", request.FolioInicial ?? string.Empty);
-        cmd.Parameters.AddWithValue("@FolioFinal", request.FolioFinal ?? string.Empty);
-        cmd.Parameters.AddWithValue("@FechaInicial", request.FechaInicial ?? request.FechaEmisionInicial ?? string.Empty);
-        cmd.Parameters.AddWithValue("@FechaFinal", request.FechaFinal ?? request.FechaEmisionFinal ?? string.Empty);
-        cmd.Parameters.AddWithValue("@FechaCancelInicial", request.FechaCancelInicial ?? string.Empty);
-        cmd.Parameters.AddWithValue("@FechaCancelFinal", request.FechaCancelFinal ?? string.Empty);
+        cmd.Parameters.AddWithValue("@FolioInicial", NormalizeLegacyFolio(request.FolioInicial));
+        cmd.Parameters.AddWithValue("@FolioFinal", NormalizeLegacyFolio(request.FolioFinal));
+        cmd.Parameters.AddWithValue("@FechaInicial", NormalizeLegacyDateTime(request.FechaInicial ?? request.FechaEmisionInicial, false));
+        cmd.Parameters.AddWithValue("@FechaFinal", NormalizeLegacyDateTime(request.FechaFinal ?? request.FechaEmisionFinal, true));
+        cmd.Parameters.AddWithValue("@FechaCancelInicial", NormalizeLegacyDateTime(request.FechaCancelInicial, false));
+        cmd.Parameters.AddWithValue("@FechaCancelFinal", NormalizeLegacyDateTime(request.FechaCancelFinal, true));
         cmd.Parameters.AddWithValue("@Formato", 0);
         cmd.Parameters.AddWithValue("@IDUsuarioActual", request.IDUsuarioActual);
 
@@ -141,14 +142,14 @@ public class VentasConsultaRepository : IVentasConsultaRepository
         cmd.Parameters.AddWithValue("@IDAgente", request.IDAgente);
         cmd.Parameters.AddWithValue("@IDTipoDocumento", request.IDTipoDocumento);
         cmd.Parameters.AddWithValue("@TipoDocumento", request.TipoDocumento);
-        cmd.Parameters.AddWithValue("@FolioInicial", request.FolioInicial ?? string.Empty);
-        cmd.Parameters.AddWithValue("@FolioFinal", request.FolioFinal ?? string.Empty);
-        cmd.Parameters.AddWithValue("@FechaEmisionInicial", request.FechaEmisionInicial ?? request.FechaInicial ?? string.Empty);
-        cmd.Parameters.AddWithValue("@FechaEmisionFinal", request.FechaEmisionFinal ?? request.FechaFinal ?? string.Empty);
-        cmd.Parameters.AddWithValue("@FechaCancelInicial", request.FechaCancelInicial ?? string.Empty);
-        cmd.Parameters.AddWithValue("@FechaCancelFinal", request.FechaCancelFinal ?? string.Empty);
-        cmd.Parameters.AddWithValue("@FechaPagoInicial", request.FechaPagoInicial ?? string.Empty);
-        cmd.Parameters.AddWithValue("@FechaPagoFinal", request.FechaPagoFinal ?? string.Empty);
+        cmd.Parameters.AddWithValue("@FolioInicial", NormalizeLegacyFolio(request.FolioInicial));
+        cmd.Parameters.AddWithValue("@FolioFinal", NormalizeLegacyFolio(request.FolioFinal));
+        cmd.Parameters.AddWithValue("@FechaEmisionInicial", NormalizeLegacyDateTime(request.FechaEmisionInicial ?? request.FechaInicial, false));
+        cmd.Parameters.AddWithValue("@FechaEmisionFinal", NormalizeLegacyDateTime(request.FechaEmisionFinal ?? request.FechaFinal, true));
+        cmd.Parameters.AddWithValue("@FechaCancelInicial", NormalizeLegacyDateTime(request.FechaCancelInicial, false));
+        cmd.Parameters.AddWithValue("@FechaCancelFinal", NormalizeLegacyDateTime(request.FechaCancelFinal, true));
+        cmd.Parameters.AddWithValue("@FechaPagoInicial", NormalizeLegacyDateTime(request.FechaPagoInicial, false));
+        cmd.Parameters.AddWithValue("@FechaPagoFinal", NormalizeLegacyDateTime(request.FechaPagoFinal, true));
         cmd.Parameters.AddWithValue("@Formato", request.Formato);
         cmd.Parameters.AddWithValue("@IDUsuarioActual", request.IDUsuarioActual);
         cmd.Parameters.AddWithValue("@IDsClientes", JoinIds(request.IDsClientesLst, request.IDsClientes));
@@ -312,6 +313,51 @@ public class VentasConsultaRepository : IVentasConsultaRepository
         if (!string.IsNullOrWhiteSpace(raw)) return raw.Trim();
         if (values == null) return string.Empty;
         return string.Join(",", values.Where(x => x > 0).Distinct());
+    }
+
+    private static string NormalizeLegacyFolio(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "0" : value.Trim();
+    }
+
+    private static string NormalizeLegacyDateTime(string? value, bool endOfDay)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+
+        var text = value.Trim();
+        var compactSlashDate = text.Contains('/') ? text.Replace(" ", "") : text;
+        var formats = new[]
+        {
+            "yyyy-MM-dd",
+            "yyyy-MM-dd HH:mm:ss",
+            "dd/MM/yyyy",
+            "d/M/yyyy",
+            "dd-MM-yyyy",
+            "d-M-yyyy",
+            "MM-dd-yyyy",
+            "M-d-yyyy"
+        };
+
+        if (!DateTime.TryParseExact(
+                compactSlashDate,
+                formats,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsed)
+            && !DateTime.TryParse(
+                text,
+                CultureInfo.GetCultureInfo("es-MX"),
+                DateTimeStyles.None,
+                out parsed))
+        {
+            return text;
+        }
+
+        var normalized = endOfDay
+            ? parsed.Date.AddDays(1).AddSeconds(-1)
+            : parsed.Date;
+
+        return normalized.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
     }
 
     private static async Task EnrichPedidoTimelineAsync(SqlConnection conn, VentasConsultaRowsResponse response, CancellationToken ct)
