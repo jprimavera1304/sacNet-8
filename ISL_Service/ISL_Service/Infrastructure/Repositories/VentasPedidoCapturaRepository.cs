@@ -29,7 +29,7 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
             Almacenes = await ConsultarUsuarioAlmacenesAsync(conn, idUsuario, ct),
             Agentes = await ConsultarAgentesAsync(conn, ct),
             FechaOperacion = fecha,
-            Pedido = new PedidoSnapshotDto()
+            Pedido = await ConsultarPedidoInicialAsync(conn, ct)
         };
     }
 
@@ -207,6 +207,41 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         };
     }
 
+    private static async Task<PedidoSnapshotDto> ConsultarPedidoInicialAsync(SqlConnection conn, CancellationToken ct)
+    {
+        return new PedidoSnapshotDto
+        {
+            CascosCargo = await ConsultarCascosCatalogoAsync(conn, ct)
+        };
+    }
+
+    private static async Task<List<Dictionary<string, object?>>> ConsultarCascosCatalogoAsync(SqlConnection conn, CancellationToken ct)
+    {
+        await using var cmd = CreateStoredProcedureCommand("sp_n_ConsultaTiposUsados", conn);
+        cmd.Parameters.AddWithValue("@IDTipoUsado", 0);
+        cmd.Parameters.AddWithValue("@IDStatus", 1);
+        cmd.Parameters.AddWithValue("@TipoUsado", string.Empty);
+        cmd.Parameters.AddWithValue("@Formato", 0);
+        cmd.Parameters.AddWithValue("@Identico", 0);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return table.AsEnumerable()
+            .Select(row => new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["IDTipoUsado"] = ReadInt(row, "IDTipoUsado", "idTipoUsado"),
+                ["TipoUsado"] = ReadString(row, "TipoUsado", "tipoUsado", "TipoUsadoCorto", "tipoUsadoCorto"),
+                ["CostoVentaCargoConIva"] = ReadDecimal(row, "CostoVentaCargoConIva", "costoVentaCargoConIva", "VentaCostoCargoConIva", "ventaCostoCargoConIva"),
+                ["ClienteBonificacion"] = 0m,
+                ["Cantidad"] = 0,
+                ["ImporteClienteBonificacion"] = 0m,
+                ["ImporteVentaCargoConIva"] = 0m,
+                ["Orden"] = ReadInt(row, "Orden", "orden")
+            })
+            .Where(row => ReadIntFromDictionary(row, "IDTipoUsado") > 0 && !string.IsNullOrWhiteSpace(Convert.ToString(row["TipoUsado"], CultureInfo.InvariantCulture)))
+            .OrderBy(row => ReadIntFromDictionary(row, "Orden"))
+            .ToList();
+    }
+
     private static void AddInsertarDetalleParams(SqlCommand cmd, PedidoAgregarDetalleRequest request, int idUsuario, string equipo)
     {
         cmd.Parameters.AddWithValue("@IDPedido", request.IDPedido);
@@ -311,6 +346,7 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         var fechaOperacion = DateTime.TryParse(fecha.FechaOperacion, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
             ? parsed.Date
             : DateTime.Today;
+        var fechaFinal = fechaOperacion.AddDays(1).AddTicks(-1);
 
         const string sql = """
             DECLARE @Funcionalidad varchar(100) = '';
@@ -320,6 +356,7 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
             (
                 SELECT
                     V.IDVenta,
+                    V.IDCliente,
                     V.IDTipoDocumento,
                     V.SoloAceites,
                     V.[Fecha de Vencimiento] AS FechaVencimiento,
@@ -329,7 +366,8 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
                     CAST(ISNULL(V.Cargos, 0) AS decimal(18, 2)) AS Cargos,
                     CAST(ISNULL(V.Abonos, 0) AS decimal(18, 2)) AS Abonos,
                     CAST(ISNULL(V.Descuentos, 0) AS decimal(18, 2)) AS Descuentos,
-                    CAST(ISNULL(V.Creditos, 0) + ISNULL(V.[Iva Creditos], 0) AS decimal(18, 2)) AS Creditos,
+                    CAST(ISNULL(V.Creditos, 0) AS decimal(18, 2)) AS Creditos,
+                    CAST(ISNULL(V.[Iva Creditos], 0) AS decimal(18, 2)) AS IvaCreditos,
                     CAST(ISNULL(V.TotalCostoUsadoCargoConIva, 0) AS decimal(18, 2)) AS Cascos,
                     CAST(CASE WHEN @Funcionalidad = 'ZARA' THEN ISNULL(V.ImporteConIvaRnd, V.Importe) ELSE ISNULL(V.Importe, 0) END AS decimal(18, 2)) AS Importe,
                     CASE WHEN V.[Fecha Pago] IS NOT NULL THEN 0 ELSE DATEDIFF(day, V.[Fecha de Vencimiento], @FechaOperacion) END AS DiasVencimiento,
@@ -340,21 +378,74 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
                 WHERE V.IDCliente = @IDCliente
                   AND V.[Fecha Cancelacion] IS NULL
                   AND V.[Fecha Pago] IS NULL
-                  AND V.[Fecha de Emision] BETWEEN @FechaInicial AND @FechaOperacion
+                  AND V.[Fecha de Emision] BETWEEN @FechaInicial AND @FechaFinal
+            ),
+            PagosDiff AS
+            (
+                SELECT VP.IDVenta, CAST(SUM(ISNULL(VP.Abono, 0)) AS decimal(18, 2)) AS PagosDiffUsados
+                FROM [Ventas Pagos Usados] VP
+                INNER JOIN Base B ON B.IDVenta = VP.IDVenta
+                WHERE VP.[Fecha Cancelacion] IS NULL
+                GROUP BY VP.IDVenta
             ),
             Saldos AS
             (
                 SELECT
-                    *,
-                    CAST(Importe + Cargos - Abonos - Descuentos AS decimal(18, 2)) AS SaldoDinero,
-                    CAST(CASE WHEN Cascos - Creditos < 0 THEN 0 ELSE Cascos - Creditos END AS decimal(18, 2)) AS SaldoCascos
-                FROM Base
+                    B.*,
+                    CAST(ISNULL(P.PagosDiffUsados, 0) AS decimal(18, 2)) AS PagosDiffUsados,
+                    CAST(
+                        CASE WHEN @Funcionalidad = 'ZARA' AND EXISTS (SELECT 1 FROM CentrosServicio CS WHERE CS.IDCliente = B.IDCliente)
+                            THEN 0
+                            ELSE B.Importe + B.Cargos - B.Descuentos - B.Abonos
+                        END AS decimal(18, 2)
+                    ) AS SaldoDinero,
+                    CAST(
+                        CASE WHEN @Funcionalidad = 'ZARA' AND EXISTS (SELECT 1 FROM CentrosServicio CS WHERE CS.IDCliente = B.IDCliente)
+                            THEN 0
+                            ELSE
+                                CASE
+                                    WHEN (
+                                        CASE WHEN @Funcionalidad = 'ZARA'
+                                            THEN CASE WHEN B.IDTipoDocumento = 6
+                                                THEN B.Cascos - ISNULL(P.PagosDiffUsados, 0)
+                                                ELSE B.Cascos - B.Creditos - B.IvaCreditos - ISNULL(P.PagosDiffUsados, 0)
+                                            END
+                                            ELSE B.Cascos - B.Creditos - B.IvaCreditos
+                                        END
+                                    ) < 0 THEN 0
+                                    WHEN (
+                                        CASE WHEN @Funcionalidad = 'ZARA'
+                                            THEN CASE WHEN B.IDTipoDocumento = 6
+                                                THEN B.Cascos - ISNULL(P.PagosDiffUsados, 0)
+                                                ELSE B.Cascos - B.Creditos - B.IvaCreditos - ISNULL(P.PagosDiffUsados, 0)
+                                            END
+                                            ELSE B.Cascos - B.Creditos - B.IvaCreditos
+                                        END
+                                    ) BETWEEN 0.01 AND 0.05 THEN 0
+                                    ELSE
+                                        CASE WHEN @Funcionalidad = 'ZARA'
+                                            THEN CASE WHEN B.IDTipoDocumento = 6
+                                                THEN B.Cascos - ISNULL(P.PagosDiffUsados, 0)
+                                                ELSE B.Cascos - B.Creditos - B.IvaCreditos - ISNULL(P.PagosDiffUsados, 0)
+                                            END
+                                            ELSE B.Cascos - B.Creditos - B.IvaCreditos
+                                        END
+                                END
+                        END AS decimal(18, 2)
+                    ) AS SaldoCascos
+                FROM Base B
+                LEFT JOIN PagosDiff P ON P.IDVenta = B.IDVenta
             ),
             Final AS
             (
                 SELECT
                     *,
-                    CAST(CASE WHEN IDTipoDocumento = 6 THEN SaldoDinero - Creditos ELSE SaldoDinero + SaldoCascos END AS decimal(18, 2)) AS SaldoTotal
+                    CAST(
+                        CASE WHEN @Funcionalidad = 'ZARA'
+                            THEN SaldoDinero + SaldoCascos
+                            ELSE CASE WHEN IDTipoDocumento = 6 THEN SaldoDinero - Creditos - IvaCreditos ELSE SaldoDinero + SaldoCascos END
+                        END AS decimal(18, 2)
+                    ) AS SaldoTotal
                 FROM Saldos
             )
             SELECT
@@ -387,6 +478,7 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         };
         cmd.Parameters.Add("@IDCliente", SqlDbType.Int).Value = idCliente;
         cmd.Parameters.Add("@FechaOperacion", SqlDbType.DateTime).Value = fechaOperacion;
+        cmd.Parameters.Add("@FechaFinal", SqlDbType.DateTime).Value = fechaFinal;
         cmd.Parameters.Add("@FechaInicial", SqlDbType.DateTime).Value = new DateTime(2023, 1, 1);
 
         var table = await ExecuteFirstTableAsync(cmd, ct);
@@ -609,5 +701,25 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
             if (DateTime.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), out var parsed)) return parsed;
         }
         return null;
+    }
+
+    private static decimal ReadDecimal(DataRow row, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (!row.Table.Columns.Contains(name)) continue;
+            var value = row[name];
+            if (value == DBNull.Value || value == null) continue;
+            if (value is decimal dec) return dec;
+            if (decimal.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed)) return parsed;
+        }
+        return 0m;
+    }
+
+    private static int ReadIntFromDictionary(Dictionary<string, object?> row, string name)
+    {
+        return row.TryGetValue(name, out var value) && int.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), out var parsed)
+            ? parsed
+            : 0;
     }
 }
