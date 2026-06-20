@@ -11,6 +11,7 @@ public class PedidoProductoBuscarRequest
 {
     public int IDAlmacen { get; set; }
     public int IDProducto { get; set; }
+    public int IDCliente { get; set; }
     public string? Clave { get; set; }
     public int IDGrupoCategoria { get; set; }
     public int IDEmpresaCS { get; set; }

@@ -101,7 +101,18 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
 
         var idPedido = request.IDPedido;
         if (result.Tables.Count > 0 && result.Tables[0].Rows.Count > 0)
-            idPedido = ReadInt(result.Tables[0].Rows[0], "IDPedido", "idPedido");
+        {
+            var row = result.Tables[0].Rows[0];
+            var legacyResult = ReadInt(row, "result", "Result");
+            if (legacyResult == 0)
+            {
+                var message = ReadString(row, "mensaje", "Mensaje");
+                if (!string.IsNullOrWhiteSpace(message))
+                    throw new ArgumentException(message.Replace("@@@@", Environment.NewLine + Environment.NewLine));
+            }
+
+            idPedido = ReadInt(row, "IDPedido", "idPedido");
+        }
 
         return await ConsultarPedidoAsync(conn, idPedido, ct);
     }
