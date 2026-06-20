@@ -209,14 +209,45 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
 
     private static async Task<PedidoSnapshotDto> ConsultarPedidoInicialAsync(SqlConnection conn, CancellationToken ct)
     {
+        var pedido = await ConsultarPedidoInicialLegacyAsync(conn, ct);
+        if (pedido.CascosCargo.Count > 0) return pedido;
+
         return new PedidoSnapshotDto
         {
             CascosCargo = await ConsultarCascosCatalogoAsync(conn, ct)
         };
     }
 
+    private static async Task<PedidoSnapshotDto> ConsultarPedidoInicialLegacyAsync(SqlConnection conn, CancellationToken ct)
+    {
+        var ds = await ExecuteDataSetWithFallbackAsync(
+            conn,
+            "sp_w_ConsultaPedido",
+            "sp_n_ConsultaPedido",
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue("@IDPedido", 0);
+                cmd.Parameters.AddWithValue("@SoloDetalles", 0);
+                cmd.Parameters.AddWithValue("@SoloCargos", 0);
+                cmd.Parameters.AddWithValue("@SoloCreditos", 0);
+                cmd.Parameters.AddWithValue("@SoloTotales", 0);
+            },
+            ct);
+
+        return new PedidoSnapshotDto
+        {
+            Detalles = ds.Tables.Count > 0 ? DataTableToRows(ds.Tables[0]) : new(),
+            CascosCargo = ds.Tables.Count > 1 ? DataTableToRows(ds.Tables[1]) : new(),
+            CascosCredito = ds.Tables.Count > 2 ? DataTableToRows(ds.Tables[2]) : new(),
+            Totales = ds.Tables.Count > 3 && ds.Tables[3].Rows.Count > 0
+                ? DataRowToDictionary(ds.Tables[3].Rows[0])
+                : new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        };
+    }
+
     private static async Task<List<Dictionary<string, object?>>> ConsultarCascosCatalogoAsync(SqlConnection conn, CancellationToken ct)
     {
+        var porcentajeIva = await ConsultarPorcentajeIvaAsync(conn, ct);
         await using var cmd = CreateStoredProcedureCommand("sp_n_ConsultaTiposUsados", conn);
         cmd.Parameters.AddWithValue("@IDTipoUsado", 0);
         cmd.Parameters.AddWithValue("@IDStatus", 1);
@@ -229,8 +260,8 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
             .Select(row => new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
                 ["IDTipoUsado"] = ReadInt(row, "IDTipoUsado", "idTipoUsado"),
-                ["TipoUsado"] = ReadString(row, "TipoUsado", "tipoUsado", "TipoUsadoCorto", "tipoUsadoCorto"),
-                ["CostoVentaCargoConIva"] = ReadDecimal(row, "CostoVentaCargoConIva", "costoVentaCargoConIva", "VentaCostoCargoConIva", "ventaCostoCargoConIva"),
+                ["TipoUsado"] = NormalizeTipoUsado(ReadString(row, "TipoUsadoCorto", "tipoUsadoCorto", "TipoUsado", "tipoUsado")),
+                ["CostoVentaCargoConIva"] = ReadCostoCargoConIva(row, porcentajeIva),
                 ["ClienteBonificacion"] = 0m,
                 ["Cantidad"] = 0,
                 ["ImporteClienteBonificacion"] = 0m,
@@ -240,6 +271,30 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
             .Where(row => ReadIntFromDictionary(row, "IDTipoUsado") > 0 && !string.IsNullOrWhiteSpace(Convert.ToString(row["TipoUsado"], CultureInfo.InvariantCulture)))
             .OrderBy(row => ReadIntFromDictionary(row, "Orden"))
             .ToList();
+    }
+
+    private static async Task<decimal> ConsultarPorcentajeIvaAsync(SqlConnection conn, CancellationToken ct)
+    {
+        await using var cmd = CreateStoredProcedureCommand("sp_n_ConsultaConstantes", conn);
+        cmd.Parameters.AddWithValue("@ValidaActividad", 0);
+        cmd.Parameters.AddWithValue("@IDUsuario", 0);
+        cmd.Parameters.AddWithValue("@Equipo", string.Empty);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        if (table.Rows.Count == 0) return 0m;
+        return ReadDecimal(table.Rows[0], "PorcentajeIVA", "porcentajeIVA", "IVA", "iva");
+    }
+
+    private static decimal ReadCostoCargoConIva(DataRow row, decimal porcentajeIva)
+    {
+        var costoConIva = ReadDecimal(row, "CostoVentaCargoConIva", "costoVentaCargoConIva", "VentaCostoCargoConIva", "ventaCostoCargoConIva", "CostoCargoConIva", "costoCargoConIva");
+        if (costoConIva > 0m) return costoConIva;
+
+        var costoSinIva = ReadDecimal(row, "CostoVentaCargo", "costoVentaCargo", "VentaCostoCargoSinIva", "ventaCostoCargoSinIva");
+        if (costoSinIva <= 0m || porcentajeIva <= 0m) return costoSinIva;
+
+        var ivaFactor = porcentajeIva > 1m ? porcentajeIva / 100m : porcentajeIva;
+        return Math.Round(costoSinIva * (1m + ivaFactor), 2, MidpointRounding.AwayFromZero);
     }
 
     private static void AddInsertarDetalleParams(SqlCommand cmd, PedidoAgregarDetalleRequest request, int idUsuario, string equipo)
@@ -721,5 +776,16 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         return row.TryGetValue(name, out var value) && int.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), out var parsed)
             ? parsed
             : 0;
+    }
+
+    private static string NormalizeTipoUsado(string value)
+    {
+        var text = value.Trim();
+        if (text.StartsWith("GRUPO ", StringComparison.OrdinalIgnoreCase)
+            && int.TryParse(text["GRUPO ".Length..], NumberStyles.Integer, CultureInfo.InvariantCulture, out var group))
+            return $"G{group}";
+
+        if (text.Equals("MEDIO TANQUE", StringComparison.OrdinalIgnoreCase)) return "MT";
+        return text;
     }
 }
