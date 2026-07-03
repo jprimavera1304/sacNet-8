@@ -46,6 +46,11 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         await conn.OpenAsync(ct);
 
         var clientes = await ConsultarClientesAsync(conn, request, ct);
+
+        // Busqueda especifica (id/numero) -> trae contexto del cliente (domicilios y
+        // saldos). Busqueda por texto (nombre/apellidos/rfc) -> solo la lista, para
+        // que el front muestre resultados y luego pida el contexto al seleccionar.
+        var isSpecific = request.IDCliente > 0 || !string.IsNullOrWhiteSpace(request.Numero);
         var idCliente = request.IDCliente > 0
             ? request.IDCliente
             : ReadInt(clientes.Rows.Count > 0 ? clientes.Rows[0] : null, "IDCliente", "idCliente");
@@ -53,7 +58,7 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         var domicilios = new List<Dictionary<string, object?>>();
         var saldos = DataTableToRows(CrearSaldosClienteFallbackTable());
 
-        if (idCliente > 0)
+        if (isSpecific && idCliente > 0)
         {
             domicilios = DataTableToRows(await ConsultarDomiciliosAsync(conn, idCliente, request.IDEmpresaCS, ct));
             saldos = DataTableToRows(await ConsultarSaldosClienteWebAsync(conn, idCliente, ct));
@@ -373,16 +378,18 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         cmd.Parameters.AddWithValue("@IDAgente", 0);
         cmd.Parameters.AddWithValue("@IDStatus", 1);
         cmd.Parameters.AddWithValue("@Numero", request.Numero ?? string.Empty);
-        cmd.Parameters.AddWithValue("@Nombre", string.Empty);
-        cmd.Parameters.AddWithValue("@ApellidoPaterno", string.Empty);
-        cmd.Parameters.AddWithValue("@ApellidoMaterno", string.Empty);
-        cmd.Parameters.AddWithValue("@RFC", string.Empty);
+        cmd.Parameters.AddWithValue("@Nombre", request.Nombre ?? string.Empty);
+        cmd.Parameters.AddWithValue("@ApellidoPaterno", request.ApellidoPaterno ?? string.Empty);
+        cmd.Parameters.AddWithValue("@ApellidoMaterno", request.ApellidoMaterno ?? string.Empty);
+        cmd.Parameters.AddWithValue("@RFC", request.RFC ?? string.Empty);
         cmd.Parameters.AddWithValue("@IDTipoCliente", 0);
         cmd.Parameters.AddWithValue("@ConHuella", 0);
         cmd.Parameters.AddWithValue("@IDEmpresaCS", request.IDEmpresaCS);
         cmd.Parameters.AddWithValue("@EsMostrador", 0);
         cmd.Parameters.AddWithValue("@Referencia", string.Empty);
         cmd.Parameters.AddWithValue("@Formato", 0);
+        // @Identico=1 -> match exacto (por id/numero). =0 -> parcial (busqueda por
+        // nombre/apellidos/rfc -> devuelve lista para elegir).
         cmd.Parameters.AddWithValue("@Identico", request.IDCliente > 0 || !string.IsNullOrWhiteSpace(request.Numero) ? 1 : 0);
         return await ExecuteFirstTableAsync(cmd, ct);
     }
