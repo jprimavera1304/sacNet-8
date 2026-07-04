@@ -4,6 +4,13 @@ public class PedidoClienteBuscarRequest
 {
     public int IDCliente { get; set; }
     public string? Numero { get; set; }
+    // Filtros de busqueda por texto (reusa el SP legacy sp_n_ConsultaClientes con
+    // @Identico=0 -> coincidencia parcial / lista). Si vienen vacios, se busca por
+    // numero/id como antes.
+    public string? Nombre { get; set; }
+    public string? ApellidoPaterno { get; set; }
+    public string? ApellidoMaterno { get; set; }
+    public string? RFC { get; set; }
     public int IDEmpresaCS { get; set; }
 }
 
