@@ -25,4 +25,32 @@ public class SesionController : ControllerBase
         var result = await _users.LoginAsync(request, ct);
         return Ok(result);
     }
+
+    // Canjea el refresh token por un nuevo access token (solo app movil).
+    [HttpPost("/api/auth/refresh")]
+    [HttpPost("/api/sesion/refresh")]
+    [Consumes("application/json")]
+    [Produces("application/json")]
+    public async Task<ActionResult<LoginResponse>> Refresh([FromBody] RefreshRequest request, CancellationToken ct)
+    {
+        try
+        {
+            var result = await _users.RefreshAsync(request?.RefreshToken ?? string.Empty, ct);
+            return Ok(result);
+        }
+        catch (System.Security.Authentication.AuthenticationException ex)
+        {
+            return Unauthorized(new { message = ex.Message });
+        }
+    }
+
+    // Revoca el refresh token (logout de la app).
+    [HttpPost("/api/auth/logout")]
+    [HttpPost("/api/sesion/logout")]
+    [Consumes("application/json")]
+    public async Task<IActionResult> Logout([FromBody] RefreshRequest request, CancellationToken ct)
+    {
+        await _users.LogoutAsync(request?.RefreshToken ?? string.Empty, ct);
+        return Ok(new { ok = true });
+    }
 }

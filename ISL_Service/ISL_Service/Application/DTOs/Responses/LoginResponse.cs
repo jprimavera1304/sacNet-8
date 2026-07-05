@@ -12,4 +12,6 @@ public class LoginResponse
     public int EmpresaId { get; set; }
     public string CompanyKey { get; set; } = string.Empty;
     public bool DebeCambiarContrasena { get; set; }
+    // Solo se llena para la app (IncluirRefresh=true). El web lo ignora.
+    public string? RefreshToken { get; set; }
 }

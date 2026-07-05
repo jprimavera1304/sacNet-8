@@ -112,6 +112,7 @@ builder.Services.AddScoped<IPersonasService, PersonasService>();
 
 // -------------------- LOGIN (YA TENIAS) --------------------
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
