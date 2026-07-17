@@ -24,6 +24,54 @@ public class PedidoProductoBuscarRequest
     public int IDEmpresaCS { get; set; }
 }
 
+// Modos de captura de pedido. Legacy usa el mismo formulario con SoloAceites=0/1
+// (ConsultarVentas.cs: btnNuevoPedido_Click / btnAceites_Click). El cliente manda
+// el modo, NUNCA el IDGrupoCategoria: la traduccion depende de la Funcionalidad de
+// la empresa y eso solo lo sabe el backend (la app es multi-tenant).
+public static class PedidoModo
+{
+    public const string Normal = "normal";
+    public const string Aceites = "aceites";
+
+    // Interruptor de servidor: permite encender aceites sin publicar app nueva.
+    public const string ConfigAceitesHabilitado = "Pedidos:AceitesHabilitado";
+
+    // Vacio/null -> normal. Valor no reconocido -> null (el controller responde 400).
+    public static string? Normalizar(string? modo)
+    {
+        if (string.IsNullOrWhiteSpace(modo)) return Normal;
+
+        var texto = modo.Trim().ToLowerInvariant();
+        return texto == Normal || texto == Aceites ? texto : null;
+    }
+}
+
+// Paginado de productos del almacen. Reusa el mismo SP legacy que
+// PedidoProductoBuscarRequest, pero el filtrado (solo Existencia > 0), el orden y
+// el recorte de pagina se hacen en C# sobre el resultado cacheado.
+public class PedidoProductoPaginaRequest
+{
+    public const int TakeDefault = 50;
+    public const int TakeMaximo = 100;
+
+    public int IDAlmacen { get; set; }
+    public int IDEmpresaCS { get; set; }
+    // "normal" | "aceites". El backend lo traduce a IDGrupoCategoria segun la
+    // Funcionalidad de la empresa.
+    public string? Modo { get; set; }
+    // Texto libre: filtra por Clave o Descripcion (contiene, sin distinguir
+    // mayusculas ni acentos). Vacio -> todo el almacen con existencia.
+    public string? Buscar { get; set; }
+    public int Skip { get; set; }
+    public int Take { get; set; } = TakeDefault;
+
+    // Se acota aqui para que el cliente no pueda pedir paginas gigantes. Valores
+    // invalidos se ajustan en silencio, no son error.
+    public int SkipSeguro() => Skip < 0 ? 0 : Skip;
+
+    public int TakeSeguro() => Take <= 0 ? TakeDefault : Math.Min(Take, TakeMaximo);
+}
+
 public class PedidoAgregarDetalleRequest
 {
     public int IDPedido { get; set; }

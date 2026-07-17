@@ -13,11 +13,13 @@ public class VentasPedidoCapturaController : ControllerBase
 {
     private readonly IVentasPedidoCapturaService _service;
     private readonly ICurrentUserAccessor _currentUserAccessor;
+    private readonly IConfiguration _configuration;
 
-    public VentasPedidoCapturaController(IVentasPedidoCapturaService service, ICurrentUserAccessor currentUserAccessor)
+    public VentasPedidoCapturaController(IVentasPedidoCapturaService service, ICurrentUserAccessor currentUserAccessor, IConfiguration configuration)
     {
         _service = service;
         _currentUserAccessor = currentUserAccessor;
+        _configuration = configuration;
     }
 
     [HttpGet("bootstrap")]
@@ -55,6 +57,31 @@ public class VentasPedidoCapturaController : ControllerBase
 
         var data = await _service.BuscarProductoAsync(safe, ct);
         return Ok(new { ok = true, message = "Producto consultado.", data });
+    }
+
+    // Version paginada de productos/buscar: devuelve solo productos con existencia
+    // y solo las columnas que usa la app. productos/buscar sigue vivo para la app
+    // publicada.
+    [HttpPost("productos/pagina")]
+    [Authorize(Policy = "perm:ventas.pedidos.crear")]
+    public async Task<IActionResult> BuscarProductoPagina([FromBody] PedidoProductoPaginaRequest? request, CancellationToken ct)
+    {
+        var safe = request ?? new PedidoProductoPaginaRequest();
+        if (safe.IDAlmacen <= 0)
+            return BadRequest(new { ok = false, message = "Seleccione almacen." });
+
+        var modo = PedidoModo.Normalizar(safe.Modo);
+        if (modo == null)
+            return BadRequest(new { ok = false, message = "Modo invalido. Use 'normal' o 'aceites'." });
+
+        // El server manda: aunque el bootstrap no ofrezca "aceites", el cliente
+        // podria pedirlo de todos modos.
+        if (modo == PedidoModo.Aceites && !_configuration.GetValue<bool>(PedidoModo.ConfigAceitesHabilitado))
+            return BadRequest(new { ok = false, message = "El modo aceites no esta habilitado." });
+
+        safe.Modo = modo;
+        var data = await _service.BuscarProductoPaginaAsync(safe, ct);
+        return Ok(new { ok = true, message = "Productos consultados.", data });
     }
 
     [HttpPost("detalle")]
