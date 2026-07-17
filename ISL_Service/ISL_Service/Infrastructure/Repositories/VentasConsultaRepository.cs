@@ -79,7 +79,11 @@ public class VentasConsultaRepository : IVentasConsultaRepository
         cmd.Parameters.AddWithValue("@Formato", 0);
         cmd.Parameters.AddWithValue("@IDUsuarioActual", request.IDUsuarioActual);
 
-        var response = ApplyAccumulatedFilters(await ExecuteRowsAsync(cmd, ct), request);
+        // El filtro de fechas va aparte: el SP legacy descarta @FechaInicial/
+        // @FechaFinal (ver ApplyDateFilter).
+        var response = ApplyDateFilter(
+            ApplyAccumulatedFilters(await ExecuteRowsAsync(cmd, ct), request),
+            request);
         if (request.IDStatusPedido == 2)
             await EnrichPedidoTimelineAsync(conn, response, ct);
 
@@ -402,6 +406,75 @@ public class VentasConsultaRepository : IVentasConsultaRepository
             : parsed.Date;
 
         return normalized.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+    }
+
+    // Devuelve la fecha ya parseada, o null si no viene o no se entiende.
+    private static DateTime? ParseLegacyDate(string? value)
+    {
+        var normalized = NormalizeLegacyDateTime(value, false);
+        if (string.IsNullOrWhiteSpace(normalized)) return null;
+        return DateTime.TryParse(
+                normalized,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsed)
+            ? parsed.Date
+            : null;
+    }
+
+    // Filtra los renglones por rango de fechas EN MEMORIA.
+    //
+    // Hace falta porque `sp_n_ConsultaVentasPedidos` IGNORA @FechaInicial y
+    // @FechaFinal: en cada rama de @IDStatusPedido (0, 1, 2 y 3) los sobreescribe
+    // con '' antes de armar el WHERE, asi que el rango que le mandemos nunca
+    // llega a la consulta. Verificado contra el servidor: pidiendo un solo dia
+    // devolvia pedidos de un mes antes.
+    //
+    // El SP es legacy y no se toca, asi que el rango se aplica aqui, igual que
+    // ApplyAccumulatedFilters ya hace con folios/clientes/productos. El volumen
+    // es chico porque el SP ya acoto por estatus y usuario.
+    private static VentasConsultaRowsResponse ApplyDateFilter(
+        VentasConsultaRowsResponse response,
+        VentasConsultaRequest request)
+    {
+        var desde = ParseLegacyDate(request.FechaInicial ?? request.FechaEmisionInicial);
+        var hasta = ParseLegacyDate(request.FechaFinal ?? request.FechaEmisionFinal);
+        if (desde is null && hasta is null) return response;
+
+        // El rango es por dia completo e inclusivo en ambos extremos: "Hoy" tiene
+        // que traer lo capturado a las 23:59.
+        var finDelDia = hasta?.AddDays(1).AddSeconds(-1);
+
+        var rows = response.Rows.Where(row =>
+        {
+            var fecha = ReadRowDate(row, "Fecha", "fecha");
+            // Sin fecha legible no se puede decidir: se conserva en vez de
+            // desaparecer un pedido de la vista del usuario.
+            if (fecha is null) return true;
+            if (desde is not null && fecha < desde) return false;
+            if (finDelDia is not null && fecha > finDelDia) return false;
+            return true;
+        }).ToList();
+
+        return new VentasConsultaRowsResponse { Rows = rows, Total = rows.Count };
+    }
+
+    private static DateTime? ReadRowDate(IDictionary<string, object?> row, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (!row.TryGetValue(key, out var value) || value is null) continue;
+            if (value is DateTime dt) return dt;
+            if (DateTime.TryParse(
+                    value.ToString(),
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var parsed))
+            {
+                return parsed;
+            }
+        }
+        return null;
     }
 
     private static async Task EnrichPedidoTimelineAsync(SqlConnection conn, VentasConsultaRowsResponse response, CancellationToken ct)
