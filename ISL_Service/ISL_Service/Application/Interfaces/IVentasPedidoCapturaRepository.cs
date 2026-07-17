@@ -13,4 +13,5 @@ public interface IVentasPedidoCapturaRepository
     Task<PedidoSnapshotDto> EliminarDetalleAsync(PedidoEliminarDetalleRequest request, CancellationToken ct);
     Task<PedidoSnapshotDto> GuardarAsync(PedidoGuardarRequest request, int idUsuario, string equipo, CancellationToken ct);
     Task<PedidoRowsResponse> EliminarBorradorAsync(int idUsuario, CancellationToken ct);
+    Task<PedidoPropiedad?> ObtenerPropiedadPedidoAsync(int idPedido, CancellationToken ct);
 }

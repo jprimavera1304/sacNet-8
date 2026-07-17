@@ -38,4 +38,7 @@ public class VentasPedidoCapturaService : IVentasPedidoCapturaService
 
     public Task<PedidoRowsResponse> EliminarBorradorAsync(int idUsuario, CancellationToken ct)
         => _repository.EliminarBorradorAsync(idUsuario, ct);
+
+    public Task<PedidoPropiedad?> ObtenerPropiedadPedidoAsync(int idPedido, CancellationToken ct)
+        => _repository.ObtenerPropiedadPedidoAsync(idPedido, ct);
 }

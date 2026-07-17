@@ -61,3 +61,7 @@ public class PedidoProductoPaginaResponse
     public int Take { get; set; }
     public bool HasMore => Skip + Rows.Count < Total;
 }
+
+// Dueño (IDUsuario) y estatus de un pedido. Se usa para validar que quien lo
+// edita desde el movil sea su creador (ver VentasPedidoCapturaController).
+public sealed record PedidoPropiedad(int IdUsuario, int IdStatus);

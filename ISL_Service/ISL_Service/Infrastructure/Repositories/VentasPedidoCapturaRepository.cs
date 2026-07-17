@@ -219,6 +219,31 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         return Convert.ToString(value, CultureInfo.InvariantCulture)?.Trim() ?? string.Empty;
     }
 
+    // Dueño y estatus de un pedido, para validar que quien lo edita sea su
+    // creador. Lectura directa de la tabla (no toca ningun sp_n_). Devuelve null
+    // si el pedido no existe.
+    public async Task<PedidoPropiedad?> ObtenerPropiedadPedidoAsync(int idPedido, CancellationToken ct)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        const string sql = "SELECT IDUsuario, IDStatusPedido FROM Pedidos WHERE IDPedido = @id;";
+        await using var cmd = new SqlCommand(sql, conn)
+        {
+            CommandType = CommandType.Text,
+            CommandTimeout = CommandTimeoutSeconds
+        };
+        cmd.Parameters.AddWithValue("@id", idPedido);
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct))
+            return null;
+
+        var idUsuario = reader.IsDBNull(0) ? 0 : Convert.ToInt32(reader.GetValue(0), CultureInfo.InvariantCulture);
+        var idStatus = reader.IsDBNull(1) ? 0 : Convert.ToInt32(reader.GetValue(1), CultureInfo.InvariantCulture);
+        return new PedidoPropiedad(idUsuario, idStatus);
+    }
+
     private async Task<List<Dictionary<string, object?>>> ConsultarAlmacenProductoConCacheAsync(int idAlmacen, int idEmpresaCs, int idGrupoCategoria, CancellationToken ct)
     {
         // El grupo va en la llave: normal y aceites devuelven catalogos distintos y
