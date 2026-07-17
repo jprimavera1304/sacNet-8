@@ -6,6 +6,20 @@ using Shared.Backend.Core.Abstractions;
 
 namespace ISL_Service.Controllers;
 
+// Captura de pedidos. La usan DOS superficies con catalogos de permiso
+// distintos, y por eso las policies son compuestas ("a|b" = basta con una):
+//
+//   - Oficina, desde el web  -> ventas.pedidos.crear   (Web\QR_Web ... pedido.api.js
+//                                                       pega a estos mismos endpoints)
+//   - Repartidor, desde el movil -> app_movil.pedidos
+//
+// Exigir solo uno deja fuera al otro: con solo ventas.pedidos.crear el
+// repartidor recibia 403 en todo y la app se quedaba en blanco; con solo
+// app_movil.pedidos se rompia la captura del web.
+//
+// NO se resolvio dandole ventas.pedidos.crear al repartidor porque ese permiso,
+// por si solo, tambien le abre la pantalla de captura del web (pedido.main.js
+// entra con un OR) y ademas lo lee el Mac31 de produccion (btnNuevoPedido).
 [ApiController]
 [Route("api/ventas/pedidos/captura")]
 [Authorize]
@@ -23,7 +37,7 @@ public class VentasPedidoCapturaController : ControllerBase
     }
 
     [HttpGet("bootstrap")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear")]
+    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
     public async Task<IActionResult> Bootstrap(CancellationToken ct)
     {
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
@@ -32,7 +46,7 @@ public class VentasPedidoCapturaController : ControllerBase
     }
 
     [HttpGet("{idPedido:int}")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear")]
+    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
     public async Task<IActionResult> Obtener([FromRoute] int idPedido, CancellationToken ct)
     {
         var data = await _service.ConsultarPedidoAsync(idPedido, ct);
@@ -40,7 +54,7 @@ public class VentasPedidoCapturaController : ControllerBase
     }
 
     [HttpPost("clientes/buscar")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear")]
+    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
     public async Task<IActionResult> BuscarCliente([FromBody] PedidoClienteBuscarRequest? request, CancellationToken ct)
     {
         var data = await _service.BuscarClienteAsync(request ?? new PedidoClienteBuscarRequest(), ct);
@@ -48,7 +62,7 @@ public class VentasPedidoCapturaController : ControllerBase
     }
 
     [HttpPost("productos/buscar")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear")]
+    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
     public async Task<IActionResult> BuscarProducto([FromBody] PedidoProductoBuscarRequest? request, CancellationToken ct)
     {
         var safe = request ?? new PedidoProductoBuscarRequest();
@@ -63,7 +77,7 @@ public class VentasPedidoCapturaController : ControllerBase
     // y solo las columnas que usa la app. productos/buscar sigue vivo para la app
     // publicada.
     [HttpPost("productos/pagina")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear")]
+    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
     public async Task<IActionResult> BuscarProductoPagina([FromBody] PedidoProductoPaginaRequest? request, CancellationToken ct)
     {
         var safe = request ?? new PedidoProductoPaginaRequest();
@@ -85,7 +99,7 @@ public class VentasPedidoCapturaController : ControllerBase
     }
 
     [HttpPost("detalle")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear")]
+    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
     public async Task<IActionResult> AgregarDetalle([FromBody] PedidoAgregarDetalleRequest? request, CancellationToken ct)
     {
         if (request == null)
@@ -102,7 +116,7 @@ public class VentasPedidoCapturaController : ControllerBase
     }
 
     [HttpDelete("detalle")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear")]
+    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
     public async Task<IActionResult> EliminarDetalle([FromBody] PedidoEliminarDetalleRequest? request, CancellationToken ct)
     {
         if (request == null || request.IDPedidoDetalle <= 0)
@@ -113,7 +127,7 @@ public class VentasPedidoCapturaController : ControllerBase
     }
 
     [HttpPut("{idPedido:int}")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear")]
+    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
     public async Task<IActionResult> Guardar([FromRoute] int idPedido, [FromBody] PedidoGuardarRequest? request, CancellationToken ct)
     {
         if (request == null)
@@ -129,7 +143,7 @@ public class VentasPedidoCapturaController : ControllerBase
     }
 
     [HttpDelete("borrador")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear")]
+    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
     public async Task<IActionResult> EliminarBorrador(CancellationToken ct)
     {
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
