@@ -42,16 +42,22 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
             rolLegacy,
             CancellationToken.None);
 
+        // Con cualquiera de los permisos aceptados alcanza (ver PermissionRequirement).
         if (snapshot.PermissionsEnabled)
         {
-            if (snapshot.Permissions.Any(p => string.Equals(p, requirement.Permission, StringComparison.OrdinalIgnoreCase)))
-                context.Succeed(requirement);
-            else if (CanUseLegacyVerAsModuleView(snapshot.Permissions, requirement.Permission))
-                context.Succeed(requirement);
+            foreach (var required in requirement.Permissions)
+            {
+                if (snapshot.Permissions.Any(p => string.Equals(p, required, StringComparison.OrdinalIgnoreCase))
+                    || CanUseLegacyVerAsModuleView(snapshot.Permissions, required))
+                {
+                    context.Succeed(requirement);
+                    return;
+                }
+            }
             return;
         }
 
-        if (_permissionService.IsAllowedByLegacy(rolLegacy, requirement.Permission))
+        if (requirement.Permissions.Any(required => _permissionService.IsAllowedByLegacy(rolLegacy, required)))
             context.Succeed(requirement);
     }
 

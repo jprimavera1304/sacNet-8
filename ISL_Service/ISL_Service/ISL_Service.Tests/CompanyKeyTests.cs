@@ -43,7 +43,7 @@ public class CompanyKeyTests
         var empresaRepo = new FakeEmpresaRepository("tauro");
         var jwt = new CapturingJwtTokenGenerator();
         var cache = new MemoryCache(new MemoryCacheOptions());
-        var service = new UserService(userRepo, jwt, empresaRepo, cache);
+        var service = new UserService(userRepo, jwt, empresaRepo, cache, new FakeRefreshTokenRepository());
 
         var response = await service.LoginAsync(new LoginRequest
         {
@@ -169,6 +169,14 @@ public class CompanyKeyTests
         public Task<Usuario> UpdateUsuarioAndRolAsync(Guid userId, string usuarioNuevo, string rolNuevo, CancellationToken ct) => Task.FromResult(new Usuario());
         public Task<Usuario> UpdateEstadoWithLegacyAsync(Guid userId, int estado, CancellationToken ct) => Task.FromResult(new Usuario());
         public Task SaveChangesAsync(CancellationToken ct) => Task.CompletedTask;
+    }
+
+    private sealed class FakeRefreshTokenRepository : IRefreshTokenRepository
+    {
+        public Task EnsureSchemaAsync(CancellationToken ct) => Task.CompletedTask;
+        public Task CreateAsync(RefreshTokenIdentity identity, byte[] tokenHash, DateTime expiraEnUtc, CancellationToken ct) => Task.CompletedTask;
+        public Task<RefreshTokenIdentity?> ValidateAsync(byte[] tokenHash, CancellationToken ct) => Task.FromResult<RefreshTokenIdentity?>(null);
+        public Task RevokeAsync(byte[] tokenHash, CancellationToken ct) => Task.CompletedTask;
     }
 
     private sealed class FakeCurrentUserAccessor : ICurrentUserAccessor

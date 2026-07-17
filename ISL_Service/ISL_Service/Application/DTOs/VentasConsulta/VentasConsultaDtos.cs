@@ -61,6 +61,10 @@ public class VentasConsultaRequest
     public bool DiferenciaUsados { get; set; }
     public int IDCobro { get; set; }
     public bool DineroExcedente { get; set; }
+    // Cuando es true (lo usa la app movil "Mis pedidos") se filtra por el
+    // usuario del token, el MISMO que se guarda al crear el pedido. Asi el
+    // usuario solo ve los pedidos que el hizo. El web no lo manda -> ve todos.
+    public bool SoloMisPedidos { get; set; }
 }
 
 public class VentasConsultaRowsResponse

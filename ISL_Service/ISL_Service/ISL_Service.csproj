@@ -7,6 +7,21 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591;1573</NoWarn>
     <UseLocalSharedBack>false</UseLocalSharedBack>
+
+    <!-- El SDK Web globbea **/*.json como Content. Sin estas exclusiones se
+         cuelan al build los ~56,000 json de carpetas que no son fuente y se
+         copian al output en CADA compilacion: un build incremental sin cambios
+         pasaba de ~3.7 s a ~11.7 min.
+
+         Se excluye aqui (y no con <Content Remove/>) porque DefaultItemExcludes
+         aplica a TODOS los globs por defecto (Compile, None, Content,
+         EmbeddedResource) de una sola vez. El bug original fue justo ese: mas
+         abajo se quitaban Compile y None de ISL_Service.Tests, pero no Content.
+
+         ISL_Service.Tests esta anidado dentro de este proyecto, asi que su bin
+         cae dentro de nuestros globs. artifacts/.tmpbin/.tmpobj son salidas
+         locales. DefaultItemExcludes ya trae bin/** y obj/**, pero no estas. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);ISL_Service.Tests\**;artifacts\**;.tmpbin\**;.tmpobj\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>

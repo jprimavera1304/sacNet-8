@@ -27,6 +27,10 @@ public class VentasConsultaService : IVentasConsultaService
     {
         var safe = Prepare(request, idUsuarioToken);
         safe.Formato = 0;
+        // "Solo mis pedidos" (app movil): filtra por el usuario del token, el
+        // mismo que se guarda al crear el pedido -> garantiza que empaten.
+        if (safe.SoloMisPedidos && idUsuarioToken > 0)
+            safe.IDUsuario = idUsuarioToken;
         return _repository.ConsultarPedidosAsync(safe, ct);
     }
 

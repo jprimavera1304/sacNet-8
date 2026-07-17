@@ -1,20 +1,59 @@
 using System.Data;
 using System.Globalization;
+using System.Text;
 using ISL_Service.Application.DTOs.VentasPedidoCaptura;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Data;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace ISL_Service.Infrastructure.Repositories;
 
 public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
 {
     private const int CommandTimeoutSeconds = 500;
-    private readonly IConfiguration _configuration;
 
-    public VentasPedidoCapturaRepository(IConfiguration configuration)
+    // sp_n_ConsultaAlmacenProducto tarda ~700 ms y devuelve el almacen completo.
+    // Su resultado solo depende de (IDAlmacen, IDEmpresaCS), asi que se cachea por
+    // esa llave. TTL corto: la existencia cambia con cada venta y no queremos
+    // mostrar stock fantasma; 3 min es suficiente para cubrir el tecleo del
+    // buscador y el paginado de una misma sesion.
+    private static readonly TimeSpan AlmacenProductoCacheTtl = TimeSpan.FromMinutes(3);
+
+    // La Funcionalidad es la configuracion del tenant: en la practica no cambia en
+    // caliente. TTL largo para no pagar un roundtrip por cada request de pagina.
+    private static readonly TimeSpan FuncionalidadCacheTtl = TimeSpan.FromMinutes(30);
+
+    // Grupos de categoria (tabla GrupoCategorias): 1=ACUMULADORES .. 4=LUBRICANTES.
+    // OJO: el 4 es un valor magico dentro de sp_n_ConsultaAlmacenProducto. Con
+    // Funcionalidad='ZARA' el SP lo reinterpreta como "todo EXCEPTO acumuladores"
+    // (IDGrupoCategoria <> 1), no como "solo lubricantes". Sin ZARA el SP filtra
+    // por el 4 literal, por eso ahi mandamos 0 (sin filtro).
+    private const int GrupoCategoriaSinFiltro = 0;
+    private const int GrupoCategoriaAcumuladores = 1;
+    private const int GrupoCategoriaAceitesZara = 4;
+
+    // Columnas que consume la app. El SP devuelve 33; mandar solo estas baja la
+    // respuesta de ~2 MB a unas decenas de KB.
+    private static readonly string[] ProductoColumnasProyectadas =
+    {
+        "IDProducto",
+        "Clave",
+        "Descripcion",
+        "Existencia",
+        "ExistenciaFtm",
+        "UnidadMedida",
+        "NumPiezas",
+        "PrecioLista"
+    };
+
+    private readonly IConfiguration _configuration;
+    private readonly IMemoryCache _cache;
+
+    public VentasPedidoCapturaRepository(IConfiguration configuration, IMemoryCache cache)
     {
         _configuration = configuration;
+        _cache = cache;
     }
 
     public async Task<PedidoBootstrapResponse> BootstrapAsync(int idUsuario, CancellationToken ct)
@@ -29,7 +68,8 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
             Almacenes = await ConsultarUsuarioAlmacenesAsync(conn, idUsuario, ct),
             Agentes = await ConsultarAgentesAsync(conn, ct),
             FechaOperacion = fecha,
-            Pedido = await ConsultarPedidoInicialAsync(conn, ct)
+            Pedido = await ConsultarPedidoInicialAsync(conn, ct),
+            ModosPedido = await ConsultarModosPedidoAsync(ct)
         };
     }
 
@@ -90,6 +130,212 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         cmd.Parameters.AddWithValue("@IDEmpresaCS", request.IDEmpresaCS);
 
         return new PedidoRowsResponse { Rows = DataTableToRows(await ExecuteFirstTableAsync(cmd, ct)) };
+    }
+
+    public async Task<PedidoProductoPaginaResponse> BuscarProductoPaginaAsync(PedidoProductoPaginaRequest request, CancellationToken ct)
+    {
+        var idGrupoCategoria = ResolverIDGrupoCategoria(request.Modo, await ConsultarFuncionalidadConCacheAsync(ct));
+
+        // El catalogo cacheado ya viene filtrado (Existencia > 0), proyectado y
+        // ordenado: nada de eso depende del texto ni de la pagina.
+        var catalogo = await ConsultarAlmacenProductoConCacheAsync(request.IDAlmacen, request.IDEmpresaCS, idGrupoCategoria, ct);
+
+        var filtrados = FiltrarPorTexto(catalogo, request.Buscar);
+        var skip = request.SkipSeguro();
+        var take = request.TakeSeguro();
+
+        return new PedidoProductoPaginaResponse
+        {
+            Rows = filtrados.Skip(skip).Take(take).ToList(),
+            Total = filtrados.Count,
+            Skip = skip,
+            Take = take
+        };
+    }
+
+    // Traduce modo -> IDGrupoCategoria. La separacion acumuladores/aceites solo
+    // existe para ZARA (Legacy: Ventas.cs ~1941). Para otras funcionalidades no hay
+    // regla que imitar -> 0 (sin filtro), que es el comportamiento de siempre.
+    private static int ResolverIDGrupoCategoria(string? modo, string funcionalidad)
+    {
+        if (!EsZara(funcionalidad)) return GrupoCategoriaSinFiltro;
+
+        return PedidoModo.Normalizar(modo) == PedidoModo.Aceites
+            ? GrupoCategoriaAceitesZara
+            : GrupoCategoriaAcumuladores;
+    }
+
+    // Igualdad exacta, no Contains: es la misma comparacion que hace el SP
+    // (UPPER(Funcionalidad) = 'ZARA'). Si aqui dijeramos "contiene" y el SP dijera
+    // "igual", mandariamos 4 a una empresa donde el SP lo tomaria como lubricantes
+    // literales.
+    private static bool EsZara(string funcionalidad)
+        => string.Equals(funcionalidad, "ZARA", StringComparison.OrdinalIgnoreCase);
+
+    private bool AceitesHabilitado()
+        => _configuration.GetValue<bool>(PedidoModo.ConfigAceitesHabilitado);
+
+    private async Task<List<string>> ConsultarModosPedidoAsync(CancellationToken ct)
+    {
+        var modos = new List<string> { PedidoModo.Normal };
+
+        // Sin ZARA no hay separacion, asi que ofrecer "aceites" no tendria sentido
+        // aunque el flag este encendido.
+        if (AceitesHabilitado() && EsZara(await ConsultarFuncionalidadConCacheAsync(ct)))
+            modos.Add(PedidoModo.Aceites);
+
+        return modos;
+    }
+
+    private async Task<string> ConsultarFuncionalidadConCacheAsync(CancellationToken ct)
+    {
+        const string key = "constantes:funcionalidad";
+        if (_cache.TryGetValue(key, out string? cacheada) && cacheada != null)
+            return cacheada;
+
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+        var funcionalidad = await ConsultarFuncionalidadAsync(conn, ct);
+
+        _cache.Set(key, funcionalidad, new MemoryCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = FuncionalidadCacheTtl
+        });
+
+        return funcionalidad;
+    }
+
+    private static async Task<string> ConsultarFuncionalidadAsync(SqlConnection conn, CancellationToken ct)
+    {
+        // Misma fuente que usa el SQL de saldos mas abajo (Constantes.Funcionalidad).
+        const string sql = "SELECT TOP 1 UPPER(ISNULL(Funcionalidad, '')) FROM Constantes;";
+        await using var cmd = new SqlCommand(sql, conn)
+        {
+            CommandType = CommandType.Text,
+            CommandTimeout = CommandTimeoutSeconds
+        };
+
+        var value = await cmd.ExecuteScalarAsync(ct);
+        return Convert.ToString(value, CultureInfo.InvariantCulture)?.Trim() ?? string.Empty;
+    }
+
+    // Dueño y estatus de un pedido, para validar que quien lo edita sea su
+    // creador. Lectura directa de la tabla (no toca ningun sp_n_). Devuelve null
+    // si el pedido no existe.
+    public async Task<PedidoPropiedad?> ObtenerPropiedadPedidoAsync(int idPedido, CancellationToken ct)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        const string sql = "SELECT IDUsuario, IDStatusPedido FROM Pedidos WHERE IDPedido = @id;";
+        await using var cmd = new SqlCommand(sql, conn)
+        {
+            CommandType = CommandType.Text,
+            CommandTimeout = CommandTimeoutSeconds
+        };
+        cmd.Parameters.AddWithValue("@id", idPedido);
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct))
+            return null;
+
+        var idUsuario = reader.IsDBNull(0) ? 0 : Convert.ToInt32(reader.GetValue(0), CultureInfo.InvariantCulture);
+        var idStatus = reader.IsDBNull(1) ? 0 : Convert.ToInt32(reader.GetValue(1), CultureInfo.InvariantCulture);
+        return new PedidoPropiedad(idUsuario, idStatus);
+    }
+
+    private async Task<List<Dictionary<string, object?>>> ConsultarAlmacenProductoConCacheAsync(int idAlmacen, int idEmpresaCs, int idGrupoCategoria, CancellationToken ct)
+    {
+        // El grupo va en la llave: normal y aceites devuelven catalogos distintos y
+        // sin esto un modo serviria el catalogo cacheado del otro.
+        var key = $"almacenProducto:{idAlmacen}:{idEmpresaCs}:{idGrupoCategoria}";
+        if (_cache.TryGetValue(key, out List<Dictionary<string, object?>>? cacheado) && cacheado != null)
+            return cacheado;
+
+        var catalogo = ProyectarProductosConExistencia(await ConsultarAlmacenProductoAsync(idAlmacen, idEmpresaCs, idGrupoCategoria, ct));
+
+        // Solo expiracion absoluta (no deslizante): un almacen consultado sin parar
+        // igual se refresca cada 3 min, y el cache no crece sin limite porque cada
+        // entrada muere sola.
+        _cache.Set(key, catalogo, new MemoryCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = AlmacenProductoCacheTtl
+        });
+
+        return catalogo;
+    }
+
+    private async Task<DataTable> ConsultarAlmacenProductoAsync(int idAlmacen, int idEmpresaCs, int idGrupoCategoria, CancellationToken ct)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        // Mismos parametros que BuscarProductoAsync. @Clave='' + @Identico=0 ->
+        // trae el almacen completo, que es justo lo que hace la llave cacheable.
+        await using var cmd = CreateStoredProcedureCommand("sp_n_ConsultaAlmacenProducto", conn);
+        cmd.Parameters.AddWithValue("@IDAlmacenProducto", 0);
+        cmd.Parameters.AddWithValue("@IDAlmacen", idAlmacen);
+        cmd.Parameters.AddWithValue("@IDProducto", 0);
+        cmd.Parameters.AddWithValue("@IDGrupoCategoria", idGrupoCategoria);
+        cmd.Parameters.AddWithValue("@IDCategoria", 0);
+        cmd.Parameters.AddWithValue("@Clave", string.Empty);
+        cmd.Parameters.AddWithValue("@Descripcion", string.Empty);
+        cmd.Parameters.AddWithValue("@Formato", 0);
+        cmd.Parameters.AddWithValue("@Identico", 0);
+        cmd.Parameters.AddWithValue("@IDEmpresaCS", idEmpresaCs);
+
+        return await ExecuteFirstTableAsync(cmd, ct);
+    }
+
+    private static List<Dictionary<string, object?>> ProyectarProductosConExistencia(DataTable table)
+    {
+        return table.AsEnumerable()
+            .Where(row => ReadDecimal(row, "Existencia", "existencia") > 0m)
+            .Select(ProyectarProducto)
+            // Orden estable y determinista por Clave; IDProducto desempata para que
+            // dos claves iguales no bailen entre paginas.
+            .OrderBy(row => ReadStringFromDictionary(row, "Clave"), StringComparer.OrdinalIgnoreCase)
+            .ThenBy(row => ReadIntFromDictionary(row, "IDProducto"))
+            .ToList();
+    }
+
+    private static Dictionary<string, object?> ProyectarProducto(DataRow row)
+    {
+        var item = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var columna in ProductoColumnasProyectadas)
+        {
+            if (!row.Table.Columns.Contains(columna)) continue;
+            item[columna] = row[columna] == DBNull.Value ? null : row[columna];
+        }
+        return item;
+    }
+
+    private static List<Dictionary<string, object?>> FiltrarPorTexto(List<Dictionary<string, object?>> rows, string? buscar)
+    {
+        var texto = NormalizarBusqueda(buscar);
+        if (string.IsNullOrEmpty(texto)) return rows;
+
+        return rows
+            .Where(row =>
+                NormalizarBusqueda(ReadStringFromDictionary(row, "Clave")).Contains(texto, StringComparison.Ordinal)
+                || NormalizarBusqueda(ReadStringFromDictionary(row, "Descripcion")).Contains(texto, StringComparison.Ordinal))
+            .ToList();
+    }
+
+    // Minusculas y sin acentos, para que "aceite" encuentre "ACEITE" y que
+    // "BUJIAS" con acento se encuentre tecleando "bujia".
+    private static string NormalizarBusqueda(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+
+        var normalized = value.Trim().ToLowerInvariant().Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder(normalized.Length);
+        foreach (var c in normalized)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                sb.Append(c);
+        }
+        return sb.ToString().Normalize(NormalizationForm.FormC);
     }
 
     public async Task<PedidoSnapshotDto> AgregarDetalleAsync(PedidoAgregarDetalleRequest request, int idUsuario, string equipo, CancellationToken ct)
@@ -794,6 +1040,13 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         return row.TryGetValue(name, out var value) && int.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), out var parsed)
             ? parsed
             : 0;
+    }
+
+    private static string ReadStringFromDictionary(Dictionary<string, object?> row, string name)
+    {
+        return row.TryGetValue(name, out var value) && value != null
+            ? Convert.ToString(value, CultureInfo.InvariantCulture)?.Trim() ?? string.Empty
+            : string.Empty;
     }
 
     private static string NormalizeTipoUsado(string value)

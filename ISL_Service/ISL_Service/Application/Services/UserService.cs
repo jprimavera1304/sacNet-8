@@ -1,4 +1,6 @@
-﻿using System.Security.Authentication;
+using System.Security.Authentication;
+using System.Security.Cryptography;
+using System.Text;
 using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
@@ -9,17 +11,22 @@ namespace ISL_Service.Application.Services;
 
 public class UserService : IUserService
 {
+    // Vida del refresh token (rolling): se renueva en cada uso.
+    private static readonly TimeSpan RefreshLifetime = TimeSpan.FromDays(60);
+
     private readonly IUserRepository _repo;
     private readonly IJwtTokenGenerator _jwt;
     private readonly IEmpresaRepository _empresas;
     private readonly IMemoryCache _cache;
+    private readonly IRefreshTokenRepository _refresh;
 
-    public UserService(IUserRepository repo, IJwtTokenGenerator jwt, IEmpresaRepository empresas, IMemoryCache cache)
+    public UserService(IUserRepository repo, IJwtTokenGenerator jwt, IEmpresaRepository empresas, IMemoryCache cache, IRefreshTokenRepository refresh)
     {
         _repo = repo;
         _jwt = jwt;
         _empresas = empresas;
         _cache = cache;
+        _refresh = refresh;
     }
 
     public async Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken ct)
@@ -72,6 +79,14 @@ public class UserService : IUserService
 
         var token = _jwt.GenerateToken(user, companyKey);
 
+        // Solo la app pide refresh; el web no lo manda -> se comporta como hoy.
+        string? refreshToken = null;
+        if (request.IncluirRefresh)
+        {
+            var identity = new RefreshTokenIdentity(user.Id, login.LegacyUserId, user.UsuarioNombre, user.Rol, user.EmpresaId, companyKey);
+            refreshToken = await IssueRefreshAsync(identity, ct);
+        }
+
         return new LoginResponse
         {
             Token = token,
@@ -81,7 +96,70 @@ public class UserService : IUserService
             Rol = user.Rol,
             EmpresaId = user.EmpresaId,
             CompanyKey = companyKey,
-            DebeCambiarContrasena = user.DebeCambiarContrasena
+            DebeCambiarContrasena = user.DebeCambiarContrasena,
+            RefreshToken = refreshToken
         };
     }
+
+    public async Task<LoginResponse> RefreshAsync(string refreshToken, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            throw new AuthenticationException("Sesión expirada.");
+
+        var hash = Hash(refreshToken);
+        var identity = await _refresh.ValidateAsync(hash, ct);
+        if (identity is null)
+            throw new AuthenticationException("Sesión expirada.");
+
+        // Rotación: se revoca el usado y se emite uno nuevo (sliding 60 días).
+        await _refresh.RevokeAsync(hash, ct);
+        var nuevoRefresh = await IssueRefreshAsync(identity, ct);
+
+        var user = new Usuario
+        {
+            Id = identity.UserId,
+            LegacyUserId = identity.LegacyUserId,
+            UsuarioNombre = identity.UsuarioNombre,
+            Rol = identity.Rol,
+            EmpresaId = identity.EmpresaId
+        };
+        var token = _jwt.GenerateToken(user, identity.CompanyKey);
+
+        return new LoginResponse
+        {
+            Token = token,
+            UserId = identity.UserId,
+            IdUsuario = identity.LegacyUserId,
+            Usuario = identity.UsuarioNombre,
+            Rol = identity.Rol,
+            EmpresaId = identity.EmpresaId,
+            CompanyKey = identity.CompanyKey,
+            DebeCambiarContrasena = false,
+            RefreshToken = nuevoRefresh
+        };
+    }
+
+    public async Task LogoutAsync(string refreshToken, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken)) return;
+        await _refresh.RevokeAsync(Hash(refreshToken), ct);
+    }
+
+    private async Task<string> IssueRefreshAsync(RefreshTokenIdentity identity, CancellationToken ct)
+    {
+        var token = GenerateRefreshToken();
+        var expira = DateTime.UtcNow.Add(RefreshLifetime);
+        await _refresh.CreateAsync(identity, Hash(token), expira, ct);
+        return token;
+    }
+
+    // 256 bits aleatorios en Base64Url (sin padding) -> el token que ve el cliente.
+    private static string GenerateRefreshToken()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        return Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+
+    // Solo se guarda el hash del token, no el token.
+    private static byte[] Hash(string token) => SHA256.HashData(Encoding.UTF8.GetBytes(token));
 }

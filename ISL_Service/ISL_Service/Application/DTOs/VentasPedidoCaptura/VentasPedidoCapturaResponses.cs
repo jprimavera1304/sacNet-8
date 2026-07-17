@@ -30,6 +30,10 @@ public class PedidoBootstrapResponse
     public List<PedidoCatalogoItemDto> Agentes { get; set; } = new();
     public PedidoFechaOperacionDto FechaOperacion { get; set; } = new();
     public PedidoSnapshotDto Pedido { get; set; } = new();
+    // Modos que el cliente puede usar en productos/pagina. Siempre trae "normal";
+    // "aceites" solo si el flag de servidor esta encendido Y la funcionalidad es
+    // ZARA. El front pinta el selector segun esto, sin conocer la regla.
+    public List<string> ModosPedido { get; set; } = new() { PedidoModo.Normal };
 }
 
 public class PedidoClienteContextResponse
@@ -45,3 +49,19 @@ public class PedidoRowsResponse
     public List<Dictionary<string, object?>> Rows { get; set; } = new();
     public int Total => Rows.Count;
 }
+
+// A diferencia de PedidoRowsResponse, aqui Total NO es Rows.Count: es el total de
+// productos que cumplen el filtro (para mostrar "N resultados" y saber si faltan
+// paginas), mientras Rows trae solo el recorte pedido.
+public class PedidoProductoPaginaResponse
+{
+    public List<Dictionary<string, object?>> Rows { get; set; } = new();
+    public int Total { get; set; }
+    public int Skip { get; set; }
+    public int Take { get; set; }
+    public bool HasMore => Skip + Rows.Count < Total;
+}
+
+// Dueño (IDUsuario) y estatus de un pedido. Se usa para validar que quien lo
+// edita desde el movil sea su creador (ver VentasPedidoCapturaController).
+public sealed record PedidoPropiedad(int IdUsuario, int IdStatus);
