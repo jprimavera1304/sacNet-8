@@ -33,9 +33,6 @@ public static class PedidoModo
     public const string Normal = "normal";
     public const string Aceites = "aceites";
 
-    // Interruptor de servidor: permite encender aceites sin publicar app nueva.
-    public const string ConfigAceitesHabilitado = "Pedidos:AceitesHabilitado";
-
     // Vacio/null -> normal. Valor no reconocido -> null (el controller responde 400).
     public static string? Normalizar(string? modo)
     {
@@ -114,6 +111,13 @@ public class PedidoAgregarDetalleRequest
     // Canal que origina el pedido (MOVIL / WEB). Si viene vacio, el backend usa
     // el nombre de usuario/maquina como antes.
     public string? Equipo { get; set; }
+}
+
+public class MisPedidosRequest
+{
+    // Fechas ISO 'yyyy-MM-dd' (como las manda el movil). Vacio = sin limite.
+    public string? FechaInicial { get; set; }
+    public string? FechaFinal { get; set; }
 }
 
 public class PedidoEliminarDetalleRequest

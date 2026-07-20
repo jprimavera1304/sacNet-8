@@ -204,16 +204,15 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
     private static bool EsZara(string funcionalidad)
         => string.Equals(funcionalidad, "ZARA", StringComparison.OrdinalIgnoreCase);
 
-    private bool AceitesHabilitado()
-        => _configuration.GetValue<bool>(PedidoModo.ConfigAceitesHabilitado);
-
     private async Task<List<string>> ConsultarModosPedidoAsync(CancellationToken ct)
     {
         var modos = new List<string> { PedidoModo.Normal };
 
-        // Sin ZARA no hay separacion, asi que ofrecer "aceites" no tendria sentido
-        // aunque el flag este encendido.
-        if (AceitesHabilitado() && EsZara(await ConsultarFuncionalidadConCacheAsync(ct)))
+        // El modo aceites se ofrece por EMPRESA: solo las de funcionalidad ZARA
+        // separan aceites de acumuladores. La empresa sale del contexto del
+        // usuario logueado (su token), no de ninguna configuracion global. Asi
+        // queda prendido para Zaragoza y apagado para las demas, automatico.
+        if (EsZara(await ConsultarFuncionalidadConCacheAsync(ct)))
             modos.Add(PedidoModo.Aceites);
 
         return modos;
@@ -481,6 +480,65 @@ SELECT @IDPedido,
         cmd.Parameters.AddWithValue("@Productos", productos);
         cmd.Parameters.AddWithValue("@TotalPagar", totalPagar);
         await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    // True si el usuario creo el pedido segun nuestra bitacora. Sirve para que el
+    // guard de propiedad deje ver/editar un pedido MIO aunque legacy haya cambiado
+    // Pedidos.IDUsuario al modificarlo (si no, daria 403 al abrir mi propio pedido).
+    public async Task<bool> EsCreadorPorBitacoraAsync(int idPedido, int idUsuario, CancellationToken ct)
+    {
+        if (idPedido <= 0) return false;
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+        const string sql = @"SELECT CASE WHEN EXISTS (
+            SELECT 1 FROM dbo.WPedidoBitacora
+            WHERE IDPedido = @IDPedido AND IDUsuario = @IDUsuario AND Evento = 'creado'
+        ) THEN 1 ELSE 0 END;";
+        await using var cmd = new SqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@IDPedido", idPedido);
+        cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
+        var result = await cmd.ExecuteScalarAsync(ct);
+        return Convert.ToInt32(result, CultureInfo.InvariantCulture) == 1;
+    }
+
+    // "Mis pedidos" del movil: usa sp_mo_ConsultaMisPedidos, que trae los pedidos
+    // que son mios por la bitacora (los que YO cree, aunque legacy haya cambiado
+    // el usuario al modificarlos) O por el usuario legacy. Excluye rechazados e
+    // incluye quien cancelo (para el detalle).
+    public async Task<PedidoRowsResponse> ConsultarMisPedidosAsync(
+        int idUsuario, string fechaInicial, string fechaFinal, CancellationToken ct)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+        await using var cmd = CreateStoredProcedureCommand("sp_mo_ConsultaMisPedidos", conn);
+        cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
+        cmd.Parameters.AddWithValue("@FechaInicial", fechaInicial ?? string.Empty);
+        cmd.Parameters.AddWithValue("@FechaFinal", fechaFinal ?? string.Empty);
+        return new PedidoRowsResponse { Rows = DataTableToRows(await ExecuteFirstTableAsync(cmd, ct)) };
+    }
+
+    // Historial de un pedido para el detalle: nuestros eventos (creado/modificado,
+    // de WPedidoBitacora) + los eventos de legacy (autorizado/cancelado, con quien
+    // y cuando), ordenados en el tiempo. Solo lectura de legacy.
+    public async Task<PedidoRowsResponse> ConsultarHistorialPedidoAsync(int idPedido, CancellationToken ct)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+        const string sql = @"
+SELECT Evento, ISNULL(Usuario, '') AS Usuario, ISNULL(Equipo, '') AS Equipo, Fecha
+FROM dbo.WPedidoBitacora WHERE IDPedido = @IDPedido
+UNION ALL
+SELECT 'autorizado', ISNULL(u.Usuario, ''), ISNULL(p.EquipoAutorizo, ''), p.[Fecha Autorizo]
+FROM Pedidos p LEFT JOIN Usuarios u ON u.IDUsuario = p.IDUsuarioAutorizo
+WHERE p.IDPedido = @IDPedido AND p.[Fecha Autorizo] IS NOT NULL
+UNION ALL
+SELECT 'cancelado', ISNULL(u.Usuario, ''), ISNULL(p.EquipoCancelo, ''), p.[Fecha Cancelo]
+FROM Pedidos p LEFT JOIN Usuarios u ON u.IDUsuario = p.IDUsuarioCancelo
+WHERE p.IDPedido = @IDPedido AND p.[Fecha Cancelo] IS NOT NULL
+ORDER BY Fecha;";
+        await using var cmd = new SqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@IDPedido", idPedido);
+        return new PedidoRowsResponse { Rows = DataTableToRows(await ExecuteFirstTableAsync(cmd, ct)) };
     }
 
     public async Task<PedidoRowsResponse> EliminarBorradorAsync(int idUsuario, CancellationToken ct)

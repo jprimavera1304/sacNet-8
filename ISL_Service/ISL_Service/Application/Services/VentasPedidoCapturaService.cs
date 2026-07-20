@@ -39,6 +39,15 @@ public class VentasPedidoCapturaService : IVentasPedidoCapturaService
     public Task RegistrarEventoAsync(int idPedido, int idUsuario, string usuario, string equipo, int productos, decimal totalPagar, CancellationToken ct)
         => _repository.RegistrarEventoAsync(idPedido, idUsuario, usuario, equipo, productos, totalPagar, ct);
 
+    public Task<PedidoRowsResponse> ConsultarMisPedidosAsync(int idUsuario, string fechaInicial, string fechaFinal, CancellationToken ct)
+        => _repository.ConsultarMisPedidosAsync(idUsuario, fechaInicial, fechaFinal, ct);
+
+    public Task<PedidoRowsResponse> ConsultarHistorialPedidoAsync(int idPedido, CancellationToken ct)
+        => _repository.ConsultarHistorialPedidoAsync(idPedido, ct);
+
+    public Task<bool> EsCreadorPorBitacoraAsync(int idPedido, int idUsuario, CancellationToken ct)
+        => _repository.EsCreadorPorBitacoraAsync(idPedido, idUsuario, ct);
+
     public Task<PedidoRowsResponse> EliminarBorradorAsync(int idUsuario, CancellationToken ct)
         => _repository.EliminarBorradorAsync(idUsuario, ct);
 

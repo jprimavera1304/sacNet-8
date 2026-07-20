@@ -28,14 +28,12 @@ public class VentasPedidoCapturaController : ControllerBase
 {
     private readonly IVentasPedidoCapturaService _service;
     private readonly ICurrentUserAccessor _currentUserAccessor;
-    private readonly IConfiguration _configuration;
     private readonly IPermissionService _permissionService;
 
-    public VentasPedidoCapturaController(IVentasPedidoCapturaService service, ICurrentUserAccessor currentUserAccessor, IConfiguration configuration, IPermissionService permissionService)
+    public VentasPedidoCapturaController(IVentasPedidoCapturaService service, ICurrentUserAccessor currentUserAccessor, IPermissionService permissionService)
     {
         _service = service;
         _currentUserAccessor = currentUserAccessor;
-        _configuration = configuration;
         _permissionService = permissionService;
     }
 
@@ -73,7 +71,11 @@ public class VentasPedidoCapturaController : ControllerBase
             return NotFound(new { ok = false, message = "Pedido no encontrado." });
 
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
-        if (propiedad.IdUsuario != idUsuario)
+        // Es mio si legacy lo tiene a mi nombre, O si yo lo cree segun la bitacora
+        // (aunque legacy haya cambiado el usuario al modificarlo). Sin esto, abrir
+        // mi propio pedido reasignado daria 403.
+        if (propiedad.IdUsuario != idUsuario
+            && !await _service.EsCreadorPorBitacoraAsync(idPedido, idUsuario, ct))
             return StatusCode(403, new { ok = false, message = "Este pedido no es tuyo." });
 
         if (propiedad.IdStatus != 0 && propiedad.IdStatus != 1)
@@ -156,11 +158,10 @@ public class VentasPedidoCapturaController : ControllerBase
         if (modo == null)
             return BadRequest(new { ok = false, message = "Modo invalido. Use 'normal' o 'aceites'." });
 
-        // El server manda: aunque el bootstrap no ofrezca "aceites", el cliente
-        // podria pedirlo de todos modos.
-        if (modo == PedidoModo.Aceites && !_configuration.GetValue<bool>(PedidoModo.ConfigAceitesHabilitado))
-            return BadRequest(new { ok = false, message = "El modo aceites no esta habilitado." });
-
+        // No hace falta un candado extra: el filtrado de aceites solo aplica a
+        // empresas ZARA (lo resuelve el repositorio por la funcionalidad de la
+        // empresa del usuario). Para las demas, pedir 'aceites' simplemente
+        // devuelve el catalogo normal, sin efecto.
         safe.Modo = modo;
         var data = await _service.BuscarProductoPaginaAsync(safe, ct);
         return Ok(new { ok = true, message = "Productos consultados.", data });
@@ -228,6 +229,32 @@ public class VentasPedidoCapturaController : ControllerBase
         catch { /* la bitacora es informativa; nunca debe tumbar el guardado */ }
 
         return Ok(new { ok = true, message = "Pedido guardado.", data });
+    }
+
+    // "Mis pedidos" del movil: los que son mios por la bitacora (aunque legacy
+    // haya cambiado el usuario) o por el usuario legacy. El idUsuario sale del
+    // token, no del body.
+    [HttpPost("mis-pedidos")]
+    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
+    public async Task<IActionResult> MisPedidos([FromBody] MisPedidosRequest? request, CancellationToken ct)
+    {
+        var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
+        var data = await _service.ConsultarMisPedidosAsync(
+            idUsuario, request?.FechaInicial ?? string.Empty, request?.FechaFinal ?? string.Empty, ct);
+        return Ok(new { ok = true, message = "Mis pedidos consultados.", data });
+    }
+
+    // Historial de cambios de un pedido (para el detalle): creado/modificado
+    // (bitacora) + autorizado/cancelado (legacy), con quien y cuando.
+    [HttpGet("{idPedido:int}/historial")]
+    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
+    public async Task<IActionResult> Historial([FromRoute] int idPedido, CancellationToken ct)
+    {
+        var rechazo = await ValidarPropiedadPedidoAsync(idPedido, ct);
+        if (rechazo != null) return rechazo;
+
+        var data = await _service.ConsultarHistorialPedidoAsync(idPedido, ct);
+        return Ok(new { ok = true, message = "Historial consultado.", data });
     }
 
     [HttpDelete("borrador")]
