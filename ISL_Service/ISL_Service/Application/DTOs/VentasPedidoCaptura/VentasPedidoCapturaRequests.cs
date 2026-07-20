@@ -111,6 +111,9 @@ public class PedidoAgregarDetalleRequest
     public int FacturaMayorista { get; set; }
     public int RemisionMayorista { get; set; }
     public decimal DescuentoAdicional { get; set; }
+    // Canal que origina el pedido (MOVIL / WEB). Si viene vacio, el backend usa
+    // el nombre de usuario/maquina como antes.
+    public string? Equipo { get; set; }
 }
 
 public class PedidoEliminarDetalleRequest
@@ -136,4 +139,7 @@ public class PedidoGuardarRequest
     public string? ServicioTelefono { get; set; }
     public int SoloLogistica { get; set; }
     public int PedidoSinCascosCambio { get; set; }
+    // Canal que origina el pedido (MOVIL / WEB). Si viene vacio, el backend usa
+    // el nombre de usuario/maquina como antes.
+    public string? Equipo { get; set; }
 }
