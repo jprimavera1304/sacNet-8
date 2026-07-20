@@ -71,7 +71,11 @@ public class VentasPedidoCapturaController : ControllerBase
             return NotFound(new { ok = false, message = "Pedido no encontrado." });
 
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
-        if (propiedad.IdUsuario != idUsuario)
+        // Es mio si legacy lo tiene a mi nombre, O si yo lo cree segun la bitacora
+        // (aunque legacy haya cambiado el usuario al modificarlo). Sin esto, abrir
+        // mi propio pedido reasignado daria 403.
+        if (propiedad.IdUsuario != idUsuario
+            && !await _service.EsCreadorPorBitacoraAsync(idPedido, idUsuario, ct))
             return StatusCode(403, new { ok = false, message = "Este pedido no es tuyo." });
 
         if (propiedad.IdStatus != 0 && propiedad.IdStatus != 1)
@@ -225,6 +229,32 @@ public class VentasPedidoCapturaController : ControllerBase
         catch { /* la bitacora es informativa; nunca debe tumbar el guardado */ }
 
         return Ok(new { ok = true, message = "Pedido guardado.", data });
+    }
+
+    // "Mis pedidos" del movil: los que son mios por la bitacora (aunque legacy
+    // haya cambiado el usuario) o por el usuario legacy. El idUsuario sale del
+    // token, no del body.
+    [HttpPost("mis-pedidos")]
+    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
+    public async Task<IActionResult> MisPedidos([FromBody] MisPedidosRequest? request, CancellationToken ct)
+    {
+        var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
+        var data = await _service.ConsultarMisPedidosAsync(
+            idUsuario, request?.FechaInicial ?? string.Empty, request?.FechaFinal ?? string.Empty, ct);
+        return Ok(new { ok = true, message = "Mis pedidos consultados.", data });
+    }
+
+    // Historial de cambios de un pedido (para el detalle): creado/modificado
+    // (bitacora) + autorizado/cancelado (legacy), con quien y cuando.
+    [HttpGet("{idPedido:int}/historial")]
+    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
+    public async Task<IActionResult> Historial([FromRoute] int idPedido, CancellationToken ct)
+    {
+        var rechazo = await ValidarPropiedadPedidoAsync(idPedido, ct);
+        if (rechazo != null) return rechazo;
+
+        var data = await _service.ConsultarHistorialPedidoAsync(idPedido, ct);
+        return Ok(new { ok = true, message = "Historial consultado.", data });
     }
 
     [HttpDelete("borrador")]

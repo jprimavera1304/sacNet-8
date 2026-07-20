@@ -113,6 +113,13 @@ public class PedidoAgregarDetalleRequest
     public string? Equipo { get; set; }
 }
 
+public class MisPedidosRequest
+{
+    // Fechas ISO 'yyyy-MM-dd' (como las manda el movil). Vacio = sin limite.
+    public string? FechaInicial { get; set; }
+    public string? FechaFinal { get; set; }
+}
+
 public class PedidoEliminarDetalleRequest
 {
     public int IDPedido { get; set; }

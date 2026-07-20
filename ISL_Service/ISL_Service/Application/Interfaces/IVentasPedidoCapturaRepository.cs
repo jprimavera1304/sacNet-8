@@ -13,6 +13,9 @@ public interface IVentasPedidoCapturaRepository
     Task<PedidoSnapshotDto> EliminarDetalleAsync(PedidoEliminarDetalleRequest request, CancellationToken ct);
     Task<PedidoSnapshotDto> GuardarAsync(PedidoGuardarRequest request, int idUsuario, string equipo, CancellationToken ct);
     Task RegistrarEventoAsync(int idPedido, int idUsuario, string usuario, string equipo, int productos, decimal totalPagar, CancellationToken ct);
+    Task<PedidoRowsResponse> ConsultarMisPedidosAsync(int idUsuario, string fechaInicial, string fechaFinal, CancellationToken ct);
+    Task<PedidoRowsResponse> ConsultarHistorialPedidoAsync(int idPedido, CancellationToken ct);
+    Task<bool> EsCreadorPorBitacoraAsync(int idPedido, int idUsuario, CancellationToken ct);
     Task<PedidoRowsResponse> EliminarBorradorAsync(int idUsuario, CancellationToken ct);
     Task<PedidoPropiedad?> ObtenerPropiedadPedidoAsync(int idPedido, CancellationToken ct);
 }
