@@ -102,6 +102,7 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         {
             domicilios = DataTableToRows(await ConsultarDomiciliosAsync(conn, idCliente, request.IDEmpresaCS, ct));
             saldos = DataTableToRows(await ConsultarSaldosClienteWebAsync(conn, idCliente, ct));
+            AgregarDisponible(saldos, clientes, idCliente);
         }
 
         return new PedidoClienteContextResponse
@@ -110,6 +111,37 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
             Domicilios = domicilios,
             Saldos = saldos
         };
+    }
+
+    // Disponible = LimiteCredito - SaldoPendiente - SaldoVencido, igual que legacy
+    // (Ventas.cs:1692). El limite viene de sp_n_ConsultaClientes (Clientes.[Limite
+    // Credito]); los saldos, de la consulta de saldos. Se agrega al row de saldos
+    // para que el movil lo mande como @Disponible al capturar el pedido: con eso
+    // el ruteo a "pendientes de autorizar" queda igual que legacy. Sin esto el
+    // disponible iba 0 y CUALQUIER pedido con total > 0 requeria autorizacion.
+    //
+    // Nota: para clientes TAU el limite real lo calcula un servicio de credito por
+    // promedio de pagos; aqui se usa el limite estatico del cliente, que es la
+    // fuente correcta para el flujo estandar (ZARA).
+    private static void AgregarDisponible(
+        List<Dictionary<string, object?>> saldos, DataTable clientes, int idCliente)
+    {
+        if (saldos.Count == 0) return;
+
+        DataRow? clienteRow = null;
+        foreach (DataRow r in clientes.Rows)
+        {
+            if (ReadInt(r, "IDCliente", "idCliente") == idCliente) { clienteRow = r; break; }
+        }
+        clienteRow ??= clientes.Rows.Count > 0 ? clientes.Rows[0] : null;
+        if (clienteRow == null) return;
+
+        var limite = ReadDecimal(clienteRow, "LimiteCredito", "limiteCredito", "Limite Credito");
+        var saldo = saldos[0];
+        var saldoVencido = ReadDecimalFromDictionary(saldo, "saldoVencido", "SaldoVencido");
+        var saldoPendiente = ReadDecimalFromDictionary(saldo, "saldoPendiente", "SaldoPendiente");
+        saldo["disponible"] = limite - saldoPendiente - saldoVencido;
+        saldo["limiteCredito"] = limite;
     }
 
     public async Task<PedidoRowsResponse> BuscarProductoAsync(PedidoProductoBuscarRequest request, CancellationToken ct)
@@ -1067,6 +1099,17 @@ SELECT @IDPedido,
         return row.TryGetValue(name, out var value) && int.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), out var parsed)
             ? parsed
             : 0;
+    }
+
+    private static decimal ReadDecimalFromDictionary(Dictionary<string, object?> row, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (!row.TryGetValue(name, out var value) || value == null || value == DBNull.Value) continue;
+            if (value is decimal dec) return dec;
+            if (decimal.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed)) return parsed;
+        }
+        return 0m;
     }
 
     private static string ReadStringFromDictionary(Dictionary<string, object?> row, string name)
