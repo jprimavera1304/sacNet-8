@@ -52,6 +52,17 @@ public class VentasPedidoCapturaController : ControllerBase
     // pendiente (1): no un pedido ya procesado.
     //
     // Devuelve un IActionResult de error si hay que rechazar; null si esta bien.
+    // Canal/equipo que queda registrado en el pedido. Si el cliente lo declara
+    // (MOVIL / WEB) se usa eso; si no, se conserva el comportamiento anterior:
+    // el nombre de usuario/maquina. Se recorta a 100 (tamaño de la columna).
+    private string ResolveEquipo(string? requestEquipo)
+    {
+        var equipo = string.IsNullOrWhiteSpace(requestEquipo)
+            ? _currentUserAccessor.GetUsername(User, Environment.MachineName)
+            : requestEquipo.Trim();
+        return equipo.Length > 100 ? equipo[..100] : equipo;
+    }
+
     private async Task<IActionResult?> ValidarPropiedadPedidoAsync(int idPedido, CancellationToken ct)
     {
         if (idPedido <= 0) return null; // pedido nuevo, aun no tiene dueño
@@ -170,7 +181,7 @@ public class VentasPedidoCapturaController : ControllerBase
         if (rechazo != null) return rechazo;
 
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
-        var equipo = _currentUserAccessor.GetUsername(User, Environment.MachineName);
+        var equipo = ResolveEquipo(request.Equipo);
         var data = await _service.AgregarDetalleAsync(request, idUsuario, equipo, ct);
         return Ok(new { ok = true, message = "Producto agregado.", data });
     }
@@ -203,8 +214,19 @@ public class VentasPedidoCapturaController : ControllerBase
         if (rechazo != null) return rechazo;
 
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
-        var equipo = _currentUserAccessor.GetUsername(User, Environment.MachineName);
+        var equipo = ResolveEquipo(request.Equipo);
         var data = await _service.GuardarAsync(request, idUsuario, equipo, ct);
+
+        // Bitacora propia: registra al creador/modificador para que "Mis pedidos"
+        // reconozca al dueño aunque legacy sobrescriba el usuario, y para el
+        // historial del detalle. Best-effort: si falla, no rompe el guardado.
+        try
+        {
+            var usuario = _currentUserAccessor.GetUsername(User, string.Empty);
+            await _service.RegistrarEventoAsync(request.IDPedido, idUsuario, usuario, equipo, request.Productos, request.TotalPagar, ct);
+        }
+        catch { /* la bitacora es informativa; nunca debe tumbar el guardado */ }
+
         return Ok(new { ok = true, message = "Pedido guardado.", data });
     }
 
