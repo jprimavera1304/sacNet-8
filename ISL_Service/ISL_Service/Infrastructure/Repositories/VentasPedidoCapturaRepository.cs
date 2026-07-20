@@ -204,16 +204,15 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
     private static bool EsZara(string funcionalidad)
         => string.Equals(funcionalidad, "ZARA", StringComparison.OrdinalIgnoreCase);
 
-    private bool AceitesHabilitado()
-        => _configuration.GetValue<bool>(PedidoModo.ConfigAceitesHabilitado);
-
     private async Task<List<string>> ConsultarModosPedidoAsync(CancellationToken ct)
     {
         var modos = new List<string> { PedidoModo.Normal };
 
-        // Sin ZARA no hay separacion, asi que ofrecer "aceites" no tendria sentido
-        // aunque el flag este encendido.
-        if (AceitesHabilitado() && EsZara(await ConsultarFuncionalidadConCacheAsync(ct)))
+        // El modo aceites se ofrece por EMPRESA: solo las de funcionalidad ZARA
+        // separan aceites de acumuladores. La empresa sale del contexto del
+        // usuario logueado (su token), no de ninguna configuracion global. Asi
+        // queda prendido para Zaragoza y apagado para las demas, automatico.
+        if (EsZara(await ConsultarFuncionalidadConCacheAsync(ct)))
             modos.Add(PedidoModo.Aceites);
 
         return modos;

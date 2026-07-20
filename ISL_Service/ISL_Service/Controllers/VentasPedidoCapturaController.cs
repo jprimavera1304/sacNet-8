@@ -28,14 +28,12 @@ public class VentasPedidoCapturaController : ControllerBase
 {
     private readonly IVentasPedidoCapturaService _service;
     private readonly ICurrentUserAccessor _currentUserAccessor;
-    private readonly IConfiguration _configuration;
     private readonly IPermissionService _permissionService;
 
-    public VentasPedidoCapturaController(IVentasPedidoCapturaService service, ICurrentUserAccessor currentUserAccessor, IConfiguration configuration, IPermissionService permissionService)
+    public VentasPedidoCapturaController(IVentasPedidoCapturaService service, ICurrentUserAccessor currentUserAccessor, IPermissionService permissionService)
     {
         _service = service;
         _currentUserAccessor = currentUserAccessor;
-        _configuration = configuration;
         _permissionService = permissionService;
     }
 
@@ -156,11 +154,10 @@ public class VentasPedidoCapturaController : ControllerBase
         if (modo == null)
             return BadRequest(new { ok = false, message = "Modo invalido. Use 'normal' o 'aceites'." });
 
-        // El server manda: aunque el bootstrap no ofrezca "aceites", el cliente
-        // podria pedirlo de todos modos.
-        if (modo == PedidoModo.Aceites && !_configuration.GetValue<bool>(PedidoModo.ConfigAceitesHabilitado))
-            return BadRequest(new { ok = false, message = "El modo aceites no esta habilitado." });
-
+        // No hace falta un candado extra: el filtrado de aceites solo aplica a
+        // empresas ZARA (lo resuelve el repositorio por la funcionalidad de la
+        // empresa del usuario). Para las demas, pedir 'aceites' simplemente
+        // devuelve el catalogo normal, sin efecto.
         safe.Modo = modo;
         var data = await _service.BuscarProductoPaginaAsync(safe, ct);
         return Ok(new { ok = true, message = "Productos consultados.", data });

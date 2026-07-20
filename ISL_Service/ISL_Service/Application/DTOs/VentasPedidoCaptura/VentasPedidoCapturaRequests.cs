@@ -33,9 +33,6 @@ public static class PedidoModo
     public const string Normal = "normal";
     public const string Aceites = "aceites";
 
-    // Interruptor de servidor: permite encender aceites sin publicar app nueva.
-    public const string ConfigAceitesHabilitado = "Pedidos:AceitesHabilitado";
-
     // Vacio/null -> normal. Valor no reconocido -> null (el controller responde 400).
     public static string? Normalizar(string? modo)
     {
