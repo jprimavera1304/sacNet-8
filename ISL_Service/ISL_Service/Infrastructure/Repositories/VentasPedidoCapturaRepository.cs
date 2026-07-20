@@ -424,6 +424,33 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         return await ConsultarPedidoAsync(conn, request.IDPedido, ct);
     }
 
+    // Bitacora propia (tabla WPedidoBitacora, no toca legacy). Registra quien
+    // creo/modifico el pedido desde la app o el web. La PRIMERA vez que un
+    // pedido llega aqui se marca 'creado' (ese es el dueño para "Mis pedidos");
+    // las siguientes veces, 'modificado' (para el historial). Asi el creador se
+    // conserva aunque legacy sobrescriba Pedidos.IDUsuario al modificar.
+    public async Task RegistrarEventoAsync(int idPedido, int idUsuario, string usuario,
+        string equipo, int productos, decimal totalPagar, CancellationToken ct)
+    {
+        if (idPedido <= 0) return;
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+        const string sql = @"
+INSERT INTO dbo.WPedidoBitacora (IDPedido, Evento, IDUsuario, Usuario, Equipo, Productos, TotalPagar)
+SELECT @IDPedido,
+       CASE WHEN EXISTS (SELECT 1 FROM dbo.WPedidoBitacora WHERE IDPedido = @IDPedido AND Evento = 'creado')
+            THEN 'modificado' ELSE 'creado' END,
+       @IDUsuario, @Usuario, @Equipo, @Productos, @TotalPagar;";
+        await using var cmd = new SqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@IDPedido", idPedido);
+        cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
+        cmd.Parameters.AddWithValue("@Usuario", (object?)usuario ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@Equipo", (object?)equipo ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@Productos", productos);
+        cmd.Parameters.AddWithValue("@TotalPagar", totalPagar);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
     public async Task<PedidoRowsResponse> EliminarBorradorAsync(int idUsuario, CancellationToken ct)
     {
         await using var conn = GetConnection();

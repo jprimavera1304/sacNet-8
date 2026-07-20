@@ -12,6 +12,7 @@ public interface IVentasPedidoCapturaService
     Task<PedidoSnapshotDto> AgregarDetalleAsync(PedidoAgregarDetalleRequest request, int idUsuario, string equipo, CancellationToken ct);
     Task<PedidoSnapshotDto> EliminarDetalleAsync(PedidoEliminarDetalleRequest request, CancellationToken ct);
     Task<PedidoSnapshotDto> GuardarAsync(PedidoGuardarRequest request, int idUsuario, string equipo, CancellationToken ct);
+    Task RegistrarEventoAsync(int idPedido, int idUsuario, string usuario, string equipo, int productos, decimal totalPagar, CancellationToken ct);
     Task<PedidoRowsResponse> EliminarBorradorAsync(int idUsuario, CancellationToken ct);
     Task<PedidoPropiedad?> ObtenerPropiedadPedidoAsync(int idPedido, CancellationToken ct);
 }

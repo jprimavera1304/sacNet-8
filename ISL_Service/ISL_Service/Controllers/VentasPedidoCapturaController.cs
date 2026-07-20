@@ -216,6 +216,17 @@ public class VentasPedidoCapturaController : ControllerBase
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
         var equipo = ResolveEquipo(request.Equipo);
         var data = await _service.GuardarAsync(request, idUsuario, equipo, ct);
+
+        // Bitacora propia: registra al creador/modificador para que "Mis pedidos"
+        // reconozca al dueño aunque legacy sobrescriba el usuario, y para el
+        // historial del detalle. Best-effort: si falla, no rompe el guardado.
+        try
+        {
+            var usuario = _currentUserAccessor.GetUsername(User, string.Empty);
+            await _service.RegistrarEventoAsync(request.IDPedido, idUsuario, usuario, equipo, request.Productos, request.TotalPagar, ct);
+        }
+        catch { /* la bitacora es informativa; nunca debe tumbar el guardado */ }
+
         return Ok(new { ok = true, message = "Pedido guardado.", data });
     }
 

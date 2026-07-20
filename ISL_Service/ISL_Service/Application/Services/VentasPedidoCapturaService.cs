@@ -36,6 +36,9 @@ public class VentasPedidoCapturaService : IVentasPedidoCapturaService
     public Task<PedidoSnapshotDto> GuardarAsync(PedidoGuardarRequest request, int idUsuario, string equipo, CancellationToken ct)
         => _repository.GuardarAsync(request, idUsuario, equipo, ct);
 
+    public Task RegistrarEventoAsync(int idPedido, int idUsuario, string usuario, string equipo, int productos, decimal totalPagar, CancellationToken ct)
+        => _repository.RegistrarEventoAsync(idPedido, idUsuario, usuario, equipo, productos, totalPagar, ct);
+
     public Task<PedidoRowsResponse> EliminarBorradorAsync(int idUsuario, CancellationToken ct)
         => _repository.EliminarBorradorAsync(idUsuario, ct);
 
