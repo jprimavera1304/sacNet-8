@@ -3,7 +3,6 @@ using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Shared.Backend.Core.Abstractions;
 
 namespace ISL_Service.Controllers;
 

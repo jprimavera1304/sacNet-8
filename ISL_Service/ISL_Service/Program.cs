@@ -17,7 +17,7 @@ using ISL_Service.Infrastructure.Security;
 using ISL_Service.Infrastructure.Middleware;
 using Microsoft.OpenApi.Models;
 using Microsoft.Data.SqlClient;
-using Shared.Backend.Core.Abstractions;
+using ISL_Service.Application.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -118,7 +118,7 @@ builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
-builder.Services.AddSingleton<ICurrentUserAccessor, Shared.Backend.Core.Security.CurrentUserAccessor>();
+builder.Services.AddSingleton<ICurrentUserAccessor, CurrentUserAccessor>();
 
 // -------------------- USER ADMIN (NUEVO) --------------------
 builder.Services.AddScoped<IUserAdminService, UserAdminService>();

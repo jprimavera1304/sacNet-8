@@ -2,7 +2,7 @@ using ISL_Service.Application.DTOs.AlmacenCascos;
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Shared.Backend.Core.Abstractions;
+using ISL_Service.Application.Security;
 
 namespace ISL_Service.Controllers;
 

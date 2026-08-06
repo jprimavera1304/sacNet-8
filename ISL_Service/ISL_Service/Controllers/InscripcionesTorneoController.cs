@@ -3,7 +3,7 @@ using ISL_Service.Application.DTOs.InscripcionesTorneo;
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Shared.Backend.Core.Abstractions;
+using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace ISL_Service.Controllers;

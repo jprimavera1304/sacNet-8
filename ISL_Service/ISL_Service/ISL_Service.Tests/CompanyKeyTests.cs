@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
@@ -15,7 +15,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Caching.Memory;
-using Shared.Backend.Core.Abstractions;
+using ISL_Service.Application.Security;
 
 namespace ISL_Service.Tests;
 

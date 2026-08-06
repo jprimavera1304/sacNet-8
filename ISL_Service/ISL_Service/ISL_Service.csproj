@@ -6,7 +6,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591;1573</NoWarn>
-    <UseLocalSharedBack>false</UseLocalSharedBack>
 
     <!-- El SDK Web globbea **/*.json como Content. Sin estas exclusiones se
          cuelan al build los ~56,000 json de carpetas que no son fuente y se
@@ -47,15 +46,7 @@
     <Folder Include="Application\DTOs\PagoProveedor\" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(UseLocalSharedBack)' != 'true'">
-    <PackageReference Include="Shared.Backend.Core" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(UseLocalSharedBack)' == 'true'">
-    <ProjectReference Include="..\..\..\shared-back\src\Shared.Backend.Core\Shared.Backend.Core.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
+<ItemGroup>
     <Compile Remove="ISL_Service.Tests\**\*.cs" />
     <None Remove="ISL_Service.Tests\**\*" />
   </ItemGroup>
