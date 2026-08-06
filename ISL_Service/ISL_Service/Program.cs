@@ -177,6 +177,9 @@ builder.Services.AddScoped<IAlmacenCascosService, AlmacenCascosService>();
 builder.Services.AddScoped<IChecadorRepository, ChecadorRepository>();
 builder.Services.AddScoped<IChecadorService, ChecadorService>();
 
+// Version minima/recomendada de la app movil (endpoint anonimo api/app/version).
+builder.Services.AddScoped<IAppVersionRepository, AppVersionRepository>();
+
 // -------------------- JWT Authentication --------------------
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtKey = jwtSection["Key"];
