@@ -173,6 +173,10 @@ builder.Services.AddScoped<IVentasPedidoCapturaService, VentasPedidoCapturaServi
 builder.Services.AddScoped<IAlmacenCascosRepository, AlmacenCascosRepository>();
 builder.Services.AddScoped<IAlmacenCascosService, AlmacenCascosService>();
 
+// -------------------- CHECADOR (HORA DE COMIDA) --------------------
+builder.Services.AddScoped<IChecadorRepository, ChecadorRepository>();
+builder.Services.AddScoped<IChecadorService, ChecadorService>();
+
 // -------------------- JWT Authentication --------------------
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtKey = jwtSection["Key"];
