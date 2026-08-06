@@ -1,0 +1,30 @@
+using ISL_Service.Application.DTOs.Checador;
+
+namespace ISL_Service.Application.Interfaces;
+
+/// <summary>
+/// Reglas de la checada de comida: normaliza tipo/origen, valida el rango de
+/// fechas y traduce los errores de negocio del SP a 400/409.
+/// </summary>
+public interface IChecadorService
+{
+    Task<ChecadaComidaRegistradaDto> RegistrarComidaAsync(
+        RegistrarChecadaComidaRequest request,
+        int idUsuario,
+        string equipo,
+        CancellationToken ct = default);
+
+    Task<ChecadaComidaRowsResponse> ConsultarComidasAsync(
+        int idEmpleado,
+        DateTime? fechaInicial,
+        DateTime? fechaFinal,
+        bool incluirCanceladas,
+        CancellationToken ct = default);
+
+    Task CancelarComidaAsync(
+        int idEmpleadoChecada,
+        string motivo,
+        int idUsuario,
+        string equipo,
+        CancellationToken ct = default);
+}

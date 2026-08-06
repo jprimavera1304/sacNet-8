@@ -127,7 +127,10 @@ public class VentasPedidoCapturaController : ControllerBase
     [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
     public async Task<IActionResult> BuscarCliente([FromBody] PedidoClienteBuscarRequest? request, CancellationToken ct)
     {
-        var data = await _service.BuscarClienteAsync(request ?? new PedidoClienteBuscarRequest(), ct);
+        // El usuario sale del token, NUNCA del body: si viniera del cliente,
+        // cualquiera podria pedir los clientes de otro agente mandando otro id.
+        var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
+        var data = await _service.BuscarClienteAsync(request ?? new PedidoClienteBuscarRequest(), idUsuario, ct);
         return Ok(new { ok = true, message = "Cliente consultado.", data });
     }
 

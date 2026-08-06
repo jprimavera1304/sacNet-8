@@ -6,7 +6,7 @@ public interface IVentasPedidoCapturaRepository
 {
     Task<PedidoBootstrapResponse> BootstrapAsync(int idUsuario, CancellationToken ct);
     Task<PedidoSnapshotDto> ConsultarPedidoAsync(int idPedido, CancellationToken ct);
-    Task<PedidoClienteContextResponse> BuscarClienteAsync(PedidoClienteBuscarRequest request, CancellationToken ct);
+    Task<PedidoClienteContextResponse> BuscarClienteAsync(PedidoClienteBuscarRequest request, int idUsuario, CancellationToken ct);
     Task<PedidoRowsResponse> BuscarProductoAsync(PedidoProductoBuscarRequest request, CancellationToken ct);
     Task<PedidoProductoPaginaResponse> BuscarProductoPaginaAsync(PedidoProductoPaginaRequest request, CancellationToken ct);
     Task<PedidoSnapshotDto> AgregarDetalleAsync(PedidoAgregarDetalleRequest request, int idUsuario, string equipo, CancellationToken ct);
