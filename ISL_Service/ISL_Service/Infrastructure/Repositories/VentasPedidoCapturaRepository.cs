@@ -32,6 +32,12 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
     // numero en el momento en que agrega la pieza y no 20 s despues.
     private static readonly TimeSpan ComprometidoCacheTtl = TimeSpan.FromSeconds(20);
 
+    // A que agente esta amarrado un usuario. No cambia en caliente: hay que
+    // editar Usuarios.EsAgente o WUsuarioAgenteConfig a mano. TTL de 5 min para
+    // no pegarle a la base en cada tecla del buscador de clientes, pero corto
+    // como para que un cambio se note sin reiniciar el servicio.
+    private static readonly TimeSpan AgenteFiltroCacheTtl = TimeSpan.FromMinutes(5);
+
     // Contador que se incrementa en cada escritura de pedido. Va dentro de la
     // llave del cache, asi que subirlo tira todas las entradas de golpe sin
     // tener que adivinar cual almacen/empresa toco el cambio.
@@ -107,21 +113,29 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         return await ConsultarPedidoAsync(conn, idPedido, ct);
     }
 
-    public async Task<PedidoClienteContextResponse> BuscarClienteAsync(PedidoClienteBuscarRequest request, CancellationToken ct)
+    public async Task<PedidoClienteContextResponse> BuscarClienteAsync(PedidoClienteBuscarRequest request, int idUsuario, CancellationToken ct)
     {
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
 
-        var clientes = await ConsultarClientesAsync(conn, request, ct);
+        // Cada repartidor ve SOLO los clientes de su agente. Quien no tiene
+        // agente vinculado (oficina, administradores) sigue viendo todos.
+        var idAgenteFiltro = await ConsultarAgenteFiltroConCacheAsync(idUsuario, ct);
+
+        var clientes = await ConsultarClientesAsync(conn, request, idAgenteFiltro, ct);
 
         // Busqueda especifica (id/numero) -> trae contexto del cliente (domicilios y
         // saldos). Busqueda por texto (nombre/apellidos/rfc) -> solo la lista, para
         // que el front muestre resultados y luego pida el contexto al seleccionar.
         var isSpecific = request.IDCliente > 0 || !string.IsNullOrWhiteSpace(request.Numero);
 
-        var idCliente = request.IDCliente > 0
-            ? request.IDCliente
-            : ReadInt(clientes.Rows.Count > 0 ? clientes.Rows[0] : null, "IDCliente", "idCliente");
+        // El cliente TIENE que venir en la lista ya filtrada. Antes se confiaba
+        // en el IDCliente que mandaba el cliente HTTP y se pedian domicilios y
+        // saldos con el, aunque la busqueda no lo hubiera devuelto. Con el
+        // filtro por agente eso seria una fuga: mandando un IDCliente a mano se
+        // sacarian domicilios y saldos de un cliente de otro agente, aunque
+        // nunca apareciera en pantalla.
+        var idCliente = ResolverIdClienteVisible(clientes, request.IDCliente);
 
         var domicilios = new List<Dictionary<string, object?>>();
         var saldos = DataTableToRows(CrearSaldosClienteFallbackTable());
@@ -139,6 +153,73 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
             Domicilios = domicilios,
             Saldos = saldos
         };
+    }
+
+    // Devuelve el IDCliente solo si de verdad esta en el resultado de la
+    // busqueda (que ya viene filtrado por agente). Si el que pidieron no
+    // aparece, devuelve 0 y el llamador no trae ni domicilios ni saldos.
+    //
+    // Cuando no se pidio ninguno en particular, se toma el primero de la lista,
+    // que es el comportamiento de siempre.
+    private static int ResolverIdClienteVisible(DataTable clientes, int idClientePedido)
+    {
+        if (idClientePedido > 0)
+        {
+            foreach (DataRow row in clientes.Rows)
+            {
+                if (ReadInt(row, "IDCliente", "idCliente") == idClientePedido)
+                    return idClientePedido;
+            }
+            return 0;
+        }
+
+        return ReadInt(clientes.Rows.Count > 0 ? clientes.Rows[0] : null, "IDCliente", "idCliente");
+    }
+
+    // Que agente filtra los clientes de este usuario. 0 = ve todos.
+    //
+    // La decision completa vive en sp_w_ConsultaAgenteUsuario; aqui solo se
+    // obedece el numero que devuelve. Se cachea porque no cambia en caliente
+    // (hay que editar Usuarios o la tabla de config para moverlo) y si no, se
+    // pagaria un roundtrip por cada tecla del buscador de clientes.
+    private async Task<int> ConsultarAgenteFiltroConCacheAsync(int idUsuario, CancellationToken ct)
+    {
+        if (idUsuario <= 0) return 0;
+
+        var key = $"agenteFiltro:{idUsuario}";
+        if (_cache.TryGetValue(key, out int cacheado)) return cacheado;
+
+        var filtro = await ConsultarAgenteFiltroAsync(idUsuario, ct);
+
+        _cache.Set(key, filtro, new MemoryCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = AgenteFiltroCacheTtl
+        });
+
+        return filtro;
+    }
+
+    private async Task<int> ConsultarAgenteFiltroAsync(int idUsuario, CancellationToken ct)
+    {
+        try
+        {
+            await using var conn = GetConnection();
+            await conn.OpenAsync(ct);
+
+            await using var cmd = CreateStoredProcedureCommand("sp_w_ConsultaAgenteUsuario", conn);
+            cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
+
+            var tabla = await ExecuteFirstTableAsync(cmd, ct);
+            if (tabla.Rows.Count == 0) return 0;
+
+            return ReadInt(tabla.Rows[0], "IDAgenteFiltro", "idAgenteFiltro");
+        }
+        catch (SqlException ex) when (IsMissingStoredProcedure(ex, "sp_w_ConsultaAgenteUsuario"))
+        {
+            // SP no desplegado: 0 = sin filtro = como se comportaba antes. Un
+            // script pendiente no debe dejar a nadie sin poder capturar.
+            return 0;
+        }
     }
 
     // Disponible = LimiteCredito - SaldoPendiente - SaldoVencido, igual que legacy
@@ -883,7 +964,16 @@ ORDER BY Fecha;";
         cmd.Parameters.AddWithValue("@DescuentoAdicional", request.DescuentoAdicional);
     }
 
-    private async Task<DataTable> ConsultarClientesAsync(SqlConnection conn, PedidoClienteBuscarRequest request, CancellationToken ct)
+    // idAgenteFiltro: 0 = todos los clientes; > 0 = solo los de ese agente.
+    //
+    // El filtro se lo come el propio sp_n_ConsultaClientes en su parametro
+    // @IDAgente, que YA EXISTIA en legacy (arma ' AND C.IDAgente = N'). No hubo
+    // que tocar nada de legacy para esto.
+    //
+    // Y lo aplica con AND sobre CUALQUIER busqueda, tambien la que va por
+    // IDCliente o por Numero, asi que no hay manera de saltarselo pidiendo un
+    // cliente por su id.
+    private async Task<DataTable> ConsultarClientesAsync(SqlConnection conn, PedidoClienteBuscarRequest request, int idAgenteFiltro, CancellationToken ct)
     {
         await using var cmd = CreateStoredProcedureCommand("sp_n_ConsultaClientes", conn);
         cmd.Parameters.AddWithValue("@IDCliente", request.IDCliente);
@@ -891,7 +981,7 @@ ORDER BY Fecha;";
         cmd.Parameters.AddWithValue("@IDCondicionesCreditoAceites", 0);
         cmd.Parameters.AddWithValue("@IDCondicionesCreditoCascos", 0);
         cmd.Parameters.AddWithValue("@IDDescuento", 0);
-        cmd.Parameters.AddWithValue("@IDAgente", 0);
+        cmd.Parameters.AddWithValue("@IDAgente", idAgenteFiltro);
         cmd.Parameters.AddWithValue("@IDStatus", 1);
         cmd.Parameters.AddWithValue("@Numero", request.Numero ?? string.Empty);
         cmd.Parameters.AddWithValue("@Nombre", request.Nombre ?? string.Empty);

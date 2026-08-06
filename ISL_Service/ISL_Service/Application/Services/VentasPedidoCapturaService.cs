@@ -18,8 +18,8 @@ public class VentasPedidoCapturaService : IVentasPedidoCapturaService
     public Task<PedidoSnapshotDto> ConsultarPedidoAsync(int idPedido, CancellationToken ct)
         => _repository.ConsultarPedidoAsync(idPedido, ct);
 
-    public Task<PedidoClienteContextResponse> BuscarClienteAsync(PedidoClienteBuscarRequest request, CancellationToken ct)
-        => _repository.BuscarClienteAsync(request, ct);
+    public Task<PedidoClienteContextResponse> BuscarClienteAsync(PedidoClienteBuscarRequest request, int idUsuario, CancellationToken ct)
+        => _repository.BuscarClienteAsync(request, idUsuario, ct);
 
     public Task<PedidoRowsResponse> BuscarProductoAsync(PedidoProductoBuscarRequest request, CancellationToken ct)
         => _repository.BuscarProductoAsync(request, ct);
