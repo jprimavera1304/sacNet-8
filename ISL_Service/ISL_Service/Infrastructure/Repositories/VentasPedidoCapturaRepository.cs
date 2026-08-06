@@ -24,6 +24,19 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
     // caliente. TTL largo para no pagar un roundtrip por cada request de pagina.
     private static readonly TimeSpan FuncionalidadCacheTtl = TimeSpan.FromMinutes(30);
 
+    // Lo apartado en pedidos sin procesar cambia con CADA renglon que captura
+    // cualquier repartidor, asi que se cachea muy poquito: solo lo suficiente
+    // para que teclear en el buscador no dispare una consulta por letra.
+    // Ademas se invalida a proposito en cuanto esta misma instancia mueve un
+    // pedido (ver ComprometidoGeneracion), para que el repartidor vea bajar el
+    // numero en el momento en que agrega la pieza y no 20 s despues.
+    private static readonly TimeSpan ComprometidoCacheTtl = TimeSpan.FromSeconds(20);
+
+    // Contador que se incrementa en cada escritura de pedido. Va dentro de la
+    // llave del cache, asi que subirlo tira todas las entradas de golpe sin
+    // tener que adivinar cual almacen/empresa toco el cambio.
+    private static long _comprometidoGeneracion;
+
     // Grupos de categoria (tabla GrupoCategorias): 1=ACUMULADORES .. 4=LUBRICANTES.
     // OJO: el 4 es un valor magico dentro de sp_n_ConsultaAlmacenProducto. Con
     // Funcionalidad='ZARA' el SP lo reinterpreta como "todo EXCEPTO acumuladores"
@@ -46,6 +59,20 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         "NumPiezas",
         "PrecioLista"
     };
+
+    // Campo NUEVO, calculado por nosotros: Existencia menos lo que ya esta
+    // apartado en pedidos que todavia no se procesan. No sale de ningun sp_n_.
+    // "Existencia" se sigue mandando igual que siempre para no romper a nadie:
+    // es la app la que decide cual de los dos pinta.
+    private const string ExistenciaDisponibleColumna = "ExistenciaDisponible";
+
+    // Version ya formateada del disponible, con el MISMO formato que arma
+    // sp_n_ConsultaAlmacenProducto para ExistenciaFtm ("15 PZAS" cuando el
+    // producto se vende por pieza, "120 PZAS / 10.00 CAJAS" cuando viene en
+    // caja). Se calcula aqui y no en la app para que los dos numeros que ve el
+    // repartidor se lean igual; si el disponible saliera en piezas pelonas al
+    // lado de una existencia en cajas, pareceria que uno de los dos esta mal.
+    private const string ExistenciaDisponibleFtmColumna = "ExistenciaDisponibleFtm";
 
     private readonly IConfiguration _configuration;
     private readonly IMemoryCache _cache;
@@ -91,6 +118,7 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         // saldos). Busqueda por texto (nombre/apellidos/rfc) -> solo la lista, para
         // que el front muestre resultados y luego pida el contexto al seleccionar.
         var isSpecific = request.IDCliente > 0 || !string.IsNullOrWhiteSpace(request.Numero);
+
         var idCliente = request.IDCliente > 0
             ? request.IDCliente
             : ReadInt(clientes.Rows.Count > 0 ? clientes.Rows[0] : null, "IDCliente", "idCliente");
@@ -161,8 +189,111 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         cmd.Parameters.AddWithValue("@Identico", 0);
         cmd.Parameters.AddWithValue("@IDEmpresaCS", request.IDEmpresaCS);
 
-        return new PedidoRowsResponse { Rows = DataTableToRows(await ExecuteFirstTableAsync(cmd, ct)) };
+        var rows = DataTableToRows(await ExecuteFirstTableAsync(cmd, ct));
+        var comprometido = await ConsultarComprometidoConCacheAsync(request.IDAlmacen, request.IDEmpresaCS, ct);
+        return new PedidoRowsResponse { Rows = AgregarExistenciaDisponible(rows, comprometido) };
     }
+
+    // Existencia disponible = existencia real - lo apartado en pedidos vivos.
+    //
+    // Se resuelve aqui, en el backend, y no en SQL junto con el catalogo, porque
+    // la existencia real puede vivir en otra base segun la empresa (esa
+    // resolucion la hace sp_n_ConsultaAlmacenProducto) mientras que lo apartado
+    // sale siempre de Pedidos local. Pedirlos por separado y restar evita
+    // duplicar la logica de prefijos de base que tiene legacy.
+    //
+    // Los productos que no vienen en el diccionario no tienen nada apartado, asi
+    // que su disponible es igual a su existencia.
+    private static List<Dictionary<string, object?>> AgregarExistenciaDisponible(
+        List<Dictionary<string, object?>> rows, IReadOnlyDictionary<int, int> comprometido)
+    {
+        var salida = new List<Dictionary<string, object?>>(rows.Count);
+        foreach (var row in rows)
+        {
+            // Copia: las filas del catalogo estan cacheadas y COMPARTIDAS entre
+            // peticiones. Mutarlas dejaria pegado un disponible viejo hasta que
+            // expirara el cache del catalogo (3 min).
+            var copia = new Dictionary<string, object?>(row, StringComparer.OrdinalIgnoreCase);
+
+            var idProducto = ReadIntFromDictionary(row, "IDProducto");
+            var existencia = (int)ReadDecimalFromDictionary(row, "Existencia", "existencia");
+            var apartado = comprometido.TryGetValue(idProducto, out var v) ? v : 0;
+
+            var disponible = existencia - apartado;
+            if (disponible < 0) disponible = 0;
+
+            var numPiezas = ReadIntFromDictionary(row, "NumPiezas");
+
+            copia[ExistenciaDisponibleColumna] = disponible;
+            copia[ExistenciaDisponibleFtmColumna] = FormatearExistencia(disponible, numPiezas);
+            salida.Add(copia);
+        }
+        return salida;
+    }
+
+    // Mismo formato que ExistenciaFtm en sp_n_ConsultaAlmacenProducto.
+    private static string FormatearExistencia(int piezas, int numPiezas)
+    {
+        var texto = piezas.ToString("#,##0", CultureInfo.InvariantCulture) + " PZAS";
+        if (numPiezas <= 1) return texto;
+
+        var cajas = (decimal)piezas / numPiezas;
+        return texto + " / " + cajas.ToString("#,##0.00", CultureInfo.InvariantCulture) + " CAJAS";
+    }
+
+    private async Task<IReadOnlyDictionary<int, int>> ConsultarComprometidoConCacheAsync(
+        int idAlmacen, int idEmpresaCs, CancellationToken ct)
+    {
+        var generacion = Interlocked.Read(ref _comprometidoGeneracion);
+        var key = $"comprometido:{generacion}:{idAlmacen}:{idEmpresaCs}";
+        if (_cache.TryGetValue(key, out Dictionary<int, int>? cacheado) && cacheado != null)
+            return cacheado;
+
+        var mapa = await ConsultarComprometidoAsync(idAlmacen, idEmpresaCs, ct);
+
+        _cache.Set(key, mapa, new MemoryCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = ComprometidoCacheTtl
+        });
+
+        return mapa;
+    }
+
+    private async Task<Dictionary<int, int>> ConsultarComprometidoAsync(
+        int idAlmacen, int idEmpresaCs, CancellationToken ct)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = CreateStoredProcedureCommand("sp_w_ConsultaExistenciaComprometida", conn);
+        cmd.Parameters.AddWithValue("@IDAlmacen", idAlmacen);
+        cmd.Parameters.AddWithValue("@IDEmpresaCS", idEmpresaCs);
+
+        var mapa = new Dictionary<int, int>();
+        try
+        {
+            var tabla = await ExecuteFirstTableAsync(cmd, ct);
+            foreach (DataRow row in tabla.Rows)
+            {
+                var idProducto = ReadInt(row, "IDProducto", "idProducto");
+                if (idProducto <= 0) continue;
+                mapa[idProducto] = (int)ReadDecimal(row, "Comprometido", "comprometido");
+            }
+        }
+        catch (SqlException ex) when (IsMissingStoredProcedure(ex, "sp_w_ConsultaExistenciaComprometida"))
+        {
+            // El SP todavia no esta desplegado en esta base: se devuelve vacio, con
+            // lo que disponible == existencia y la app se comporta como antes.
+            // Preferible a tumbar el catalogo completo por un script pendiente.
+        }
+
+        return mapa;
+    }
+
+    // Cualquier escritura de pedido cambia lo apartado. Se sube la generacion
+    // para que la siguiente consulta lea de la base y el repartidor vea el
+    // numero moverse en el momento, no cuando expire el cache.
+    private static void InvalidarComprometido() => Interlocked.Increment(ref _comprometidoGeneracion);
 
     public async Task<PedidoProductoPaginaResponse> BuscarProductoPaginaAsync(PedidoProductoPaginaRequest request, CancellationToken ct)
     {
@@ -176,9 +307,15 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         var skip = request.SkipSeguro();
         var take = request.TakeSeguro();
 
+        // El disponible se calcula SOLO sobre la pagina que se va a devolver, no
+        // sobre el catalogo completo: son ~20 filas contra ~300, y ademas el
+        // catalogo cacheado tiene que quedarse sin tocar.
+        var pagina = filtrados.Skip(skip).Take(take).ToList();
+        var comprometido = await ConsultarComprometidoConCacheAsync(request.IDAlmacen, request.IDEmpresaCS, ct);
+
         return new PedidoProductoPaginaResponse
         {
-            Rows = filtrados.Skip(skip).Take(take).ToList(),
+            Rows = AgregarExistenciaDisponible(pagina, comprometido),
             Total = filtrados.Count,
             Skip = skip,
             Take = take
@@ -381,6 +518,11 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
             cmd => AddInsertarDetalleParams(cmd, request, idUsuario, equipo),
             ct);
 
+        // Se acaba de apartar (o de intentar) inventario: el disponible cacheado
+        // ya no sirve. Va aqui y no despues del throw para que tambien se tire
+        // cuando legacy rechaza a medias.
+        InvalidarComprometido();
+
         var idPedido = request.IDPedido;
         if (result.Tables.Count > 0 && result.Tables[0].Rows.Count > 0)
         {
@@ -415,6 +557,9 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
                 cmd.Parameters.AddWithValue("@SinModificarObservaciones", request.SinModificarObservaciones);
             },
             ct);
+
+        // Quitar un renglon libera piezas: el disponible sube y hay que releerlo.
+        InvalidarComprometido();
 
         var idPedido = request.IDPedido;
         if (result.Tables.Count > 0 && result.Tables[0].Rows.Count > 0)
@@ -451,6 +596,11 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
                 cmd.Parameters.AddWithValue("@PedidoSinCascosCambio", request.PedidoSinCascosCambio);
             },
             ct);
+
+        // Confirmar el pedido lo pasa de borrador (estatus 0) a pedido real
+        // (estatus 1). El apartado no cambia de monto, pero si de origen: deja de
+        // depender del corte de 12 h de los borradores y pasa a contar siempre.
+        InvalidarComprometido();
 
         return await ConsultarPedidoAsync(conn, request.IDPedido, ct);
     }
@@ -551,6 +701,9 @@ ORDER BY Fecha;";
             "sp_n_EliminarPedido",
             cmd => cmd.Parameters.AddWithValue("@IDUsuario", idUsuario),
             ct);
+
+        // Tirar el borrador devuelve al inventario todo lo que tenia apartado.
+        InvalidarComprometido();
 
         return new PedidoRowsResponse
         {
