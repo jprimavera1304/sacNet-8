@@ -38,6 +38,12 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
     // como para que un cambio se note sin reiniciar el servicio.
     private static readonly TimeSpan AgenteFiltroCacheTtl = TimeSpan.FromMinutes(5);
 
+    // El padron de clientes del usuario. Se cachea porque la busqueda por nombre
+    // se resuelve en memoria (ver ConsultarClientesFiltradosAsync) y sin esto
+    // cada tecla traeria la lista completa desde la base. Los clientes se dan de
+    // alta de vez en cuando, no cada minuto: 3 min es de sobra.
+    private static readonly TimeSpan ClientesCacheTtl = TimeSpan.FromMinutes(3);
+
     // Contador que se incrementa en cada escritura de pedido. Va dentro de la
     // llave del cache, asi que subirlo tira todas las entradas de golpe sin
     // tener que adivinar cual almacen/empresa toco el cambio.
@@ -122,7 +128,7 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         // agente vinculado (oficina, administradores) sigue viendo todos.
         var idAgenteFiltro = await ConsultarAgenteFiltroConCacheAsync(idUsuario, ct);
 
-        var clientes = await ConsultarClientesAsync(conn, request, idAgenteFiltro, ct);
+        var clientes = await ConsultarClientesFiltradosAsync(conn, request, idAgenteFiltro, ct);
 
         // Busqueda especifica (id/numero) -> trae contexto del cliente (domicilios y
         // saldos). Busqueda por texto (nombre/apellidos/rfc) -> solo la lista, para
@@ -153,6 +159,80 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
             Domicilios = domicilios,
             Saldos = saldos
         };
+    }
+
+    // Busqueda de clientes que aguanta el orden en que la gente escribe el nombre.
+    //
+    // El problema: sp_n_ConsultaClientes arma  C.Nombre LIKE '%<lo tecleado>%'
+    // contra la columna Nombre NADA MAS. Como el apellido vive en [Apellido
+    // Paterno], buscar "juan primavera" nunca encontraba a PRIMAVERA JUAN: ni
+    // por el orden, ni porque son dos columnas distintas.
+    //
+    // Solucion: NO se le manda el texto al SP. Se pide la lista (ya acotada por
+    // agente) y se filtra aqui, exigiendo que todas las palabras aparezcan en
+    // nombre + apellidos juntos, sin importar el orden.
+    //
+    // De pasada esto cierra un hueco feo: ese SP concatena @Nombre directo al
+    // SQL dinamico sin escapar comillas. Al dejar de mandarle texto libre desde
+    // el celular, ya no hay por donde inyectar.
+    //
+    // La lista se cachea igual que el catalogo de productos, porque si no cada
+    // tecla seria una consulta que trae el padron completo.
+    private async Task<DataTable> ConsultarClientesFiltradosAsync(
+        SqlConnection conn, PedidoClienteBuscarRequest request, int idAgenteFiltro, CancellationToken ct)
+    {
+        // Busqueda puntual (por id o por numero de cliente): esa la resuelve el
+        // SP igual que siempre, es exacta y no tiene problema de orden.
+        var esPuntual = request.IDCliente > 0 || !string.IsNullOrWhiteSpace(request.Numero);
+        if (esPuntual)
+            return await ConsultarClientesAsync(conn, request, idAgenteFiltro, ct);
+
+        var palabras = PalabrasDeBusqueda(request.Nombre);
+        var todos = await ConsultarClientesConCacheAsync(conn, request, idAgenteFiltro, ct);
+        if (palabras.Length == 0) return todos;
+
+        var filtrada = todos.Clone();
+        foreach (DataRow row in todos.Rows)
+        {
+            if (CoincidenTodas(palabras,
+                    ReadString(row, "Nombre o Razon Social", "Nombre"),
+                    ReadString(row, "Apellido Paterno", "ApellidoPaterno"),
+                    ReadString(row, "Apellido Materno", "ApellidoMaterno"),
+                    ReadString(row, "RFC", "Rfc")))
+            {
+                filtrada.ImportRow(row);
+            }
+        }
+        return filtrada;
+    }
+
+    private async Task<DataTable> ConsultarClientesConCacheAsync(
+        SqlConnection conn, PedidoClienteBuscarRequest request, int idAgenteFiltro, CancellationToken ct)
+    {
+        var key = $"clientes:{request.IDEmpresaCS}:{idAgenteFiltro}";
+        if (_cache.TryGetValue(key, out DataTable? cacheada) && cacheada != null)
+            return cacheada;
+
+        // Sin texto: se trae la lista completa que le toca a este usuario.
+        var sinTexto = new PedidoClienteBuscarRequest
+        {
+            IDCliente = 0,
+            Numero = string.Empty,
+            Nombre = string.Empty,
+            ApellidoPaterno = string.Empty,
+            ApellidoMaterno = string.Empty,
+            RFC = string.Empty,
+            IDEmpresaCS = request.IDEmpresaCS
+        };
+
+        var tabla = await ConsultarClientesAsync(conn, sinTexto, idAgenteFiltro, ct);
+
+        _cache.Set(key, tabla, new MemoryCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = ClientesCacheTtl
+        });
+
+        return tabla;
     }
 
     // Devuelve el IDCliente solo si de verdad esta en el resultado de la
@@ -559,16 +639,69 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         return item;
     }
 
+    // Busqueda de productos tolerante a como teclea la gente.
+    //
+    // Antes era un Contains literal, asi que la clave habia que escribirla EXACTA,
+    // con guion incluido: "L-22" encontraba, pero "L 22" y "l22" no devolvian
+    // nada. Y "aceite 20w50" no encontraba "ACEITE MOTUL 20W-50" porque en medio
+    // va la marca.
+    //
+    // Ahora se parte lo tecleado en palabras y se exige que TODAS aparezcan.
+    // Ademas se comparan sin separadores (guiones, espacios, puntos, diagonales),
+    // asi que "L-22", "L 22" y "l22" son la misma busqueda.
+    //
+    // Se busca sobre clave + descripcion juntas, para que "l22 gel" funcione
+    // aunque una palabra este en la clave y la otra en la descripcion.
     private static List<Dictionary<string, object?>> FiltrarPorTexto(List<Dictionary<string, object?>> rows, string? buscar)
     {
-        var texto = NormalizarBusqueda(buscar);
-        if (string.IsNullOrEmpty(texto)) return rows;
+        var palabras = PalabrasDeBusqueda(buscar);
+        if (palabras.Length == 0) return rows;
 
         return rows
-            .Where(row =>
-                NormalizarBusqueda(ReadStringFromDictionary(row, "Clave")).Contains(texto, StringComparison.Ordinal)
-                || NormalizarBusqueda(ReadStringFromDictionary(row, "Descripcion")).Contains(texto, StringComparison.Ordinal))
+            .Where(row => CoincidenTodas(
+                palabras,
+                ReadStringFromDictionary(row, "Clave"),
+                ReadStringFromDictionary(row, "Descripcion")))
             .ToList();
+    }
+
+    // Parte lo tecleado en palabras ya normalizadas y sin separadores. Las que
+    // quedan vacias (alguien tecleo solo guiones) se descartan.
+    private static string[] PalabrasDeBusqueda(string? buscar)
+    {
+        if (string.IsNullOrWhiteSpace(buscar)) return Array.Empty<string>();
+
+        return NormalizarBusqueda(buscar)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(SinSeparadores)
+            .Where(p => p.Length > 0)
+            .ToArray();
+    }
+
+    // True si TODAS las palabras aparecen en alguno de los campos. El AND es a
+    // proposito: al teclear mas, la lista se angosta. Con OR pasaria al reves.
+    private static bool CoincidenTodas(string[] palabras, params string?[] campos)
+    {
+        var texto = SinSeparadores(NormalizarBusqueda(string.Join(" ", campos)));
+        foreach (var palabra in palabras)
+        {
+            if (!texto.Contains(palabra, StringComparison.Ordinal)) return false;
+        }
+        return true;
+    }
+
+    // Deja solo letras y numeros. Es lo que hace que "L-22", "L 22" y "l22"
+    // terminen siendo la misma cadena ("l22") y se encuentren entre si.
+    private static string SinSeparadores(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+
+        var sb = new StringBuilder(value.Length);
+        foreach (var c in value)
+        {
+            if (char.IsLetterOrDigit(c)) sb.Append(c);
+        }
+        return sb.ToString();
     }
 
     // Minusculas y sin acentos, para que "aceite" encuentre "ACEITE" y que
