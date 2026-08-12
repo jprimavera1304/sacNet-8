@@ -95,6 +95,117 @@ public class ChecadorController : ControllerBase
         return Ok(new { ok = true, message = "Checada cancelada." });
     }
 
+    /// <summary>
+    /// Registra la ENTRADA o la SALIDA del empleado que puso el dedo.
+    ///
+    /// No se manda el tipo: el SP mira si ya tiene hora de entrada hoy y decide.
+    /// Es a proposito, porque el que checa no elige nada, nada mas pone el dedo.
+    /// La checada queda tambien en EmpleadoAsistencias, asi que se ve en el
+    /// sistema viejo igual que si hubiera usado el checador de siempre.
+    /// </summary>
+    /// <response code="200">Movimiento registrado</response>
+    /// <response code="400">Datos invalidos o empleado inactivo</response>
+    /// <response code="409">No hay periodo de nomina generado para hoy</response>
+    [HttpPost("movimientos")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RegistrarMovimiento([FromBody] RegistrarChecadaMovimientoRequest? request, CancellationToken ct)
+    {
+        if (request == null)
+            return BadRequest(new { ok = false, message = "Body requerido." });
+
+        var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
+        var data = await _service.RegistrarMovimientoAsync(request, idUsuario, ResolveEquipo(), ct);
+
+        var message = data.Tipo == ChecadaMovimientoTipo.Salida
+            ? "Salida registrada."
+            : "Entrada registrada.";
+        return Ok(new { ok = true, message, data });
+    }
+
+    /// <summary>
+    /// Todo lo checado en un dia: entradas, salidas y comidas, en una sola lista.
+    /// Incluye lo que se marco en el checador viejo, no solo lo del web.
+    /// </summary>
+    /// <param name="fecha">Opcional. Sin ella, hoy.</param>
+    /// <param name="idEmpleado">Opcional. 0 o ausente = todos.</param>
+    [HttpGet("movimientos")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ConsultarMovimientos(
+        [FromQuery] DateTime? fecha,
+        [FromQuery] int idEmpleado,
+        CancellationToken ct)
+    {
+        var data = await _service.ConsultarMovimientosDiaAsync(fecha, idEmpleado, ct);
+        return Ok(new { ok = true, message = "Movimientos consultados.", data = data.Rows });
+    }
+
+    /// <summary>
+    /// Empleados activos con cuantos dedos tienen registrados, para el alta de
+    /// huella.
+    /// </summary>
+    [HttpGet("empleados")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ConsultarEmpleados([FromQuery] string? filtro, CancellationToken ct)
+    {
+        var data = await _service.ConsultarEmpleadosAsync(filtro, ct);
+        return Ok(new { ok = true, message = "Empleados consultados.", data = data.Rows });
+    }
+
+    /// <summary>
+    /// Que dedos tiene registrados un empleado. No devuelve la huella misma:
+    /// la pantalla solo necesita saber cuales hay, y un dato biometrico no tiene
+    /// por que salir a un navegador.
+    /// </summary>
+    [HttpGet("empleados/{idEmpleado:int}/huellas")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConsultarHuellas([FromRoute] int idEmpleado, CancellationToken ct)
+    {
+        var data = await _service.ConsultarHuellasAsync(idEmpleado, ct);
+        return Ok(new { ok = true, message = "Huellas consultadas.", data = data.Rows });
+    }
+
+    /// <summary>
+    /// Da de alta o reemplaza la huella de un dedo. Se guarda donde ya las tiene
+    /// el sistema, para que la persona pueda checar tambien en el aparato viejo.
+    ///
+    /// Van dos capturas del mismo dedo: es como las guarda el sistema y es lo
+    /// que hace que reconozca aunque el dedo quede un poco corrido.
+    /// </summary>
+    /// <response code="200">Huella guardada</response>
+    /// <response code="400">Faltan capturas, o mano/dedo invalidos</response>
+    [HttpPost("huellas")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GuardarHuella([FromBody] GuardarHuellaEmpleadoRequest? request, CancellationToken ct)
+    {
+        if (request == null)
+            return BadRequest(new { ok = false, message = "Body requerido." });
+
+        var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
+        var data = await _service.GuardarHuellaAsync(request, idUsuario, ResolveEquipo(), ct);
+        return Ok(new { ok = true, message = "Huella guardada.", data = data.Rows });
+    }
+
+    /// <summary>
+    /// Quita la huella de un dedo. Se borra de donde la lee el checador (si no,
+    /// seguiria abriendo la puerta), pero antes se guarda copia por si la baja
+    /// fue un error.
+    /// </summary>
+    /// <response code="200">Huella dada de baja</response>
+    /// <response code="404">La huella no existe</response>
+    [HttpPost("huellas/{idEmpleadoHuella:int}/baja")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> BajaHuella([FromRoute] int idEmpleadoHuella, CancellationToken ct)
+    {
+        var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
+        await _service.BajaHuellaAsync(idEmpleadoHuella, idUsuario, ResolveEquipo(), ct);
+        return Ok(new { ok = true, message = "Huella dada de baja." });
+    }
+
     // Quien y desde donde: el cliente NUNCA los manda, para que no pueda firmar
     // una checada a nombre de otro. El IDUsuario sale del token (claim legacy) y
     // el equipo del nombre de usuario del token; si el token no lo trae, se usa la

@@ -1,0 +1,5 @@
+# Copia este archivo como "conector.config" en la misma carpeta y ajusta la
+# linea de abajo. Es lo unico que cambia por equipo.
+#
+# El archivo real NO se sube al repo: apunta a la base de cada maquina.
+conexion=Server=NOMBRE-DEL-SERVIDOR;Database=MacZ;Integrated Security=true;TrustServerCertificate=True;

@@ -1,0 +1,5 @@
+# Apunta a la base de cada maquina: se copia de conector.config.ejemplo.
+conector.config
+
+# Binario sin firmar: el antivirus lo borra y no es la forma de distribuirlo.
+ConectorChecador.exe

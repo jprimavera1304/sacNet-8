@@ -18,6 +18,15 @@ public class ChecadorRepository : IChecadorRepository
     private const string SpConsultarComida = "dbo.sp_w_ConsultarChecadasComida";
     private const string SpCancelarComida = "dbo.sp_w_CancelarChecadaComida";
 
+    // Entrada/salida y huellas. Estos si terminan tocando datos de legacy, pero
+    // siempre por dentro del sp_w_, que llama a los sp_n_ de siempre.
+    private const string SpRegistrarMovimiento = "dbo.sp_w_RegistrarChecadaMovimiento";
+    private const string SpConsultarMovimientos = "dbo.sp_w_ConsultarMovimientosDia";
+    private const string SpConsultarEmpleados = "dbo.sp_w_ConsultarEmpleadosChecador";
+    private const string SpConsultarHuellas = "dbo.sp_w_ConsultarHuellasEmpleado";
+    private const string SpGuardarHuella = "dbo.sp_w_GuardarHuellaEmpleado";
+    private const string SpBajaHuella = "dbo.sp_w_BajaHuellaEmpleado";
+
     private readonly IConfiguration _configuration;
 
     public ChecadorRepository(IConfiguration configuration)
@@ -95,6 +104,133 @@ public class ChecadorRepository : IChecadorRepository
         await using var cmd = CreateStoredProcedureCommand(SpCancelarComida, conn);
         cmd.Parameters.AddWithValue("@IDEmpleadoChecada", idEmpleadoChecada);
         cmd.Parameters.AddWithValue("@Motivo", motivo);
+        cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
+        cmd.Parameters.AddWithValue("@Equipo", equipo);
+
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    public async Task<ChecadaMovimientoRegistradoDto> RegistrarMovimientoAsync(
+        int idEmpleado,
+        string tipo,
+        int? idEmpleadoHuella,
+        string origen,
+        int idUsuario,
+        string equipo,
+        CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = CreateStoredProcedureCommand(SpRegistrarMovimiento, conn);
+        cmd.Parameters.AddWithValue("@IDEmpleado", idEmpleado);
+        cmd.Parameters.AddWithValue("@Tipo", tipo);
+        cmd.Parameters.AddWithValue("@IDEmpleadoHuella", (object?)idEmpleadoHuella ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@Origen", origen);
+        cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
+        cmd.Parameters.AddWithValue("@Equipo", equipo);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        var row = table.Rows.Count > 0 ? table.Rows[0] : null;
+        if (row == null)
+            throw new InvalidOperationException($"{SpRegistrarMovimiento} no devolvio la checada registrada.");
+
+        return new ChecadaMovimientoRegistradoDto
+        {
+            IDEmpleadoChecada = ReadInt(row, "IDEmpleadoChecada"),
+            IDEmpleado = ReadInt(row, "IDEmpleado"),
+            Empleado = ReadString(row, "Empleado"),
+            Tipo = ReadString(row, "Tipo"),
+            Fecha = ReadDate(row, "FechaHora") ?? DateTime.Now,
+            HoraFtm = ReadString(row, "HoraFtm"),
+            PrimeraDelDia = ReadInt(row, "PrimeraDelDia") == 1
+        };
+    }
+
+    public async Task<ChecadaComidaRowsResponse> ConsultarMovimientosDiaAsync(
+        DateTime fecha,
+        int idEmpleado,
+        CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = CreateStoredProcedureCommand(SpConsultarMovimientos, conn);
+        cmd.Parameters.Add("@Fecha", SqlDbType.Date).Value = fecha.Date;
+        cmd.Parameters.AddWithValue("@IDEmpleado", idEmpleado);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return new ChecadaComidaRowsResponse { Rows = DataTableToRows(table) };
+    }
+
+    public async Task<ChecadaComidaRowsResponse> ConsultarEmpleadosAsync(
+        string filtro,
+        CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = CreateStoredProcedureCommand(SpConsultarEmpleados, conn);
+        cmd.Parameters.AddWithValue("@Filtro", filtro ?? string.Empty);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return new ChecadaComidaRowsResponse { Rows = DataTableToRows(table) };
+    }
+
+    public async Task<ChecadaComidaRowsResponse> ConsultarHuellasAsync(
+        int idEmpleado,
+        CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = CreateStoredProcedureCommand(SpConsultarHuellas, conn);
+        cmd.Parameters.AddWithValue("@IDEmpleado", idEmpleado);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return new ChecadaComidaRowsResponse { Rows = DataTableToRows(table) };
+    }
+
+    public async Task<ChecadaComidaRowsResponse> GuardarHuellaAsync(
+        int idEmpleado,
+        int idMano,
+        int idDedo,
+        byte[] huella,
+        byte[] huella2,
+        int idUsuario,
+        string equipo,
+        CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = CreateStoredProcedureCommand(SpGuardarHuella, conn);
+        cmd.Parameters.AddWithValue("@IDEmpleado", idEmpleado);
+        cmd.Parameters.AddWithValue("@IDMano", idMano);
+        cmd.Parameters.AddWithValue("@IDDedo", idDedo);
+        // -1 = MAX. Sin esto el proveedor toma el tamaño del primer valor y una
+        // captura mas grande se trunca, que en una huella significa que ya no
+        // reconoce a nadie.
+        cmd.Parameters.Add("@Huella", SqlDbType.VarBinary, -1).Value = huella;
+        cmd.Parameters.Add("@Huella2", SqlDbType.VarBinary, -1).Value = huella2;
+        cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
+        cmd.Parameters.AddWithValue("@Equipo", equipo);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return new ChecadaComidaRowsResponse { Rows = DataTableToRows(table) };
+    }
+
+    public async Task BajaHuellaAsync(
+        int idEmpleadoHuella,
+        int idUsuario,
+        string equipo,
+        CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = CreateStoredProcedureCommand(SpBajaHuella, conn);
+        cmd.Parameters.AddWithValue("@IDEmpleadoHuella", idEmpleadoHuella);
         cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
         cmd.Parameters.AddWithValue("@Equipo", equipo);
 
