@@ -22,6 +22,13 @@ $ErrorActionPreference = "Stop"
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $dir
 
+# Set-Location NO cambia el directorio del proceso .NET, solo el de PowerShell.
+# Sin estas dos lineas el conector busca conector.config y escribe conector.log
+# en la carpeta de PowerShell: se va a la cadena de conexion de reserva y el log
+# no aparece nunca, las dos cosas en silencio.
+[System.IO.Directory]::SetCurrentDirectory($dir)
+$env:MAC_CONECTOR_DIR = $dir
+
 Write-Host "Compilando el conector en memoria..." -ForegroundColor Cyan
 
 $refs = @(

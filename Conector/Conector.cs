@@ -73,6 +73,57 @@ namespace Mac.Checador.Conector
         static Mutex _instanciaUnica;  // impide que se abran dos conectores
         static readonly List<Registro> _padron = new List<Registro>();
         static readonly object _candado = new object();
+        static readonly object _candadoLog = new object();
+
+        // ---------------------------------------------------------------- log
+        //
+        // Cuando "no pasa nada" al poner el dedo hay cuatro sospechosos y desde
+        // fuera se ven igual: no llego la peticion, el lector no arranco la
+        // captura, el dedo no se leyo, o se leyo y no se reconocio. El log
+        // separa esos cuatro casos; sin el, solo queda adivinar.
+        //
+        // Se escribe junto al programa y se abre y cierra en cada linea, para
+        // poder leerlo mientras el conector sigue corriendo.
+        /// <summary>
+        /// Carpeta del conector.
+        ///
+        /// No se puede dar por hecho que sea la del ejecutable: en desarrollo el
+        /// conector se compila EN MEMORIA dentro de PowerShell, y entonces
+        /// Application.ExecutablePath apunta a la carpeta de PowerShell. Eso ya
+        /// habia hecho que el conector ignorara conector.config en silencio y se
+        /// fuera a la cadena de reserva, que es de las cosas mas dificiles de
+        /// notar: funciona, pero contra la base equivocada.
+        ///
+        /// Se busca la carpeta que REALMENTE tenga la configuracion.
+        /// </summary>
+        static string CarpetaBase()
+        {
+            foreach (var candidata in new[]
+                     {
+                         Environment.GetEnvironmentVariable("MAC_CONECTOR_DIR"),
+                         Path.GetDirectoryName(Application.ExecutablePath),
+                         Directory.GetCurrentDirectory()
+                     })
+            {
+                if (string.IsNullOrEmpty(candidata)) continue;
+                if (File.Exists(Path.Combine(candidata, "conector.config")) ||
+                    File.Exists(Path.Combine(candidata, "conector.config.ejemplo")))
+                    return candidata;
+            }
+            return Directory.GetCurrentDirectory();
+        }
+
+        static void Log(string mensaje)
+        {
+            try
+            {
+                string ruta = Path.Combine(CarpetaBase(), "conector.log");
+                string linea = DateTime.Now.ToString("HH:mm:ss.fff") + "  " + mensaje;
+                lock (_candadoLog) File.AppendAllText(ruta, linea + Environment.NewLine);
+                Console.WriteLine(linea);
+            }
+            catch { /* el log nunca debe tumbar al conector */ }
+        }
 
         sealed class Registro
         {
@@ -130,13 +181,68 @@ WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
         /// pero la captura se arranca EN EL HILO DE LA BOMBA de mensajes; si no,
         /// el evento del SDK no llega nunca.
         /// </summary>
+        /// <summary>
+        /// Deja el lector en READY antes de pedirle otra captura.
+        ///
+        /// El SDK NO se libera solo: despues de entregar una huella el lector se
+        /// queda BUSY, y toda captura siguiente devuelve DP_DEVICE_BUSY al
+        /// instante. Visto desde la pantalla eso parece "no se puso el dedo a
+        /// tiempo", aunque conteste en milisegundos y el dedo ya estuviera
+        /// puesto. El sintoma tipico es que el conector sirve UNA sola vez por
+        /// arranque.
+        ///
+        /// El sondeo se hace desde el hilo del servidor y cada paso entra y sale
+        /// de la bomba de mensajes, para no dejarla bloqueada: si se congela, el
+        /// SDK no puede entregar nada y el lector no volveria a estar listo
+        /// nunca.
+        /// </summary>
+        static bool EsperarLectorListo(int intentos = 20)
+        {
+            for (int i = 0; i < intentos; i++)
+            {
+                bool listo = false;
+
+                _bomba.Invoke((MethodInvoker)delegate
+                {
+                    if (_lector.GetStatus() == Constants.ResultCode.DP_SUCCESS &&
+                        _lector.Status != null &&
+                        _lector.Status.Status == Constants.ReaderStatuses.DP_STATUS_READY)
+                    {
+                        listo = true;
+                        return;
+                    }
+                    try { _lector.CancelCapture(); } catch { }
+                });
+
+                if (listo)
+                {
+                    if (i > 0) Log("    lector liberado tras " + (i * 100) + " ms.");
+                    return true;
+                }
+
+                Thread.Sleep(100);
+            }
+
+            Log("    AVISO: el lector sigue ocupado despues de 2 s.");
+            return false;
+        }
+
         static CaptureResult Capturar(int segundos)
         {
             CaptureResult resultado = null;
             var listo = new ManualResetEventSlim(false);
 
+            EsperarLectorListo();
+
             Reader.CaptureCallback alCapturar = delegate (CaptureResult cr)
             {
+                // Ojo: que llegue el evento NO quiere decir que la huella sirva.
+                // El lector avisa igual cuando el dedo salio mal puesto o muy
+                // seco; por eso se registra el resultado y no solo "llego".
+                Log("    <- el lector entrego una captura: resultado=" +
+                    (cr == null ? "null" : cr.ResultCode.ToString()) +
+                    ", calidad=" + (cr == null ? "-" : cr.Quality.ToString()) +
+                    ", bytes=" + (cr == null || cr.Data == null ? "0" : cr.Data.Bytes.Length.ToString()));
                 resultado = cr;
                 listo.Set();
             };
@@ -144,19 +250,38 @@ WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
             _bomba.Invoke((MethodInvoker)delegate
             {
                 _lector.On_Captured += alCapturar;
-                if (_lector.GetStatus() != Constants.ResultCode.DP_SUCCESS) { listo.Set(); return; }
+
+                var estado = _lector.GetStatus();
+                Log("    lector: consulta=" + estado + ", estado=" +
+                    (_lector.Status == null ? "?" : _lector.Status.Status.ToString()));
+
+                if (estado != Constants.ResultCode.DP_SUCCESS)
+                {
+                    Log("    ABORTA: no se pudo consultar el lector.");
+                    listo.Set();
+                    return;
+                }
+
                 var rc = _lector.CaptureAsync(Constants.Formats.Fid.ANSI,
                                               Constants.CaptureProcessing.DP_IMG_PROC_DEFAULT,
                                               _lector.Capabilities.Resolutions[0]);
+                Log("    CaptureAsync -> " + rc + (rc == Constants.ResultCode.DP_SUCCESS
+                    ? "  (esperando el dedo...)" : "  ABORTA"));
                 if (rc != Constants.ResultCode.DP_SUCCESS) listo.Set();
             });
 
             bool llego = listo.Wait(segundos * 1000);
+            if (!llego) Log("    se acabo el tiempo (" + segundos + "s) sin que el lector entregara nada.");
 
             _bomba.Invoke((MethodInvoker)delegate
             {
                 _lector.On_Captured -= alCapturar;
-                if (!llego) { try { _lector.CancelCapture(); } catch { } }
+
+                // SIEMPRE, tambien cuando la captura salio bien. Si solo se
+                // cancelara al agotarse el tiempo, el lector se quedaria ocupado
+                // despues de cada huella buena y el conector serviria una sola
+                // vez por arranque.
+                try { _lector.CancelCapture(); } catch { }
             });
 
             return llego ? resultado : null;
@@ -281,15 +406,24 @@ WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
 
             if (ruta == "/escanear" || ruta == "/capturar")
             {
+                Log("PETICION " + ruta + "  (la pagina si llego hasta aqui)");
+
                 if (_lector == null)
-                { Responder(ctx, 200, "{\"ok\":false,\"motivo\":\"No hay lector conectado.\"}"); return; }
+                {
+                    Log("    ABORTA: el conector arranco sin lector.");
+                    Responder(ctx, 200, "{\"ok\":false,\"motivo\":\"No hay lector conectado.\"}"); return;
+                }
 
                 var cap = Capturar(LeerSegundos(ctx));
                 if (cap == null || cap.ResultCode != Constants.ResultCode.DP_SUCCESS || cap.Data == null)
-                { Responder(ctx, 200, "{\"ok\":false,\"motivo\":\"No se puso el dedo a tiempo.\"}"); return; }
+                {
+                    Log("    RESULTADO: sin huella util -> se responde 'no se puso el dedo a tiempo'.");
+                    Responder(ctx, 200, "{\"ok\":false,\"motivo\":\"No se puso el dedo a tiempo.\"}"); return;
+                }
 
                 if (ruta == "/capturar")
                 {
+                    Log("    RESULTADO: huella capturada para el alta (" + cap.Data.Bytes.Length + " bytes). Se manda a la pagina.");
                     // Alta: se devuelve la imagen tal cual, en el mismo formato
                     // que ya usa legacy, para que el checador viejo la reconozca.
                     Responder(ctx, 200,
@@ -300,22 +434,38 @@ WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
 
                 var f = FeatureExtraction.CreateFmdFromFid(cap.Data, Constants.Formats.Fmd.ANSI);
                 if (f.ResultCode != Constants.ResultCode.DP_SUCCESS)
-                { Responder(ctx, 200, "{\"ok\":false,\"motivo\":\"No se pudo procesar la huella.\"}"); return; }
+                {
+                    Log("    RESULTADO: la huella se leyo pero no se pudo procesar (" + f.ResultCode + ").");
+                    Responder(ctx, 200, "{\"ok\":false,\"motivo\":\"No se pudo procesar la huella.\"}"); return;
+                }
 
                 Registro mejor = null; int mejorScore = int.MaxValue;
+                int mejorDeTodos = int.MaxValue;   // el mas parecido aunque no pase el umbral
                 var reloj = Stopwatch.StartNew();
                 lock (_candado)
                     foreach (var reg in _padron)
                     {
                         var cr = Comparison.Compare(reg.Template, 0, f.Data, 0);
                         if (cr.ResultCode != Constants.ResultCode.DP_SUCCESS) continue;
+                        if (cr.Score < mejorDeTodos) mejorDeTodos = cr.Score;
                         if (cr.Score < UMBRAL && cr.Score < mejorScore)
                         { mejorScore = cr.Score; mejor = reg; }
                     }
                 reloj.Stop();
 
                 if (mejor == null)
-                { Responder(ctx, 200, "{\"ok\":true,\"empleado\":null,\"ms\":" + reloj.ElapsedMilliseconds + "}"); return; }
+                {
+                    // Se registra el mejor parecido aunque no alcance: distingue
+                    // "esa huella no esta registrada" de "si esta pero el dedo
+                    // salio mal puesto y quedo apenas arriba del umbral".
+                    Log("    RESULTADO: no se reconocio. Comparadas " + _padron.Count +
+                        " huellas en " + reloj.ElapsedMilliseconds + " ms. Mejor parecido=" +
+                        mejorDeTodos + " (hace falta menos de " + UMBRAL + ").");
+                    Responder(ctx, 200, "{\"ok\":true,\"empleado\":null,\"ms\":" + reloj.ElapsedMilliseconds + "}"); return;
+                }
+
+                Log("    RESULTADO: reconocido -> " + mejor.Empleado + " (empleado " + mejor.IdEmpleado +
+                    "), score=" + mejorScore + ", en " + reloj.ElapsedMilliseconds + " ms.");
 
                 Responder(ctx, 200,
                     "{\"ok\":true,\"ms\":" + reloj.ElapsedMilliseconds +
@@ -349,9 +499,8 @@ WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
 
         static string LeerCadenaConexion()
         {
-            // En archivo junto al .exe, para no recompilar por equipo.
-            string ruta = Path.Combine(
-                Path.GetDirectoryName(Application.ExecutablePath) ?? ".", "conector.config");
+            // En archivo junto al programa, para no recompilar por equipo.
+            string ruta = Path.Combine(CarpetaBase(), "conector.config");
             if (File.Exists(ruta))
                 foreach (var linea in File.ReadAllLines(ruta))
                 {
@@ -433,14 +582,34 @@ WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
             }
 
             var lectores = ReaderCollection.GetReaders();
-            if (lectores.Count == 0) Console.WriteLine("AVISO: no hay lector conectado.");
+            Log("Lectores encontrados: " + lectores.Count);
+            if (lectores.Count == 0) Log("AVISO: no hay lector conectado.");
             else
             {
                 _lector = lectores[0];
-                if (_lector.Open(Constants.CapturePriority.DP_PRIORITY_COOPERATIVE)
-                    != Constants.ResultCode.DP_SUCCESS)
-                { Console.WriteLine("No se pudo abrir el lector."); _lector = null; }
-                else Console.WriteLine("Lector listo.");
+                Log("Usando: " + _lector.Description.Name);
+
+                // EXCLUSIVE, no COOPERATIVE.
+                //
+                // En cooperativo, otro programa que tambien tenga el lector
+                // abierto (el checador viejo, el software del fabricante, o un
+                // segundo conector) se lleva las capturas, y el sintoma es que
+                // el lector prende, el dedo se lee, y aqui no llega nada. En
+                // exclusivo, si alguien mas lo tiene, falla AQUI y se ve en el
+                // log, en vez de fallar en silencio cada vez que alguien checa.
+                var rc = _lector.Open(Constants.CapturePriority.DP_PRIORITY_EXCLUSIVE);
+                Log("Open(EXCLUSIVE) -> " + rc);
+
+                if (rc != Constants.ResultCode.DP_SUCCESS)
+                {
+                    Log("No se pudo tomar el lector en exclusiva; se intenta compartido.");
+                    rc = _lector.Open(Constants.CapturePriority.DP_PRIORITY_COOPERATIVE);
+                    Log("Open(COOPERATIVE) -> " + rc);
+                }
+
+                if (rc != Constants.ResultCode.DP_SUCCESS)
+                { Log("No se pudo abrir el lector. Cierra el checador viejo y vuelve a intentar."); _lector = null; }
+                else Log("Lector listo.");
             }
 
             new Thread(() => Servir(oyente)) { IsBackground = true }.Start();
