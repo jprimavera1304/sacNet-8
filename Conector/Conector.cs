@@ -70,6 +70,7 @@ namespace Mac.Checador.Conector
         static string _cadenaConexion;
         static Reader _lector;
         static Form _bomba;            // ventana invisible: solo bombea mensajes
+        static Mutex _instanciaUnica;  // impide que se abran dos conectores
         static readonly List<Registro> _padron = new List<Registro>();
         static readonly object _candado = new object();
 
@@ -368,6 +369,27 @@ WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
             Console.Title = "Conector del checador";
             Console.WriteLine("=== Conector del checador ===\n");
 
+            // UNA SOLA INSTANCIA.
+            //
+            // Dos conectores abiertos a la vez rompen el lector de una forma que
+            // no se ve: el segundo se queda con el lector, el primero sigue
+            // atendiendo la pagina, y el resultado es que todo se ve bien
+            // (dice "lector listo") pero la huella nunca llega. Es facilisimo
+            // llegar ahi: basta con darle dos veces al icono.
+            //
+            // El candado es del sistema, asi que sirve aunque el otro conector
+            // lo haya abierto otra sesion de Windows.
+            bool esElPrimero;
+            _instanciaUnica = new Mutex(true, @"Global\MacChecadorConector", out esElPrimero);
+            if (!esElPrimero)
+            {
+                Console.WriteLine("Ya hay un conector abierto en esta computadora.");
+                Console.WriteLine("Usa ese; no hace falta abrir otro.");
+                Console.WriteLine("\nPresiona una tecla para cerrar.");
+                Console.ReadKey();
+                return 1;
+            }
+
             _token = Guid.NewGuid().ToString("N");
             _cadenaConexion = LeerCadenaConexion();
 
@@ -384,17 +406,12 @@ WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
                 return 1;
             }
 
-            var lectores = ReaderCollection.GetReaders();
-            if (lectores.Count == 0) Console.WriteLine("AVISO: no hay lector conectado.");
-            else
-            {
-                _lector = lectores[0];
-                if (_lector.Open(Constants.CapturePriority.DP_PRIORITY_COOPERATIVE)
-                    != Constants.ResultCode.DP_SUCCESS)
-                { Console.WriteLine("No se pudo abrir el lector."); _lector = null; }
-                else Console.WriteLine("Lector listo.");
-            }
-
+            // El PUERTO se toma antes que el lector, a proposito.
+            //
+            // Al reves, un segundo conector alcanzaria a quedarse con el lector y
+            // solo despues descubriria que el puerto esta ocupado: para entonces
+            // ya dejo ciego al conector bueno. Tomando primero el puerto, el que
+            // sobra se sale sin haber tocado el lector.
             HttpListener oyente = null;
             foreach (int puerto in PUERTOS)
                 try
@@ -413,6 +430,17 @@ WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
                 Console.WriteLine("Todos los puertos ocupados. Puede que ya haya otro conector abierto.");
                 Console.ReadKey();
                 return 1;
+            }
+
+            var lectores = ReaderCollection.GetReaders();
+            if (lectores.Count == 0) Console.WriteLine("AVISO: no hay lector conectado.");
+            else
+            {
+                _lector = lectores[0];
+                if (_lector.Open(Constants.CapturePriority.DP_PRIORITY_COOPERATIVE)
+                    != Constants.ResultCode.DP_SUCCESS)
+                { Console.WriteLine("No se pudo abrir el lector."); _lector = null; }
+                else Console.WriteLine("Lector listo.");
             }
 
             new Thread(() => Servir(oyente)) { IsBackground = true }.Start();
