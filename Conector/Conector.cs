@@ -74,6 +74,7 @@ namespace Mac.Checador.Conector
         static readonly List<Registro> _padron = new List<Registro>();
         static readonly object _candado = new object();
         static readonly object _candadoLog = new object();
+        static readonly object _candadoLector = new object();   // una captura a la vez
 
         // ---------------------------------------------------------------- log
         //
@@ -404,6 +405,18 @@ WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
                 return;
             }
 
+            // Corta la espera que este en curso. La pagina la usa antes de dar de
+            // alta una huella: el lector es uno solo, y sin esto habria que
+            // aguantar hasta 15 segundos a que se venciera la escucha, que desde
+            // fuera se ve como que el boton no hace nada.
+            if (ruta == "/cancelar")
+            {
+                Log("PETICION /cancelar");
+                try { _bomba.Invoke((MethodInvoker)delegate { _lector.CancelCapture(); }); } catch { }
+                Responder(ctx, 200, "{\"ok\":true}");
+                return;
+            }
+
             if (ruta == "/escanear" || ruta == "/capturar")
             {
                 Log("PETICION " + ruta + "  (la pagina si llego hasta aqui)");
@@ -414,6 +427,29 @@ WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
                     Responder(ctx, 200, "{\"ok\":false,\"motivo\":\"No hay lector conectado.\"}"); return;
                 }
 
+                // El lector es uno: dos capturas a la vez se pisan. La que llega
+                // despues espera un poco y, si sigue ocupado, lo dice claro en vez
+                // de quedarse colgada.
+                if (!Monitor.TryEnter(_candadoLector, TimeSpan.FromSeconds(20)))
+                {
+                    Log("    ABORTA: el lector esta ocupado con otra captura.");
+                    Responder(ctx, 200, "{\"ok\":false,\"motivo\":\"El lector está ocupado.\"}"); return;
+                }
+
+                try
+                {
+                    AtenderCaptura(ctx, ruta);
+                }
+                finally { Monitor.Exit(_candadoLector); }
+                return;
+            }
+
+            Responder(ctx, 404, "{\"ok\":false}");
+        }
+
+        static void AtenderCaptura(HttpListenerContext ctx, string ruta)
+        {
+            {
                 var cap = Capturar(LeerSegundos(ctx));
                 if (cap == null || cap.ResultCode != Constants.ResultCode.DP_SUCCESS || cap.Data == null)
                 {
@@ -474,12 +510,22 @@ WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
                     ",\"nombre\":\"" + Esc(mejor.Empleado) + "\"}" +
                     ",\"huella\":{\"idEmpleadoHuella\":" + mejor.IdHuella +
                     ",\"idMano\":" + mejor.Mano + ",\"idDedo\":" + mejor.Dedo + "}}");
-                return;
             }
-
-            Responder(ctx, 404, "{\"ok\":false}");
         }
 
+        /// <summary>
+        /// Cada peticion se atiende en su propio hilo.
+        ///
+        /// Antes se atendian de una en una, y con la pagina escuchando al lector
+        /// todo el tiempo eso dejaba al conector mudo: mientras esperaba el dedo
+        /// (15 s) no podia contestar ni /estado, asi que la pantalla creia que el
+        /// conector no estaba instalado y se apagaba sola. Lo mismo pasaba con el
+        /// alta de huellas.
+        ///
+        /// La captura si esta serializada (ver el candado en Atender): el lector
+        /// es uno solo. Lo que se gana aqui es que las consultas que NO tocan el
+        /// lector se contesten al momento, aunque haya una espera en curso.
+        /// </summary>
         static void Servir(HttpListener oyente)
         {
             while (oyente.IsListening)
@@ -487,11 +533,15 @@ WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
                 HttpListenerContext ctx;
                 try { ctx = oyente.GetContext(); }
                 catch { return; }   // se cerro el oyente
-                try { Atender(ctx); }
-                catch (Exception e)
+
+                ThreadPool.QueueUserWorkItem(delegate
                 {
-                    try { Responder(ctx, 500, "{\"ok\":false,\"motivo\":\"" + Esc(e.Message) + "\"}"); } catch { }
-                }
+                    try { Atender(ctx); }
+                    catch (Exception e)
+                    {
+                        try { Responder(ctx, 500, "{\"ok\":false,\"motivo\":\"" + Esc(e.Message) + "\"}"); } catch { }
+                    }
+                });
             }
         }
 
