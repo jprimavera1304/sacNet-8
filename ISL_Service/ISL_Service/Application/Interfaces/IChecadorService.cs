@@ -39,6 +39,13 @@ public interface IChecadorService
         int idEmpleado,
         CancellationToken ct = default);
 
+    Task<ChecadaComidaRowsResponse> ConsultarAsistenciaDiaAsync(
+        DateTime? fecha,
+        int idEmpleado,
+        CancellationToken ct = default);
+
+    Task<ChecadaComidaRowsResponse> ConsultarConfiguracionAsync(CancellationToken ct = default);
+
     Task<ChecadaComidaRowsResponse> ConsultarEmpleadosAsync(
         string? filtro,
         CancellationToken ct = default);

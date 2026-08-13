@@ -184,6 +184,37 @@ public class ChecadorService : IChecadorService
         }
     }
 
+    public async Task<ChecadaComidaRowsResponse> ConsultarAsistenciaDiaAsync(
+        DateTime? fecha,
+        int idEmpleado,
+        CancellationToken ct = default)
+    {
+        var dia = (fecha ?? DateTime.Today).Date;
+
+        try
+        {
+            return await _repository.ConsultarAsistenciaDiaAsync(dia, idEmpleado > 0 ? idEmpleado : 0, ct);
+        }
+        catch (SqlException ex)
+        {
+            MapSqlException(ex);
+            throw;
+        }
+    }
+
+    public async Task<ChecadaComidaRowsResponse> ConsultarConfiguracionAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repository.ConsultarConfiguracionAsync(ct);
+        }
+        catch (SqlException ex)
+        {
+            MapSqlException(ex);
+            throw;
+        }
+    }
+
     public async Task<ChecadaComidaRowsResponse> ConsultarEmpleadosAsync(
         string? filtro,
         CancellationToken ct = default)

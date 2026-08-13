@@ -26,6 +26,8 @@ public class ChecadorRepository : IChecadorRepository
     private const string SpConsultarHuellas = "dbo.sp_w_ConsultarHuellasEmpleado";
     private const string SpGuardarHuella = "dbo.sp_w_GuardarHuellaEmpleado";
     private const string SpBajaHuella = "dbo.sp_w_BajaHuellaEmpleado";
+    private const string SpAsistenciaDia = "dbo.sp_w_ConsultarAsistenciaDia";
+    private const string SpConfiguracion = "dbo.sp_w_ConsultarConfiguracionChecador";
 
     private readonly IConfiguration _configuration;
 
@@ -158,6 +160,33 @@ public class ChecadorRepository : IChecadorRepository
         await using var cmd = CreateStoredProcedureCommand(SpConsultarMovimientos, conn);
         cmd.Parameters.Add("@Fecha", SqlDbType.Date).Value = fecha.Date;
         cmd.Parameters.AddWithValue("@IDEmpleado", idEmpleado);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return new ChecadaComidaRowsResponse { Rows = DataTableToRows(table) };
+    }
+
+    public async Task<ChecadaComidaRowsResponse> ConsultarAsistenciaDiaAsync(
+        DateTime fecha,
+        int idEmpleado,
+        CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = CreateStoredProcedureCommand(SpAsistenciaDia, conn);
+        cmd.Parameters.Add("@Fecha", SqlDbType.Date).Value = fecha.Date;
+        cmd.Parameters.AddWithValue("@IDEmpleado", idEmpleado);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return new ChecadaComidaRowsResponse { Rows = DataTableToRows(table) };
+    }
+
+    public async Task<ChecadaComidaRowsResponse> ConsultarConfiguracionAsync(CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = CreateStoredProcedureCommand(SpConfiguracion, conn);
 
         var table = await ExecuteFirstTableAsync(cmd, ct);
         return new ChecadaComidaRowsResponse { Rows = DataTableToRows(table) };

@@ -142,6 +142,36 @@ public class ChecadorController : ControllerBase
     }
 
     /// <summary>
+    /// El horario que debe mostrar la pantalla (entrada, salida, jornada) y la
+    /// hora a partir de la cual se propone SALIDA en vez de ENTRADA.
+    ///
+    /// Sale de la misma configuracion que lee el checador viejo, para que los
+    /// dos digan lo mismo.
+    /// </summary>
+    /// <summary>
+    /// La asistencia de un dia: un renglon por empleado con su entrada, su
+    /// salida y su retardo, igual que la muestra el checador viejo.
+    /// </summary>
+    [HttpGet("asistencia")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ConsultarAsistencia(
+        [FromQuery] DateTime? fecha,
+        [FromQuery] int idEmpleado,
+        CancellationToken ct)
+    {
+        var data = await _service.ConsultarAsistenciaDiaAsync(fecha, idEmpleado, ct);
+        return Ok(new { ok = true, message = "Asistencia consultada.", data = data.Rows });
+    }
+
+    [HttpGet("configuracion")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ConsultarConfiguracion(CancellationToken ct)
+    {
+        var data = await _service.ConsultarConfiguracionAsync(ct);
+        return Ok(new { ok = true, message = "Configuracion consultada.", data = data.Rows.FirstOrDefault() });
+    }
+
+    /// <summary>
     /// Empleados activos con cuantos dedos tienen registrados, para el alta de
     /// huella.
     /// </summary>
