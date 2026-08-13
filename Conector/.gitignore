@@ -3,3 +3,7 @@ conector.config
 
 # Binario sin firmar: el antivirus lo borra y no es la forma de distribuirlo.
 ConectorChecador.exe
+
+# Templates ya calculados: se reconstruyen solos y son de esta maquina.
+padron.cache
+conector.log

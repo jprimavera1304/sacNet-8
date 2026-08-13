@@ -142,36 +142,186 @@ namespace Mac.Checador.Conector
             return r.ResultCode == Constants.ResultCode.DP_SUCCESS ? r.Data : null;
         }
 
+        // ------------------------------------------------- cache de templates
+        //
+        // POR QUE EXISTE
+        // --------------
+        // Lo caro no es traer las huellas de la base: es CONVERTIRLAS. Cada una
+        // es una imagen de 200 KB de la que hay que sacar el template, y eso
+        // tarda. Medido con las 833 reales: ~38 segundos, todos los arranques,
+        // para volver a calcular exactamente lo mismo.
+        //
+        // El template pesa 330 bytes y se puede guardar y volver a armar tal
+        // cual (comprobado: comparar el original contra el reconstruido da 0,
+        // o sea identicos). Asi que se guardan en un archivo al lado del
+        // conector y en el siguiente arranque solo se calculan LAS NUEVAS.
+        //
+        // La llave es el IDEmpleadoHuella. Sirve porque las huellas nunca se
+        // editan en su lugar: al reemplazar un dedo, legacy borra el renglon e
+        // inserta otro, que trae id nuevo. Un id que ya estaba es, con certeza,
+        // la misma huella de siempre.
+        const string CACHE_SELLO = "MACFMD1";
+
+        static string RutaCache()
+        {
+            return Path.Combine(CarpetaBase(), "padron.cache");
+        }
+
+        static Dictionary<int, Fmd> LeerCache()
+        {
+            var cache = new Dictionary<int, Fmd>();
+            string ruta = RutaCache();
+            if (!File.Exists(ruta)) return cache;
+
+            try
+            {
+                using (var fs = File.OpenRead(ruta))
+                using (var br = new BinaryReader(fs, Encoding.UTF8))
+                {
+                    if (br.ReadString() != CACHE_SELLO) return new Dictionary<int, Fmd>();
+                    int cuantos = br.ReadInt32();
+                    for (int i = 0; i < cuantos; i++)
+                    {
+                        int id = br.ReadInt32();
+                        int formato = br.ReadInt32();
+                        string version = br.ReadString();
+                        int largo = br.ReadInt32();
+                        byte[] bytes = br.ReadBytes(largo);
+                        cache[id] = new Fmd(bytes, formato, version);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                // Un cache corrupto no puede dejar sin checar a nadie: se tira y
+                // se reconstruye. Lo unico que se pierde son los segundos de
+                // este arranque.
+                Log("El cache de huellas no se pudo leer (" + e.Message + "). Se reconstruye.");
+                return new Dictionary<int, Fmd>();
+            }
+            return cache;
+        }
+
+        static void GuardarCache(List<Registro> padron)
+        {
+            try
+            {
+                // Se escribe aparte y se reemplaza al final: si se corta la luz a
+                // medias, queda el cache viejo entero y no uno roto.
+                string ruta = RutaCache();
+                string temporal = ruta + ".tmp";
+
+                using (var fs = File.Create(temporal))
+                using (var bw = new BinaryWriter(fs, Encoding.UTF8))
+                {
+                    bw.Write(CACHE_SELLO);
+                    bw.Write(padron.Count);
+                    foreach (var r in padron)
+                    {
+                        bw.Write(r.IdHuella);
+                        bw.Write((int)r.Template.Format);
+                        bw.Write(r.Template.Version ?? "");
+                        bw.Write(r.Template.Bytes.Length);
+                        bw.Write(r.Template.Bytes);
+                    }
+                }
+
+                if (File.Exists(ruta)) File.Delete(ruta);
+                File.Move(temporal, ruta);
+            }
+            catch (Exception e)
+            {
+                // Sin cache el conector sigue sirviendo; solo arranca lento.
+                Log("No se pudo guardar el cache de huellas: " + e.Message);
+            }
+        }
+
         static int CargarPadron()
         {
+            var reloj = Stopwatch.StartNew();
+            var cache = LeerCache();
+
             var nuevo = new List<Registro>();
+            var faltantes = new List<Registro>();   // las que hay que calcular
+
             using (var cn = new SqlConnection(_cadenaConexion))
             {
                 cn.Open();
-                const string sql = @"
+
+                // Primero SOLO los datos, sin las imagenes. Son 833 renglones de
+                // texto contra 160 MB de huellas: traerlas todas para descubrir
+                // que ya estaban seria pagar el viaje completo por nada.
+                const string sqlDatos = @"
 SELECT h.IDEmpleadoHuella, h.IDEmpleado, h.IDMano, h.IDDedo,
-       ISNULL(e.Nombre,'') AS Empleado, h.Huella
+       ISNULL(e.Nombre,'') AS Empleado
 FROM EmpleadosHuellas h
 LEFT JOIN Empleados e ON e.IDEmpleado = h.IDEmpleado
 WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
-                using (var cmd = new SqlCommand(sql, cn))
+
+                using (var cmd = new SqlCommand(sqlDatos, cn))
                 using (var rd = cmd.ExecuteReader())
                     while (rd.Read())
                     {
-                        var f = AFmd((byte[])rd["Huella"]);
-                        if (f == null) continue;   // huella ilegible: se salta
-                        nuevo.Add(new Registro
+                        var reg = new Registro
                         {
                             IdHuella = (int)rd["IDEmpleadoHuella"],
                             IdEmpleado = (int)rd["IDEmpleado"],
                             Mano = (int)rd["IDMano"],
                             Dedo = (int)rd["IDDedo"],
-                            Empleado = Convert.ToString(rd["Empleado"]),
-                            Template = f
-                        });
+                            // El nombre se toma SIEMPRE de la base, no del cache:
+                            // si alguien corrige un nombre, se ve enseguida.
+                            Empleado = Convert.ToString(rd["Empleado"])
+                        };
+
+                        Fmd guardado;
+                        if (cache.TryGetValue(reg.IdHuella, out guardado))
+                        {
+                            reg.Template = guardado;
+                            nuevo.Add(reg);
+                        }
+                        else faltantes.Add(reg);
                     }
+
+                // Solo se bajan las imagenes de las que no estaban.
+                if (faltantes.Count > 0)
+                {
+                    Log("Huellas nuevas por procesar: " + faltantes.Count);
+
+                    var porId = new Dictionary<int, Registro>();
+                    foreach (var r in faltantes) porId[r.IdHuella] = r;
+
+                    // En tandas, porque una lista IN gigante hace que SQL Server
+                    // recompile el plan en cada arranque distinto.
+                    var ids = new List<int>(porId.Keys);
+                    for (int desde = 0; desde < ids.Count; desde += 200)
+                    {
+                        var tanda = ids.GetRange(desde, Math.Min(200, ids.Count - desde));
+                        string lista = string.Join(",", tanda.ConvertAll(i => i.ToString()).ToArray());
+
+                        using (var cmd = new SqlCommand(
+                            "SELECT IDEmpleadoHuella, Huella FROM EmpleadosHuellas WHERE IDEmpleadoHuella IN (" + lista + ");", cn))
+                        using (var rd = cmd.ExecuteReader())
+                            while (rd.Read())
+                            {
+                                int id = (int)rd["IDEmpleadoHuella"];
+                                var f = AFmd((byte[])rd["Huella"]);
+                                if (f == null) continue;   // huella ilegible: se salta
+                                porId[id].Template = f;
+                                nuevo.Add(porId[id]);
+                            }
+                    }
+                }
             }
+
             lock (_candado) { _padron.Clear(); _padron.AddRange(nuevo); }
+
+            // Solo se reescribe si cambio algo: si no, cada arranque reescribiria
+            // el mismo archivo sin necesidad.
+            if (faltantes.Count > 0 || cache.Count != nuevo.Count) GuardarCache(nuevo);
+
+            reloj.Stop();
+            Log("Padron listo: " + nuevo.Count + " huellas (" + faltantes.Count +
+                " nuevas) en " + reloj.ElapsedMilliseconds + " ms.");
             return nuevo.Count;
         }
 
