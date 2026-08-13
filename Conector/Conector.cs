@@ -447,14 +447,91 @@ WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
             Responder(ctx, 404, "{\"ok\":false}");
         }
 
+        /// <summary>
+        /// Traduce por que salio mal una lectura, en palabras que le sirvan a
+        /// quien esta parado frente al lector.
+        ///
+        /// Importa distinguirlo: no es lo mismo que nadie haya puesto el dedo a
+        /// que si lo haya puesto y la lectura saliera mal. Decir "no se puso el
+        /// dedo a tiempo" en el segundo caso hace que la persona se quede
+        /// esperando, cuando lo que tiene que hacer es volver a intentar.
+        /// </summary>
+        static string PorQueFallo(Constants.CaptureQuality calidad)
+        {
+            switch (calidad)
+            {
+                // El dedo quedo fuera de lugar. Es lo mas comun de lejos, y se
+                // resuelve solo con decir donde ponerlo.
+                case Constants.CaptureQuality.DP_QUALITY_FINGER_TOO_LEFT:
+                case Constants.CaptureQuality.DP_QUALITY_FINGER_TOO_RIGHT:
+                case Constants.CaptureQuality.DP_QUALITY_FINGER_TOO_HIGH:
+                case Constants.CaptureQuality.DP_QUALITY_FINGER_TOO_LOW:
+                case Constants.CaptureQuality.DP_QUALITY_FINGER_OFF_CENTER:
+                case Constants.CaptureQuality.DP_QUALITY_SCAN_SKEWED:
+                    return "El dedo quedo corrido. Ponlo plano y al centro del lector.";
+
+                // Lo levanto antes de tiempo o lo movio.
+                case Constants.CaptureQuality.DP_QUALITY_SCAN_TOO_SHORT:
+                case Constants.CaptureQuality.DP_QUALITY_SCAN_TOO_FAST:
+                    return "Se levanto el dedo muy rapido. Dejalo puesto un momento.";
+                case Constants.CaptureQuality.DP_QUALITY_SCAN_TOO_LONG:
+                case Constants.CaptureQuality.DP_QUALITY_SCAN_TOO_SLOW:
+                case Constants.CaptureQuality.DP_QUALITY_SCAN_WRONG_DIRECTION:
+                    return "No se leyo bien. Pon el dedo y mantenlo quieto.";
+
+                case Constants.CaptureQuality.DP_QUALITY_CANCELED:
+                    return "Se corto la lectura. Vuelve a poner el dedo.";
+                case Constants.CaptureQuality.DP_QUALITY_FAKE_FINGER:
+                    return "No se reconocio como un dedo. Vuelve a intentar.";
+
+                // Estas dos no las arregla la persona: son del aparato, y por eso
+                // se dicen distinto, para que avise en vez de seguir insistiendo.
+                case Constants.CaptureQuality.DP_QUALITY_READER_DIRTY:
+                    return "El lector esta sucio. Limpialo con un paño seco y vuelve a intentar.";
+                case Constants.CaptureQuality.DP_QUALITY_READER_FAILED:
+                    return "El lector fallo. Desconectalo y vuelvelo a conectar, o avisa al administrador.";
+
+                default:
+                    return "No se leyo bien la huella. Vuelve a poner el dedo.";
+            }
+        }
+
         static void AtenderCaptura(HttpListenerContext ctx, string ruta)
         {
             {
                 var cap = Capturar(LeerSegundos(ctx));
-                if (cap == null || cap.ResultCode != Constants.ResultCode.DP_SUCCESS || cap.Data == null)
+
+                // Nadie puso el dedo. El SDK lo reporta de tres formas y las tres
+                // son lo mismo: sin entregar nada, con la captura marcada como
+                // vencida, o -lo que hace en la practica al vencerse- con calidad
+                // NO_FINGER. Medido: al agotarse una espera de 5 s sin nadie
+                // enfrente, contesta NO_FINGER.
+                //
+                // Hay que distinguirlo o la pantalla estaria mostrando "vuelve a
+                // poner el dedo" cada 15 segundos sin nadie enfrente, que ademas
+                // de inutil le quita sentido al aviso cuando SI hace falta.
+                if (cap != null &&
+                    (cap.Quality == Constants.CaptureQuality.DP_QUALITY_TIMED_OUT ||
+                     cap.Quality == Constants.CaptureQuality.DP_QUALITY_NO_FINGER))
+                    cap = null;
+
+                if (cap == null)
                 {
-                    Log("    RESULTADO: sin huella util -> se responde 'no se puso el dedo a tiempo'.");
-                    Responder(ctx, 200, "{\"ok\":false,\"motivo\":\"No se puso el dedo a tiempo.\"}"); return;
+                    Log("    RESULTADO: nadie puso el dedo.");
+                    Responder(ctx, 200, "{\"ok\":false,\"agotado\":true,\"motivo\":\"No se puso el dedo a tiempo.\"}"); return;
+                }
+
+                // Si puso el dedo pero salio mal, se dice QUE hacer. Con
+                // reintentar=true la pantalla lo muestra como aviso para volver a
+                // intentar, no como si no hubiera pasado nada.
+                if (cap.ResultCode != Constants.ResultCode.DP_SUCCESS || cap.Data == null)
+                {
+                    string porque = PorQueFallo(cap.Quality);
+                    Log("    RESULTADO: lectura fallida (" + cap.ResultCode + " / " + cap.Quality + ") -> " + porque);
+                    Responder(ctx, 200,
+                        "{\"ok\":false,\"reintentar\":true,\"calidad\":\"" + Esc(cap.Quality.ToString()) +
+                        "\",\"motivo\":\"" + Esc(porque) + "\"}");
+                    return;
                 }
 
                 if (ruta == "/capturar")
@@ -472,7 +549,10 @@ WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
                 if (f.ResultCode != Constants.ResultCode.DP_SUCCESS)
                 {
                     Log("    RESULTADO: la huella se leyo pero no se pudo procesar (" + f.ResultCode + ").");
-                    Responder(ctx, 200, "{\"ok\":false,\"motivo\":\"No se pudo procesar la huella.\"}"); return;
+                    Responder(ctx, 200,
+                        "{\"ok\":false,\"reintentar\":true," +
+                        "\"motivo\":\"La huella se leyo incompleta. Ponla plana y vuelve a intentar.\"}");
+                    return;
                 }
 
                 Registro mejor = null; int mejorScore = int.MaxValue;
