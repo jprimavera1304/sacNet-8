@@ -3,3 +3,9 @@
 #
 # El archivo real NO se sube al repo: apunta a la base de cada maquina.
 conexion=Server=NOMBRE-DEL-SERVIDOR;Database=MacZ;Integrated Security=true;TrustServerCertificate=True;
+
+# Dejar la ventana negra a la vista. En la computadora de la puerta va en 0: ahi
+# la ventana solo estorba e invita a cerrarla, y si alguien la cierra el checador
+# deja de funcionar. Ponla en 1 solo para desarrollar o para ver que pasa.
+# El registro se guarda siempre en conector.log, este a la vista o no.
+consola=0
