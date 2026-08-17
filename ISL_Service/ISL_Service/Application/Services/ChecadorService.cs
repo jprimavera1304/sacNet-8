@@ -22,6 +22,17 @@ public class ChecadorService : IChecadorService
     // solo pinta una quincena.
     private const int DiasMaximosConsulta = 366;
 
+    // EmpleadosHuellas.EquipoAlta es varchar(400), no varchar(200) como en la
+    // tabla de comida.
+    private const int EquipoHuellaMaximo = 400;
+    private const int FiltroMaximo = 200;
+
+    // Una huella del lector pesa ~200 KB (imagen ISO de 200,050 bytes). Los
+    // limites son holgados a proposito: sirven para atajar un envio absurdo, no
+    // para exigir un formato exacto que manana cambie con otro modelo de lector.
+    private const int HuellaBytesMinimo = 1_000;
+    private const int HuellaBytesMaximo = 2_000_000;
+
     private readonly IChecadorRepository _repository;
 
     public ChecadorService(IChecadorRepository repository)
@@ -120,6 +131,205 @@ public class ChecadorService : IChecadorService
         }
     }
 
+    public async Task<ChecadaMovimientoRegistradoDto> RegistrarMovimientoAsync(
+        RegistrarChecadaMovimientoRequest request,
+        int idUsuario,
+        string equipo,
+        CancellationToken ct = default)
+    {
+        if (request == null)
+            throw new ArgumentException("Body requerido.");
+        if (request.IDEmpleado <= 0)
+            throw new ArgumentException("idEmpleado es requerido y debe ser mayor a 0.");
+
+        var tipo = ChecadaMovimientoTipo.Normalizar(request.Tipo);
+        if (tipo == null)
+            throw new ArgumentException("tipo invalido. Use ENTRADA o SALIDA, o dejelo vacio para que se deduzca.");
+
+        var origen = ChecadaComidaOrigen.Normalizar(request.Origen);
+        if (origen == null)
+            throw new ArgumentException("origen invalido. Use CHECADOR o WEB.");
+
+        var idEmpleadoHuella = request.IDEmpleadoHuella is > 0 ? request.IDEmpleadoHuella : null;
+
+        try
+        {
+            return await _repository.RegistrarMovimientoAsync(
+                request.IDEmpleado, tipo, idEmpleadoHuella, origen, idUsuario, Recortar(equipo, EquipoMaximo), ct);
+        }
+        catch (SqlException ex)
+        {
+            MapSqlException(ex);
+            throw;
+        }
+    }
+
+    public async Task<ChecadaComidaRowsResponse> ConsultarMovimientosDiaAsync(
+        DateTime? fecha,
+        int idEmpleado,
+        CancellationToken ct = default)
+    {
+        // Sin fecha se asume hoy, que es lo que la pantalla pide el 99% de las
+        // veces al abrirse.
+        var dia = (fecha ?? DateTime.Today).Date;
+
+        try
+        {
+            return await _repository.ConsultarMovimientosDiaAsync(dia, idEmpleado > 0 ? idEmpleado : 0, ct);
+        }
+        catch (SqlException ex)
+        {
+            MapSqlException(ex);
+            throw;
+        }
+    }
+
+    public async Task<ChecadaComidaRowsResponse> ConsultarAsistenciaDiaAsync(
+        DateTime? fecha,
+        int idEmpleado,
+        CancellationToken ct = default)
+    {
+        var dia = (fecha ?? DateTime.Today).Date;
+
+        try
+        {
+            return await _repository.ConsultarAsistenciaDiaAsync(dia, idEmpleado > 0 ? idEmpleado : 0, ct);
+        }
+        catch (SqlException ex)
+        {
+            MapSqlException(ex);
+            throw;
+        }
+    }
+
+    public async Task<ChecadaComidaRowsResponse> ConsultarConfiguracionAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repository.ConsultarConfiguracionAsync(ct);
+        }
+        catch (SqlException ex)
+        {
+            MapSqlException(ex);
+            throw;
+        }
+    }
+
+    public async Task<ChecadaComidaRowsResponse> ConsultarEmpleadosAsync(
+        string? filtro,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            return await _repository.ConsultarEmpleadosAsync(Recortar(filtro, FiltroMaximo), ct);
+        }
+        catch (SqlException ex)
+        {
+            MapSqlException(ex);
+            throw;
+        }
+    }
+
+    public async Task<ChecadaComidaRowsResponse> ConsultarHuellasAsync(
+        int idEmpleado,
+        CancellationToken ct = default)
+    {
+        if (idEmpleado <= 0)
+            throw new ArgumentException("idEmpleado es requerido y debe ser mayor a 0.");
+
+        try
+        {
+            return await _repository.ConsultarHuellasAsync(idEmpleado, ct);
+        }
+        catch (SqlException ex)
+        {
+            MapSqlException(ex);
+            throw;
+        }
+    }
+
+    public async Task<ChecadaComidaRowsResponse> GuardarHuellaAsync(
+        GuardarHuellaEmpleadoRequest request,
+        int idUsuario,
+        string equipo,
+        CancellationToken ct = default)
+    {
+        if (request == null)
+            throw new ArgumentException("Body requerido.");
+        if (request.IDEmpleado <= 0)
+            throw new ArgumentException("idEmpleado es requerido y debe ser mayor a 0.");
+        if (request.IDMano is not (1 or 2))
+            throw new ArgumentException("idMano invalido. 1 = derecha, 2 = izquierda.");
+        if (request.IDDedo is < 1 or > 5)
+            throw new ArgumentException("idDedo invalido. Va del 1 (pulgar) al 5 (meñique).");
+
+        // Las dos capturas son obligatorias: es como guarda el sistema cada dedo.
+        var huella = DecodificarHuella(request.HuellaBase64, "huellaBase64");
+        var huella2 = DecodificarHuella(request.Huella2Base64, "huella2Base64");
+
+        try
+        {
+            return await _repository.GuardarHuellaAsync(
+                request.IDEmpleado, request.IDMano, request.IDDedo,
+                huella, huella2, idUsuario, Recortar(equipo, EquipoHuellaMaximo), ct);
+        }
+        catch (SqlException ex)
+        {
+            MapSqlException(ex);
+            throw;
+        }
+    }
+
+    public async Task BajaHuellaAsync(
+        int idEmpleadoHuella,
+        int idUsuario,
+        string equipo,
+        CancellationToken ct = default)
+    {
+        if (idEmpleadoHuella <= 0)
+            throw new ArgumentException("idEmpleadoHuella es requerido y debe ser mayor a 0.");
+
+        try
+        {
+            await _repository.BajaHuellaAsync(idEmpleadoHuella, idUsuario, Recortar(equipo, EquipoHuellaMaximo), ct);
+        }
+        catch (SqlException ex)
+        {
+            MapSqlException(ex);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// La huella llega en base64 porque viaja en JSON. Se valida el tamaño aqui,
+    /// antes de ir a la base: una imagen de huella pesa poco mas de 200 KB, asi
+    /// que algo de 10 bytes es un error del conector y algo de 20 MB es alguien
+    /// mandando lo que no debe. En los dos casos vale mas responder 400 que
+    /// guardar basura en el padron.
+    /// </summary>
+    private static byte[] DecodificarHuella(string? base64, string campo)
+    {
+        if (string.IsNullOrWhiteSpace(base64))
+            throw new ArgumentException($"{campo} es requerido: hacen falta las dos capturas de la huella.");
+
+        byte[] datos;
+        try
+        {
+            datos = Convert.FromBase64String(base64.Trim());
+        }
+        catch (FormatException)
+        {
+            throw new ArgumentException($"{campo} no es base64 valido.");
+        }
+
+        if (datos.Length < HuellaBytesMinimo)
+            throw new ArgumentException($"{campo} viene incompleta ({datos.Length} bytes).");
+        if (datos.Length > HuellaBytesMaximo)
+            throw new ArgumentException($"{campo} es demasiado grande ({datos.Length} bytes).");
+
+        return datos;
+    }
+
     private static string Recortar(string? texto, int maximo)
     {
         var limpio = (texto ?? string.Empty).Trim();
@@ -140,6 +350,19 @@ public class ChecadorService : IChecadorService
     private static void MapSqlException(SqlException ex)
     {
         var msg = ex.Message ?? string.Empty;
+
+        // Sin periodo de nomina no hay dia al que colgar la asistencia. No es un
+        // dato mal mandado: es un estado del sistema que alguien tiene que
+        // arreglar, y el mensaje del SP ya dice como. 409 para que el front lo
+        // muestre tal cual en vez de tratarlo como error de captura.
+        if (msg.Contains("periodo de nomina", StringComparison.OrdinalIgnoreCase))
+            throw new ConflictException(msg, msg);
+
+        // "La huella no existe" es un 404 de verdad; va antes del 400 generico
+        // de huella que sigue, porque ese atrapa cualquier mensaje que la
+        // mencione.
+        if (msg.Contains("La huella no existe", StringComparison.OrdinalIgnoreCase))
+            throw new NotFoundException(msg, msg);
 
         // Huella mal mandada: es un dato del request, no un estado. 400 antes de
         // que el "no existe" de mas abajo lo convierta en 404.

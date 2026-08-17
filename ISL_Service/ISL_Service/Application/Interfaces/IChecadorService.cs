@@ -27,4 +27,42 @@ public interface IChecadorService
         int idUsuario,
         string equipo,
         CancellationToken ct = default);
+
+    Task<ChecadaMovimientoRegistradoDto> RegistrarMovimientoAsync(
+        RegistrarChecadaMovimientoRequest request,
+        int idUsuario,
+        string equipo,
+        CancellationToken ct = default);
+
+    Task<ChecadaComidaRowsResponse> ConsultarMovimientosDiaAsync(
+        DateTime? fecha,
+        int idEmpleado,
+        CancellationToken ct = default);
+
+    Task<ChecadaComidaRowsResponse> ConsultarAsistenciaDiaAsync(
+        DateTime? fecha,
+        int idEmpleado,
+        CancellationToken ct = default);
+
+    Task<ChecadaComidaRowsResponse> ConsultarConfiguracionAsync(CancellationToken ct = default);
+
+    Task<ChecadaComidaRowsResponse> ConsultarEmpleadosAsync(
+        string? filtro,
+        CancellationToken ct = default);
+
+    Task<ChecadaComidaRowsResponse> ConsultarHuellasAsync(
+        int idEmpleado,
+        CancellationToken ct = default);
+
+    Task<ChecadaComidaRowsResponse> GuardarHuellaAsync(
+        GuardarHuellaEmpleadoRequest request,
+        int idUsuario,
+        string equipo,
+        CancellationToken ct = default);
+
+    Task BajaHuellaAsync(
+        int idEmpleadoHuella,
+        int idUsuario,
+        string equipo,
+        CancellationToken ct = default);
 }
