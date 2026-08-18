@@ -10,4 +10,12 @@ public class UpdateUserRequest
 
     [Required, StringLength(30)]
     public string Rol { get; set; } = default!;
+
+    /// <summary>
+    /// Opcional. Si viene, se cambia la contrasena en los dos lados (web y legacy).
+    /// Vacia o ausente significa "dejala como esta": editar el rol de alguien no
+    /// tiene por que tumbarle la contrasena.
+    /// </summary>
+    [StringLength(100, MinimumLength = 8)]
+    public string? Password { get; set; }
 }

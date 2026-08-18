@@ -1,5 +1,6 @@
 ﻿using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.Interfaces;
+using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,13 +11,54 @@ namespace ISL_Service.Controllers;
 [Authorize]
 public class UsuariosController : ControllerBase
 {
+    // Ver la contrasena de alguien mas no es lo mismo que administrarlo: se separa
+    // a proposito de usuarios.editar para que se pueda dar suelto y a quien sea.
+    private const string PermisoVerPassword = "usuarios.password.ver";
+
     private readonly IUserAdminService _service;
     private readonly IUsuarioModuloFavoritoService _favoritosService;
+    private readonly ICurrentUserAccessor _currentUserAccessor;
+    private readonly IPermissionService _permissionService;
 
-    public UsuariosController(IUserAdminService service, IUsuarioModuloFavoritoService favoritosService)
+    public UsuariosController(
+        IUserAdminService service,
+        IUsuarioModuloFavoritoService favoritosService,
+        ICurrentUserAccessor currentUserAccessor,
+        IPermissionService permissionService)
     {
         _service = service;
         _favoritosService = favoritosService;
+        _currentUserAccessor = currentUserAccessor;
+        _permissionService = permissionService;
+    }
+
+    /// <summary>
+    /// Devuelve el 403 a regresar si al usuario le falta el permiso, o null si puede pasar.
+    ///
+    /// Se resuelve contra el token y no contra un [Authorize(Policy=...)] porque el
+    /// modelo de permisos es por empresa y vive en la base: una politica estatica no
+    /// sabe si el tenant siquiera lo tiene prendido.
+    /// </summary>
+    private async Task<IActionResult?> ExigirPermisoAsync(string permiso, CancellationToken ct)
+    {
+        var userId = _currentUserAccessor.GetUserId(User);
+        if (userId is null)
+            return Unauthorized(new { ok = false, message = "Token invalido." });
+
+        var empresaId = _currentUserAccessor.GetCompanyId(User) ?? 0;
+        var rol = _currentUserAccessor.GetRole(User);
+        var snapshot = await _permissionService.GetPermissionsAsync(userId.Value, empresaId, rol, ct);
+
+        // Instalacion sin modelo de permisos: no hay nada contra que comparar y negar
+        // dejaria muerta una funcion en bases que hoy trabajan.
+        if (!snapshot.PermissionsEnabled)
+            return null;
+
+        var tiene = snapshot.Permissions.Any(x => string.Equals(x, permiso, StringComparison.OrdinalIgnoreCase));
+        if (tiene)
+            return null;
+
+        return StatusCode(StatusCodes.Status403Forbidden, new { ok = false, message = "No tienes permiso para esta accion." });
     }
 
     [HttpPost]
@@ -112,6 +154,31 @@ public class UsuariosController : ControllerBase
     public async Task<IActionResult> ResetPassword(Guid id, CancellationToken ct)
     {
         var result = await _service.ResetPasswordAsync(id, User, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Fija la contrasena que escribio el administrador. Se guarda en los dos lados:
+    /// hash en UsuarioWeb y texto plano en legacy.
+    /// </summary>
+    [HttpPut("{id:guid}/password")]
+    [Authorize(Policy = "perm:usuarios.password.reset")]
+    public async Task<IActionResult> SetPassword(Guid id, [FromBody] SetUserPasswordRequest req, CancellationToken ct)
+    {
+        var result = await _service.SetPasswordAsync(id, req, User, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Contrasena en claro del usuario, leida de legacy. Solo lectura.
+    /// </summary>
+    [HttpGet("{id:guid}/password")]
+    public async Task<IActionResult> GetPassword(Guid id, CancellationToken ct)
+    {
+        var denegado = await ExigirPermisoAsync(PermisoVerPassword, ct);
+        if (denegado is not null) return denegado;
+
+        var result = await _service.GetPasswordAsync(id, User, ct);
         return Ok(result);
     }
 
