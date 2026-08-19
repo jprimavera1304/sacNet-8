@@ -11,8 +11,6 @@ public class VentasPedidosRepository : IVentasPedidosRepository
 {
     private const string SpConsultaVentasPedidos = "sp_n_ConsultaVentasPedidos";
     private const string SpProcesarPedido = "sp_w_ProcesarPedido";
-    private const string SpProcesarPedidoBatch = "sp_w_ProcesarPedidosBatch";
-    private const string TvpPedidoIdsType = "dbo.WPedidoIdListType";
 
     private readonly IConfiguration _configuration;
 
@@ -102,104 +100,31 @@ public class VentasPedidosRepository : IVentasPedidosRepository
         if (idsPedido.Count == 0)
             return new AutorizarPedidosResponse(new List<PedidoResultadoDto>(), string.Empty);
 
-        try
-        {
-            var batchResponse = await AutorizarPedidosBatchAsync(
-                conn,
-                idsPedido,
-                request,
-                idUsuarioProcesar,
-                equipoProcesar,
-                idUsuarioAutorizar,
-                equipoAutorizar,
-                ct);
-
-            if (ShouldFallbackToPerPedidoByBatchContent(batchResponse))
-            {
-                return await AutorizarPedidosPerPedidoAsync(
-                    conn,
-                    idsPedido,
-                    request,
-                    idUsuarioProcesar,
-                    equipoProcesar,
-                    idUsuarioAutorizar,
-                    equipoAutorizar,
-                    ct);
-            }
-
-            return batchResponse;
-        }
-        catch (SqlException ex) when (IsBatchArtifactsMissing(ex))
-        {
-            // Fallback seguro web: si aun no instalaron scripts batch en DB, usa flujo por pedido web.
-            return await AutorizarPedidosPerPedidoAsync(
-                conn,
-                idsPedido,
-                request,
-                idUsuarioProcesar,
-                equipoProcesar,
-                idUsuarioAutorizar,
-                equipoAutorizar,
-                ct);
-        }
-    }
-
-    private static bool IsBatchArtifactsMissing(SqlException ex)
-    {
-        var msg = ex.Message ?? string.Empty;
-        return msg.Contains(SpProcesarPedidoBatch, StringComparison.OrdinalIgnoreCase)
-               || msg.Contains(TvpPedidoIdsType, StringComparison.OrdinalIgnoreCase)
-               || ex.Number is 208 or 2715 or 2812;
-    }
-
-    private static bool ShouldFallbackToPerPedidoByBatchContent(AutorizarPedidosResponse response)
-    {
-        if (response == null) return false;
-        if (!string.IsNullOrWhiteSpace(response.IdsVenta)) return false;
-        if (response.Pedidos == null || response.Pedidos.Count == 0) return false;
-
-        // Error clásico cuando el SP interno usa INSERT...EXEC y el batch intenta hacer otro INSERT...EXEC.
-        return response.Pedidos.All(p =>
-            p?.Result == -1
-            && !string.IsNullOrWhiteSpace(p.Mensaje)
-            && p.Mensaje.Contains("INSERT EXEC", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private async Task<AutorizarPedidosResponse> AutorizarPedidosBatchAsync(
-        SqlConnection conn,
-        List<int> idsPedido,
-        AutorizarPedidosRequest request,
-        int idUsuarioProcesar,
-        string equipoProcesar,
-        int idUsuarioAutorizar,
-        string equipoAutorizar,
-        CancellationToken ct)
-    {
-        await using var cmd = new SqlCommand(SpProcesarPedidoBatch, conn)
-        {
-            CommandType = CommandType.StoredProcedure
-        };
-
-        var tvp = BuildPedidoIdsTvp(idsPedido);
-        var pIds = cmd.Parameters.AddWithValue("@IdsPedido", tvp);
-        pIds.SqlDbType = SqlDbType.Structured;
-        pIds.TypeName = TvpPedidoIdsType;
-
-        AddAutorizarCommonParameters(
-            cmd,
+        // Se va DIRECTO al flujo por pedido. El batch no funciona y no puede
+        // funcionar: hace "INSERT INTO #tmp EXEC sp_w_ProcesarPedido", y ese
+        // procedimiento termina llamando procedimientos de legacy que a su vez
+        // hacen INSERT...EXEC. SQL Server no permite anidarlos, asi que el
+        // batch contesta siempre "An INSERT EXEC statement cannot be nested."
+        // (medido contra la base: uno por uno autoriza y genera venta; el mismo
+        // pedido por batch falla).
+        //
+        // Antes se intentaba el batch y se caia al flujo por pedido SOLO si el
+        // mensaje de error traia el texto "INSERT EXEC". Eso hacia que autorizar
+        // dependiera de reconocer una frase de SQL Server: basta con que cambie
+        // la redaccion o el idioma del servidor para que el rescate no entre y
+        // la autorizacion se pierda sin explicacion.
+        //
+        // Ir por pedido tambien da mejor informacion: se sabe cual si y cual no,
+        // en vez de perder el lote entero por uno.
+        return await AutorizarPedidosPerPedidoAsync(
+            conn,
+            idsPedido,
             request,
             idUsuarioProcesar,
             equipoProcesar,
             idUsuarioAutorizar,
-            equipoAutorizar);
-
-        var dt = new DataTable();
-        using (var adapter = new SqlDataAdapter(cmd))
-        {
-            adapter.Fill(dt);
-        }
-
-        return MapAutorizarResponse(dt, idsPedido);
+            equipoAutorizar,
+            ct);
     }
 
     private async Task<AutorizarPedidosResponse> AutorizarPedidosPerPedidoAsync(
@@ -284,15 +209,6 @@ public class VentasPedidosRepository : IVentasPedidosRepository
         cmd.Parameters.AddWithValue("@DepositoEfectivoNumeroCS", request.DepositoEfectivoNumeroCS ?? string.Empty);
         cmd.Parameters.AddWithValue("@MontoTotalCS", request.MontoTotalCS ?? 0m);
         cmd.Parameters.AddWithValue("@TipoTarjeta", request.TipoTarjeta ?? 0);
-    }
-
-    private static DataTable BuildPedidoIdsTvp(IEnumerable<int> idsPedido)
-    {
-        var tvp = new DataTable();
-        tvp.Columns.Add("IDPedido", typeof(int));
-        foreach (var id in idsPedido.Where(x => x > 0).Distinct())
-            tvp.Rows.Add(id);
-        return tvp;
     }
 
     private static AutorizarPedidosResponse MapAutorizarResponse(DataTable dt, IReadOnlyCollection<int> requestedIds)

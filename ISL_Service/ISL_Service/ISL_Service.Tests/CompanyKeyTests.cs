@@ -168,6 +168,7 @@ public class CompanyKeyTests
         public Task<Usuario> UpsertWebAndLegacyAsync(string usuario, string contrasenaPlano, string contrasenaHashWeb, string nombre, string rol, bool debeCambiarContrasena, int estado, CancellationToken ct) => Task.FromResult(new Usuario());
         public Task<Usuario> UpdateUsuarioAndRolAsync(Guid userId, string usuarioNuevo, string rolNuevo, CancellationToken ct) => Task.FromResult(new Usuario());
         public Task<Usuario> UpdateEstadoWithLegacyAsync(Guid userId, int estado, CancellationToken ct) => Task.FromResult(new Usuario());
+        public Task<string?> GetLegacyPasswordAsync(string usuario, CancellationToken ct) => Task.FromResult<string?>(null);
         public Task SaveChangesAsync(CancellationToken ct) => Task.CompletedTask;
     }
 
@@ -229,6 +230,8 @@ public class CompanyKeyTests
         public Task<ResetPasswordResponse> ResetPasswordAsync(Guid userId, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
         public Task<UserResponse> UpdateEmpresaAsync(Guid userId, UpdateUserEmpresaRequest req, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
         public Task ChangeMyPasswordAsync(ChangePasswordRequest req, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
+        public Task<ResetPasswordResponse> SetPasswordAsync(Guid userId, SetUserPasswordRequest req, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
+        public Task<UserPasswordResponse> GetPasswordAsync(Guid userId, ClaimsPrincipal actor, CancellationToken ct) => throw new NotImplementedException();
     }
 
     private sealed class FakePermissionService : IPermissionService
