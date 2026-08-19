@@ -50,12 +50,26 @@ public sealed class PermissionService : IPermissionService
         ["btnFacturar"] = ("ventas.facturar", "Ventas - Facturar"),
         ["btnPedidosFaltantes"] = ("ventas.pedidos.faltantes", "Ventas - Pedidos faltantes")
     };
+    // Permisos de ventas que manda el WEB, no legacy.
+    //
+    // Todo lo que empiece con "ventas." y no este en esta lista se BORRA del
+    // snapshot y se vuelve a calcular desde los botones de Mac31 (ver mas
+    // abajo, donde se limpian Allow/Deny). O sea: si un permiso de ventas no
+    // aparece aqui, darlo desde la pantalla de permisos web NO sirve de nada
+    // — se asigna en la base y al siguiente calculo desaparece, sin error y
+    // sin rastro. Es exactamente lo que pasaba con "pendientes de autorizar".
     private static readonly List<PermissionSeed> VentasWebPermissionSeeds = new()
     {
         new(VentasViewPermission, "Ventas - Ver modulo", VentasModuleKey),
         new("ventas.ver", "Ventas - Ver", VentasModuleKey),
-        new("ventas.cliente.ver", "Ventas - Ver cliente", VentasModuleKey)
+        new("ventas.cliente.ver", "Ventas - Ver cliente", VentasModuleKey),
+        // Pendientes de autorizar: ver la pantalla y soltar el pedido son
+        // permisos distintos a proposito, para poder dar uno sin el otro.
+        new(PendientesViewPermission, "Ventas - Ver pendientes de autorizar", VentasModuleKey),
+        new(PendientesAuthorizePermission, "Ventas - Autorizar pendientes", VentasModuleKey)
     };
+    public const string PendientesViewPermission = "ventas.pendientes.ver";
+    public const string PendientesAuthorizePermission = "ventas.pendientes.autorizar";
     private static readonly TimeSpan ActiveCacheTtl = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan StaleCacheTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan SchemaCacheTtl = TimeSpan.FromMinutes(15);
