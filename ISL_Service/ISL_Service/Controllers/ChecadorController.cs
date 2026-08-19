@@ -16,13 +16,57 @@ namespace ISL_Service.Controllers;
 [Authorize]
 public class ChecadorController : ControllerBase
 {
+    // Poner el dedo, ver a que hora llego cada quien y decidir quien puede
+    // entrar son tres cosas de publicos distintos. La computadora de la puerta
+    // se queda con la primera y nada mas, porque su sesion vive abierta todo el
+    // dia y cualquiera que pase por ahi la tiene a la mano.
+    private const string PermisoChecar = "checador.ver";
+    private const string PermisoReportes = "checador.reportes";
+    private const string PermisoHuellas = "checador.huellas";
+
     private readonly IChecadorService _service;
     private readonly ICurrentUserAccessor _currentUserAccessor;
+    private readonly IPermissionService _permissionService;
 
-    public ChecadorController(IChecadorService service, ICurrentUserAccessor currentUserAccessor)
+    public ChecadorController(
+        IChecadorService service,
+        ICurrentUserAccessor currentUserAccessor,
+        IPermissionService permissionService)
     {
         _service = service;
         _currentUserAccessor = currentUserAccessor;
+        _permissionService = permissionService;
+    }
+
+    /// <summary>
+    /// Devuelve el 403 a regresar si al usuario le falta el permiso, o null si
+    /// puede pasar.
+    ///
+    /// Se resuelve contra el token y no contra un [Authorize(Policy=...)]
+    /// porque el modelo de permisos es por empresa y vive en la base: una
+    /// politica estatica no sabe si el tenant siquiera lo tiene prendido.
+    /// </summary>
+    private async Task<IActionResult?> ExigirPermisoAsync(string permiso, CancellationToken ct)
+    {
+        var userId = _currentUserAccessor.GetUserId(User);
+        if (userId is null)
+            return Unauthorized(new { ok = false, message = "Token invalido." });
+
+        var empresaId = _currentUserAccessor.GetCompanyId(User) ?? 0;
+        var rol = _currentUserAccessor.GetRole(User);
+        var snapshot = await _permissionService.GetPermissionsAsync(userId.Value, empresaId, rol, ct);
+
+        // Instalacion sin modelo de permisos: no hay nada contra que comparar y
+        // negar dejaria el checador muerto en bases que hoy funcionan. Pasa,
+        // igual que antes de que este control existiera.
+        if (!snapshot.PermissionsEnabled)
+            return null;
+
+        var tiene = snapshot.Permissions.Any(x => string.Equals(x, permiso, StringComparison.OrdinalIgnoreCase));
+        if (tiene)
+            return null;
+
+        return StatusCode(StatusCodes.Status403Forbidden, new { ok = false, message = "No tienes permiso para esta accion." });
     }
 
     /// <summary>
@@ -40,6 +84,9 @@ public class ChecadorController : ControllerBase
     {
         if (request == null)
             return BadRequest(new { ok = false, message = "Body requerido." });
+
+        var sinPermiso = await ExigirPermisoAsync(PermisoChecar, ct);
+        if (sinPermiso != null) return sinPermiso;
 
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
         var data = await _service.RegistrarComidaAsync(request, idUsuario, ResolveEquipo(), ct);
@@ -68,6 +115,9 @@ public class ChecadorController : ControllerBase
         [FromQuery] bool incluirCanceladas,
         CancellationToken ct)
     {
+        var sinPermiso = await ExigirPermisoAsync(PermisoReportes, ct);
+        if (sinPermiso != null) return sinPermiso;
+
         var data = await _service.ConsultarComidasAsync(idEmpleado, fechaInicial, fechaFinal, incluirCanceladas, ct);
         return Ok(new { ok = true, message = "Checadas de comida consultadas.", data });
     }
@@ -89,6 +139,11 @@ public class ChecadorController : ControllerBase
     {
         if (request == null || string.IsNullOrWhiteSpace(request.Motivo))
             return BadRequest(new { ok = false, message = "motivo es requerido." });
+
+        // Corregir un registro ya hecho es del mismo publico que revisa el
+        // reporte, no del que se para en la puerta a poner el dedo.
+        var sinPermiso = await ExigirPermisoAsync(PermisoReportes, ct);
+        if (sinPermiso != null) return sinPermiso;
 
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
         await _service.CancelarComidaAsync(id, request.Motivo, idUsuario, ResolveEquipo(), ct);
@@ -115,6 +170,9 @@ public class ChecadorController : ControllerBase
         if (request == null)
             return BadRequest(new { ok = false, message = "Body requerido." });
 
+        var sinPermiso = await ExigirPermisoAsync(PermisoChecar, ct);
+        if (sinPermiso != null) return sinPermiso;
+
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
         var data = await _service.RegistrarMovimientoAsync(request, idUsuario, ResolveEquipo(), ct);
 
@@ -137,6 +195,9 @@ public class ChecadorController : ControllerBase
         [FromQuery] int idEmpleado,
         CancellationToken ct)
     {
+        var sinPermiso = await ExigirPermisoAsync(PermisoReportes, ct);
+        if (sinPermiso != null) return sinPermiso;
+
         var data = await _service.ConsultarMovimientosDiaAsync(fecha, idEmpleado, ct);
         return Ok(new { ok = true, message = "Movimientos consultados.", data = data.Rows });
     }
@@ -159,10 +220,16 @@ public class ChecadorController : ControllerBase
         [FromQuery] int idEmpleado,
         CancellationToken ct)
     {
+        var sinPermiso = await ExigirPermisoAsync(PermisoReportes, ct);
+        if (sinPermiso != null) return sinPermiso;
+
         var data = await _service.ConsultarAsistenciaDiaAsync(fecha, idEmpleado, ct);
         return Ok(new { ok = true, message = "Asistencia consultada.", data = data.Rows });
     }
 
+    // Sin permiso extra a proposito: es el horario que pinta la pantalla de
+    // checar, asi que exigir algo mas que sesion dejaria a la puerta sin el
+    // dato que necesita para trabajar.
     [HttpGet("configuracion")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ConsultarConfiguracion(CancellationToken ct)
@@ -179,6 +246,9 @@ public class ChecadorController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ConsultarEmpleados([FromQuery] string? filtro, CancellationToken ct)
     {
+        var sinPermiso = await ExigirPermisoAsync(PermisoHuellas, ct);
+        if (sinPermiso != null) return sinPermiso;
+
         var data = await _service.ConsultarEmpleadosAsync(filtro, ct);
         return Ok(new { ok = true, message = "Empleados consultados.", data = data.Rows });
     }
@@ -193,6 +263,9 @@ public class ChecadorController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ConsultarHuellas([FromRoute] int idEmpleado, CancellationToken ct)
     {
+        var sinPermiso = await ExigirPermisoAsync(PermisoHuellas, ct);
+        if (sinPermiso != null) return sinPermiso;
+
         var data = await _service.ConsultarHuellasAsync(idEmpleado, ct);
         return Ok(new { ok = true, message = "Huellas consultadas.", data = data.Rows });
     }
@@ -214,6 +287,9 @@ public class ChecadorController : ControllerBase
         if (request == null)
             return BadRequest(new { ok = false, message = "Body requerido." });
 
+        var sinPermiso = await ExigirPermisoAsync(PermisoHuellas, ct);
+        if (sinPermiso != null) return sinPermiso;
+
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
         var data = await _service.GuardarHuellaAsync(request, idUsuario, ResolveEquipo(), ct);
         return Ok(new { ok = true, message = "Huella guardada.", data = data.Rows });
@@ -231,6 +307,9 @@ public class ChecadorController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> BajaHuella([FromRoute] int idEmpleadoHuella, CancellationToken ct)
     {
+        var sinPermiso = await ExigirPermisoAsync(PermisoHuellas, ct);
+        if (sinPermiso != null) return sinPermiso;
+
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
         await _service.BajaHuellaAsync(idEmpleadoHuella, idUsuario, ResolveEquipo(), ct);
         return Ok(new { ok = true, message = "Huella dada de baja." });

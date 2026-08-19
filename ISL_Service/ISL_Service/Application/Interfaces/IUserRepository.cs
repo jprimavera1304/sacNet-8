@@ -26,6 +26,11 @@ public interface IUserRepository
         bool debeCambiarContrasena,
         int estado,
         CancellationToken ct);
+    /// <summary>
+    /// Contrasena en claro que guarda legacy, o null si el usuario no existe alla.
+    /// Solo lectura: a dbo.Usuarios nada mas se escribe por sp_WebUsuario_Upsert.
+    /// </summary>
+    Task<string?> GetLegacyPasswordAsync(string usuario, CancellationToken ct);
     Task<Usuario> UpdateUsuarioAndRolAsync(Guid userId, string usuarioNuevo, string rolNuevo, CancellationToken ct);
     Task<Usuario> UpdateEstadoWithLegacyAsync(Guid userId, int estado, CancellationToken ct);
     Task SaveChangesAsync(CancellationToken ct);

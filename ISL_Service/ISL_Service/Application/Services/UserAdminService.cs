@@ -33,14 +33,18 @@ public class UserAdminService : IUserAdminService
         if (await _repo.ExistsByUsuarioAsync(usuarioNombre, ct))
             throw new ConflictException("El usuario ya existe.");
 
-        var hash = BCrypt.Net.BCrypt.HashPassword(req.PasswordTemporal);
+        var password = NormalizePassword(req.ResolverPassword());
+        var hash = BCrypt.Net.BCrypt.HashPassword(password);
+
+        // Sin cambio forzado: la contrasena que escribio el administrador es la
+        // definitiva, y el usuario entra con ella a la primera.
         var entity = await _repo.UpsertWebAndLegacyAsync(
             usuarioNombre,
-            req.PasswordTemporal,
+            password,
             hash,
             usuarioNombre,
             rol,
-            debeCambiarContrasena: true,
+            debeCambiarContrasena: false,
             estado: ESTADO_ACTIVO,
             ct);
 
@@ -62,7 +66,7 @@ public class UserAdminService : IUserAdminService
         return new CreateUserResponse
         {
             User = Map(entity),
-            PasswordTemporal = req.PasswordTemporal
+            Password = password
         };
     }
 
@@ -109,6 +113,23 @@ public class UserAdminService : IUserAdminService
             throw new ConflictException("El usuario ya existe.");
 
         var updated = await _repo.UpdateUsuarioAndRolAsync(userId, usuarioNuevo, rolNuevo, ct);
+
+        // La contrasena es opcional al editar: dejarla vacia significa "no la toques".
+        if (!string.IsNullOrWhiteSpace(req.Password))
+        {
+            var password = NormalizePassword(req.Password!);
+            var hash = BCrypt.Net.BCrypt.HashPassword(password);
+            updated = await _repo.UpsertWebAndLegacyAsync(
+                usuarioNuevo,
+                password,
+                hash,
+                usuarioNuevo,
+                rolNuevo,
+                debeCambiarContrasena: false,
+                estado: updated.Estado,
+                ct);
+        }
+
         return Map(updated);
     }
 
@@ -127,25 +148,83 @@ public class UserAdminService : IUserAdminService
 
         EnsureActorCanManageTarget(actor, user);
 
-        var temp = PasswordGenerator.Generate(12);
-        var hash = BCrypt.Net.BCrypt.HashPassword(temp);
+        // Sin contrasena a la mano se genera una, pero ya no es "temporal": queda
+        // como la definitiva y el administrador la puede ver con el ojito.
+        var generada = PasswordGenerator.Generate(12);
+        return await AplicarPasswordAsync(user, generada, ct);
+    }
 
+    public async Task<ResetPasswordResponse> SetPasswordAsync(Guid userId, SetUserPasswordRequest req, ClaimsPrincipal actor, CancellationToken ct)
+    {
+        var user = await _repo.GetByIdAsync(userId, ct) ?? throw new NotFoundException("Usuario no encontrado.");
+
+        EnsureActorCanManageTarget(actor, user);
+
+        return await AplicarPasswordAsync(user, NormalizePassword(req.ResolverPassword()), ct);
+    }
+
+    public async Task<UserPasswordResponse> GetPasswordAsync(Guid userId, ClaimsPrincipal actor, CancellationToken ct)
+    {
+        var user = await _repo.GetByIdAsync(userId, ct) ?? throw new NotFoundException("Usuario no encontrado.");
+
+        EnsureActorCanManageTarget(actor, user);
+
+        var password = await _repo.GetLegacyPasswordAsync(user.UsuarioNombre, ct);
+
+        // El hash de UsuarioWeb no se puede revertir. Si legacy no tiene al usuario
+        // no hay contrasena que mostrar, y eso se dice claro en vez de tronar.
+        if (string.IsNullOrEmpty(password))
+        {
+            return new UserPasswordResponse
+            {
+                UserId = user.Id,
+                Usuario = user.UsuarioNombre,
+                Password = null,
+                Disponible = false,
+                Mensaje = "No hay contrasena guardada en legacy para este usuario. Asigne una nueva para poder verla."
+            };
+        }
+
+        return new UserPasswordResponse
+        {
+            UserId = user.Id,
+            Usuario = user.UsuarioNombre,
+            Password = password,
+            Disponible = true
+        };
+    }
+
+    private async Task<ResetPasswordResponse> AplicarPasswordAsync(Usuario user, string password, CancellationToken ct)
+    {
+        var hash = BCrypt.Net.BCrypt.HashPassword(password);
+
+        // Un solo camino para las dos escrituras: el SP deja el hash en UsuarioWeb
+        // y la contrasena en claro en legacy. Si esto se partiera en dos, los dos
+        // lados se desincronizarian a la primera falla.
         var updated = await _repo.UpsertWebAndLegacyAsync(
             user.UsuarioNombre,
-            temp,
+            password,
             hash,
             user.UsuarioNombre,
             user.Rol,
-            debeCambiarContrasena: true,
+            debeCambiarContrasena: false,
             estado: user.Estado,
             ct);
 
         return new ResetPasswordResponse
         {
             UserId = updated.Id,
-            PasswordTemporal = temp,
-            DebeCambiarContrasena = true
+            Password = password,
+            DebeCambiarContrasena = false
         };
+    }
+
+    private static string NormalizePassword(string password)
+    {
+        var value = (password ?? string.Empty).Trim();
+        if (value.Length < 8 || value.Length > 100)
+            throw new ArgumentException("Contrasena invalida. Longitud permitida: 8 a 100.");
+        return value;
     }
 
     public Task<UserResponse> UpdateEmpresaAsync(Guid userId, UpdateUserEmpresaRequest req, ClaimsPrincipal actor, CancellationToken ct)

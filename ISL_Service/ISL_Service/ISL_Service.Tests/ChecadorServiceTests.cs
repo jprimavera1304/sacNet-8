@@ -242,5 +242,36 @@ public class ChecadorServiceTests
             LastEquipo = equipo;
             return Task.CompletedTask;
         }
+
+        // El resto del checador (movimientos, huellas, configuracion) se agrego
+        // despues y estas pruebas no lo tocan: son de las comidas. Van como no
+        // implementados para que el doble siga cumpliendo el contrato — si
+        // alguna prueba futura los llama, truena y se ve, en vez de devolver un
+        // vacio que parezca una respuesta buena.
+        public Task<ChecadaMovimientoRegistradoDto> RegistrarMovimientoAsync(
+            int idEmpleado, string tipo, int? idEmpleadoHuella, string origen, int idUsuario, string equipo, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<ChecadaComidaRowsResponse> ConsultarMovimientosDiaAsync(DateTime fecha, int idEmpleado, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<ChecadaComidaRowsResponse> ConsultarAsistenciaDiaAsync(DateTime fecha, int idEmpleado, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<ChecadaComidaRowsResponse> ConsultarConfiguracionAsync(CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<ChecadaComidaRowsResponse> ConsultarEmpleadosAsync(string filtro, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<ChecadaComidaRowsResponse> ConsultarHuellasAsync(int idEmpleado, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<ChecadaComidaRowsResponse> GuardarHuellaAsync(
+            int idEmpleado, int idMano, int idDedo, byte[] huella, byte[] huella2, int idUsuario, string equipo, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task BajaHuellaAsync(int idEmpleadoHuella, int idUsuario, string equipo, CancellationToken ct = default)
+            => throw new NotImplementedException();
     }
 }

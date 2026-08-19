@@ -355,6 +355,33 @@ WHERE Id = @Id
         await cmd.ExecuteNonQueryAsync(ct);
     }
 
+    public async Task<string?> GetLegacyPasswordAsync(string usuario, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(usuario)) return null;
+
+        await using var conn = new SqlConnection(_db.Database.GetConnectionString());
+        await conn.OpenAsync(ct);
+
+        // Bases recien creadas no traen el legacy: sin la columna no hay nada que
+        // leer, y eso no es un error que deba tronar la peticion.
+        if (!await TableHasColumnAsync(conn, "dbo", "Usuarios", "Contrasena", ct))
+            return null;
+
+        await using var cmd = new SqlCommand(@"
+SELECT TOP 1 Contrasena
+FROM dbo.Usuarios
+WHERE UPPER(LTRIM(RTRIM(CAST(Usuario AS NVARCHAR(150))))) = UPPER(LTRIM(RTRIM(@Usuario)));", conn)
+        {
+            CommandType = CommandType.Text,
+            CommandTimeout = 30
+        };
+        cmd.Parameters.Add(new SqlParameter("@Usuario", SqlDbType.NVarChar, 150) { Value = usuario.Trim() });
+
+        var raw = await cmd.ExecuteScalarAsync(ct);
+        if (raw is null || raw is DBNull) return null;
+        return raw.ToString();
+    }
+
     public async Task<Usuario> UpdateUsuarioAndRolAsync(Guid userId, string usuarioNuevo, string rolNuevo, CancellationToken ct)
     {
         var empresaId = await ResolveEmpresaIdAsync(ct);

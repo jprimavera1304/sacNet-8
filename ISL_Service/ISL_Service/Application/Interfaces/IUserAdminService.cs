@@ -13,6 +13,8 @@ public interface IUserAdminService
     Task<UserResponse> UpdateUserAsync(Guid userId, UpdateUserRequest req, ClaimsPrincipal actor, CancellationToken ct);
     Task<UserResponse> UpdateEstadoAsync(Guid userId, UpdateUserEstadoRequest req, ClaimsPrincipal actor, CancellationToken ct);
     Task<ResetPasswordResponse> ResetPasswordAsync(Guid userId, ClaimsPrincipal actor, CancellationToken ct);
+    Task<ResetPasswordResponse> SetPasswordAsync(Guid userId, SetUserPasswordRequest req, ClaimsPrincipal actor, CancellationToken ct);
+    Task<UserPasswordResponse> GetPasswordAsync(Guid userId, ClaimsPrincipal actor, CancellationToken ct);
     Task<UserResponse> UpdateEmpresaAsync(Guid userId, UpdateUserEmpresaRequest req, ClaimsPrincipal actor, CancellationToken ct);
     Task ChangeMyPasswordAsync(ChangePasswordRequest req, ClaimsPrincipal actor, CancellationToken ct);
 }

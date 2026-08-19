@@ -41,8 +41,10 @@ using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
@@ -71,6 +73,37 @@ namespace Mac.Checador.Conector
         static Reader _lector;
         static Form _bomba;            // ventana invisible: solo bombea mensajes
         static Mutex _instanciaUnica;  // impide que se abran dos conectores
+        static NotifyIcon _bandeja;    // el unico rastro visible del conector
+
+        // ---------------------------------------------------------- sin ventana
+        //
+        // El conector vive todo el dia en la computadora de la puerta. Una
+        // ventana de consola ahi estorba: ocupa la barra de tareas, invita a
+        // cerrarla "porque no se estaba usando", y si alguien la cierra el
+        // checador deja de funcionar sin que nadie entienda por que.
+        //
+        // Se esconde la consola en vez de compilar sin ella porque hoy el
+        // conector se ejecuta hospedado en PowerShell (ver iniciar-conector.ps1),
+        // y asi la ventana se va igual, sea quien sea el que la abrio. El dia que
+        // se compile firmado como aplicacion de ventanas, esto sobra y no estorba.
+        [DllImport("kernel32.dll")]
+        static extern IntPtr GetConsoleWindow();
+
+        [DllImport("user32.dll")]
+        static extern bool ShowWindow(IntPtr ventana, int comando);
+
+        const int SW_HIDE = 0;
+        const int SW_SHOW = 5;
+
+        static bool _consolaVisible = true;
+
+        static void VerConsola(bool mostrar)
+        {
+            var ventana = GetConsoleWindow();
+            if (ventana == IntPtr.Zero) return;   // compilado sin consola: nada que hacer
+            ShowWindow(ventana, mostrar ? SW_SHOW : SW_HIDE);
+            _consolaVisible = mostrar;
+        }
         static readonly List<Registro> _padron = new List<Registro>();
         static readonly object _candado = new object();
         static readonly object _candadoLog = new object();
@@ -131,6 +164,104 @@ namespace Mac.Checador.Conector
             public int IdHuella, IdEmpleado, Mano, Dedo;
             public string Empleado;
             public Fmd Template;
+        }
+
+        // ------------------------------------------------------------ bandeja
+        //
+        // POR QUE NO SE ESCONDE DEL TODO
+        // ------------------------------------------------------------------
+        // Un programa completamente invisible que abre un puerto es un problema
+        // de soporte: nadie sabe si esta corriendo, y para cerrarlo o reiniciarlo
+        // hay que ir al administrador de tareas a buscar un proceso llamado
+        // "powershell". El icono cuesta poco y contesta las tres preguntas que
+        // se hacen cuando algo falla: esta vivo, que dice el registro, y como lo
+        // reinicio.
+
+        /// <summary>
+        /// Dibuja el icono en vez de traer un .ico aparte: un archivo suelto mas
+        /// que se puede perder al copiar la carpeta, para 32 pixeles.
+        /// </summary>
+        static Icon DibujarIcono()
+        {
+            var mapa = new Bitmap(32, 32);
+            using (var g = Graphics.FromImage(mapa))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(Color.Transparent);
+                using (var lapiz = new Pen(Color.FromArgb(0, 12, 123), 2.4f))
+                {
+                    // Tres arcos: se lee como una huella aun a 16 pixeles.
+                    g.DrawArc(lapiz, 6, 4, 20, 24, 200, 140);
+                    g.DrawArc(lapiz, 10, 9, 12, 18, 200, 140);
+                    g.DrawArc(lapiz, 14, 14, 4, 12, 200, 140);
+                }
+            }
+            return Icon.FromHandle(mapa.GetHicon());
+        }
+
+        static void PrepararBandeja()
+        {
+            var menu = new ContextMenuStrip();
+
+            menu.Items.Add("Ver registro", null, delegate
+            {
+                // El log es lo primero que se pide cuando algo falla; que este a
+                // un clic evita explicar por telefono donde vive.
+                try { Process.Start("notepad.exe", Path.Combine(CarpetaBase(), "conector.log")); }
+                catch { }
+            });
+
+            menu.Items.Add("Recargar huellas", null, delegate
+            {
+                try
+                {
+                    int cuantas = CargarPadron();
+                    _bandeja.ShowBalloonTip(3000, "Conector del checador",
+                        cuantas + " huellas cargadas.", ToolTipIcon.Info);
+                }
+                catch (Exception e)
+                {
+                    _bandeja.ShowBalloonTip(4000, "Conector del checador",
+                        "No se pudieron recargar: " + e.Message, ToolTipIcon.Error);
+                }
+            });
+
+            var verConsola = new ToolStripMenuItem("Mostrar consola");
+            verConsola.Click += delegate
+            {
+                VerConsola(!_consolaVisible);
+                verConsola.Text = _consolaVisible ? "Ocultar consola" : "Mostrar consola";
+            };
+            menu.Items.Add(verConsola);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            menu.Items.Add("Salir", null, delegate
+            {
+                // Se confirma: cerrarlo deja la puerta sin checador, y desde la
+                // bandeja es facil darle sin querer.
+                var r = MessageBox.Show(
+                    "Si cierras el conector, nadie podra checar en esta computadora.\n\n¿Cerrarlo de todos modos?",
+                    "Conector del checador", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button2);
+                if (r == DialogResult.Yes) Application.Exit();
+            });
+
+            _bandeja = new NotifyIcon
+            {
+                Icon = DibujarIcono(),
+                Text = "Conector del checador",   // lo que sale al pasar el raton
+                ContextMenuStrip = menu,
+                Visible = true
+            };
+
+            // Doble clic: lo mas probable que quiera quien lo busca es ver que
+            // esta pasando.
+            _bandeja.DoubleClick += delegate
+            {
+                VerConsola(!_consolaVisible);
+                verConsola.Text = _consolaVisible ? "Ocultar consola" : "Mostrar consola";
+            };
         }
 
         // --------------------------------------------------------------- padron
@@ -792,6 +923,32 @@ WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
             return "Server=LAP-JUAND;Database=MacZ;Integrated Security=true;TrustServerCertificate=True;";
         }
 
+        /// <summary>
+        /// Si la consola se queda a la vista. En la puerta NO; en desarrollo si,
+        /// que es donde uno quiere ver el registro corriendo.
+        ///
+        /// Se decide en conector.config y no por argumentos porque el conector se
+        /// arranca desde un acceso directo o una tarea programada, donde nadie va
+        /// a escribir banderas.
+        /// </summary>
+        static bool MostrarConsolaSegunConfig()
+        {
+            string ruta = Path.Combine(CarpetaBase(), "conector.config");
+            if (!File.Exists(ruta)) return false;
+
+            foreach (var linea in File.ReadAllLines(ruta))
+            {
+                var l = linea.Trim();
+                if (l.StartsWith("consola=", StringComparison.OrdinalIgnoreCase))
+                {
+                    var v = l.Substring("consola=".Length).Trim();
+                    return v == "1" || v.Equals("si", StringComparison.OrdinalIgnoreCase)
+                                    || v.Equals("true", StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            return false;
+        }
+
         [STAThread]
         static int Main()
         {
@@ -897,10 +1054,35 @@ WHERE h.Huella IS NOT NULL AND h.IDStatus = 1;";
 
             // La ventana invisible existe SOLO para que el SDK pueda entregar las
             // capturas. Ver la nota 1 de arriba.
+            // La consola se va cuando ya no hay nada que contar. Se esconde
+            // HASTA AQUI, y no al principio, para que si algo truena al arrancar
+            // (sin base, sin lector, puerto ocupado) el mensaje quede a la vista
+            // en vez de desaparecer con la ventana.
+            PrepararBandeja();
+            if (!MostrarConsolaSegunConfig())
+            {
+                Log("Listo. El conector queda en la bandeja, junto al reloj.");
+                VerConsola(false);
+            }
+
+            // Con la ventana escondida, quedarse sin lector es invisible: el
+            // conector arranca, contesta, y la puerta no funciona sin que nadie
+            // sepa por que. El globo lo dice en el momento, que es cuando alguien
+            // todavia puede ir a conectar el cable.
+            if (_lector == null)
+            {
+                _bandeja.ShowBalloonTip(6000, "Conector del checador",
+                    "No hay lector conectado. Conectalo por USB y reinicia el conector.",
+                    ToolTipIcon.Warning);
+            }
+
             _bomba = new Form { ShowInTaskbar = false, WindowState = FormWindowState.Minimized };
             _bomba.Load += delegate { _bomba.Visible = false; };
             Application.Run(_bomba);
 
+            // Sin esto el icono se queda pegado en la bandeja hasta que alguien
+            // pasa el raton por encima, y parece que el conector sigue vivo.
+            try { if (_bandeja != null) { _bandeja.Visible = false; _bandeja.Dispose(); } } catch { }
             try { oyente.Stop(); } catch { }
             try { if (_lector != null) _lector.Dispose(); } catch { }
             return 0;
