@@ -13,8 +13,20 @@ public class VentasPedidosController : ControllerBase
 {
     // Ver la lista y soltar el pedido son permisos SEPARADOS: hay quien
     // necesita vigilar que no se acumulen pendientes sin poder autorizarlos.
-    private const string PermisoVer = "ventas.pendientes.ver";
-    private const string PermisoAutorizar = "ventas.pendientes.autorizar";
+    //
+    // Y ademas van separados POR CANAL: el del web y el del movil son permisos
+    // distintos aunque hagan lo mismo. Se puede dar el acceso en la
+    // computadora y no en el telefono, o al reves, sin que uno encienda al
+    // otro. Cada pantalla mira el suyo (la app, app_movil.ventas.*; el web,
+    // ventas.pendientes.*).
+    //
+    // Aqui basta con cualquiera de los dos porque el endpoint es el mismo para
+    // los dos canales: quien no tiene el de su canal no llega a llamarlo,
+    // porque su pantalla ni siquiera le muestra la opcion.
+    private static readonly string[] PermisosVer =
+        { "ventas.pendientes.ver", "app_movil.ventas.ver" };
+    private static readonly string[] PermisosAutorizar =
+        { "ventas.pendientes.autorizar", "app_movil.ventas.autorizar" };
 
     private readonly IVentasPedidosService _service;
     private readonly IAutorizarPedidosAsyncCoordinator _asyncCoordinator;
@@ -46,7 +58,7 @@ public class VentasPedidosController : ControllerBase
     /// permisos son por empresa y viven en la base: una politica estatica no
     /// sabe si el tenant siquiera lo tiene prendido.
     /// </summary>
-    private async Task<IActionResult?> ExigirPermisoAsync(string permiso, CancellationToken ct)
+    private async Task<IActionResult?> ExigirPermisoAsync(string[] permisos, CancellationToken ct)
     {
         var userId = _currentUserAccessor.GetUserId(User);
         if (userId is null)
@@ -62,7 +74,8 @@ public class VentasPedidosController : ControllerBase
         if (!snapshot.PermissionsEnabled)
             return null;
 
-        var tiene = snapshot.Permissions.Any(x => string.Equals(x, permiso, StringComparison.OrdinalIgnoreCase));
+        var tiene = snapshot.Permissions.Any(
+            x => permisos.Any(p => string.Equals(x, p, StringComparison.OrdinalIgnoreCase)));
         if (tiene)
             return null;
 
@@ -72,7 +85,7 @@ public class VentasPedidosController : ControllerBase
     [HttpPost("pendientes-autorizar/consultar")]
     public async Task<IActionResult> ConsultarPendientesAutorizar([FromBody] ConsultaVentasPedidosRequest? request, CancellationToken ct)
     {
-        var sinPermiso = await ExigirPermisoAsync(PermisoVer, ct);
+        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
         if (sinPermiso != null) return sinPermiso;
 
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
@@ -83,7 +96,7 @@ public class VentasPedidosController : ControllerBase
     [HttpPost("autorizar")]
     public async Task<IActionResult> Autorizar([FromBody] AutorizarPedidosRequest? request, CancellationToken ct)
     {
-        var sinPermiso = await ExigirPermisoAsync(PermisoAutorizar, ct);
+        var sinPermiso = await ExigirPermisoAsync(PermisosAutorizar, ct);
         if (sinPermiso != null) return sinPermiso;
 
         if (request == null)
@@ -113,7 +126,7 @@ public class VentasPedidosController : ControllerBase
     [HttpGet("autorizar/status/{operationId}")]
     public async Task<IActionResult> AutorizarStatus([FromRoute] string operationId, CancellationToken ct)
     {
-        var sinPermiso = await ExigirPermisoAsync(PermisoAutorizar, ct);
+        var sinPermiso = await ExigirPermisoAsync(PermisosAutorizar, ct);
         if (sinPermiso != null) return sinPermiso;
 
         var status = _asyncCoordinator.GetStatus(operationId);
