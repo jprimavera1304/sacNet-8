@@ -1882,13 +1882,20 @@ WHERE f.Descripcion = 'REPORTES'
         var movementUserId = await ResolveMovementLegacyUserIdAsync(conn, ct);
         foreach (var report in reportCatalog.Values)
         {
+            // Solo se OTORGA. Nunca se revoca: mismo motivo que en el sync de
+            // ventas (ver SyncLegacyVentasPermissionsForUserAsync). Guardar
+            // permisos desde el web le estaba borrando a la gente sus reportes
+            // de Mac31.
+            if (!effective.Contains(report.Key))
+                continue;
+
             await using var cmd = new SqlCommand("dbo.sp_n_ActualizarUsuarioFormaProceso", conn)
             {
                 CommandType = CommandType.StoredProcedure
             };
             cmd.Parameters.Add(new SqlParameter("@IDUsuario", SqlDbType.Int) { Value = legacyUserId.Value });
             cmd.Parameters.Add(new SqlParameter("@IDProceso", SqlDbType.Int) { Value = report.LegacyProcessId });
-            cmd.Parameters.Add(new SqlParameter("@IDStatus", SqlDbType.Int) { Value = effective.Contains(report.Key) ? 1 : 2 });
+            cmd.Parameters.Add(new SqlParameter("@IDStatus", SqlDbType.Int) { Value = 1 });
             cmd.Parameters.Add(new SqlParameter("@IDUsuarioMovimiento", SqlDbType.Int) { Value = movementUserId });
             await cmd.ExecuteNonQueryAsync(ct);
         }
@@ -2097,13 +2104,30 @@ WHERE UPPER(LTRIM(RTRIM(f.Descripcion))) = @Forma
         var movementUserId = await ResolveMovementLegacyUserIdAsync(conn, ct);
         foreach (var action in ventasCatalog.Values)
         {
+            // Solo se OTORGA en legacy. NUNCA se revoca.
+            //
+            // Antes esta linea mandaba IDStatus=2 para todo lo que el web no
+            // tuviera, tratando al web como la fuente de la verdad. No lo es:
+            // los permisos de ventas VIVEN en legacy (se leen de los botones
+            // de Mac31) y no existen como filas en las tablas web, asi que
+            // "effective" casi nunca los contiene.
+            //
+            // Consecuencia real, medida en produccion el 2026-08-26: guardar
+            // permisos de un usuario desde la pantalla web le revoco 44 de sus
+            // 135 permisos de Mac31 —todos los botones de CONSULTA DE VENTAS y
+            // varios reportes— sin avisar y sin que nadie los hubiera tocado.
+            //
+            // Quitar un permiso de legacy se hace en Mac31, que es donde vive.
+            if (!effective.Contains(action.Key))
+                continue;
+
             await using var cmd = new SqlCommand("dbo.sp_n_ActualizarUsuarioFormaProceso", conn)
             {
                 CommandType = CommandType.StoredProcedure
             };
             cmd.Parameters.Add(new SqlParameter("@IDUsuario", SqlDbType.Int) { Value = legacyUserId.Value });
             cmd.Parameters.Add(new SqlParameter("@IDProceso", SqlDbType.Int) { Value = action.LegacyProcessId });
-            cmd.Parameters.Add(new SqlParameter("@IDStatus", SqlDbType.Int) { Value = effective.Contains(action.Key) ? 1 : 2 });
+            cmd.Parameters.Add(new SqlParameter("@IDStatus", SqlDbType.Int) { Value = 1 });
             cmd.Parameters.Add(new SqlParameter("@IDUsuarioMovimiento", SqlDbType.Int) { Value = movementUserId });
             await cmd.ExecuteNonQueryAsync(ct);
         }
