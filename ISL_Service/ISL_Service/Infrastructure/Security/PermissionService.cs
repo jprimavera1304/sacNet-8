@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Models;
@@ -70,6 +70,110 @@ public sealed class PermissionService : IPermissionService
     };
     public const string PendientesViewPermission = "ventas.pendientes.ver";
     public const string PendientesAuthorizePermission = "ventas.pendientes.autorizar";
+
+    private const string EmpleadosModuleKey = "empleados";
+    private const string EmpleadosViewPermission = "empleados.ver_modulo";
+
+    // La forma de Mac31 se busca por su DESCRIPCION, no por su nombre, porque
+    // asi lo hace ya el puente de ventas y porque es lo que ensena la pantalla
+    // de permisos de legacy. Verificado igual en las dos empresas: IDForma 2,
+    // Forma "ConsultaEmpleados", Descripcion "CONSULTAR EMPLEADOS", tanto en
+    // Produccion_svr (Tauro) como en MacZ (Zaragoza).
+    private const string EmpleadosLegacyForm = "CONSULTAR EMPLEADOS";
+
+    // Los cuatro botones que Mac31 tiene dados de alta en n_Procesos para la
+    // forma ConsultaEmpleados (IDProceso 1012, 1013, 1014 y 5136; los mismos
+    // numeros en las dos empresas). Ese es el universo completo: BUSCAR,
+    // LIMPIAR, EXCEL, CERRAR y la casilla VER SUELDOS NO estan en n_Procesos,
+    // asi que no son permisos y no se inventan aqui — legacy las controla de
+    // otra forma (ver ConsultaEmpleados.cs, contrasena rotatoria).
+    private static readonly Dictionary<string, (string Key, string Name)> EmpleadosLegacyPermissionMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["btnVer"] = ("empleados.ver", "Empleados - Ver"),
+        ["btnNuevo"] = ("empleados.crear", "Empleados - Dar de alta"),
+        ["btnModificar"] = ("empleados.editar", "Empleados - Modificar"),
+        ["btnHuellas"] = ("empleados.huellas", "Empleados - Huellas")
+    };
+
+    // Permisos de empleados que manda el WEB, no legacy. Misma trampa que en
+    // ventas: lo que empiece con "empleados." y no este aqui se borra del
+    // snapshot y se recalcula desde los botones de Mac31.
+    //
+    // "empleados.sueldo.ver" TIENE que vivir aqui. En Mac31 ver los sueldos no
+    // es un permiso: es la casilla VER SUELDOS, que pide una contrasena que se
+    // regenera cada minuto (ConfirmarContrasena.cs), mas una lista de
+    // IDUsuario escritos a mano en el codigo para Zaragoza
+    // (ConsultaEmpleados.cs, SetColumnas). Nada de eso existe como fila en
+    // n_Procesos, asi que si se dejara heredar se borraria en cada calculo y
+    // NADIE podria ver un sueldo desde el web, nunca.
+    //
+    // "empleados.ver_modulo" tambien, y no por gusto: el RemoveAll es por
+    // prefijo y se lo llevaria. Ventas lo resolvio con esta misma lista blanca;
+    // reportes lo resolvio con el parche de PermissionAuthorizationHandler, que
+    // NO aplica a ModulosController — o sea, sin esta linea el modulo
+    // desapareceria del menu de inicio aunque sus endpoints contestaran 200.
+    private static readonly List<PermissionSeed> EmpleadosWebPermissionSeeds = new()
+    {
+        new(EmpleadosViewPermission, "Empleados - Ver modulo", EmpleadosModuleKey),
+        new("empleados.sueldo.ver", "Empleados - Ver sueldo y bonos", EmpleadosModuleKey)
+    };
+
+    // Un modulo del web cuyos permisos VIVEN en una forma de Mac31. Se saco
+    // como parametro para que empleados no fuera una tercera copia del mismo
+    // SQL: el puente de ventas y el de empleados son identicos salvo estos
+    // cinco datos. Reportes sigue aparte porque su clave se DEDUCE del texto
+    // del proceso, en vez de estar mapeada a mano.
+    private sealed record LegacyModuleBinding(
+        string ModuleKey,
+        string ModuleName,
+        string LegacyForm,
+        IReadOnlyDictionary<string, (string Key, string Name)> Map,
+        IReadOnlyList<PermissionSeed> WebSeeds);
+
+    private static readonly LegacyModuleBinding VentasBinding = new(
+        VentasModuleKey, "Ventas", VentasLegacyForm, VentasLegacyPermissionMap, VentasWebPermissionSeeds);
+
+    private static readonly LegacyModuleBinding EmpleadosBinding = new(
+        EmpleadosModuleKey, "Empleados", EmpleadosLegacyForm, EmpleadosLegacyPermissionMap, EmpleadosWebPermissionSeeds);
+
+    private const string PrestamosModuleKey = "prestamos";
+    private const string PrestamosViewPermission = "prestamos.ver_modulo";
+
+    // La forma se busca por su DESCRIPCION, igual que ventas y empleados.
+    // Verificado en las DOS empresas y son identicas hasta el byte: IDForma 3,
+    // Forma "ConsultaPrestamos", Descripcion "CONSULTAR PRESTAMOS" (con E
+    // acentuada, 0xC9 en la codificacion de la columna varchar), tanto en
+    // Produccion_svr (Tauro) como en MacZ (Zaragoza).
+    private const string PrestamosLegacyForm = "CONSULTAR PRÉSTAMOS";
+
+    // Los CUATRO botones que Mac31 tiene dados de alta en n_Procesos para la
+    // forma ConsultaPrestamos. Los IDProceso son los MISMOS numeros en las dos
+    // empresas (1015, 1016, 2055, 2056), asi que el puente vale igual para
+    // Tauro y para Zaragoza sin un solo "if empresa".
+    //
+    // Ese es el universo completo: btnBuscar, btnLimpiar y btnCerrar NO estan
+    // en n_Procesos —en el Designer llevan Tag = "1", que en
+    // ValidaOperadorProcesos significa "encendido para todos"— asi que no son
+    // permisos y no se inventan aqui.
+    private static readonly Dictionary<string, (string Key, string Name)> PrestamosLegacyPermissionMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["btnVer"] = ("prestamos.ver", "Prestamos - Ver"),
+        ["btnNuevo"] = ("prestamos.crear", "Prestamos - Registrar"),
+        ["btnModificar"] = ("prestamos.editar", "Prestamos - Cambiar descuento semanal"),
+        ["btnCancelar"] = ("prestamos.cancelar", "Prestamos - Cancelar")
+    };
+
+    // Permisos de prestamos que manda el WEB, no legacy. Misma trampa que en
+    // ventas y empleados: el RemoveAll de abajo es POR PREFIJO y se llevaria
+    // "prestamos.ver_modulo" —que no existe en Mac31— dejando el modulo fuera
+    // del menu de inicio aunque sus endpoints contestaran 200.
+    private static readonly List<PermissionSeed> PrestamosWebPermissionSeeds = new()
+    {
+        new(PrestamosViewPermission, "Prestamos - Ver modulo", PrestamosModuleKey)
+    };
+
+    private static readonly LegacyModuleBinding PrestamosBinding = new(
+        PrestamosModuleKey, "Prestamos", PrestamosLegacyForm, PrestamosLegacyPermissionMap, PrestamosWebPermissionSeeds);
     private static readonly TimeSpan ActiveCacheTtl = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan StaleCacheTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan SchemaCacheTtl = TimeSpan.FromMinutes(15);
@@ -266,7 +370,9 @@ public sealed class PermissionService : IPermissionService
 
         var schema = await GetSchemaAsync(conn, ct);
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
-        var ventasCatalog = await EnsureLegacyVentasPermissionsSyncedAsync(conn, empresaId, ct);
+        var ventasCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasBinding, ct);
+        var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
+        var prestamosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
 
         var response = new PermisosWebBootstrapResponse { PermissionsEnabled = true };
         var activeModules = await GetActiveModulesAsync(conn, empresaId, ct);
@@ -301,7 +407,7 @@ ORDER BY Clave;", conn))
             {
                 var code = reader.GetString(reader.GetOrdinal("Clave"));
                 if (!IsPermissionInActiveModule(code, activeModules)) continue;
-                response.Permissions.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog, ventasCatalog));
+                response.Permissions.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog, ventasCatalog, empleadosCatalog, prestamosCatalog));
             }
         }
 
@@ -401,8 +507,13 @@ WHERE up.EmpresaId = @EmpresaId;";
         foreach (var user in response.Users)
         {
             var legacyReports = await LoadLegacyReportPermissionsForUserAsync(conn, empresaId, user.UserId, reportCatalog, ct);
-            var legacyVentas = await LoadLegacyVentasPermissionsForUserAsync(conn, empresaId, user.UserId, ventasCatalog, ct);
-            if (legacyReports.Allow.Count == 0 && legacyReports.Deny.Count == 0 && legacyVentas.Allow.Count == 0 && legacyVentas.Deny.Count == 0)
+            var legacyVentas = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, user.UserId, VentasBinding, ventasCatalog, ct);
+            var legacyEmpleados = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, user.UserId, EmpleadosBinding, empleadosCatalog, ct);
+            var legacyPrestamos = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, user.UserId, PrestamosBinding, prestamosCatalog, ct);
+            if (legacyReports.Allow.Count == 0 && legacyReports.Deny.Count == 0
+                && legacyVentas.Allow.Count == 0 && legacyVentas.Deny.Count == 0
+                && legacyEmpleados.Allow.Count == 0 && legacyEmpleados.Deny.Count == 0
+                && legacyPrestamos.Allow.Count == 0 && legacyPrestamos.Deny.Count == 0)
                 continue;
 
             if (!overrides.TryGetValue(user.UserId, out var row))
@@ -419,6 +530,14 @@ WHERE up.EmpresaId = @EmpresaId;";
             row.Deny.RemoveAll(x => x.StartsWith($"{VentasModuleKey}.", StringComparison.OrdinalIgnoreCase) && !VentasWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
             row.Allow.AddRange(legacyVentas.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
             row.Deny.AddRange(legacyVentas.Deny.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+            row.Allow.RemoveAll(x => x.StartsWith($"{EmpleadosModuleKey}.", StringComparison.OrdinalIgnoreCase) && !EmpleadosWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
+            row.Deny.RemoveAll(x => x.StartsWith($"{EmpleadosModuleKey}.", StringComparison.OrdinalIgnoreCase) && !EmpleadosWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
+            row.Allow.AddRange(legacyEmpleados.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+            row.Deny.AddRange(legacyEmpleados.Deny.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+            row.Allow.RemoveAll(x => x.StartsWith($"{PrestamosModuleKey}.", StringComparison.OrdinalIgnoreCase) && !PrestamosWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
+            row.Deny.RemoveAll(x => x.StartsWith($"{PrestamosModuleKey}.", StringComparison.OrdinalIgnoreCase) && !PrestamosWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
+            row.Allow.AddRange(legacyPrestamos.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+            row.Deny.AddRange(legacyPrestamos.Deny.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
         }
 
         response.UserOverrides = overrides.Values.OrderBy(x => x.UserId).ToList();
@@ -435,7 +554,9 @@ WHERE up.EmpresaId = @EmpresaId;";
 
         var schema = await GetSchemaAsync(conn, ct);
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
-        var ventasCatalog = await EnsureLegacyVentasPermissionsSyncedAsync(conn, empresaId, ct);
+        var ventasCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasBinding, ct);
+        var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
+        var prestamosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
         var response = new PermisosWebRolesBootstrapResponse { PermissionsEnabled = true };
         var activeModules = await GetActiveModulesAsync(conn, empresaId, ct);
 
@@ -469,7 +590,7 @@ ORDER BY Clave;", conn))
             {
                 var code = reader.GetString(reader.GetOrdinal("Clave"));
                 if (!IsPermissionInActiveModule(code, activeModules)) continue;
-                response.Permissions.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog, ventasCatalog));
+                response.Permissions.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog, ventasCatalog, empleadosCatalog, prestamosCatalog));
             }
         }
 
@@ -515,7 +636,9 @@ ORDER BY r.Codigo, p.Clave;";
             return Array.Empty<PermisosWebPermissionItem>();
 
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
-        var ventasCatalog = await EnsureLegacyVentasPermissionsSyncedAsync(conn, empresaId, ct);
+        var ventasCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasBinding, ct);
+        var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
+        var prestamosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
         var response = new List<PermisosWebPermissionItem>();
         await using var permsCmd = new SqlCommand(@"
 SELECT Clave, Nombre
@@ -527,7 +650,7 @@ ORDER BY Clave;", conn);
         while (await reader.ReadAsync(ct))
         {
             var code = reader.GetString(reader.GetOrdinal("Clave"));
-            response.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog, ventasCatalog));
+            response.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog, ventasCatalog, empleadosCatalog, prestamosCatalog));
         }
 
         return response;
@@ -675,7 +798,9 @@ ORDER BY CASE WHEN m.ModuloClave = 'inicio' THEN 0 ELSE 1 END, m.ModuloClave;";
             return Array.Empty<PermisosWebModuleItem>();
 
         await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
-        await EnsureLegacyVentasPermissionsSyncedAsync(conn, empresaId, ct);
+        await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasBinding, ct);
+        await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
+        await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
 
         if (!await TableExistsAsync(conn, "WModulo", ct))
             return Array.Empty<PermisosWebModuleItem>();
@@ -868,7 +993,9 @@ VALUES ({string.Join(", ", insertValues)});";
 
         var schema = await GetSchemaAsync(conn, ct);
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
-        var ventasCatalog = await EnsureLegacyVentasPermissionsSyncedAsync(conn, empresaId, ct);
+        var ventasCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasBinding, ct);
+        var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
+        var prestamosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
         var normalizedPermissions = permissions
             .Where(p => !string.IsNullOrWhiteSpace(p))
             .Select(p => p.Trim())
@@ -887,7 +1014,9 @@ VALUES ({string.Join(", ", insertValues)});";
             spCmd.Parameters.Add(new SqlParameter("@ClavesCsv", SqlDbType.NVarChar, -1) { Value = string.Join(",", normalizedPermissions) });
             await spCmd.ExecuteNonQueryAsync(ct);
             await SyncLegacyReportPermissionsForRoleAsync(conn, schema, empresaId, roleCode ?? string.Empty, reportCatalog, ct);
-            await SyncLegacyVentasPermissionsForRoleAsync(conn, schema, empresaId, roleCode ?? string.Empty, ventasCatalog, ct);
+            await SyncLegacyModulePermissionsForRoleAsync(conn, schema, empresaId, roleCode ?? string.Empty, ventasCatalog, ct);
+            await SyncLegacyModulePermissionsForRoleAsync(conn, schema, empresaId, roleCode ?? string.Empty, empleadosCatalog, ct);
+            await SyncLegacyModulePermissionsForRoleAsync(conn, schema, empresaId, roleCode ?? string.Empty, prestamosCatalog, ct);
             InvalidateEmpresaPermissionCache(empresaId);
             return;
         }
@@ -941,7 +1070,9 @@ VALUES ({string.Join(", ", insertValues)});";
 
         await tx.CommitAsync(ct);
         await SyncLegacyReportPermissionsForRoleAsync(conn, schema, empresaId, roleCode ?? string.Empty, reportCatalog, ct);
-        await SyncLegacyVentasPermissionsForRoleAsync(conn, schema, empresaId, roleCode ?? string.Empty, ventasCatalog, ct);
+        await SyncLegacyModulePermissionsForRoleAsync(conn, schema, empresaId, roleCode ?? string.Empty, ventasCatalog, ct);
+        await SyncLegacyModulePermissionsForRoleAsync(conn, schema, empresaId, roleCode ?? string.Empty, empleadosCatalog, ct);
+        await SyncLegacyModulePermissionsForRoleAsync(conn, schema, empresaId, roleCode ?? string.Empty, prestamosCatalog, ct);
         InvalidateEmpresaPermissionCache(empresaId);
     }
 
@@ -955,7 +1086,9 @@ VALUES ({string.Join(", ", insertValues)});";
 
         var schema = await GetSchemaAsync(conn, ct);
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
-        var ventasCatalog = await EnsureLegacyVentasPermissionsSyncedAsync(conn, empresaId, ct);
+        var ventasCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasBinding, ct);
+        var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
+        var prestamosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
         var overrideTypes = await GetOverrideTypeTokensAsync(conn, ct);
         var userPermCols = await GetUserPermColumnsAsync(conn, null, ct);
 
@@ -1003,7 +1136,9 @@ WHERE EmpresaId = @EmpresaId
         await tx.CommitAsync(ct);
         var userRole = await GetUserRoleAsync(conn, empresaId, userId, ct);
         await SyncLegacyReportPermissionsForUserAsync(conn, schema, empresaId, userId, userRole, reportCatalog, ct);
-        await SyncLegacyVentasPermissionsForUserAsync(conn, schema, empresaId, userId, userRole, ventasCatalog, ct);
+        await SyncLegacyModulePermissionsForUserAsync(conn, schema, empresaId, userId, userRole, ventasCatalog, ct);
+        await SyncLegacyModulePermissionsForUserAsync(conn, schema, empresaId, userId, userRole, empleadosCatalog, ct);
+        await SyncLegacyModulePermissionsForUserAsync(conn, schema, empresaId, userId, userRole, prestamosCatalog, ct);
         InvalidateUserPermissionCache(userId, empresaId);
     }
 
@@ -1205,7 +1340,9 @@ WHERE t.name = 'WUsuarioPermiso';";
         var schema = await GetSchemaAsync(conn, ct);
         var permissions = await LoadEffectivePermissionsAsync(conn, schema, userId, empresaId, rolLegacy, ct);
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
-        var ventasCatalog = await EnsureLegacyVentasPermissionsSyncedAsync(conn, empresaId, ct);
+        var ventasCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasBinding, ct);
+        var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
+        var prestamosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
         if (reportCatalog.Count > 0)
         {
             var legacyReports = await LoadLegacyReportPermissionsForUserAsync(conn, empresaId, userId, reportCatalog, ct);
@@ -1214,9 +1351,70 @@ WHERE t.name = 'WUsuarioPermiso';";
         }
         if (ventasCatalog.Count > 0)
         {
-            var legacyVentas = await LoadLegacyVentasPermissionsForUserAsync(conn, empresaId, userId, ventasCatalog, ct);
+            var legacyVentas = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, userId, VentasBinding, ventasCatalog, ct);
             permissions.RemoveAll(x => x.StartsWith($"{VentasModuleKey}.", StringComparison.OrdinalIgnoreCase) && !VentasWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
             permissions.AddRange(legacyVentas.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+        }
+        // Empleados: lo mismo que ventas. Si Mac31 no tiene la forma dada de
+        // alta, empleadosCatalog viene vacio y NO se borra nada — asi una base
+        // sin ese modulo se queda con lo que diga el web, en vez de quedarse
+        // sin permisos de empleados de golpe.
+        if (empleadosCatalog.Count > 0)
+        {
+            var legacyEmpleados = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, userId, EmpleadosBinding, empleadosCatalog, ct);
+            permissions.RemoveAll(x => x.StartsWith($"{EmpleadosModuleKey}.", StringComparison.OrdinalIgnoreCase) && !EmpleadosWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
+            permissions.AddRange(legacyEmpleados.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+
+            // QUIEN VE LA FORMA EN MAC31 VE EL MODULO EN EL WEB.
+            //
+            // "empleados.ver_modulo" no existe en legacy —es una llave del web,
+            // la que decide si la tarjeta sale en el inicio—, asi que sin esta
+            // linea habria que darla A MANO desde la pantalla de permisos a
+            // cada quien que ya tiene el permiso en Mac31. Eso es justo la
+            // doble captura que este puente viene a quitar.
+            //
+            // Medido en la base de Tauro: JAZMIN tiene los cuatro botones de
+            // ConsultaEmpleados en Mac31, pero su rol web (EMPLEADOS) no tiene
+            // "empleados.ver_modulo"; sin esta derivacion entraria por URL pero
+            // no veria la tarjeta en el inicio.
+            //
+            // No sirve el parche de PermissionAuthorizationHandler (".ver"
+            // satisface ".ver_modulo"): ese solo corre al autorizar un endpoint.
+            // ModulosController compara la clave EXACTA contra el snapshot, asi
+            // que la llave tiene que estar aqui dentro.
+            if (legacyEmpleados.Allow.Contains("empleados.ver")
+                && !permissions.Any(x => string.Equals(x, EmpleadosViewPermission, StringComparison.OrdinalIgnoreCase)))
+            {
+                permissions.Add(EmpleadosViewPermission);
+            }
+        }
+        // Prestamos: exactamente el mismo puente que empleados. Si Mac31 no
+        // tiene la forma dada de alta, prestamosCatalog viene vacio y NO se
+        // borra nada — una base sin ese modulo se queda con lo que diga el web
+        // en vez de quedarse sin permisos de prestamos de golpe.
+        if (prestamosCatalog.Count > 0)
+        {
+            var legacyPrestamos = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, userId, PrestamosBinding, prestamosCatalog, ct);
+            permissions.RemoveAll(x => x.StartsWith($"{PrestamosModuleKey}.", StringComparison.OrdinalIgnoreCase) && !PrestamosWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
+            permissions.AddRange(legacyPrestamos.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+
+            // QUIEN VE LA FORMA EN MAC31 VE EL MODULO EN EL WEB.
+            //
+            // Mismo motivo que en empleados: "prestamos.ver_modulo" no existe en
+            // legacy —es la llave del web que decide si la tarjeta sale en el
+            // inicio—, asi que sin esta linea habria que darla A MANO a cada
+            // quien que ya tiene el boton en Mac31, que es justo la doble
+            // captura que este puente viene a quitar.
+            //
+            // Se deriva de "prestamos.ver" y no de los de escribir: quien puede
+            // MODIFICAR pero no VER no existe en Mac31 (btnVer y btnModificar
+            // son permisos aparte, pero el que solo tiene modificar igual abre
+            // la misma forma). Ver el modulo es el minimo comun.
+            if (legacyPrestamos.Allow.Contains("prestamos.ver")
+                && !permissions.Any(x => string.Equals(x, PrestamosViewPermission, StringComparison.OrdinalIgnoreCase)))
+            {
+                permissions.Add(PrestamosViewPermission);
+            }
         }
         return new PermissionSnapshot
         {
@@ -1944,12 +2142,13 @@ WHERE EmpresaId = @EmpresaId
             await SyncLegacyReportPermissionsForUserAsync(conn, schema, empresaId, user.UserId, user.Rol, reportCatalog, ct);
     }
 
-    private async Task<Dictionary<string, VentasPermissionInfo>> EnsureLegacyVentasPermissionsSyncedAsync(
+    private async Task<Dictionary<string, VentasPermissionInfo>> EnsureLegacyModulePermissionsSyncedAsync(
         SqlConnection conn,
         int empresaId,
+        LegacyModuleBinding binding,
         CancellationToken ct)
     {
-        var ventasCatalog = await LoadLegacyVentasCatalogAsync(conn, ct);
+        var ventasCatalog = await LoadLegacyModuleCatalogAsync(conn, binding, ct);
         if (!await TableExistsAsync(conn, "WPermiso", ct))
             return ventasCatalog.ToDictionary(x => x.Key, StringComparer.OrdinalIgnoreCase);
 
@@ -1971,14 +2170,14 @@ BEGIN
     VALUES (@EmpresaId, @ModuloClave, @Nombre, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
 END", conn);
             moduleCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
-            moduleCmd.Parameters.Add(new SqlParameter("@ModuloClave", SqlDbType.NVarChar, 120) { Value = VentasModuleKey });
-            moduleCmd.Parameters.Add(new SqlParameter("@Nombre", SqlDbType.NVarChar, 200) { Value = "Ventas" });
+            moduleCmd.Parameters.Add(new SqlParameter("@ModuloClave", SqlDbType.NVarChar, 120) { Value = binding.ModuleKey });
+            moduleCmd.Parameters.Add(new SqlParameter("@Nombre", SqlDbType.NVarChar, 200) { Value = binding.ModuleName });
             await moduleCmd.ExecuteNonQueryAsync(ct);
         }
 
         var permissionRows = ventasCatalog
-            .Select(x => new PermissionSeed(x.Key, x.Name, VentasModuleKey))
-            .Concat(VentasWebPermissionSeeds)
+            .Select(x => new PermissionSeed(x.Key, x.Name, binding.ModuleKey))
+            .Concat(binding.WebSeeds)
             .GroupBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
             .Select(x => x.First())
             .ToList();
@@ -2002,14 +2201,14 @@ END", conn);
             cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
             cmd.Parameters.Add(new SqlParameter("@Clave", SqlDbType.NVarChar, 200) { Value = seed.Key });
             cmd.Parameters.Add(new SqlParameter("@Nombre", SqlDbType.NVarChar, 200) { Value = seed.Name });
-            cmd.Parameters.Add(new SqlParameter("@Descripcion", SqlDbType.NVarChar, 500) { Value = VentasWebPermissionSeeds.Any(x => x.Key.Equals(seed.Key, StringComparison.OrdinalIgnoreCase)) ? "ventas.web" : "ventas.legacy" });
+            cmd.Parameters.Add(new SqlParameter("@Descripcion", SqlDbType.NVarChar, 500) { Value = binding.WebSeeds.Any(x => x.Key.Equals(seed.Key, StringComparison.OrdinalIgnoreCase)) ? $"{binding.ModuleKey}.web" : $"{binding.ModuleKey}.legacy" });
             await cmd.ExecuteNonQueryAsync(ct);
         }
 
         return ventasCatalog.ToDictionary(x => x.Key, StringComparer.OrdinalIgnoreCase);
     }
 
-    private static async Task<List<VentasPermissionInfo>> LoadLegacyVentasCatalogAsync(SqlConnection conn, CancellationToken ct)
+    private static async Task<List<VentasPermissionInfo>> LoadLegacyModuleCatalogAsync(SqlConnection conn, LegacyModuleBinding binding, CancellationToken ct)
     {
         if (!await TableExistsAsync(conn, "n_Formas", ct) || !await TableExistsAsync(conn, "n_Procesos", ct))
             return new List<VentasPermissionInfo>();
@@ -2027,7 +2226,7 @@ INNER JOIN dbo.n_Procesos p
 WHERE UPPER(LTRIM(RTRIM(f.Descripcion))) = @Forma
   AND ISNULL(p.IDStatus, 1) = 1
 ORDER BY COALESCE(p.Orden, 0), p.IDProceso;", conn);
-        cmd.Parameters.Add(new SqlParameter("@Forma", SqlDbType.NVarChar, 200) { Value = VentasLegacyForm });
+        cmd.Parameters.Add(new SqlParameter("@Forma", SqlDbType.NVarChar, 200) { Value = binding.LegacyForm });
 
         var list = new List<VentasPermissionInfo>();
         await using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -2036,7 +2235,12 @@ ORDER BY COALESCE(p.Orden, 0), p.IDProceso;", conn);
             var processCode = reader.IsDBNull(reader.GetOrdinal("Proceso"))
                 ? string.Empty
                 : reader.GetString(reader.GetOrdinal("Proceso"));
-            if (!VentasLegacyPermissionMap.TryGetValue(processCode, out var mapped))
+            // El Trim() es lo UNICO que cambia respecto de como estaba antes
+            // solo para ventas: un Proceso guardado en n_Procesos con un
+            // espacio al final ("btnBuscar ") antes no empataba con el mapa y
+            // se perdia el permiso en silencio. Se deja porque el espacio es
+            // un error de captura, no una forma de negar un permiso.
+            if (!binding.Map.TryGetValue(processCode.Trim(), out var mapped))
                 continue;
 
             var info = new VentasPermissionInfo(
@@ -2055,10 +2259,11 @@ ORDER BY COALESCE(p.Orden, 0), p.IDProceso;", conn);
         return list;
     }
 
-    private static async Task<(HashSet<string> Allow, HashSet<string> Deny)> LoadLegacyVentasPermissionsForUserAsync(
+    private static async Task<(HashSet<string> Allow, HashSet<string> Deny)> LoadLegacyModulePermissionsForUserAsync(
         SqlConnection conn,
         int empresaId,
         Guid userId,
+        LegacyModuleBinding binding,
         IReadOnlyDictionary<string, VentasPermissionInfo> ventasCatalog,
         CancellationToken ct)
     {
@@ -2083,7 +2288,7 @@ LEFT JOIN dbo.[Usuario Forma Procesos] ufp
 WHERE UPPER(LTRIM(RTRIM(f.Descripcion))) = @Forma
   AND ISNULL(p.IDStatus, 1) = 1;", conn);
         cmd.Parameters.Add(new SqlParameter("@IDUsuario", SqlDbType.Int) { Value = legacyUserId.Value });
-        cmd.Parameters.Add(new SqlParameter("@Forma", SqlDbType.NVarChar, 200) { Value = VentasLegacyForm });
+        cmd.Parameters.Add(new SqlParameter("@Forma", SqlDbType.NVarChar, 200) { Value = binding.LegacyForm });
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct))
         {
@@ -2098,7 +2303,7 @@ WHERE UPPER(LTRIM(RTRIM(f.Descripcion))) = @Forma
         return (allow, deny);
     }
 
-    private async Task SyncLegacyVentasPermissionsForUserAsync(
+    private async Task SyncLegacyModulePermissionsForUserAsync(
         SqlConnection conn,
         CapabilitySchema schema,
         int empresaId,
@@ -2147,7 +2352,7 @@ WHERE UPPER(LTRIM(RTRIM(f.Descripcion))) = @Forma
         }
     }
 
-    private async Task SyncLegacyVentasPermissionsForRoleAsync(
+    private async Task SyncLegacyModulePermissionsForRoleAsync(
         SqlConnection conn,
         CapabilitySchema schema,
         int empresaId,
@@ -2173,7 +2378,7 @@ WHERE EmpresaId = @EmpresaId
         }
 
         foreach (var user in users)
-            await SyncLegacyVentasPermissionsForUserAsync(conn, schema, empresaId, user.UserId, user.Rol, ventasCatalog, ct);
+            await SyncLegacyModulePermissionsForUserAsync(conn, schema, empresaId, user.UserId, user.Rol, ventasCatalog, ct);
     }
 
     private static async Task<HashSet<string>> LoadEffectivePermissionsFromWebAsync(
@@ -2259,7 +2464,9 @@ WHERE t.name = @TableName
         string code,
         string name,
         IReadOnlyDictionary<string, ReportPermissionInfo> reportCatalog,
-        IReadOnlyDictionary<string, VentasPermissionInfo> ventasCatalog)
+        IReadOnlyDictionary<string, VentasPermissionInfo> ventasCatalog,
+        IReadOnlyDictionary<string, VentasPermissionInfo> empleadosCatalog,
+        IReadOnlyDictionary<string, VentasPermissionInfo> prestamosCatalog)
     {
         if (reportCatalog.TryGetValue(code, out var report))
         {
@@ -2289,6 +2496,41 @@ WHERE t.name = @TableName
                 CategoryName = venta.CategoryName,
                 LegacyFormId = venta.LegacyFormId,
                 LegacyProcessId = venta.LegacyProcessId
+            };
+        }
+
+        // Empleados: se marca con su IDForma/IDProceso de Mac31 para que la
+        // pantalla de permisos ensene de donde sale y no parezca un permiso
+        // que se pueda dar desde el web.
+        if (empleadosCatalog.TryGetValue(code, out var empleado))
+        {
+            return new PermisosWebPermissionItem
+            {
+                Code = empleado.Key,
+                Name = empleado.Name,
+                ModuleKey = EmpleadosModuleKey,
+                ModuleName = "Empleados",
+                CategoryKey = empleado.CategoryKey,
+                CategoryName = empleado.CategoryName,
+                LegacyFormId = empleado.LegacyFormId,
+                LegacyProcessId = empleado.LegacyProcessId
+            };
+        }
+
+        // Prestamos: igual que empleados, se marca con su IDForma/IDProceso de
+        // Mac31 para que la pantalla de permisos ensene de donde sale.
+        if (prestamosCatalog.TryGetValue(code, out var prestamo))
+        {
+            return new PermisosWebPermissionItem
+            {
+                Code = prestamo.Key,
+                Name = prestamo.Name,
+                ModuleKey = PrestamosModuleKey,
+                ModuleName = "Prestamos",
+                CategoryKey = prestamo.CategoryKey,
+                CategoryName = prestamo.CategoryName,
+                LegacyFormId = prestamo.LegacyFormId,
+                LegacyProcessId = prestamo.LegacyProcessId
             };
         }
 

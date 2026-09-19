@@ -50,6 +50,39 @@ public class PrestamosService : IPrestamosService
         if (!request.PagoInmediato && request.MontoPagos <= 0)
             throw new ArgumentException("El descuento semanal debe ser mayor que cero.");
 
+        // TRES REGLAS DE MAC31 QUE FALTABAN AQUI.
+        //
+        // Estan en Prestamos.cs, metodo Validaciones(), y el procedimiento NO
+        // las revisa: sp_n_InsertaEmpleadoPrestamos inserta lo que le manden.
+        // O sea que sin estas lineas el web podia guardar prestamos que Mac31
+        // nunca habria dejado capturar, y la diferencia solo se notaria semanas
+        // despues, cuando el descuento semanal no cuadrara.
+        //
+        // Se repiten en el front (nucleo/prestamos.ts, revisarNuevoPrestamo)
+        // para avisar antes de mandar; aqui viven porque el movil entra por la
+        // misma puerta y una validacion que solo esta en el navegador no es una
+        // validacion.
+
+        // Prestamos.cs:389 — el descuento no puede ser mayor que la deuda: se
+        // cobraria de mas en el primer pago.
+        if (!request.PagoInmediato && request.MontoPagos > request.MontoPrestamo)
+            throw new ArgumentException("El monto de los pagos no puede ser mayor al monto del prestamo.");
+
+        // Prestamos.cs:412 — no se puede empezar a descontar antes de haber
+        // prestado. Mac31 compara fechaPrestamo > fechaInicioPagos; el mensaje
+        // de alla dice lo contrario de lo que revisa, asi que se conserva LA
+        // REGLA y se redacta el aviso como lo que de verdad pasa.
+        if (!request.PagoInmediato
+            && request.FechaInicioPagos is not null
+            && request.FechaPrestamo!.Value.Date > request.FechaInicioPagos.Value.Date)
+            throw new ArgumentException("La fecha de inicio de los pagos no puede ser anterior a la fecha del prestamo.");
+
+        // Prestamos.cs:421 — el motivo es obligatorio. Es la unica explicacion
+        // de por que existe el prestamo, y es lo primero que se busca cuando
+        // alguien reclama un descuento en su recibo.
+        if (string.IsNullOrWhiteSpace(request.MotivoPrestamo))
+            throw new ArgumentException("Ingrese el motivo del prestamo.");
+
         // Se pregunta ANTES de insertar: despues del alta ya hay un prestamo
         // abierto de todas formas y no se podria distinguir.
         var yaTenia = await _repository.TienePrestamoAbiertoAsync(request.IdEmpleado, ct);
@@ -95,6 +128,14 @@ public class PrestamosService : IPrestamosService
         if (TieneFecha(prestamo, "fechaPago"))
             throw new ConflictException("El prestamo ya esta pagado: ya no se puede cambiar su descuento semanal.");
 
+        // La misma regla de Prestamos.cs:389, tambien al modificar: en Mac31 el
+        // boton GUARDAR corre Validaciones() completo, no solo en el alta.
+        // Faltaba aqui, y el hueco era peor que en el alta: este endpoint
+        // existe justamente para cambiar ese numero.
+        var montoPrestamo = ADecimal(prestamo, "montoPrestamo");
+        if (montoPrestamo > 0 && montoPagos > montoPrestamo)
+            throw new ArgumentException("El monto de los pagos no puede ser mayor al monto del prestamo.");
+
         var idEmpleado = AEntero(prestamo, "idEmpleado");
         var resultado = await _repository.ActualizarMontoPagosAsync(idEmpleadoPrestamo, idEmpleado, montoPagos, idUsuario, ct);
         if (!resultado.Ok)
@@ -133,6 +174,11 @@ public class PrestamosService : IPrestamosService
     /// </summary>
     private static bool TieneFecha(Dictionary<string, object?> row, string llave)
         => row.TryGetValue(llave, out var v) && v is not null;
+
+    private static decimal ADecimal(Dictionary<string, object?> row, string llave)
+        => row.TryGetValue(llave, out var v) && v is not null
+            ? Convert.ToDecimal(v, CultureInfo.InvariantCulture)
+            : 0m;
 
     private static int AEntero(Dictionary<string, object?> row, string llave)
         => row.TryGetValue(llave, out var v) && v is not null

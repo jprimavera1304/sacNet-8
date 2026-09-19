@@ -38,7 +38,11 @@ public class AsistenciasController : PermisoControllerBase
     /// <summary>
     /// Periodos de nomina para el combo, del mas nuevo al mas viejo.
     /// </summary>
-    /// <param name="idTipoSueldo">0 = todos. 1 nomina, 2 comision.</param>
+    /// <param name="idTipoSueldo">
+    /// Sin valor (o 0) se entiende 1 = NOMINA, que es el unico que tiene dias
+    /// generados y por tanto el unico que puede producir una rejilla. Ver
+    /// AsistenciasService.ConsultarPeriodosAsync.
+    /// </param>
     /// <param name="top">Cuantos traer. Default 52 (un anio).</param>
     [HttpGet("periodos")]
     [ProducesResponseType(StatusCodes.Status200OK)]
