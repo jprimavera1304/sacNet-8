@@ -106,6 +106,22 @@ public class VentasConsultaController : ControllerBase
       estado de la venta en el momento en que se pide (cancelaciones,
       devoluciones y pagos cambian despues de emitida).
     */
+    /*
+      DOS DIRECCIONES PARA LA MISMA HOJA, Y LA CORTA ES LA BUENA
+
+      Lo que se ve en la barra cuando alguien abre una remision era
+      "/api/ventas/consulta/reporte/pdf?t=...": el organigrama del backend
+      colgado en la pantalla de una persona que solo queria un papel. "/remision"
+      dice lo mismo y cabe en la barra junto al pase.
+
+      La ruta empieza con "/" para salirse del prefijo del controlador; no se
+      mueve de archivo porque es la MISMA accion, no una copia.
+
+      La vieja se queda por una razon concreta: el pase dura diez minutos, asi
+      que durante un despliegue hay pestañas ya abiertas apuntando a la
+      direccion anterior. Quitarla les daria 404 a media jornada.
+    */
+    [HttpGet("/remision")]
     [HttpGet("reporte/pdf")]
     [AllowAnonymous]
     public async Task<IActionResult> ReportePdf([FromQuery] string? t, CancellationToken ct)
@@ -147,6 +163,6 @@ public class VentasConsultaController : ControllerBase
     private string BuildRemisionUrl(string ticket)
     {
         var pathBase = Request.PathBase.HasValue ? Request.PathBase.Value : "";
-        return $"{Request.Scheme}://{Request.Host}{pathBase}/api/ventas/consulta/reporte/pdf?t={Uri.EscapeDataString(ticket)}";
+        return $"{Request.Scheme}://{Request.Host}{pathBase}/remision?t={Uri.EscapeDataString(ticket)}";
     }
 }

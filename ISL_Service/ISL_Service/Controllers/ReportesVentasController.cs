@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.Reportes;
+﻿using ISL_Service.Application.DTOs.Reportes;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Reports;
 using Microsoft.AspNetCore.Authorization;
@@ -231,7 +231,13 @@ public class ReportesVentasController : ControllerBase
         }
 
         var result = await _service.ConsultarReporteVentasPorParametrosAsync(psp, ct);
-        var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(result.Html, result.Orientacion, ct);
+        /* El nombre del reporte es lo que se lee en la pestaña; sin el decia "pdf",
+           que es el ultimo pedazo de la direccion. Ver RenderAsync. */
+        var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(
+            result.Html,
+            result.Orientacion,
+            result.NombreReporte,
+            ct);
         Response.Headers["Cache-Control"] = "no-store";
         return File(pdf, "application/pdf");
     }

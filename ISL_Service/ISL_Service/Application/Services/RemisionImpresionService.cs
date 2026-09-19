@@ -85,8 +85,10 @@ public class RemisionImpresionService : IRemisionImpresionService
                 : "No se pudo obtener la informacion de las remisiones.");
         }
 
+        var folio = Valor(ventas[0].Detalle.Rows.Count > 0 ? ventas[0].Detalle.Rows[0] : null, "folio");
+
         var html = RemisionHtmlBuilder.Construir(ventas, plantillas, Copias);
-        var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(html, Orientacion, ct);
+        var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(html, Orientacion, TituloDePestana(folio, ventas.Count), ct);
 
         return new RemisionPdf
         {
@@ -136,16 +138,38 @@ public class RemisionImpresionService : IRemisionImpresionService
                 : "No se pudo obtener la informacion de las remisiones.");
         }
 
-        var html = RemisionZaragozaHtmlBuilder.Construir(ventas, plantillas, logos.Logo, logos.MarcaDeAgua);
-        var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(html, Orientacion, ct);
-
         var primera = ventas[0].Rows[0];
+
+        var html = RemisionZaragozaHtmlBuilder.Construir(ventas, plantillas, logos.Logo, logos.MarcaDeAgua);
+        var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(
+            html,
+            Orientacion,
+            TituloDePestana(Valor(primera, "folio"), ventas.Count),
+            ct);
 
         return new RemisionPdf
         {
             Contenido = pdf,
             NombreArchivo = NombreArchivoDe("zaragoza", primera)
         };
+    }
+
+    /*
+      LO QUE SE LEE EN LA PESTAÑA MIENTRAS SE VE EL PAPEL
+
+      Va el FOLIO y no el nombre del modulo: quien imprime en mostrador suele
+      tener varias remisiones abiertas a la vez, y lo unico que las distingue
+      entre si es el folio. "Reporte" repetido seis veces no sirve para nada.
+
+      Corto a proposito —una pestaña deja leer unos quince caracteres— y sin el
+      nombre de la empresa, igual que hace el resto del front (nucleo/pestana.ts).
+    */
+    private static string TituloDePestana(string folio, int cuantas)
+    {
+        if (cuantas > 1)
+            return $"Remisiones ({cuantas})";
+
+        return string.IsNullOrWhiteSpace(folio) ? "Remisión" : $"Remisión {folio}";
     }
 
     /*
