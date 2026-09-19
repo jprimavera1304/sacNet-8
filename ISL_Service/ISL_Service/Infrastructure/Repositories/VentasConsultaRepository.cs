@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using ISL_Service.Application.DTOs.VentasConsulta;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Data;
@@ -135,6 +135,61 @@ public class VentasConsultaRepository : IVentasConsultaRepository
 
         var connector = new Mac3SqlServerConnector(cs);
         return connector.GetConnection;
+    }
+
+    /*
+      REGISTRAR LOS PARAMETROS DEL REPORTE
+
+      Es el mismo procedimiento que llama Mac31 (sp_n_ActualizarParametro) con
+      los mismos parametros y en el mismo formato. Ver Funciones.VerVenta en
+      Legacy/Mac31/Utils/Funciones.cs:
+
+        Param1 = "<equipo>[<idUsuario>"   (el corchete es el separador, no un typo)
+        Param2 = los IDVenta unidos con "~"
+        Param3 = IDDescuento
+        Param4 = SimularConCascos
+
+      NO se escribe una version "limpia" de esto: la pagina de reportes lee esos
+      campos posicionalmente y con esos separadores. Cambiar uno es romper el
+      reporte sin que nada avise.
+    */
+    public async Task<int> RegistrarParametrosReporteAsync(
+        string nombreEquipo,
+        int idUsuario,
+        int idReporte,
+        string idsVenta,
+        CancellationToken ct)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand("sp_n_ActualizarParametro", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = CommandTimeoutSeconds
+        };
+
+        cmd.Parameters.AddWithValue("@NombreEquipo", nombreEquipo);
+        cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
+        cmd.Parameters.AddWithValue("@IDReporte", idReporte);
+        cmd.Parameters.AddWithValue("@Param1", $"{nombreEquipo}[{idUsuario}");
+        cmd.Parameters.AddWithValue("@Param2", idsVenta);
+        cmd.Parameters.AddWithValue("@Param3", "0");
+        cmd.Parameters.AddWithValue("@Param4", "0");
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct))
+            throw new InvalidOperationException("sp_n_ActualizarParametro no devolvio resultado.");
+
+        var result = reader.GetInt32(reader.GetOrdinal("result"));
+        if (result != 1)
+        {
+            var mensaje = reader.GetString(reader.GetOrdinal("mensaje"));
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(mensaje) ? "No se pudieron guardar los parametros del reporte." : mensaje);
+        }
+
+        return reader.GetInt32(reader.GetOrdinal("ID"));
     }
 
     private static void AddVentasCommonParams(SqlCommand cmd, VentasConsultaRequest request)

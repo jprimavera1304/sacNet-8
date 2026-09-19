@@ -1,4 +1,4 @@
-namespace ISL_Service.Application.DTOs.VentasConsulta;
+﻿namespace ISL_Service.Application.DTOs.VentasConsulta;
 
 public class VentasConsultaCatalogoItem
 {
@@ -71,4 +71,39 @@ public class VentasConsultaRowsResponse
 {
     public List<Dictionary<string, object?>> Rows { get; set; } = new();
     public int Total { get; set; }
+}
+
+/*
+  ABRIR EL REPORTE DE UNA REMISION
+
+  El reporte NO se genera aqui. Ya existe: es la misma pagina web que abre Mac31
+  (el modulo MacReportes), y lo unico que hace falta para llegar a ella es dejar
+  los parametros en la tabla Parametros y devolver la direccion.
+
+  Reusarla en vez de reescribirla no es pereza: es la unica forma de que el
+  formato sea IDENTICO. Un reporte reescrito se parece el primer dia y se
+  separa en cuanto alguien toque uno de los dos — y este es el papel que se le
+  entrega al cliente.
+*/
+public class VentasReporteRequest
+{
+    /// Las ventas a incluir. Mac31 manda varias cuando hay varias marcadas.
+    public List<int> IdsVenta { get; set; } = new();
+
+    /// 5 = Remision, que es el que abre la pantalla de consulta. Se deja
+    /// parametrizable porque el mismo mecanismo sirve para los demas reportes.
+    public int IdReporte { get; set; } = 5;
+
+    /// 0 = ver en pantalla, 1 = descargar. Es el parametro "d" de la direccion.
+    public int Descargar { get; set; }
+}
+
+public class VentasReporteResponse
+{
+    public bool Ok { get; set; }
+    public string Message { get; set; } = string.Empty;
+    /// El renglon que se acaba de dejar en Parametros.
+    public int IdParametros { get; set; }
+    /// La direccion completa, lista para abrirse en otra pestaña.
+    public string Url { get; set; } = string.Empty;
 }
