@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Data;
 using ISL_Service.Infrastructure.Reports;
@@ -38,6 +38,18 @@ public class RemisionImpresionRepository : IRemisionImpresionRepository
 
     /// 1 = Mac3, la aplicacion de la que cuelgan las plantillas de la remision.
     private const int IdAplicacionMac3 = 1;
+
+    /*
+      LOS DOS NUMEROS DE LA REMISION DE ZARAGOZA.
+
+      1202 "Remision Zaragoza Generico" es la que imprime Mac31 hoy. 1201
+      "Remision Sin Precio" es la que elige el codigo de MacServicios2 que
+      tenemos a la vista. Se prefiere la 1202 cuando la base la tiene y se cae a
+      la 1201 cuando no: asi sale lo que la gente ve en su pantalla, sin
+      depender de cual de las dos versiones del servicio este publicada.
+    */
+    private const int IdReporteRemisionZaragoza = 1202;
+    private const int IdReporteRemisionZaragozaPrevia = 1201;
 
     /// 0 = usados que se entregan en esta venta, 1 = los que quedaron de antes.
     private const int UsadosCreditoActual = 0;
@@ -167,6 +179,137 @@ public class RemisionImpresionRepository : IRemisionImpresionRepository
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         tabla.Load(reader);
         return tabla;
+    }
+
+    public async Task<string> ConsultarFuncionalidadAsync(CancellationToken ct)
+    {
+        var constantes = await ConsultarConstantesAsync(ct);
+        return constantes.Rows.Count > 0 ? Celda(constantes.Rows[0], "Funcionalidad") : "";
+    }
+
+    public async Task<RemisionLogos> ConsultarLogosAsync(CancellationToken ct)
+    {
+        var constantes = await ConsultarConstantesAsync(ct);
+        if (constantes.Rows.Count == 0)
+            return new RemisionLogos();
+
+        var fila = constantes.Rows[0];
+
+        /*
+          Igual que en la remision de Tauro: legacy usa PathImagenes, que es una
+          carpeta local del servidor donde corre MacReportes. Este backend no
+          corre ahi, asi que si la carpeta no existe se usa PathImagenesServer,
+          que es la MISMA carpeta publicada por http. Sin esto el logo sale como
+          imagen rota.
+        */
+        var local = Celda(fila, "PathImagenes");
+        var ruta = local != "" && Directory.Exists(local) ? local : Celda(fila, "PathImagenesServer");
+        if (ruta == "") ruta = local;
+
+        return new RemisionLogos
+        {
+            Logo = ruta + Celda(fila, "LogoMacReportes"),
+            MarcaDeAgua = ruta + Celda(fila, "LogoMacWM")
+        };
+    }
+
+    public async Task<DataTable> ConsultarPlantillasZaragozaAsync(CancellationToken ct)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        var plantillas = await PlantillasDeAsync(conn, IdReporteRemisionZaragoza, ct);
+        if (plantillas.Rows.Count > 0)
+            return plantillas;
+
+        return await PlantillasDeAsync(conn, IdReporteRemisionZaragozaPrevia, ct);
+    }
+
+    public async Task<RemisionZaragozaResultado> ConsultarDatosVentaZaragozaAsync(
+        int idVenta,
+        int idUsuarioImpresion,
+        CancellationToken ct)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        var datos = await LlenarAsync(
+            conn,
+            "sp_n_rptVentasRemisionSinPrecio",
+            new Dictionary<string, object>
+            {
+                ["@IDVenta"] = idVenta,
+                ["@IDUsuarioImpresion"] = idUsuarioImpresion,
+                /*
+                  Sin equipo y sin primera impresion, por lo mismo que en Tauro:
+                  pedir primera impresion haria que el procedimiento RECHAZARA
+                  toda remision que alguien ya imprimio, que es justo la que se
+                  consulta desde el web.
+                */
+                ["@EquipoImpresion"] = "",
+                ["@PrimerImpresion"] = 0,
+                ["@Reimpresion"] = 0
+            },
+            ct);
+
+        if (datos.Rows.Count == 0)
+            return new RemisionZaragozaResultado { Mensaje = $"La venta {idVenta} no existe." };
+
+        var fila = datos.Rows[0];
+        if (datos.Columns.Contains("result") && Celda(fila, "result") == "0")
+        {
+            return new RemisionZaragozaResultado
+            {
+                Mensaje = Celda(fila, "mensaje") is { Length: > 0 } m ? m : $"No se puede imprimir la venta {idVenta}."
+            };
+        }
+
+        return new RemisionZaragozaResultado { Datos = datos };
+    }
+
+    private async Task<DataTable> PlantillasDeAsync(SqlConnection conn, int idReporte, CancellationToken ct)
+        => await LlenarAsync(
+            conn,
+            "sp_n_ConsultaTemplateHtml",
+            new Dictionary<string, object>
+            {
+                ["@IDTemplateHtml"] = 0,
+                ["@IDTipoTemplateHtml"] = idReporte,
+                ["@IDAplicacion"] = IdAplicacionMac3,
+                ["@IDStatus"] = 0
+            },
+            ct);
+
+    private async Task<DataTable> ConsultarConstantesAsync(CancellationToken ct)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        /*
+          Sin validar actividad: aqui solo se quieren las rutas de las imagenes y
+          la funcionalidad de la empresa. Con @ValidaActividad en 1 el
+          procedimiento ademas registra al usuario, y esto no es una accion del
+          usuario, es armar un papel.
+        */
+        return await LlenarAsync(
+            conn,
+            "sp_n_ConsultaConstantes",
+            new Dictionary<string, object>
+            {
+                ["@ValidaActividad"] = 0,
+                ["@IDUsuario"] = 0,
+                ["@Equipo"] = ""
+            },
+            ct);
+    }
+
+    private static string Celda(DataRow fila, string columna)
+    {
+        if (!fila.Table.Columns.Contains(columna))
+            return "";
+
+        var valor = fila[columna];
+        return valor == DBNull.Value ? "" : Convert.ToString(valor) ?? "";
     }
 
     private SqlConnection GetConnection()
