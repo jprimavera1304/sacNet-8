@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Globalization;
 using System.Text;
 using ISL_Service.Application.DTOs.VentasPedidoCaptura;
@@ -150,7 +150,7 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         {
             domicilios = DataTableToRows(await ConsultarDomiciliosAsync(conn, idCliente, request.IDEmpresaCS, ct));
             saldos = DataTableToRows(await ConsultarSaldosClienteWebAsync(conn, idCliente, ct));
-            AgregarDisponible(saldos, clientes, idCliente);
+            await AgregarDisponibleAsync(conn, saldos, clientes, idCliente, ct);
         }
 
         return new PedidoClienteContextResponse
@@ -303,17 +303,34 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
     }
 
     // Disponible = LimiteCredito - SaldoPendiente - SaldoVencido, igual que legacy
-    // (Ventas.cs:1692). El limite viene de sp_n_ConsultaClientes (Clientes.[Limite
-    // Credito]); los saldos, de la consulta de saldos. Se agrega al row de saldos
-    // para que el movil lo mande como @Disponible al capturar el pedido: con eso
-    // el ruteo a "pendientes de autorizar" queda igual que legacy. Sin esto el
-    // disponible iba 0 y CUALQUIER pedido con total > 0 requeria autorizacion.
+    // (Ventas.cs:1692). Los saldos salen de la consulta de saldos; el LIMITE
+    // depende de la funcionalidad de la empresa y ahi estaba el error:
     //
-    // Nota: para clientes TAU el limite real lo calcula un servicio de credito por
-    // promedio de pagos; aqui se usa el limite estatico del cliente, que es la
-    // fuente correcta para el flujo estandar (ZARA).
-    private static void AgregarDisponible(
-        List<Dictionary<string, object?>> saldos, DataTable clientes, int idCliente)
+    //   ZARA  -> el limite estatico del cliente, Clientes.[Limite Credito].
+    //   TAU   -> NO es el estatico. Mac31 llama a un servicio de credito
+    //            (Ventas.cs:1630, CreditoDisponible) que detras es
+    //            sp_n_ConsultaCreditoDisponible, y ese calcula el limite con el
+    //            PROMEDIO DE PAGOS de los ultimos N meses: si el promedio no es
+    //            cero, el limite ES el promedio; si es cero, se queda con
+    //            Constantes.MaxIncrementoLimCred. O sea, en Tauro el credito se
+    //            gana pagando.
+    //
+    // Antes aqui se usaba el estatico para las dos, y para Tauro eso daba un
+    // limite distinto al que enseña Mac31 — comprobado con el cliente 5: la
+    // pantalla decia 10,000 (el estatico) y Mac31 5,000 (el calculado), asi que
+    // el disponible salia 800 pesos mas alto que el real.
+    //
+    // NO ES SOLO COSMETICO: este disponible se manda como @Disponible al
+    // capturar, y con el legacy decide si el pedido se va a "pendientes de
+    // autorizar". Con el limite equivocado, pedidos que requerian visto bueno
+    // podian pasar directo. Afecta igual a la app movil, que consume este mismo
+    // endpoint.
+    private async Task AgregarDisponibleAsync(
+        SqlConnection conn,
+        List<Dictionary<string, object?>> saldos,
+        DataTable clientes,
+        int idCliente,
+        CancellationToken ct)
     {
         if (saldos.Count == 0) return;
 
@@ -327,10 +344,52 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
 
         var limite = ReadDecimal(clienteRow, "LimiteCredito", "limiteCredito", "Limite Credito");
         var saldo = saldos[0];
+
+        // Mac31 solo consulta el servicio de credito cuando la funcionalidad
+        // contiene "TAU" (Ventas.cs:1627). Se replica igual: para las demas, el
+        // estatico sigue siendo lo correcto y no se paga una consulta de mas.
+        var funcionalidad = await ConsultarFuncionalidadConCacheAsync(ct);
+        if (funcionalidad.ToUpperInvariant().Contains("TAU"))
+        {
+            var credito = await ConsultarCreditoDisponibleAsync(conn, idCliente, ct);
+            if (credito != null)
+            {
+                limite = ReadDecimal(credito, "LimiteCredito", "limiteCredito");
+
+                // Se devuelven tambien los datos con los que se calculo, porque
+                // Mac31 los enseña ("PAGOS DEL x AL y", "PAGOS $n / N MESES =
+                // $limite") y sin ellos el numero parece salido de la nada.
+                saldo["sumaPagosMeses"] = ReadDecimal(credito, "SumaPagosMeses", "sumaPagosMeses");
+                saldo["promedioPagosMeses"] = ReadDecimal(credito, "PromedioPagosMeses", "promedioPagosMeses");
+                saldo["fechaInicialPagos"] = ReadString(credito, "FechaInicialPagos", "fechaInicialPagos");
+                saldo["fechaFinalPagos"] = ReadString(credito, "FechaFinalPagos", "fechaFinalPagos");
+            }
+        }
+
         var saldoVencido = ReadDecimalFromDictionary(saldo, "saldoVencido", "SaldoVencido");
         var saldoPendiente = ReadDecimalFromDictionary(saldo, "saldoPendiente", "SaldoPendiente");
         saldo["disponible"] = limite - saldoPendiente - saldoVencido;
         saldo["limiteCredito"] = limite;
+    }
+
+    // sp_n_ConsultaCreditoDisponible. Si no esta desplegado o truena, se devuelve
+    // null y el llamador se queda con el limite estatico: es mejor un limite
+    // conservador que dejar a alguien sin poder capturar.
+    private static async Task<DataRow?> ConsultarCreditoDisponibleAsync(
+        SqlConnection conn, int idCliente, CancellationToken ct)
+    {
+        try
+        {
+            await using var cmd = CreateStoredProcedureCommand("sp_n_ConsultaCreditoDisponible", conn);
+            cmd.Parameters.AddWithValue("@IDCliente", idCliente);
+
+            var tabla = await ExecuteFirstTableAsync(cmd, ct);
+            return tabla.Rows.Count > 0 ? tabla.Rows[0] : null;
+        }
+        catch (SqlException)
+        {
+            return null;
+        }
     }
 
     public async Task<PedidoRowsResponse> BuscarProductoAsync(PedidoProductoBuscarRequest request, CancellationToken ct)
@@ -1147,154 +1206,115 @@ ORDER BY Fecha;";
         table.Columns.Add("saldoPendiente", typeof(decimal));
         table.Columns.Add("saldoVencido", typeof(decimal));
         table.Columns.Add("saldo", typeof(decimal));
+        /* Los dias van por categoria porque legacy los cobra por separado: un
+           cliente puede estar al corriente en aceites y vencido en
+           acumuladores. */
+        table.Columns.Add("maxDiasVencidos", typeof(int));
+        table.Columns.Add("maxDiasVencidosAcumuladores", typeof(int));
+        table.Columns.Add("maxDiasVencidosAceites", typeof(int));
+        table.Columns.Add("maxDiasVencidosCascos", typeof(int));
         table.Columns.Add("diasVencimientoMostrar", typeof(string));
-        table.Rows.Add(0m, 0m, 0m, "0/0/0");
+        table.Rows.Add(0m, 0m, 0m, 0, 0, 0, 0, "0");
         return table;
     }
 
+    /*
+      LOS SALDOS SALEN DEL PROCEDIMIENTO DE LEGACY, NO DE UNA CONSULTA NUESTRA
+
+      Aqui habia una consulta escrita a mano que reimplementaba el reporte de
+      saldos: unas ciento veinte lineas de SQL con las reglas de cascos,
+      creditos, centros de servicio y vencimientos. Funcionaba, pero NO daba lo
+      mismo que Mac31, y eso en una pantalla de credito es lo unico que importa.
+      Comprobado con dos clientes:
+
+        cliente 50   la consulta decia 1,018,701   Mac31: 782,141
+        cliente 5    la consulta decia 0           Mac31:  24,725
+
+      La diferencia de fondo es que la nuestra filtraba las ventas por fecha de
+      emision desde 2023 —el limite que legacy usa SOLO para Zaragoza— mientras
+      que el reporte de verdad arma el saldo de otra manera. Perseguir la
+      igualdad a punta de ajustes en nuestro SQL habria sido adivinar.
+
+      Ahora se llama a sp_n_rptVentasSaldos, que es el MISMO que usa Mac31 por
+      debajo (CobranzaPendientesVencidos -> sp_n_rptVentasSaldosPrincipal ->
+      sp_n_rptVentasSaldos) y el mismo que ya usa el panel de saldos de la
+      consulta de ventas. Con eso las tres pantallas dicen el mismo numero, que
+      es el punto.
+
+      Se llama al SP DE ADENTRO y no al Principal a proposito: el Principal hace
+      trabajo extra despues y en esta base truena (error 213 en su segunda
+      pasada), igual que el reporte de PDF de MacReportes. Lo que necesitamos es
+      el detalle por folio, que es justo lo que devuelve el de adentro.
+
+      @Status = 4 -> pendientes y vencidas. Lo pagado no cuenta para el credito.
+
+      La suma se hace aqui y no en SQL porque el SP devuelve un renglon por
+      folio: sumar en C# evita meter el resultado en una tabla temporal cuya
+      definicion tendria que seguir a la del SP cada vez que legacy le agregue
+      una columna.
+    */
     private async Task<DataTable> ConsultarSaldosClienteWebAsync(SqlConnection conn, int idCliente, CancellationToken ct)
     {
         var fecha = await ConsultarFechaOperacionAsync(conn, ct);
         var fechaOperacion = DateTime.TryParse(fecha.FechaOperacion, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
             ? parsed.Date
             : DateTime.Today;
-        var fechaFinal = fechaOperacion.AddDays(1).AddTicks(-1);
 
-        const string sql = """
-            DECLARE @Funcionalidad varchar(100) = '';
-            SELECT TOP 1 @Funcionalidad = UPPER(ISNULL(Funcionalidad, '')) FROM Constantes;
+        var tabla = CrearSaldosClienteFallbackTable();
+        var fila = tabla.Rows[0];
 
-            ;WITH Base AS
-            (
-                SELECT
-                    V.IDVenta,
-                    V.IDCliente,
-                    V.IDTipoDocumento,
-                    V.SoloAceites,
-                    V.[Fecha de Vencimiento] AS FechaVencimiento,
-                    V.FechaVencimientoAceites,
-                    V.FechaVencimientoCascos,
-                    V.[Fecha Pago] AS FechaPago,
-                    CAST(ISNULL(V.Cargos, 0) AS decimal(18, 2)) AS Cargos,
-                    CAST(ISNULL(V.Abonos, 0) AS decimal(18, 2)) AS Abonos,
-                    CAST(ISNULL(V.Descuentos, 0) AS decimal(18, 2)) AS Descuentos,
-                    CAST(ISNULL(V.Creditos, 0) AS decimal(18, 2)) AS Creditos,
-                    CAST(ISNULL(V.[Iva Creditos], 0) AS decimal(18, 2)) AS IvaCreditos,
-                    CAST(ISNULL(V.TotalCostoUsadoCargoConIva, 0) AS decimal(18, 2)) AS Cascos,
-                    CAST(CASE WHEN @Funcionalidad = 'ZARA' THEN ISNULL(V.ImporteConIvaRnd, V.Importe) ELSE ISNULL(V.Importe, 0) END AS decimal(18, 2)) AS Importe,
-                    CASE WHEN V.[Fecha Pago] IS NOT NULL THEN 0 ELSE DATEDIFF(day, V.[Fecha de Vencimiento], @FechaOperacion) END AS DiasVencimiento,
-                    CASE WHEN V.[Fecha Pago] IS NOT NULL AND ISNULL(V.SoloAceites, 0) = 0 THEN 0 ELSE DATEDIFF(day, V.[Fecha de Vencimiento], @FechaOperacion) END AS DiasVencimientoAcumuladores,
-                    CASE WHEN V.[Fecha Pago] IS NOT NULL AND ISNULL(V.SoloAceites, 0) = 1 THEN 0 ELSE DATEDIFF(day, V.FechaVencimientoAceites, @FechaOperacion) END AS DiasVencimientoAceites,
-                    CASE WHEN V.[Fecha Pago] IS NOT NULL AND ISNULL(V.SoloAceites, 0) = 0 THEN 0 ELSE DATEDIFF(day, V.FechaVencimientoCascos, @FechaOperacion) END AS DiasVencimientoCascos
-                FROM Ventas V
-                WHERE V.IDCliente = @IDCliente
-                  AND V.[Fecha Cancelacion] IS NULL
-                  AND V.[Fecha Pago] IS NULL
-                  AND V.[Fecha de Emision] BETWEEN @FechaInicial AND @FechaFinal
-            ),
-            PagosDiff AS
-            (
-                SELECT VP.IDVenta, CAST(SUM(ISNULL(VP.Abono, 0)) AS decimal(18, 2)) AS PagosDiffUsados
-                FROM [Ventas Pagos Usados] VP
-                INNER JOIN Base B ON B.IDVenta = VP.IDVenta
-                WHERE VP.[Fecha Cancelacion] IS NULL
-                GROUP BY VP.IDVenta
-            ),
-            Saldos AS
-            (
-                SELECT
-                    B.*,
-                    CAST(ISNULL(P.PagosDiffUsados, 0) AS decimal(18, 2)) AS PagosDiffUsados,
-                    CAST(
-                        CASE WHEN @Funcionalidad = 'ZARA' AND EXISTS (SELECT 1 FROM CentrosServicio CS WHERE CS.IDCliente = B.IDCliente)
-                            THEN 0
-                            ELSE B.Importe + B.Cargos - B.Descuentos - B.Abonos
-                        END AS decimal(18, 2)
-                    ) AS SaldoDinero,
-                    CAST(
-                        CASE WHEN @Funcionalidad = 'ZARA' AND EXISTS (SELECT 1 FROM CentrosServicio CS WHERE CS.IDCliente = B.IDCliente)
-                            THEN 0
-                            ELSE
-                                CASE
-                                    WHEN (
-                                        CASE WHEN @Funcionalidad = 'ZARA'
-                                            THEN CASE WHEN B.IDTipoDocumento = 6
-                                                THEN B.Cascos - ISNULL(P.PagosDiffUsados, 0)
-                                                ELSE B.Cascos - B.Creditos - B.IvaCreditos - ISNULL(P.PagosDiffUsados, 0)
-                                            END
-                                            ELSE B.Cascos - B.Creditos - B.IvaCreditos
-                                        END
-                                    ) < 0 THEN 0
-                                    WHEN (
-                                        CASE WHEN @Funcionalidad = 'ZARA'
-                                            THEN CASE WHEN B.IDTipoDocumento = 6
-                                                THEN B.Cascos - ISNULL(P.PagosDiffUsados, 0)
-                                                ELSE B.Cascos - B.Creditos - B.IvaCreditos - ISNULL(P.PagosDiffUsados, 0)
-                                            END
-                                            ELSE B.Cascos - B.Creditos - B.IvaCreditos
-                                        END
-                                    ) BETWEEN 0.01 AND 0.05 THEN 0
-                                    ELSE
-                                        CASE WHEN @Funcionalidad = 'ZARA'
-                                            THEN CASE WHEN B.IDTipoDocumento = 6
-                                                THEN B.Cascos - ISNULL(P.PagosDiffUsados, 0)
-                                                ELSE B.Cascos - B.Creditos - B.IvaCreditos - ISNULL(P.PagosDiffUsados, 0)
-                                            END
-                                            ELSE B.Cascos - B.Creditos - B.IvaCreditos
-                                        END
-                                END
-                        END AS decimal(18, 2)
-                    ) AS SaldoCascos
-                FROM Base B
-                LEFT JOIN PagosDiff P ON P.IDVenta = B.IDVenta
-            ),
-            Final AS
-            (
-                SELECT
-                    *,
-                    CAST(
-                        CASE WHEN @Funcionalidad = 'ZARA'
-                            THEN SaldoDinero + SaldoCascos
-                            ELSE CASE WHEN IDTipoDocumento = 6 THEN SaldoDinero - Creditos - IvaCreditos ELSE SaldoDinero + SaldoCascos END
-                        END AS decimal(18, 2)
-                    ) AS SaldoTotal
-                FROM Saldos
-            )
-            SELECT
-                CAST(ISNULL(SUM(CASE WHEN DiasVencimiento > 0 THEN SaldoTotal ELSE 0 END), 0) AS decimal(18, 2)) AS saldoVencido,
-                CAST(ISNULL(SUM(CASE WHEN DiasVencimiento <= 0 THEN SaldoTotal ELSE 0 END), 0) AS decimal(18, 2)) AS saldoPendiente,
-                CAST(ISNULL(SUM(SaldoTotal), 0) AS decimal(18, 2)) AS saldo,
-                CAST(ISNULL(MAX(CASE WHEN DiasVencimiento > 0 THEN DiasVencimiento ELSE 0 END), 0) AS int) AS maxDiasVencidos,
-                CAST(ISNULL(MAX(CASE WHEN SoloAceites = 0 AND SaldoDinero > 0 AND DiasVencimientoAcumuladores > 0 THEN DiasVencimientoAcumuladores ELSE 0 END), 0) AS int) AS maxDiasVencidosAcumuladores,
-                CAST(ISNULL(MAX(CASE WHEN SoloAceites = 0 AND SaldoCascos > 0 AND DiasVencimientoCascos > 0 THEN DiasVencimientoCascos ELSE 0 END), 0) AS int) AS maxDiasVencidosCascos,
-                CAST(ISNULL(MAX(CASE WHEN SoloAceites = 1 AND DiasVencimientoAceites > 0 THEN DiasVencimientoAceites ELSE 0 END), 0) AS int) AS maxDiasVencidosAceites,
-                CAST(
-                    CASE WHEN @Funcionalidad = 'ZARA'
-                        THEN CONCAT(
-                            ISNULL(MAX(CASE WHEN SoloAceites = 0 AND SaldoDinero > 0 AND DiasVencimientoAcumuladores > 0 THEN DiasVencimientoAcumuladores ELSE 0 END), 0),
-                            '/',
-                            ISNULL(MAX(CASE WHEN SoloAceites = 0 AND SaldoCascos > 0 AND DiasVencimientoCascos > 0 THEN DiasVencimientoCascos ELSE 0 END), 0),
-                            '/',
-                            ISNULL(MAX(CASE WHEN SoloAceites = 1 AND DiasVencimientoAceites > 0 THEN DiasVencimientoAceites ELSE 0 END), 0)
-                        )
-                        ELSE CAST(ISNULL(MAX(CASE WHEN DiasVencimiento > 0 THEN DiasVencimiento ELSE 0 END), 0) AS varchar(20))
-                    END AS varchar(100)
-                ) AS diasVencimientoMostrar
-            FROM Final;
-            """;
-
-        await using var cmd = new SqlCommand(sql, conn)
+        try
         {
-            CommandType = CommandType.Text,
-            CommandTimeout = CommandTimeoutSeconds
-        };
-        cmd.Parameters.Add("@IDCliente", SqlDbType.Int).Value = idCliente;
-        cmd.Parameters.Add("@FechaOperacion", SqlDbType.DateTime).Value = fechaOperacion;
-        cmd.Parameters.Add("@FechaFinal", SqlDbType.DateTime).Value = fechaFinal;
-        cmd.Parameters.Add("@FechaInicial", SqlDbType.DateTime).Value = new DateTime(2023, 1, 1);
+            await using var cmd = CreateStoredProcedureCommand("sp_n_rptVentasSaldos", conn);
+            cmd.Parameters.AddWithValue("@IDsEmpresa", string.Empty);
+            cmd.Parameters.AddWithValue("@IDCliente", idCliente);
+            cmd.Parameters.AddWithValue("@IDAgente", 0);
+            cmd.Parameters.AddWithValue("@FechaInicial", string.Empty);
+            // MM-dd-yyyy: el SP la recibe en varchar y con dd/MM/yyyy devuelve
+            // vacio sin avisar. Probado contra esta base.
+            cmd.Parameters.AddWithValue("@FechaFinal", fechaOperacion.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture));
+            cmd.Parameters.AddWithValue("@DiasVencimiento", 0);
+            cmd.Parameters.AddWithValue("@Status", 4);
+            cmd.Parameters.AddWithValue("@Formato", 0);
 
-        var table = await ExecuteFirstTableAsync(cmd, ct);
-        return table.Rows.Count > 0 ? table : CrearSaldosClienteFallbackTable();
+            var detalle = await ExecuteFirstTableAsync(cmd, ct);
+
+            decimal pendiente = 0, vencido = 0;
+            int maxDias = 0, maxAcum = 0, maxAceites = 0, maxCascos = 0;
+
+            foreach (DataRow r in detalle.Rows)
+            {
+                var saldo = ReadDecimal(r, "Saldo", "saldo");
+
+                // El estatus lo decide el SP y es el mismo que pinta Mac31; no
+                // se recalcula aqui a partir de los dias, que fue justo el tipo
+                // de suposicion que hacia que los numeros no cuadraran.
+                var estatus = ReadString(r, "EstatusMostrar", "Estatus").Trim().ToUpperInvariant();
+                if (estatus.StartsWith("VENCID", StringComparison.Ordinal)) vencido += saldo;
+                else pendiente += saldo;
+
+                maxDias = Math.Max(maxDias, ReadInt(r, "DiasVencimiento", "diasVencimiento"));
+                maxAcum = Math.Max(maxAcum, ReadInt(r, "DiasVencimientoAcumuladores", "diasVencimientoAcumuladores"));
+                maxAceites = Math.Max(maxAceites, ReadInt(r, "DiasVencimientoAceites", "diasVencimientoAceites"));
+                maxCascos = Math.Max(maxCascos, ReadInt(r, "DiasVencimientoCascos", "diasVencimientoCascos"));
+            }
+
+            fila["saldoPendiente"] = pendiente;
+            fila["saldoVencido"] = vencido;
+            fila["saldo"] = pendiente + vencido;
+            fila["maxDiasVencidos"] = maxDias;
+            fila["maxDiasVencidosAcumuladores"] = maxAcum;
+            fila["maxDiasVencidosAceites"] = maxAceites;
+            fila["maxDiasVencidosCascos"] = maxCascos;
+            fila["diasVencimientoMostrar"] = maxDias.ToString(CultureInfo.InvariantCulture);
+        }
+        catch (SqlException)
+        {
+            // Se devuelve el renglon en ceros. Sin saldos la pantalla sigue
+            // sirviendo para consultar; lo que no se hace es inventar cifras.
+        }
+
+        return tabla;
     }
 
     private static async Task<List<PedidoCatalogoItemDto>> ConsultarUsuarioAlmacenesAsync(SqlConnection conn, int idUsuario, CancellationToken ct)

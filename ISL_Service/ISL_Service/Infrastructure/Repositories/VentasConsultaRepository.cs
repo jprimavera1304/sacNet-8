@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using ISL_Service.Application.DTOs.VentasConsulta;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Data;
@@ -79,11 +79,10 @@ public class VentasConsultaRepository : IVentasConsultaRepository
         cmd.Parameters.AddWithValue("@Formato", 0);
         cmd.Parameters.AddWithValue("@IDUsuarioActual", request.IDUsuarioActual);
 
-        // El filtro de fechas va aparte: el SP legacy descarta @FechaInicial/
-        // @FechaFinal (ver ApplyDateFilter).
-        var response = ApplyDateFilter(
-            ApplyAccumulatedFilters(await ExecuteRowsAsync(cmd, ct), request),
-            request);
+        // El filtro de fechas NO se aplica aqui para el web. Ver ApplyDateFilter.
+        var response = ApplyAccumulatedFilters(await ExecuteRowsAsync(cmd, ct), request);
+        if (request.SoloMisPedidos)
+            response = ApplyDateFilter(response, request);
         if (request.IDStatusPedido == 2)
             await EnrichPedidoTimelineAsync(conn, response, ct);
 
@@ -424,15 +423,18 @@ public class VentasConsultaRepository : IVentasConsultaRepository
 
     // Filtra los renglones por rango de fechas EN MEMORIA.
     //
-    // Hace falta porque `sp_n_ConsultaVentasPedidos` IGNORA @FechaInicial y
-    // @FechaFinal: en cada rama de @IDStatusPedido (0, 1, 2 y 3) los sobreescribe
-    // con '' antes de armar el WHERE, asi que el rango que le mandemos nunca
-    // llega a la consulta. Verificado contra el servidor: pidiendo un solo dia
-    // devolvia pedidos de un mes antes.
+    // `sp_n_ConsultaVentasPedidos` IGNORA @FechaInicial y @FechaFinal: en cada
+    // rama de @IDStatusPedido (0, 1, 2 y 3) los sobreescribe con '' antes de
+    // armar el WHERE, asi que el rango que le mandemos nunca llega a la consulta.
     //
-    // El SP es legacy y no se toca, asi que el rango se aplica aqui, igual que
-    // ApplyAccumulatedFilters ya hace con folios/clientes/productos. El volumen
-    // es chico porque el SP ya acoto por estatus y usuario.
+    // ESO NO ES UN DESCUIDO DE LEGACY, ES LA REGLA, y por eso el web ya NO lo
+    // corrige. Un pedido pendiente de imprimir de noviembre SIGUE pendiente hoy:
+    // acotarlo al dia consultado lo esconde, y esconder trabajo pendiente es
+    // exactamente lo que no debe hacer esa pestaña. Se comprobo poniendo las dos
+    // pantallas lado a lado: Mac31 enseñaba diez folios y el web uno.
+    //
+    // Se conserva SOLO para la app movil ("Mis pedidos"), que si pide un rango y
+    // lo espera respetado; ahi la lista es del usuario y del periodo que eligio.
     private static VentasConsultaRowsResponse ApplyDateFilter(
         VentasConsultaRowsResponse response,
         VentasConsultaRequest request)

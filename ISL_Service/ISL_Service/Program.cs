@@ -165,7 +165,13 @@ builder.Services.AddScoped<IVentasPedidosRepository, VentasPedidosRepository>();
 builder.Services.AddScoped<IVentasPedidosService, VentasPedidosService>();
 builder.Services.AddSingleton<IAutorizarPedidosAsyncCoordinator, AutorizarPedidosAsyncCoordinator>();
 builder.Services.AddScoped<IVentasConsultaRepository, VentasConsultaRepository>();
+builder.Services.AddScoped<IRemisionImpresionRepository, RemisionImpresionRepository>();
+builder.Services.AddScoped<IRemisionImpresionService, RemisionImpresionService>();
 builder.Services.AddScoped<IVentasConsultaService, VentasConsultaService>();
+builder.Services.AddScoped<IVentasCancelacionRepository, VentasCancelacionRepository>();
+builder.Services.AddScoped<IVentasCancelacionService, VentasCancelacionService>();
+builder.Services.AddScoped<IVentasSaldosRepository, VentasSaldosRepository>();
+builder.Services.AddScoped<IVentasSaldosService, VentasSaldosService>();
 builder.Services.AddScoped<IVentasPedidoCapturaRepository, VentasPedidoCapturaRepository>();
 builder.Services.AddScoped<IVentasPedidoCapturaService, VentasPedidoCapturaService>();
 
@@ -176,6 +182,24 @@ builder.Services.AddScoped<IAlmacenCascosService, AlmacenCascosService>();
 // -------------------- CHECADOR (HORA DE COMIDA) --------------------
 builder.Services.AddScoped<IChecadorRepository, ChecadorRepository>();
 builder.Services.AddScoped<IChecadorService, ChecadorService>();
+
+// -------------------- NOMINA: EMPLEADOS, ASISTENCIAS Y PRESTAMOS --------------------
+// Los tres van juntos porque comparten origen: son las pantallas de nomina de
+// Mac31 (empleados, asistencias por periodo y prestamos) llevadas al web.
+// Todo lo que escriben lo escribe legacy con sus propios sp_n_.
+builder.Services.AddScoped<IEmpleadosRepository, EmpleadosRepository>();
+builder.Services.AddScoped<IEmpleadosService, EmpleadosService>();
+builder.Services.AddScoped<IAsistenciasRepository, AsistenciasRepository>();
+builder.Services.AddScoped<IAsistenciasService, AsistenciasService>();
+builder.Services.AddScoped<IPrestamosRepository, PrestamosRepository>();
+builder.Services.AddScoped<IPrestamosService, PrestamosService>();
+
+// -------------------- CASCOS A CAMBIO --------------------
+// La cuenta de cascos y dinero con la otra empresa (hoy un Excel a mano).
+// Escribe solo en tablas propias (WCascoCambio*) con sp_w_; de legacy nada mas
+// lee [Catalogo TiposUsados], que es de donde salen los precios.
+builder.Services.AddScoped<ICascosCambioRepository, CascosCambioRepository>();
+builder.Services.AddScoped<ICascosCambioService, CascosCambioService>();
 
 // Version minima/recomendada de la app movil (endpoint anonimo api/app/version).
 builder.Services.AddScoped<IAppVersionRepository, AppVersionRepository>();

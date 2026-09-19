@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.VentasConsulta;
+﻿using ISL_Service.Application.DTOs.VentasConsulta;
 
 namespace ISL_Service.Application.Interfaces;
 
@@ -9,4 +9,7 @@ public interface IVentasConsultaService
     Task<VentasConsultaRowsResponse> ConsultarPedidosAsync(VentasConsultaRequest request, int idUsuarioToken, CancellationToken ct);
     Task<VentasConsultaRowsResponse> ConsultarPendientesImprimirAsync(VentasConsultaRequest request, int idUsuarioToken, CancellationToken ct);
     Task<VentasConsultaRowsResponse> ConsultarPagosAsync(VentasConsultaRequest request, int idUsuarioToken, CancellationToken ct);
+
+    /// Firma el pase de pocos minutos con el que el navegador puede ir por el PDF.
+    string CrearTicketReporte(VentasReporteRequest request, int idUsuarioToken);
 }

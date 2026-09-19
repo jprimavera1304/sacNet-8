@@ -555,17 +555,29 @@ ORDER BY Clave;", conn);
         var modules = new List<ModuloDisponibleResponse>();
         var sql = includeAllTenants
             ? hasWModuloEmpresa
+                // "Ver todos" sigue sin filtrar por la empresa del token (ese es su punto:
+                // el superadmin ve los modulos de todas las empresas de esta base), pero ya
+                // no inventa modulos: solo salen los que alguna empresa tiene dados de alta
+                // y activos en WModuloEmpresa. Con el LEFT JOIN anterior aparecia cualquier
+                // renglon de WModulo aunque ninguna empresa lo tuviera, y por eso los modulos
+                // de ISL (equipos, jornadas, partidos, cedula, registros, roles_juego...) se
+                // colaban en Tauro. Asi, dar de baja un modulo de una empresa alcanza para
+                // que desaparezca tambien de "Ver todos".
+                // El GROUP BY evita el duplicado que producia el join cuando la base tiene
+                // mas de una empresa (un renglon por EmpresaClave del mismo modulo).
                 ? @"
 SELECT
     m.ModuloClave,
     COALESCE(NULLIF(m.Nombre,''), m.ModuloClave) AS Nombre,
-    COALESCE(me.EmpresaClave, @EmpresaClave) AS EmpresaClave
+    MIN(me.EmpresaClave) AS EmpresaClave
 FROM dbo.WModulo m
-LEFT JOIN dbo.WModuloEmpresa me
+INNER JOIN dbo.WModuloEmpresa me
     ON me.EmpresaId = m.EmpresaId
    AND me.ModuloClave = m.ModuloClave
+   AND me.Activo = 1
 WHERE m.EmpresaId = @EmpresaId
-ORDER BY me.EmpresaClave, CASE WHEN m.ModuloClave = 'inicio' THEN 0 ELSE 1 END, m.ModuloClave;"
+GROUP BY m.ModuloClave, COALESCE(NULLIF(m.Nombre,''), m.ModuloClave)
+ORDER BY CASE WHEN m.ModuloClave = 'inicio' THEN 0 ELSE 1 END, m.ModuloClave;"
                 : @"
 SELECT
     m.ModuloClave,
@@ -627,12 +639,14 @@ ORDER BY CASE WHEN m.ModuloClave = 'inicio' THEN 0 ELSE 1 END, m.ModuloClave;";
     private static IReadOnlyList<ModuloDisponibleResponse> BuildAllModulesFallback(string companyKey)
     {
         var empresaClave = (companyKey ?? string.Empty).Trim().ToLowerInvariant();
+        // Lista de emergencia (base sin tablas de capacidades). Solo modulos comunes a
+        // cualquier empresa: "profesores" salio de aqui porque es de ISL y aparecia en
+        // Tauro/Zaragoza sin que esas empresas lo tengan.
         var keys = new[]
         {
             "inicio",
             "cheques",
             "pagosproveedores",
-            "profesores",
             "permisos_modulos",
             "permisos_roles",
             "permisos_usuarios",
@@ -2485,6 +2499,12 @@ WHERE EmpresaId = @EmpresaId
             "permisos_modulos" => "/permisos-modulos/index.html",
             "permisos_roles" => "/permisos-roles/index.html",
             "permisos_usuarios" => "/permisos-usuarios/index.html",
+            // Modulos del front NUEVO (docs2). Ahi no hay una carpeta con su
+            // index.html por modulo: es UNA aplicacion, y su direccion publica
+            // se reescribe a /v2/index.html en docs/staticwebapp.config.json.
+            // Devolver "/cascos_cambio/index.html" daba "Cannot GET": la
+            // carpeta no existe ni va a existir.
+            "cascos_cambio" => "/cascos-cambio",
             _ => $"/{moduleKey}/index.html"
         };
     }

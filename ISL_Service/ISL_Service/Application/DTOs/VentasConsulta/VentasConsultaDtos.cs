@@ -1,4 +1,4 @@
-namespace ISL_Service.Application.DTOs.VentasConsulta;
+﻿namespace ISL_Service.Application.DTOs.VentasConsulta;
 
 public class VentasConsultaCatalogoItem
 {
@@ -71,4 +71,38 @@ public class VentasConsultaRowsResponse
 {
     public List<Dictionary<string, object?>> Rows { get; set; } = new();
     public int Total { get; set; }
+}
+
+/*
+  ABRIR EL REPORTE DE UNA REMISION
+
+  El reporte lo genera ESTE backend: lee las mismas plantillas de Template_Html
+  y llama los mismos sp_n_ que usa Mac31, y arma el PDF. Antes se delegaba en
+  MacReportes —el servidor de reportes viejo— y eso obligaba a tener esa
+  aplicacion viva y alcanzable desde el navegador del usuario.
+
+  Lo que se conserva de aquel flujo es lo que de verdad importaba: las
+  plantillas y los procedimientos. Por eso el papel sigue saliendo igual al de
+  Mac31 y se sigue actualizando solo si alguien ajusta una plantilla.
+
+  El POST no devuelve el PDF: devuelve la direccion donde esta. La pestana ya
+  se abrio en el navegador antes de pedir (si no, la bloquea), asi que lo unico
+  que falta es a donde mandarla.
+*/
+public class VentasReporteRequest
+{
+    /// Las ventas a incluir. Mac31 manda varias cuando hay varias marcadas, y
+    /// salen todas en el mismo PDF, una por hoja.
+    public List<int> IdsVenta { get; set; } = new();
+
+    /// 0 = ver en pantalla, 1 = descargar el archivo.
+    public int Descargar { get; set; }
+}
+
+public class VentasReporteResponse
+{
+    public bool Ok { get; set; }
+    public string Message { get; set; } = string.Empty;
+    /// La direccion completa, lista para abrirse en otra pestana.
+    public string Url { get; set; } = string.Empty;
 }

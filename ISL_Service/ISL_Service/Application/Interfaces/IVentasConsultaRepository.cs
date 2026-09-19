@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.VentasConsulta;
+﻿using ISL_Service.Application.DTOs.VentasConsulta;
 
 namespace ISL_Service.Application.Interfaces;
 
