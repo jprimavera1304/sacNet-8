@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Globalization;
 using System.Text;
 using ISL_Service.Application.DTOs.VentasPedidoCaptura;
@@ -150,7 +150,7 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         {
             domicilios = DataTableToRows(await ConsultarDomiciliosAsync(conn, idCliente, request.IDEmpresaCS, ct));
             saldos = DataTableToRows(await ConsultarSaldosClienteWebAsync(conn, idCliente, ct));
-            AgregarDisponible(saldos, clientes, idCliente);
+            await AgregarDisponibleAsync(conn, saldos, clientes, idCliente, ct);
         }
 
         return new PedidoClienteContextResponse
@@ -303,17 +303,34 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
     }
 
     // Disponible = LimiteCredito - SaldoPendiente - SaldoVencido, igual que legacy
-    // (Ventas.cs:1692). El limite viene de sp_n_ConsultaClientes (Clientes.[Limite
-    // Credito]); los saldos, de la consulta de saldos. Se agrega al row de saldos
-    // para que el movil lo mande como @Disponible al capturar el pedido: con eso
-    // el ruteo a "pendientes de autorizar" queda igual que legacy. Sin esto el
-    // disponible iba 0 y CUALQUIER pedido con total > 0 requeria autorizacion.
+    // (Ventas.cs:1692). Los saldos salen de la consulta de saldos; el LIMITE
+    // depende de la funcionalidad de la empresa y ahi estaba el error:
     //
-    // Nota: para clientes TAU el limite real lo calcula un servicio de credito por
-    // promedio de pagos; aqui se usa el limite estatico del cliente, que es la
-    // fuente correcta para el flujo estandar (ZARA).
-    private static void AgregarDisponible(
-        List<Dictionary<string, object?>> saldos, DataTable clientes, int idCliente)
+    //   ZARA  -> el limite estatico del cliente, Clientes.[Limite Credito].
+    //   TAU   -> NO es el estatico. Mac31 llama a un servicio de credito
+    //            (Ventas.cs:1630, CreditoDisponible) que detras es
+    //            sp_n_ConsultaCreditoDisponible, y ese calcula el limite con el
+    //            PROMEDIO DE PAGOS de los ultimos N meses: si el promedio no es
+    //            cero, el limite ES el promedio; si es cero, se queda con
+    //            Constantes.MaxIncrementoLimCred. O sea, en Tauro el credito se
+    //            gana pagando.
+    //
+    // Antes aqui se usaba el estatico para las dos, y para Tauro eso daba un
+    // limite distinto al que enseña Mac31 — comprobado con el cliente 5: la
+    // pantalla decia 10,000 (el estatico) y Mac31 5,000 (el calculado), asi que
+    // el disponible salia 800 pesos mas alto que el real.
+    //
+    // NO ES SOLO COSMETICO: este disponible se manda como @Disponible al
+    // capturar, y con el legacy decide si el pedido se va a "pendientes de
+    // autorizar". Con el limite equivocado, pedidos que requerian visto bueno
+    // podian pasar directo. Afecta igual a la app movil, que consume este mismo
+    // endpoint.
+    private async Task AgregarDisponibleAsync(
+        SqlConnection conn,
+        List<Dictionary<string, object?>> saldos,
+        DataTable clientes,
+        int idCliente,
+        CancellationToken ct)
     {
         if (saldos.Count == 0) return;
 
@@ -327,10 +344,52 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
 
         var limite = ReadDecimal(clienteRow, "LimiteCredito", "limiteCredito", "Limite Credito");
         var saldo = saldos[0];
+
+        // Mac31 solo consulta el servicio de credito cuando la funcionalidad
+        // contiene "TAU" (Ventas.cs:1627). Se replica igual: para las demas, el
+        // estatico sigue siendo lo correcto y no se paga una consulta de mas.
+        var funcionalidad = await ConsultarFuncionalidadConCacheAsync(ct);
+        if (funcionalidad.ToUpperInvariant().Contains("TAU"))
+        {
+            var credito = await ConsultarCreditoDisponibleAsync(conn, idCliente, ct);
+            if (credito != null)
+            {
+                limite = ReadDecimal(credito, "LimiteCredito", "limiteCredito");
+
+                // Se devuelven tambien los datos con los que se calculo, porque
+                // Mac31 los enseña ("PAGOS DEL x AL y", "PAGOS $n / N MESES =
+                // $limite") y sin ellos el numero parece salido de la nada.
+                saldo["sumaPagosMeses"] = ReadDecimal(credito, "SumaPagosMeses", "sumaPagosMeses");
+                saldo["promedioPagosMeses"] = ReadDecimal(credito, "PromedioPagosMeses", "promedioPagosMeses");
+                saldo["fechaInicialPagos"] = ReadString(credito, "FechaInicialPagos", "fechaInicialPagos");
+                saldo["fechaFinalPagos"] = ReadString(credito, "FechaFinalPagos", "fechaFinalPagos");
+            }
+        }
+
         var saldoVencido = ReadDecimalFromDictionary(saldo, "saldoVencido", "SaldoVencido");
         var saldoPendiente = ReadDecimalFromDictionary(saldo, "saldoPendiente", "SaldoPendiente");
         saldo["disponible"] = limite - saldoPendiente - saldoVencido;
         saldo["limiteCredito"] = limite;
+    }
+
+    // sp_n_ConsultaCreditoDisponible. Si no esta desplegado o truena, se devuelve
+    // null y el llamador se queda con el limite estatico: es mejor un limite
+    // conservador que dejar a alguien sin poder capturar.
+    private static async Task<DataRow?> ConsultarCreditoDisponibleAsync(
+        SqlConnection conn, int idCliente, CancellationToken ct)
+    {
+        try
+        {
+            await using var cmd = CreateStoredProcedureCommand("sp_n_ConsultaCreditoDisponible", conn);
+            cmd.Parameters.AddWithValue("@IDCliente", idCliente);
+
+            var tabla = await ExecuteFirstTableAsync(cmd, ct);
+            return tabla.Rows.Count > 0 ? tabla.Rows[0] : null;
+        }
+        catch (SqlException)
+        {
+            return null;
+        }
     }
 
     public async Task<PedidoRowsResponse> BuscarProductoAsync(PedidoProductoBuscarRequest request, CancellationToken ct)
