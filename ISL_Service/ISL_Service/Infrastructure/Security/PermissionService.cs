@@ -2499,6 +2499,12 @@ WHERE EmpresaId = @EmpresaId
             "permisos_modulos" => "/permisos-modulos/index.html",
             "permisos_roles" => "/permisos-roles/index.html",
             "permisos_usuarios" => "/permisos-usuarios/index.html",
+            // Modulos del front NUEVO (docs2). Ahi no hay una carpeta con su
+            // index.html por modulo: es UNA aplicacion, y su direccion publica
+            // se reescribe a /v2/index.html en docs/staticwebapp.config.json.
+            // Devolver "/cascos_cambio/index.html" daba "Cannot GET": la
+            // carpeta no existe ni va a existir.
+            "cascos_cambio" => "/cascos-cambio",
             _ => $"/{moduleKey}/index.html"
         };
     }

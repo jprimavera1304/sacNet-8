@@ -188,6 +188,13 @@ builder.Services.AddScoped<IAsistenciasService, AsistenciasService>();
 builder.Services.AddScoped<IPrestamosRepository, PrestamosRepository>();
 builder.Services.AddScoped<IPrestamosService, PrestamosService>();
 
+// -------------------- CASCOS A CAMBIO --------------------
+// La cuenta de cascos y dinero con la otra empresa (hoy un Excel a mano).
+// Escribe solo en tablas propias (WCascoCambio*) con sp_w_; de legacy nada mas
+// lee [Catalogo TiposUsados], que es de donde salen los precios.
+builder.Services.AddScoped<ICascosCambioRepository, CascosCambioRepository>();
+builder.Services.AddScoped<ICascosCambioService, CascosCambioService>();
+
 // Version minima/recomendada de la app movil (endpoint anonimo api/app/version).
 builder.Services.AddScoped<IAppVersionRepository, AppVersionRepository>();
 
