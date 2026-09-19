@@ -168,6 +168,8 @@ builder.Services.AddScoped<IVentasConsultaRepository, VentasConsultaRepository>(
 builder.Services.AddScoped<IRemisionImpresionRepository, RemisionImpresionRepository>();
 builder.Services.AddScoped<IRemisionImpresionService, RemisionImpresionService>();
 builder.Services.AddScoped<IVentasConsultaService, VentasConsultaService>();
+builder.Services.AddScoped<IVentasSaldosRepository, VentasSaldosRepository>();
+builder.Services.AddScoped<IVentasSaldosService, VentasSaldosService>();
 builder.Services.AddScoped<IVentasPedidoCapturaRepository, VentasPedidoCapturaRepository>();
 builder.Services.AddScoped<IVentasPedidoCapturaService, VentasPedidoCapturaService>();
 
