@@ -7,7 +7,23 @@ public static class WkhtmltopdfHtmlPdfRenderer
 {
     private const string WkhtmltopdfPath = "Assets/Wkhtmltopdf/wkhtmltopdf.exe";
 
-    public static async Task<byte[]> RenderAsync(string html, string? orientation, CancellationToken ct = default)
+    /*
+      EL TITULO ES LO QUE SE LEE EN LA PESTAÑA DEL NAVEGADOR
+
+      Sin el, el visor del navegador no tiene de donde sacar un nombre y usa el
+      ultimo pedazo de la direccion: la pestaña decia "pdf" —literalmente— con
+      el icono generico de documento. No es que faltara el <title> en el HTML;
+      wkhtmltopdf ignora el del documento salvo que se le pase --title, y las
+      plantillas de Template_Html no traen cabecera.
+
+      Es lo UNICO que se puede escribir en la pestaña de un PDF: el icono lo
+      decide el navegador y no se puede tocar desde el documento.
+    */
+    public static async Task<byte[]> RenderAsync(
+        string html,
+        string? orientation,
+        string? titulo = null,
+        CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(html))
             throw new InvalidOperationException("No hay HTML para generar el PDF.");
@@ -37,6 +53,13 @@ public static class WkhtmltopdfHtmlPdfRenderer
             };
 
             startInfo.ArgumentList.Add("--quiet");
+
+            if (!string.IsNullOrWhiteSpace(titulo))
+            {
+                startInfo.ArgumentList.Add("--title");
+                startInfo.ArgumentList.Add(titulo);
+            }
+
             startInfo.ArgumentList.Add("--enable-local-file-access");
             startInfo.ArgumentList.Add("--orientation");
             startInfo.ArgumentList.Add(NormalizeOrientation(orientation));

@@ -32,14 +32,71 @@ public static class RemisionTicket
         public List<int> IdsVenta { get; init; } = new();
         public int IdUsuario { get; init; }
         public int Descargar { get; init; }
+
+        /*
+          LAS DOS BANDERAS DE IMPRESION VIAJAN EN EL PASE
+
+          Son las mismas que Mac31 le manda al procedimiento
+          (ConsultarVentas.cs:4213 y :4221 -> Imprimir(primerImpresion,
+          reimpresion)), y tienen que llegar hasta sp_n_VentasInformacion porque
+          ahi es donde cambian el resultado:
+
+            PrimerImpresion = 1  ->  si la remision YA la imprimio alguien, el
+                                     procedimiento no la entrega: devuelve
+                                     result = 0 con "EL FOLIO ... YA FUE
+                                     IMPRESO POR ...".
+            Reimpresion     = 1  ->  autoriza volver a hacer la primer
+                                     impresion: reescribe quien imprimio y
+                                     desde que equipo, y marca el pedido como
+                                     reimpreso.
+
+          Viajan en el pase FIRMADO y no como parametro suelto de la direccion
+          justamente por eso: la que marca papel es la bandera, y si fuera
+          editable en la barra del navegador cualquiera podria autorizarse una
+          reimpresion escribiendo un 1.
+        */
+        public int PrimerImpresion { get; init; }
+        public int Reimpresion { get; init; }
+
+        /*
+          DESDE DONDE SE IMPRIMIO, Y POR QUE VIAJA AQUI
+
+          El procedimiento GUARDA este dato en Ventas y en Pedidos: es el rastro
+          de quien saco el papel y desde que maquina. En Mac31 es el nombre del
+          equipo; en el web no hay equipo, asi que se manda el usuario, que es
+          lo mas parecido a "quien fue".
+
+          Tiene que venir en el pase porque el GET que entrega el PDF es ANONIMO
+          —una pestaña nueva no manda el token—, asi que ahi ya no se sabe quien
+          pidio el reporte. Sin esto se guardaba el nombre de la maquina del
+          SERVIDOR, o sea "todas las impresiones del web salieron del servidor":
+          un rastro que no sirve para nada.
+        */
+        public string Equipo { get; init; } = "";
     }
 
-    public static string Firmar(string llave, IEnumerable<int> idsVenta, int idUsuario, int descargar)
+    public static string Firmar(
+        string llave,
+        IEnumerable<int> idsVenta,
+        int idUsuario,
+        int descargar,
+        int primerImpresion = 0,
+        int reimpresion = 0,
+        string equipo = "")
     {
         var expira = DateTimeOffset.UtcNow.Add(Vigencia).ToUnixTimeSeconds();
-        var cuerpo = $"{string.Join(",", idsVenta)}|{idUsuario}|{(descargar == 1 ? 1 : 0)}|{expira}";
+        var cuerpo = $"{string.Join(",", idsVenta)}|{idUsuario}|{(descargar == 1 ? 1 : 0)}" +
+                     $"|{(primerImpresion == 1 ? 1 : 0)}|{(reimpresion == 1 ? 1 : 0)}" +
+                     $"|{Limpio(equipo)}|{expira}";
         return Base64Url(Encoding.UTF8.GetBytes(cuerpo)) + "." + Base64Url(Firma(llave, cuerpo));
     }
+
+    /// El separador del pase es "|": si el dato lo trae, se quita, o el pase se
+    /// leeria partido en un campo de mas. Se corta a lo que cabe en la columna.
+    private static string Limpio(string? texto)
+        => (texto ?? "").Replace("|", "").Trim() is { Length: > 0 } t
+            ? (t.Length > 60 ? t[..60] : t)
+            : "";
 
     /// Devuelve null si el pase esta mal formado, fue alterado o ya vencio.
     public static Contenido? Validar(string llave, string? ticket)
@@ -67,11 +124,23 @@ public static class RemisionTicket
         if (!CryptographicOperations.FixedTimeEquals(firmaRecibida, Firma(llave, cuerpo)))
             return null;
 
+        /*
+          SE ACEPTAN LOS DOS FORMATOS, EL VIEJO Y EL NUEVO
+
+          El viejo son cuatro campos (sin banderas de impresion) y el nuevo son
+          seis. No es por nostalgia: el pase dura diez minutos, asi que cuando
+          se publica una version hay pestañas ya abiertas con un pase del
+          formato anterior. Rechazarlas le daria "el enlace no es valido" a
+          gente que no hizo nada mal, a media jornada.
+
+          El pase viejo se lee como lo que era: sin banderas, o sea Pantalla.
+        */
         var campos = cuerpo.Split('|');
-        if (campos.Length != 4)
+        if (campos.Length != 4 && campos.Length != 7)
             return null;
 
-        if (!long.TryParse(campos[3], out var expira) || DateTimeOffset.UtcNow.ToUnixTimeSeconds() > expira)
+        var posicionExpira = campos.Length - 1;
+        if (!long.TryParse(campos[posicionExpira], out var expira) || DateTimeOffset.UtcNow.ToUnixTimeSeconds() > expira)
             return null;
 
         var ids = campos[0]
@@ -87,7 +156,10 @@ public static class RemisionTicket
         {
             IdsVenta = ids,
             IdUsuario = int.TryParse(campos[1], out var idu) ? idu : 0,
-            Descargar = campos[2] == "1" ? 1 : 0
+            Descargar = campos[2] == "1" ? 1 : 0,
+            PrimerImpresion = campos.Length == 7 && campos[3] == "1" ? 1 : 0,
+            Reimpresion = campos.Length == 7 && campos[4] == "1" ? 1 : 0,
+            Equipo = campos.Length == 7 ? campos[5] : ""
         };
     }
 

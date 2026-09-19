@@ -23,6 +23,8 @@ public class VentasConsultaRepository : IVentasConsultaRepository
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
 
+        var constantes = await ConsultarConstantesDeVentasAsync(conn, ct);
+
         return new VentasConsultaCatalogosResponse
         {
             Empresas = await ConsultarEmpresasAsync(conn, ct),
@@ -30,7 +32,9 @@ public class VentasConsultaRepository : IVentasConsultaRepository
             Agentes = await ConsultarAgentesAsync(conn, ct),
             TiposDocumento = BuildTiposDocumento(),
             EstatusVenta = BuildEstatusVenta(),
-            FechasOperacion = await ConsultarFechasOperacionAsync(conn, ct)
+            FechasOperacion = constantes.Fechas,
+            Funcionalidad = constantes.Funcionalidad,
+            EsCentroServicio = constantes.EsCentroServicio
         };
     }
 
@@ -104,6 +108,79 @@ public class VentasConsultaRepository : IVentasConsultaRepository
         return await ExecuteRowsAsync(cmd, ct);
     }
 
+    /*
+      PEDIDOS FALTANTES
+
+      Mac31 llama a este procedimiento con los dos parametros en blanco:
+      ConsultaPedidoFaltante() (ConsultarVentas.cs:3503) arma un PedidoInputDTO
+      SIN fijar ningun campo, asi que @Fecha va vacio y @IDEmpresaCS va en 0.
+
+      No es descuido de legacy: @Fecha esta declarado pero el procedimiento no
+      lo usa —filtra con `CAST(pedDetFal.Fecha as date) = CAST(GETDATE() as date)`
+      por dentro—, y por eso el mensaje de cuando no hay nada dice "EN EL DÍA
+      ACTUAL". Se copia igual para no inventarse un filtro que alla no existe.
+
+      Y por eso mismo no hace falta ramificar por empresa: el propio
+      procedimiento lee Funcionalidad de Constantes y decide de que base saca
+      catalogos, clientes e inventario. Se comprobo ejecutandolo en
+      Produccion_svr (TAU) y en MacZ (ZARA): mismas columnas, misma definicion
+      (diff sin espacios: identica), y en las dos corre sin error.
+    */
+    public async Task<List<VentasPedidoFaltanteItem>> ConsultarPedidosFaltantesAsync(CancellationToken ct)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand("sp_n_ConsultaPedidoFaltante", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = CommandTimeoutSeconds
+        };
+        cmd.Parameters.AddWithValue("@Fecha", "");
+        cmd.Parameters.AddWithValue("@IDEmpresaCS", 0);
+
+        var filas = new List<VentasPedidoFaltanteItem>();
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            filas.Add(new VentasPedidoFaltanteItem
+            {
+                Numero = Texto(reader, "Numero"),
+                Nombre = Texto(reader, "Nombre"),
+                FechaFtm = Texto(reader, "FechaFtm"),
+                GrupoCategoria = Texto(reader, "GrupoCategoria"),
+                Categoria = Texto(reader, "Categoria"),
+                Marca = Texto(reader, "Marca"),
+                Clave = Texto(reader, "Clave"),
+                CantidadSolicitada = Numero(reader, "CantidadSolicitada"),
+                CantidadPedido = Numero(reader, "CantidadPedido"),
+                CantidadFaltante = Numero(reader, "CantidadFaltante")
+            });
+        }
+
+        return filas;
+    }
+
+    /* Por nombre de columna y tolerante: el procedimiento arma su SELECT con
+       SQL dinamico, y una columna que se agregue alla no debe tirar esto. */
+    private static string Texto(SqlDataReader reader, string columna)
+    {
+        for (var i = 0; i < reader.FieldCount; i++)
+        {
+            if (!string.Equals(reader.GetName(i), columna, StringComparison.OrdinalIgnoreCase))
+                continue;
+            return reader.IsDBNull(i) ? "" : Convert.ToString(reader.GetValue(i)) ?? "";
+        }
+        return "";
+    }
+
+    private static decimal Numero(SqlDataReader reader, string columna)
+    {
+        var texto = Texto(reader, columna);
+        return decimal.TryParse(texto, out var valor) ? valor : 0m;
+    }
+
     public async Task<VentasConsultaRowsResponse> ConsultarPagosAsync(VentasConsultaRequest request, CancellationToken ct)
     {
         await using var conn = GetConnection();
@@ -138,7 +215,22 @@ public class VentasConsultaRepository : IVentasConsultaRepository
 
     private static void AddVentasCommonParams(SqlCommand cmd, VentasConsultaRequest request)
     {
-        cmd.Parameters.AddWithValue("@IDsVenta", JoinIds(request.IDsVentaLst, request.IDsVenta));
+        /*
+          LA LISTA DE VENTAS VA CON VIRGULILLA, NO CON COMA.
+
+          `sp_n_ConsultaVentas` NO recibe el separador: lo tiene escrito a mano
+          dentro (`SET @Delimitador = '~'`), que es el delimitador de toda la
+          familia legacy (Globales.DELIMITADOR_PARAM_TILDE_SP en Mac31).
+
+          Con coma y DOS O MAS ventas el procedimiento truena al convertir
+          '370852,370851' a entero. Comprobado ejecutandolo contra la base: con
+          coma da error, con virgulilla devuelve las dos.
+
+          Y es el peor tipo de fallo: con UNA sola venta funciona igual, porque
+          no hay nada que partir. Asi que pasa desapercibido hasta que alguien
+          marca dos folios.
+        */
+        cmd.Parameters.AddWithValue("@IDsVenta", JoinIds(request.IDsVentaLst, request.IDsVenta, "~"));
         cmd.Parameters.AddWithValue("@IDVenta", request.IDVenta);
         cmd.Parameters.AddWithValue("@IDEmpresa", request.IDEmpresa);
         cmd.Parameters.AddWithValue("@IDCliente", request.IDCliente);
@@ -259,7 +351,19 @@ public class VentasConsultaRepository : IVentasConsultaRepository
         };
     }
 
-    private static async Task<VentasConsultaFechasOperacion> ConsultarFechasOperacionAsync(SqlConnection conn, CancellationToken ct)
+    /*
+      Las fechas de operacion y las dos variables de empresa salen del MISMO
+      renglon de Constantes, asi que se leen de una sola llamada: Mac31 tambien
+      las saca juntas al arrancar (Utils/Globales.cs, region Constantes).
+    */
+    private sealed class ConstantesDeVentas
+    {
+        public VentasConsultaFechasOperacion Fechas { get; init; } = new();
+        public string Funcionalidad { get; init; } = "";
+        public int EsCentroServicio { get; init; }
+    }
+
+    private static async Task<ConstantesDeVentas> ConsultarConstantesDeVentasAsync(SqlConnection conn, CancellationToken ct)
     {
         await using var cmd = new SqlCommand("sp_n_ConsultaConstantes", conn)
         {
@@ -272,18 +376,23 @@ public class VentasConsultaRepository : IVentasConsultaRepository
 
         var table = await ExecuteFirstTableAsync(cmd, ct);
         if (table.Rows.Count == 0)
-            return new VentasConsultaFechasOperacion();
+            return new ConstantesDeVentas();
 
         var row = table.Rows[0];
         var fechaOperacion = ReadDateIso(row, "FechaOperacion");
         var fechaPagos = ReadDateIso(row, "FechaOperacionPagosUsuario", "FechaOperacionPagos");
 
-        return new VentasConsultaFechasOperacion
+        return new ConstantesDeVentas
         {
-            FechaOperacion = fechaOperacion,
-            FechaOperacionFtm = ReadString(row, "FechaOperacionFtm"),
-            FechaOperacionPagos = fechaPagos,
-            FechaOperacionPagosFtm = ReadString(row, "FechaOperacionPagosFtm")
+            Fechas = new VentasConsultaFechasOperacion
+            {
+                FechaOperacion = fechaOperacion,
+                FechaOperacionFtm = ReadString(row, "FechaOperacionFtm"),
+                FechaOperacionPagos = fechaPagos,
+                FechaOperacionPagosFtm = ReadString(row, "FechaOperacionPagosFtm")
+            },
+            Funcionalidad = ReadString(row, "Funcionalidad").ToUpperInvariant(),
+            EsCentroServicio = ReadInt(row, "EsCentroServicio")
         };
     }
 
@@ -355,11 +464,18 @@ public class VentasConsultaRepository : IVentasConsultaRepository
         return string.Empty;
     }
 
-    private static string JoinIds(IEnumerable<int>? values, string? raw)
+    /*
+      Los otros dos (@IDsClientes, @IDsProducto) se quedan con coma a proposito:
+      solo se comprobo contra la base el de ventas, y cambiar a ciegas un
+      separador que hoy no da problemas es arriesgar un fallo silencioso en dos
+      filtros que sí funcionan. Si algun dia se ven vacios con varios elementos,
+      el sospechoso es este.
+    */
+    private static string JoinIds(IEnumerable<int>? values, string? raw, string separador = ",")
     {
         if (!string.IsNullOrWhiteSpace(raw)) return raw.Trim();
         if (values == null) return string.Empty;
-        return string.Join(",", values.Where(x => x > 0).Distinct());
+        return string.Join(separador, values.Where(x => x > 0).Distinct());
     }
 
     private static string NormalizeLegacyFolio(string? value)

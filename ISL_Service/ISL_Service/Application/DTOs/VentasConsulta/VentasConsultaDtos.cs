@@ -15,6 +15,21 @@ public class VentasConsultaCatalogosResponse
     public List<VentasConsultaCatalogoItem> TiposDocumento { get; set; } = new();
     public List<VentasConsultaCatalogoItem> EstatusVenta { get; set; } = new();
     public VentasConsultaFechasOperacion FechasOperacion { get; set; } = new();
+
+    /*
+      LAS DOS VARIABLES DE EMPRESA QUE MAC31 LEE AL ARRANCAR
+
+      Variables.funcionalidad y Variables.EsCentroServicio (Utils/Globales.cs:470).
+      De ellas depende media barra de botones de Consultar ventas, y la pantalla
+      las necesita ANTES de pulsar nada: el navegador solo deja abrir una pestaña
+      nueva dentro del mismo clic, asi que decidir "¿abro la pestaña del PDF o
+      abro un dialogo?" no puede costar una ida al servidor.
+
+      Que vengan aqui no las convierte en la regla: la regla vive en
+      VentasImpresionReglas y se vuelve a aplicar entera al firmar el pase.
+    */
+    public string Funcionalidad { get; set; } = string.Empty;
+    public int EsCentroServicio { get; set; }
 }
 
 public class VentasConsultaFechasOperacion
@@ -97,6 +112,85 @@ public class VentasReporteRequest
 
     /// 0 = ver en pantalla, 1 = descargar el archivo.
     public int Descargar { get; set; }
+
+    /*
+      QUE BOTON LO PIDIO. No es cosmetico: de esto dependen las banderas de
+      impresion, si hay que pedir la contrasena rotatoria y que folios se
+      pueden sacar. Ver VentasImpresionReglas.
+
+        "pantalla"    btnPantalla_Click   (ConsultarVentas.cs:3771)
+        "imprimir"    btnImprimir_Click   (ConsultarVentas.cs:4213)
+        "reimprimir"  btnReimprimir_Click (ConsultarVentas.cs:4221)
+    */
+    public string Accion { get; set; } = "pantalla";
+
+    /// La pestaña desde la que se pidio: "remisiones" es la Emitidas de Mac31,
+    /// la unica que pide contrasena para imprimir (ConsultarVentas.cs:4324).
+    public string Vista { get; set; } = "remisiones";
+
+    /// La contrasena rotatoria, cuando el paso anterior dijo que hacia falta.
+    public string? Contrasena { get; set; }
+}
+
+/*
+  LO QUE HAY QUE PREGUNTAR ANTES DE ABRIR EL PAPEL
+
+  Mac31 pregunta en este orden y por eso aqui se devuelve todo junto: primero
+  se ve si algun folio no se puede, luego la contrasena, luego la confirmacion
+  de impresora. La pantalla necesita saberlo ANTES de abrir la pestaña nueva,
+  porque una pestaña que se abre para cerrarse en tres segundos es peor que no
+  abrirla.
+*/
+public class VentasReportePreparacionResponse
+{
+    /// "TAU" o "ZARA". Lo que Mac31 lee de Constantes en Variables.funcionalidad.
+    public string Funcionalidad { get; set; } = string.Empty;
+    public int EsCentroServicio { get; set; }
+
+    public bool RequiereContrasena { get; set; }
+
+    /// Solo Tauro enseña el dialogo de impresora (ConsultarVentas.cs:4377-4400).
+    public bool ConfirmaImpresora { get; set; }
+
+    /// Solo "reimprimir": "SE HARÁ LA PRIMER IMPRESIÓN..." (ConsultarVentas.cs:4355).
+    public bool ConfirmaReimpresion { get; set; }
+
+    /// Los folios que legacy no deja sacar por este camino, con el motivo.
+    public List<VentasReporteBloqueo> Bloqueos { get; set; } = new();
+
+    /// Las ventas que SI se pueden pedir. Si queda vacia, no hay nada que abrir.
+    public List<int> IdsVenta { get; set; } = new();
+}
+
+public class VentasReporteBloqueo
+{
+    public int IdVenta { get; set; }
+    public string FolioFtm { get; set; } = string.Empty;
+    public string Motivo { get; set; } = string.Empty;
+}
+
+/*
+  UN RENGLON DE "PEDIDOS FALTANTES"
+
+  Las columnas son las que devuelve sp_n_ConsultaPedidoFaltante y las que
+  enseña ConsultarResultado.SetColumnasPedidoFaltante en Mac31
+  (Legacy/Mac31/Mac31/Forms/ConsultarResultado.cs, region SetColumnasPedidoFaltante).
+
+  Es lo que un cliente PIDIO y no se le pudo surtir hoy: cantidad solicitada
+  contra cantidad que si entro al pedido, y la diferencia.
+*/
+public class VentasPedidoFaltanteItem
+{
+    public string Numero { get; set; } = string.Empty;
+    public string Nombre { get; set; } = string.Empty;
+    public string FechaFtm { get; set; } = string.Empty;
+    public string GrupoCategoria { get; set; } = string.Empty;
+    public string Categoria { get; set; } = string.Empty;
+    public string Marca { get; set; } = string.Empty;
+    public string Clave { get; set; } = string.Empty;
+    public decimal CantidadSolicitada { get; set; }
+    public decimal CantidadPedido { get; set; }
+    public decimal CantidadFaltante { get; set; }
 }
 
 public class VentasReporteResponse

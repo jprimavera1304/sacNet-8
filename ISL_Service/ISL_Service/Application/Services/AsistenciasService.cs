@@ -13,6 +13,10 @@ public class AsistenciasService : IAsistenciasService
     // nadie escribio. Se filtra antes de que llegue a la base.
     private static readonly Regex FormatoHora = new(@"^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$", RegexOptions.Compiled);
 
+    // El unico tipo de sueldo que tiene dias generados, y por tanto el unico
+    // que puede producir una rejilla. Ver ConsultarPeriodosAsync.
+    private const int TipoSueldoNomina = 1;
+
     private readonly IAsistenciasRepository _repository;
 
     public AsistenciasService(IAsistenciasRepository repository)
@@ -24,7 +28,24 @@ public class AsistenciasService : IAsistenciasService
         // 52 semanas por default: un anio hacia atras es lo que se corrige en la
         // practica. Se topa en 520 para que un top absurdo no arrastre los 540
         // periodos completos a un combo.
-        => _repository.ConsultarPeriodosAsync(Math.Max(idTipoSueldo, 0), top <= 0 ? 52 : Math.Min(top, 520), ct);
+        //
+        // SIN TIPO DE SUELDO SE ENTIENDE "NOMINA" (1), NO "TODOS".
+        //
+        // Antes 0 significaba "todos" y el combo salia con periodos de COMISION
+        // adentro. Elegir uno de esos no puede funcionar NUNCA:
+        // sp_n_ConsultaPeriodosTipoSueldoDias hace INNER JOIN contra
+        // PeriodosTipoSueldoDias y un periodo de comision no tiene dias, asi que
+        // /periodos/{id}/dias contesta 404 y la rejilla sale vacia sin explicar
+        // por que.
+        //
+        // No es una limitacion nuestra: Mac31 tampoco los ve, porque su consulta
+        // (Asistencias.cs:259, ConsultaDias) pasa por ese mismo INNER JOIN.
+        // Verificado contra las dos bases: los 1897 dias de Tauro y los 1656 de
+        // Zaragoza son TODOS de IDTipoSueldo = 1, sin una sola excepcion.
+        //
+        // Quien de verdad quiera comision lo pide explicito (idTipoSueldo=2) y
+        // recibe lo mismo que le daria legacy: nada.
+        => _repository.ConsultarPeriodosAsync(idTipoSueldo > 0 ? idTipoSueldo : TipoSueldoNomina, top <= 0 ? 52 : Math.Min(top, 520), ct);
 
     public async Task<List<DiaPeriodoDto>> ConsultarDiasAsync(int idPeriodoTipoSueldo, CancellationToken ct = default)
     {
@@ -62,6 +83,31 @@ public class AsistenciasService : IAsistenciasService
 
         request.HoraEntrada = NormalizarHora(request.HoraEntrada, "entrada");
         request.HoraSalida = NormalizarHora(request.HoraSalida, "salida");
+
+        // SALIDA SIN ENTRADA, NO.
+        //
+        // Ni el sp_w_ ni legacy lo revisan, pero la base lo paga: es EXACTAMENTE
+        // lo que rompe los totales del periodo en Zaragoza. A su copia de
+        // sp_n_ConsultaEmpleadosPeriodoAsistencia le falta el
+        // ISNULL(@diaHorasLaboradas, 0) que si tiene la de Tauro, asi que un
+        // DATEDIFF contra una entrada NULL deja en NULL la suma del periodo
+        // COMPLETO de esa persona. Medido en el periodo 12551 de MacZ: 3 de 85
+        // empleados sin totales, y uno de ellos (EDDER ROBLES SANCHEZ) por tener
+        // el dia 1 con salida 18:54 y sin entrada.
+        //
+        // Mac31 tampoco lo permite, aunque lo consigue de otra forma: la hora de
+        // salida solo se puede escribir con la casilla SALIDA marcada, y esa
+        // casilla solo se enciende cuando el dia tiene entrada
+        // (Asistencias.cs:206 y :239-245). Aqui se dice con una regla en vez de
+        // con un control apagado.
+        //
+        // No aplica a la huella: el checador entra por otro camino, no por este
+        // endpoint (aqui @IDEmpleadoHuella siempre va en 0 = captura manual).
+        if (!request.Inasistencia && !request.Vacacion
+            && string.IsNullOrEmpty(request.HoraEntrada) && !string.IsNullOrEmpty(request.HoraSalida))
+        {
+            throw new ArgumentException("No se puede capturar una hora de salida sin la hora de entrada.");
+        }
 
         // Ni falta, ni vacacion, ni horas: no hay nada que guardar. Legacy
         // aceptaria y dejaria un renglon vacio que en la rejilla se ve igual

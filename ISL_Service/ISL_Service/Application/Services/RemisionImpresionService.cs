@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Reports;
 
@@ -39,10 +39,28 @@ public class RemisionImpresionService : IRemisionImpresionService
         _repository = repository;
     }
 
-    public async Task<RemisionPdf> GenerarAsync(IReadOnlyList<int> idsVenta, int idUsuarioImpresion, CancellationToken ct)
+    public async Task<RemisionPdf> GenerarAsync(
+        IReadOnlyList<int> idsVenta,
+        int idUsuarioImpresion,
+        int primerImpresion,
+        int reimpresion,
+        string equipoImpresion,
+        CancellationToken ct)
     {
         if (idsVenta.Count == 0)
             throw new InvalidOperationException("No se indico ninguna remision.");
+
+        /*
+          ZARAGOZA IMPRIME OTRO PAPEL, NO ESTE CON OTRO LOGO.
+
+          Es el mismo desvio que hace MacServicios2 (ReporteV2Service ~813):
+          cuando le piden la remision y la empresa es Zaragoza, se va por la
+          "Remision Zaragoza Generico". Sin esto el web de Zaragoza entregaba la
+          remision de Tauro, que no se parece a la que sale de Mac31.
+        */
+        var funcionalidad = await _repository.ConsultarFuncionalidadAsync(ct);
+        if (funcionalidad.ToUpperInvariant().Contains("ZARA"))
+            return await GenerarZaragozaAsync(idsVenta, idUsuarioImpresion, ct);
 
         var plantillas = await _repository.ConsultarPlantillasAsync(ct);
 
@@ -51,7 +69,8 @@ public class RemisionImpresionService : IRemisionImpresionService
 
         foreach (var idVenta in idsVenta)
         {
-            var resultado = await _repository.ConsultarDatosVentaAsync(idVenta, idUsuarioImpresion, 0, ct);
+            var resultado = await _repository.ConsultarDatosVentaAsync(
+                idVenta, idUsuarioImpresion, 0, primerImpresion, reimpresion, equipoImpresion, ct);
 
             if (resultado.Datos is null)
             {
@@ -73,14 +92,91 @@ public class RemisionImpresionService : IRemisionImpresionService
                 : "No se pudo obtener la informacion de las remisiones.");
         }
 
+        var folio = Valor(ventas[0].Detalle.Rows.Count > 0 ? ventas[0].Detalle.Rows[0] : null, "folio");
+
         var html = RemisionHtmlBuilder.Construir(ventas, plantillas, Copias);
-        var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(html, Orientacion, ct);
+        var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(html, Orientacion, TituloDePestana(folio, ventas.Count), ct);
 
         return new RemisionPdf
         {
             Contenido = pdf,
             NombreArchivo = NombreArchivo(ventas[0])
         };
+    }
+
+    /*
+      EL PAPEL DE ZARAGOZA.
+
+      Mismo esqueleto que el de Tauro —se piden las plantillas, se recorren las
+      ventas, las que no se puedan imprimir aportan su motivo— pero con el
+      procedimiento y el constructor de alla. Ver RemisionZaragozaHtmlBuilder.
+    */
+    private async Task<RemisionPdf> GenerarZaragozaAsync(
+        IReadOnlyList<int> idsVenta,
+        int idUsuarioImpresion,
+        CancellationToken ct)
+    {
+        var plantillas = await _repository.ConsultarPlantillasZaragozaAsync(ct);
+        if (plantillas.Rows.Count == 0)
+            throw new InvalidOperationException("No estan cargadas las plantillas de la remision de Zaragoza.");
+
+        var logos = await _repository.ConsultarLogosAsync(ct);
+
+        var ventas = new List<System.Data.DataTable>();
+        var rechazadas = new List<string>();
+
+        foreach (var idVenta in idsVenta)
+        {
+            var resultado = await _repository.ConsultarDatosVentaZaragozaAsync(idVenta, idUsuarioImpresion, ct);
+
+            if (resultado.Datos is null)
+            {
+                rechazadas.Add(resultado.Mensaje);
+                continue;
+            }
+
+            ventas.Add(resultado.Datos);
+        }
+
+        if (ventas.Count == 0)
+        {
+            throw new InvalidOperationException(rechazadas.Count > 0
+                ? string.Join(" ", rechazadas)
+                : "No se pudo obtener la informacion de las remisiones.");
+        }
+
+        var primera = ventas[0].Rows[0];
+
+        var html = RemisionZaragozaHtmlBuilder.Construir(ventas, plantillas, logos.Logo, logos.MarcaDeAgua);
+        var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(
+            html,
+            Orientacion,
+            TituloDePestana(Valor(primera, "folio"), ventas.Count),
+            ct);
+
+        return new RemisionPdf
+        {
+            Contenido = pdf,
+            NombreArchivo = NombreArchivoDe("zaragoza", primera)
+        };
+    }
+
+    /*
+      LO QUE SE LEE EN LA PESTAÑA MIENTRAS SE VE EL PAPEL
+
+      Va el FOLIO y no el nombre del modulo: quien imprime en mostrador suele
+      tener varias remisiones abiertas a la vez, y lo unico que las distingue
+      entre si es el folio. "Reporte" repetido seis veces no sirve para nada.
+
+      Corto a proposito —una pestaña deja leer unos quince caracteres— y sin el
+      nombre de la empresa, igual que hace el resto del front (nucleo/pestana.ts).
+    */
+    private static string TituloDePestana(string folio, int cuantas)
+    {
+        if (cuantas > 1)
+            return $"Remisiones ({cuantas})";
+
+        return string.IsNullOrWhiteSpace(folio) ? "Remisión" : $"Remisión {folio}";
     }
 
     /*
@@ -91,7 +187,17 @@ public class RemisionImpresionService : IRemisionImpresionService
     private static string NombreArchivo(RemisionDatosVenta venta)
     {
         var folio = Valor(venta.Detalle.Rows.Count > 0 ? venta.Detalle.Rows[0] : null, "folio");
-        var informacion = venta.Informacion.Rows[0];
+        return NombreArchivoDe("tauro", venta.Informacion.Rows[0], folio);
+    }
+
+    /*
+      En Zaragoza el folio y el cliente vienen en la MISMA tabla que el detalle,
+      porque su procedimiento devuelve un solo conjunto. Por eso el folio se
+      puede omitir y se toma de ahi.
+    */
+    private static string NombreArchivoDe(string empresa, System.Data.DataRow informacion, string? folio = null)
+    {
+        folio ??= Valor(informacion, "folio");
 
         var nombreCompleto = (Valor(informacion, "ClienteApellidoPaterno") + " " +
                               Valor(informacion, "ClienteApellidoMaterno") + " " +
@@ -100,7 +206,7 @@ public class RemisionImpresionService : IRemisionImpresionService
         if (nombreCompleto.Length > 21)
             nombreCompleto = nombreCompleto.Substring(0, 20);
 
-        var archivo = "tauro_" + folio + "_" + nombreCompleto;
+        var archivo = empresa + "_" + folio + "_" + nombreCompleto;
         return Regex.Replace(archivo, "[^0-9a-zA-Z]+", "_") + ".pdf";
     }
 

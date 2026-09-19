@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using ISL_Service.Infrastructure.Reports;
 
 namespace ISL_Service.Application.Interfaces;
@@ -24,5 +24,76 @@ public interface IRemisionImpresionRepository
         int idVenta,
         int idUsuarioImpresion,
         int idDescuento,
+        int primerImpresion,
+        int reimpresion,
+        string equipoImpresion,
         CancellationToken ct);
+
+    /*
+      QUIEN YA IMPRIMIO CADA UNA, ANTES DE PEDIR EL PAPEL
+
+      sp_n_VentasInformacion rechaza la primera impresion de una remision ya
+      impresa y devuelve el motivo, pero lo hace cuando el navegador YA abrio la
+      pestaña: el usuario ve aparecer una hoja y desaparecer un texto de error.
+
+      Con esto se pregunta antes, con la MISMA frase que arma el procedimiento
+      (el bloque `IF @PrimerImpresion = 1 AND @NombreUsuarioReimpresion <> ''`),
+      para poder decirlo en la pantalla donde se apreto el boton y ofrecer
+      Reimprimir, que es lo que legacy hace ir a buscar a mano.
+
+      Es una SELECT: no marca nada. Lo que marca es el procedimiento, despues.
+    */
+    Task<List<RemisionImpresionPrevia>> ConsultarImpresionesPreviasAsync(
+        IReadOnlyCollection<int> idsVenta,
+        CancellationToken ct);
+
+    /*
+      LO DE ZARAGOZA VA APARTE PORQUE ES OTRO REPORTE.
+
+      No es la misma remision con otro logo: Zaragoza imprime la "Remision
+      Zaragoza Generico", con sus propias plantillas y un solo procedimiento.
+      Ver RemisionZaragozaHtmlBuilder para el detalle de por que.
+    */
+
+    /// Que empresa es esta base (ZARA, TAU, ...). Sale de Constantes.
+    Task<string> ConsultarFuncionalidadAsync(CancellationToken ct);
+
+    /// El logo del reporte y el de la marca de agua, ya con su ruta resuelta.
+    Task<RemisionLogos> ConsultarLogosAsync(CancellationToken ct);
+
+    /// Las cinco plantillas de la remision de Zaragoza (cuerpo_n, detalle,
+    /// totales, pie, hoja4).
+    Task<DataTable> ConsultarPlantillasZaragozaAsync(CancellationToken ct);
+
+    /// Los datos de UNA venta para el papel de Zaragoza.
+    Task<RemisionZaragozaResultado> ConsultarDatosVentaZaragozaAsync(
+        int idVenta,
+        int idUsuarioImpresion,
+        CancellationToken ct);
+}
+
+/// Una remision que ya tiene sello de impresion, con quien y cuando, para poder
+/// repetir el mensaje de legacy palabra por palabra.
+public sealed class RemisionImpresionPrevia
+{
+    public int IdVenta { get; init; }
+    public string FolioFtm { get; init; } = "";
+    public string Usuario { get; init; } = "";
+    public string Cuando { get; init; } = "";
+    public string Equipo { get; init; } = "";
+}
+
+/// Las dos imagenes del papel, ya listas para meterlas en el html.
+public sealed class RemisionLogos
+{
+    public string Logo { get; init; } = "";
+    public string MarcaDeAgua { get; init; } = "";
+}
+
+/// Igual que en Tauro: si la venta no se puede imprimir no vienen datos, viene
+/// el motivo, y legacy sigue con las demas.
+public sealed class RemisionZaragozaResultado
+{
+    public DataTable? Datos { get; init; }
+    public string Mensaje { get; init; } = "";
 }

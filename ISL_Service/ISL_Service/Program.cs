@@ -170,10 +170,22 @@ builder.Services.AddScoped<IRemisionImpresionService, RemisionImpresionService>(
 builder.Services.AddScoped<IVentasConsultaService, VentasConsultaService>();
 builder.Services.AddScoped<IVentasCancelacionRepository, VentasCancelacionRepository>();
 builder.Services.AddScoped<IVentasCancelacionService, VentasCancelacionService>();
+// Devolucion de una remision (la pantalla VentasDevolucion de Mac31).
+builder.Services.AddScoped<IVentasDevolucionRepository, VentasDevolucionRepository>();
+builder.Services.AddScoped<IVentasDevolucionService, VentasDevolucionService>();
+// Consultar pagos de una remision (la pantalla ConsultarVentasPagos de Mac31).
+builder.Services.AddScoped<IVentasPagosRepository, VentasPagosRepository>();
+builder.Services.AddScoped<IVentasPagosService, VentasPagosService>();
+// Multi pago: cobrar varias remisiones de un golpe (btnMultiPago de Mac31).
+builder.Services.AddScoped<IVentasMultiPagoRepository, VentasMultiPagoRepository>();
+builder.Services.AddScoped<IVentasMultiPagoService, VentasMultiPagoService>();
 builder.Services.AddScoped<IVentasSaldosRepository, VentasSaldosRepository>();
 builder.Services.AddScoped<IVentasSaldosService, VentasSaldosService>();
 builder.Services.AddScoped<IVentasPedidoCapturaRepository, VentasPedidoCapturaRepository>();
 builder.Services.AddScoped<IVentasPedidoCapturaService, VentasPedidoCapturaService>();
+// Modificacion de usados de una remision (btnUsados de Mac31).
+builder.Services.AddScoped<IVentasUsadosRepository, VentasUsadosRepository>();
+builder.Services.AddScoped<IVentasUsadosService, VentasUsadosService>();
 
 // -------------------- ALMACEN CASCOS --------------------
 builder.Services.AddScoped<IAlmacenCascosRepository, AlmacenCascosRepository>();
