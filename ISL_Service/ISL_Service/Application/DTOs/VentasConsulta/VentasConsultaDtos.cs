@@ -76,25 +76,26 @@ public class VentasConsultaRowsResponse
 /*
   ABRIR EL REPORTE DE UNA REMISION
 
-  El reporte NO se genera aqui. Ya existe: es la misma pagina web que abre Mac31
-  (el modulo MacReportes), y lo unico que hace falta para llegar a ella es dejar
-  los parametros en la tabla Parametros y devolver la direccion.
+  El reporte lo genera ESTE backend: lee las mismas plantillas de Template_Html
+  y llama los mismos sp_n_ que usa Mac31, y arma el PDF. Antes se delegaba en
+  MacReportes —el servidor de reportes viejo— y eso obligaba a tener esa
+  aplicacion viva y alcanzable desde el navegador del usuario.
 
-  Reusarla en vez de reescribirla no es pereza: es la unica forma de que el
-  formato sea IDENTICO. Un reporte reescrito se parece el primer dia y se
-  separa en cuanto alguien toque uno de los dos — y este es el papel que se le
-  entrega al cliente.
+  Lo que se conserva de aquel flujo es lo que de verdad importaba: las
+  plantillas y los procedimientos. Por eso el papel sigue saliendo igual al de
+  Mac31 y se sigue actualizando solo si alguien ajusta una plantilla.
+
+  El POST no devuelve el PDF: devuelve la direccion donde esta. La pestana ya
+  se abrio en el navegador antes de pedir (si no, la bloquea), asi que lo unico
+  que falta es a donde mandarla.
 */
 public class VentasReporteRequest
 {
-    /// Las ventas a incluir. Mac31 manda varias cuando hay varias marcadas.
+    /// Las ventas a incluir. Mac31 manda varias cuando hay varias marcadas, y
+    /// salen todas en el mismo PDF, una por hoja.
     public List<int> IdsVenta { get; set; } = new();
 
-    /// 5 = Remision, que es el que abre la pantalla de consulta. Se deja
-    /// parametrizable porque el mismo mecanismo sirve para los demas reportes.
-    public int IdReporte { get; set; } = 5;
-
-    /// 0 = ver en pantalla, 1 = descargar. Es el parametro "d" de la direccion.
+    /// 0 = ver en pantalla, 1 = descargar el archivo.
     public int Descargar { get; set; }
 }
 
@@ -102,8 +103,6 @@ public class VentasReporteResponse
 {
     public bool Ok { get; set; }
     public string Message { get; set; } = string.Empty;
-    /// El renglon que se acaba de dejar en Parametros.
-    public int IdParametros { get; set; }
-    /// La direccion completa, lista para abrirse en otra pestaña.
+    /// La direccion completa, lista para abrirse en otra pestana.
     public string Url { get; set; } = string.Empty;
 }

@@ -10,5 +10,6 @@ public interface IVentasConsultaService
     Task<VentasConsultaRowsResponse> ConsultarPendientesImprimirAsync(VentasConsultaRequest request, int idUsuarioToken, CancellationToken ct);
     Task<VentasConsultaRowsResponse> ConsultarPagosAsync(VentasConsultaRequest request, int idUsuarioToken, CancellationToken ct);
 
-    Task<VentasReporteResponse> PrepararReporteAsync(VentasReporteRequest request, int idUsuarioToken, CancellationToken ct);
+    /// Firma el pase de pocos minutos con el que el navegador puede ir por el PDF.
+    string CrearTicketReporte(VentasReporteRequest request, int idUsuarioToken);
 }

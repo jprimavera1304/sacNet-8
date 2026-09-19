@@ -12,12 +12,20 @@ namespace ISL_Service.Controllers;
 public class VentasConsultaController : ControllerBase
 {
     private readonly IVentasConsultaService _service;
+    private readonly IRemisionImpresionService _remisiones;
     private readonly ICurrentUserAccessor _currentUserAccessor;
+    private readonly IConfiguration _configuration;
 
-    public VentasConsultaController(IVentasConsultaService service, ICurrentUserAccessor currentUserAccessor)
+    public VentasConsultaController(
+        IVentasConsultaService service,
+        IRemisionImpresionService remisiones,
+        ICurrentUserAccessor currentUserAccessor,
+        IConfiguration configuration)
     {
         _service = service;
+        _remisiones = remisiones;
         _currentUserAccessor = currentUserAccessor;
+        _configuration = configuration;
     }
 
     [HttpGet("catalogos")]
@@ -60,23 +68,85 @@ public class VentasConsultaController : ControllerBase
     }
 
     /*
-      Prepara el reporte de una o varias remisiones y devuelve la direccion a la
-      que hay que ir. NO devuelve el reporte: lo pinta MacReportes, la misma
-      aplicacion que abre Mac31, y por eso sale identico.
+      PREPARA EL REPORTE Y DICE A DONDE IR
 
-      El id de usuario sale del TOKEN y no del cuerpo de la peticion. En Mac31 lo
-      manda el cliente porque el cliente es de confianza; aqui no lo es, y ese id
-      es el que queda escrito como quien pidio el reporte.
+      No devuelve el PDF: devuelve la direccion donde esta. La pantalla ya abrio
+      la pestana antes de llamar aqui (si la abriera al recibir la respuesta, el
+      navegador la bloquearia por emergente), asi que lo unico que le falta es a
+      donde apuntarla.
     */
     [HttpPost("reporte")]
-    public async Task<IActionResult> Reporte([FromBody] VentasReporteRequest? request, CancellationToken ct)
+    public IActionResult Reporte([FromBody] VentasReporteRequest? request)
     {
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
-        var data = await _service.PrepararReporteAsync(request ?? new VentasReporteRequest(), idUsuario, ct);
 
-        if (!data.Ok)
-            return BadRequest(new { ok = false, message = data.Message });
+        string ticket;
+        try
+        {
+            ticket = _service.CrearTicketReporte(request ?? new VentasReporteRequest(), idUsuario);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { ok = false, message = ex.Message });
+        }
 
+        var data = new VentasReporteResponse { Ok = true, Url = BuildRemisionUrl(ticket) };
+        Response.Headers["Cache-Control"] = "no-store";
         return Ok(new { ok = true, message = "Reporte listo.", data });
+    }
+
+    /*
+      ENTREGA EL PDF DE LA REMISION
+
+      Anonimo a proposito: lo abre una pestana nueva del navegador, que no manda
+      el encabezado Authorization. Lo que autoriza es el pase firmado del
+      parametro "t", que trae las ventas, el usuario y una vigencia corta.
+
+      El PDF se genera al vuelo, no se guarda: el papel tiene que reflejar el
+      estado de la venta en el momento en que se pide (cancelaciones,
+      devoluciones y pagos cambian despues de emitida).
+    */
+    [HttpGet("reporte/pdf")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ReportePdf([FromQuery] string? t, CancellationToken ct)
+    {
+        var llave = _configuration["Jwt:Key"] ?? "";
+        var pase = RemisionTicket.Validar(llave, t);
+
+        if (pase is null)
+            return BadRequest("El enlace del reporte no es valido o ya vencio. Vuelve a generarlo desde la consulta.");
+
+        RemisionPdf pdf;
+        try
+        {
+            pdf = await _remisiones.GenerarAsync(pase.IdsVenta, pase.IdUsuario, ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            /*
+              El motivo se devuelve en texto y no como json: esto se ve en una
+              pestana del navegador, no lo consume codigo.
+            */
+            return BadRequest(ex.Message);
+        }
+
+        Response.Headers["Cache-Control"] = "no-store";
+
+        // d=1 descarga con nombre de archivo; d=0 se ve dentro del navegador.
+        return pase.Descargar == 1
+            ? File(pdf.Contenido, "application/pdf", pdf.NombreArchivo)
+            : File(pdf.Contenido, "application/pdf");
+    }
+
+    /*
+      La direccion se arma con el esquema, host y ruta base de la peticion —no
+      con una configuracion— para que sirva igual en local, detras de un proxy y
+      en produccion, sin una clave mas que mantener. Mismo patron que
+      ReportesVentasController.BuildReportesV3WUrl.
+    */
+    private string BuildRemisionUrl(string ticket)
+    {
+        var pathBase = Request.PathBase.HasValue ? Request.PathBase.Value : "";
+        return $"{Request.Scheme}://{Request.Host}{pathBase}/api/ventas/consulta/reporte/pdf?t={Uri.EscapeDataString(ticket)}";
     }
 }

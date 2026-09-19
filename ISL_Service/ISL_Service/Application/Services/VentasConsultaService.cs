@@ -1,17 +1,11 @@
 ﻿using ISL_Service.Application.DTOs.VentasConsulta;
 using ISL_Service.Application.Interfaces;
+using ISL_Service.Application.Security;
 
 namespace ISL_Service.Application.Services;
 
 public class VentasConsultaService : IVentasConsultaService
 {
-    /*
-      El separador de la lista de ventas es "~", igual que
-      Globales.DELIMITADOR_PARAM_TILDE_SP en Mac31. Si aqui se pusiera una coma,
-      la pagina de reportes leeria una sola venta con un texto raro adentro.
-    */
-    private const string SeparadorIds = "~";
-
     private readonly IVentasConsultaRepository _repository;
     private readonly IConfiguration _configuration;
 
@@ -76,48 +70,36 @@ public class VentasConsultaService : IVentasConsultaService
 
       EL NOMBRE DE EQUIPO ES UNICO POR LLAMADA. En Mac31 es el nombre de la
       maquina, que ahi identifica a un solo usuario sentado enfrente. En el web
-      la misma persona puede pedir dos reportes a la vez desde dos pestañas, y
+      la misma persona puede pedir dos reportes a la vez desde dos pestanas, y
       el procedimiento recupera el id con un MAX() por equipo y usuario: con el
-      nombre repetido, las dos pestañas se llevarian el mismo reporte.
+      nombre repetido, las dos pestanas se llevarian el mismo reporte.
     */
-    public async Task<VentasReporteResponse> PrepararReporteAsync(
-        VentasReporteRequest request,
-        int idUsuarioToken,
-        CancellationToken ct)
+    /*
+      EL PASE PARA VER EL REPORTE
+
+      Aqui no se genera nada ni se toca la base: solo se firma un pase de pocos
+      minutos con las ventas y el usuario. El PDF se arma cuando el navegador
+      va por el, en RemisionImpresionService.
+
+      Por que un pase y no la lista de ventas en la direccion: porque entonces
+      cualquiera podria cambiar el numero y leer la remision de otro cliente. El
+      GET que entrega el PDF es anonimo —una pestana nueva no manda el token— y
+      lo unico que lo autoriza es esta firma.
+
+      El id de usuario sale del TOKEN, no del cuerpo de la peticion. En Mac31 lo
+      manda el cliente porque el cliente es de confianza; aqui no lo es, y ese
+      id es el que queda escrito como quien imprimio la remision.
+    */
+    public string CrearTicketReporte(VentasReporteRequest request, int idUsuarioToken)
     {
         var ids = (request?.IdsVenta ?? new List<int>()).Where(x => x > 0).Distinct().ToList();
         if (ids.Count == 0)
-            return new VentasReporteResponse { Ok = false, Message = "Selecciona una remisión." };
+            throw new InvalidOperationException("Selecciona una remisión.");
 
-        var baseUrl = (_configuration["Reportes:BaseUrl"] ?? string.Empty).Trim();
-        if (string.IsNullOrWhiteSpace(baseUrl))
-        {
-            return new VentasReporteResponse
-            {
-                Ok = false,
-                Message = "Falta configurar Reportes:BaseUrl. Sin eso no se sabe a qué servidor de reportes ir."
-            };
-        }
+        var llave = _configuration["Jwt:Key"];
+        if (string.IsNullOrWhiteSpace(llave))
+            throw new InvalidOperationException("Falta Jwt:Key; sin llave no se puede firmar el acceso al reporte.");
 
-        if (!baseUrl.EndsWith("/", StringComparison.Ordinal))
-            baseUrl += "/";
-
-        var nombreEquipo = $"WEB-{Guid.NewGuid():N}"[..20];
-        var idReporte = request!.IdReporte > 0 ? request.IdReporte : 5;
-
-        var idParametros = await _repository.RegistrarParametrosReporteAsync(
-            nombreEquipo,
-            idUsuarioToken,
-            idReporte,
-            string.Join(SeparadorIds, ids),
-            ct);
-
-        if (idParametros <= 0)
-            return new VentasReporteResponse { Ok = false, Message = "No se pudieron guardar los parámetros del reporte." };
-
-        var url = $"{baseUrl}Reportes?IDReporte={idReporte}&ids={idParametros}&idu={idUsuarioToken}" +
-                  $"&d={(request.Descargar == 1 ? 1 : 0)}&idd=0";
-
-        return new VentasReporteResponse { Ok = true, IdParametros = idParametros, Url = url };
+        return RemisionTicket.Firmar(llave, ids, idUsuarioToken, request!.Descargar);
     }
 }
