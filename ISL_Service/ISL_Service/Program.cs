@@ -170,6 +170,9 @@ builder.Services.AddScoped<IRemisionImpresionService, RemisionImpresionService>(
 builder.Services.AddScoped<IVentasConsultaService, VentasConsultaService>();
 builder.Services.AddScoped<IVentasCancelacionRepository, VentasCancelacionRepository>();
 builder.Services.AddScoped<IVentasCancelacionService, VentasCancelacionService>();
+// Consultar pagos de una remision (la pantalla ConsultarVentasPagos de Mac31).
+builder.Services.AddScoped<IVentasPagosRepository, VentasPagosRepository>();
+builder.Services.AddScoped<IVentasPagosService, VentasPagosService>();
 builder.Services.AddScoped<IVentasSaldosRepository, VentasSaldosRepository>();
 builder.Services.AddScoped<IVentasSaldosService, VentasSaldosService>();
 builder.Services.AddScoped<IVentasPedidoCapturaRepository, VentasPedidoCapturaRepository>();

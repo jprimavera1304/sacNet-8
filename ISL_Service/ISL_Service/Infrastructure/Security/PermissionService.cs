@@ -136,6 +136,37 @@ public sealed class PermissionService : IPermissionService
     private static readonly LegacyModuleBinding EmpleadosBinding = new(
         EmpleadosModuleKey, "Empleados", EmpleadosLegacyForm, EmpleadosLegacyPermissionMap, EmpleadosWebPermissionSeeds);
 
+    /*
+      LOS BOTONES DE LA PANTALLA DE PAGOS VIVEN EN OTRA FORMA DE MAC31.
+
+      "ventas.pagos.ver" (btnPagos) vive en CONSULTA DE VENTAS y ya estaba
+      arriba: es el que deja ABRIR la pantalla. Pero los dos botones de ADENTRO
+      —Nuevo pago y Cancelar pago— estan dados de alta en otra forma,
+      ConsultarVentasPagos, y por eso hace falta un segundo puente.
+
+      Verificado en las DOS empresas y son identicas hasta el numero: IDForma 9,
+      Forma "ConsultarVentasPagos", Descripcion "CONSULTA DE VENTAS PAGOS", con
+      exactamente DOS procesos, btnNuevo (1032) y btnCancelar (1033), los mismos
+      IDProceso en Produccion_svr (Tauro) y en MacZ (Zaragoza). Ese es el
+      universo completo: btnCerrar no esta en n_Procesos —en el Designer lleva
+      Tag = "1", que en ValidaOperadorProcesos significa "encendido para
+      todos"— asi que no es un permiso y no se inventa aqui.
+
+      NO LLEVA WebSeeds NI SU PROPIO ver_modulo. El modulo es el MISMO
+      ("ventas"), y su ".ver_modulo" ya lo siembra VentasWebPermissionSeeds;
+      volver a declararlo crearia dos duenos de la misma llave.
+    */
+    private const string VentasPagosLegacyForm = "CONSULTA DE VENTAS PAGOS";
+
+    private static readonly Dictionary<string, (string Key, string Name)> VentasPagosLegacyPermissionMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["btnNuevo"] = ("ventas.pagos.nuevo", "Ventas - Nuevo pago"),
+        ["btnCancelar"] = ("ventas.pagos.cancelar", "Ventas - Cancelar pago")
+    };
+
+    private static readonly LegacyModuleBinding VentasPagosBinding = new(
+        VentasModuleKey, "Ventas", VentasPagosLegacyForm, VentasPagosLegacyPermissionMap, new List<PermissionSeed>());
+
     private const string PrestamosModuleKey = "prestamos";
     private const string PrestamosViewPermission = "prestamos.ver_modulo";
 
@@ -370,7 +401,7 @@ public sealed class PermissionService : IPermissionService
 
         var schema = await GetSchemaAsync(conn, ct);
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
-        var ventasCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasBinding, ct);
+        var ventasCatalog = await EnsureVentasPermissionsSyncedAsync(conn, empresaId, ct);
         var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
         var prestamosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
 
@@ -507,7 +538,7 @@ WHERE up.EmpresaId = @EmpresaId;";
         foreach (var user in response.Users)
         {
             var legacyReports = await LoadLegacyReportPermissionsForUserAsync(conn, empresaId, user.UserId, reportCatalog, ct);
-            var legacyVentas = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, user.UserId, VentasBinding, ventasCatalog, ct);
+            var legacyVentas = await LoadVentasPermissionsForUserAsync(conn, empresaId, user.UserId, ventasCatalog, ct);
             var legacyEmpleados = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, user.UserId, EmpleadosBinding, empleadosCatalog, ct);
             var legacyPrestamos = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, user.UserId, PrestamosBinding, prestamosCatalog, ct);
             if (legacyReports.Allow.Count == 0 && legacyReports.Deny.Count == 0
@@ -554,7 +585,7 @@ WHERE up.EmpresaId = @EmpresaId;";
 
         var schema = await GetSchemaAsync(conn, ct);
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
-        var ventasCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasBinding, ct);
+        var ventasCatalog = await EnsureVentasPermissionsSyncedAsync(conn, empresaId, ct);
         var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
         var prestamosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
         var response = new PermisosWebRolesBootstrapResponse { PermissionsEnabled = true };
@@ -636,7 +667,7 @@ ORDER BY r.Codigo, p.Clave;";
             return Array.Empty<PermisosWebPermissionItem>();
 
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
-        var ventasCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasBinding, ct);
+        var ventasCatalog = await EnsureVentasPermissionsSyncedAsync(conn, empresaId, ct);
         var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
         var prestamosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
         var response = new List<PermisosWebPermissionItem>();
@@ -798,7 +829,7 @@ ORDER BY CASE WHEN m.ModuloClave = 'inicio' THEN 0 ELSE 1 END, m.ModuloClave;";
             return Array.Empty<PermisosWebModuleItem>();
 
         await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
-        await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasBinding, ct);
+        await EnsureVentasPermissionsSyncedAsync(conn, empresaId, ct);
         await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
         await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
 
@@ -993,7 +1024,7 @@ VALUES ({string.Join(", ", insertValues)});";
 
         var schema = await GetSchemaAsync(conn, ct);
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
-        var ventasCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasBinding, ct);
+        var ventasCatalog = await EnsureVentasPermissionsSyncedAsync(conn, empresaId, ct);
         var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
         var prestamosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
         var normalizedPermissions = permissions
@@ -1086,7 +1117,7 @@ VALUES ({string.Join(", ", insertValues)});";
 
         var schema = await GetSchemaAsync(conn, ct);
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
-        var ventasCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasBinding, ct);
+        var ventasCatalog = await EnsureVentasPermissionsSyncedAsync(conn, empresaId, ct);
         var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
         var prestamosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
         var overrideTypes = await GetOverrideTypeTokensAsync(conn, ct);
@@ -1340,7 +1371,7 @@ WHERE t.name = 'WUsuarioPermiso';";
         var schema = await GetSchemaAsync(conn, ct);
         var permissions = await LoadEffectivePermissionsAsync(conn, schema, userId, empresaId, rolLegacy, ct);
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
-        var ventasCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasBinding, ct);
+        var ventasCatalog = await EnsureVentasPermissionsSyncedAsync(conn, empresaId, ct);
         var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
         var prestamosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
         if (reportCatalog.Count > 0)
@@ -1351,7 +1382,7 @@ WHERE t.name = 'WUsuarioPermiso';";
         }
         if (ventasCatalog.Count > 0)
         {
-            var legacyVentas = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, userId, VentasBinding, ventasCatalog, ct);
+            var legacyVentas = await LoadVentasPermissionsForUserAsync(conn, empresaId, userId, ventasCatalog, ct);
             permissions.RemoveAll(x => x.StartsWith($"{VentasModuleKey}.", StringComparison.OrdinalIgnoreCase) && !VentasWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
             permissions.AddRange(legacyVentas.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
         }
@@ -2140,6 +2171,53 @@ WHERE EmpresaId = @EmpresaId
 
         foreach (var user in users)
             await SyncLegacyReportPermissionsForUserAsync(conn, schema, empresaId, user.UserId, user.Rol, reportCatalog, ct);
+    }
+
+    /*
+      VENTAS SON DOS FORMAS DE MAC31, NO UNA.
+
+      Los botones de la consulta viven en CONSULTA DE VENTAS y los dos de la
+      pantalla de pagos en CONSULTA DE VENTAS PAGOS. Para el web es UN solo
+      modulo ("ventas") y un solo conjunto de permisos, asi que se juntan aqui
+      y no en cada uno de los ocho sitios que piden el catalogo: repetir el par
+      de llamadas ocho veces es como se acaba con un sitio que sincroniza una
+      forma y se olvida de la otra.
+
+      NO HAY CHOQUE DE IDProceso entre las dos formas: la consulta usa 1..18,
+      1031, 3063, 5096, 5151-5154, 5196 y 53xx; la de pagos usa 1032 y 1033.
+      Verificado en Produccion_svr (Tauro) y en MacZ (Zaragoza). Importa porque
+      el catalogo se indexa por IDProceso al leer los permisos del usuario: dos
+      formas con el mismo numero se pisarian.
+    */
+    private async Task<Dictionary<string, VentasPermissionInfo>> EnsureVentasPermissionsSyncedAsync(
+        SqlConnection conn,
+        int empresaId,
+        CancellationToken ct)
+    {
+        var catalogo = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasBinding, ct);
+        var pagos = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasPagosBinding, ct);
+        foreach (var par in pagos)
+            catalogo[par.Key] = par.Value;
+        return catalogo;
+    }
+
+    /// <summary>
+    /// Lo que el usuario tiene encendido en las DOS formas de ventas, en un
+    /// solo par Allow/Deny.
+    /// </summary>
+    private static async Task<(HashSet<string> Allow, HashSet<string> Deny)> LoadVentasPermissionsForUserAsync(
+        SqlConnection conn,
+        int empresaId,
+        Guid userId,
+        IReadOnlyDictionary<string, VentasPermissionInfo> catalogo,
+        CancellationToken ct)
+    {
+        var consulta = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, userId, VentasBinding, catalogo, ct);
+        var pagos = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, userId, VentasPagosBinding, catalogo, ct);
+
+        consulta.Allow.UnionWith(pagos.Allow);
+        consulta.Deny.UnionWith(pagos.Deny);
+        return consulta;
     }
 
     private async Task<Dictionary<string, VentasPermissionInfo>> EnsureLegacyModulePermissionsSyncedAsync(
