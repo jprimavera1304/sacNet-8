@@ -151,6 +151,36 @@ public class PrestamosRepository : IPrestamosRepository
         return n > 0;
     }
 
+    public async Task<DateTime?> FinDelPeriodoNominaAbiertoAsync(CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        // SELECT directo y no sp_n_ConsultaPeriodosTipoSueldo porque ese SP
+        // termina en EXEC (@Sql) y devuelve trece columnas para llenar un combo;
+        // aqui hace falta UN dato. Es solo lectura sobre una tabla de legacy, que
+        // es lo mismo que ya hace TienePrestamoAbiertoAsync mas arriba.
+        //
+        // Los filtros son los de Prestamos.cs:82-86, uno por uno:
+        //   IDPeriodoStatus = 1  -> periodo abierto
+        //   IDTipoSueldo    = 1  -> enumTiposSueldo.Nomina
+        //   orden descendente, primer renglon
+        //
+        // Comprobado en las dos empresas: hoy hay exactamente UN periodo de
+        // nomina abierto en cada una (Tauro 9523, Zaragoza 12551), asi que el
+        // TOP 1 no esta eligiendo entre varios candidatos.
+        await using var cmd = new SqlCommand(@"
+            SELECT TOP 1 FechaFinal
+            FROM dbo.PeriodosTipoSueldo
+            WHERE IDPeriodoStatus = 1
+              AND IDTipoSueldo = 1
+            ORDER BY FechaFinal DESC", conn);
+
+        var valor = await cmd.ExecuteScalarAsync(ct);
+        if (valor is null || valor is DBNull) return null;
+        return Convert.ToDateTime(valor, CultureInfo.InvariantCulture);
+    }
+
     /// <summary>
     /// Fecha -> texto MM-dd-yyyy. Sin fecha se manda vacio, que es lo que
     /// legacy entiende como "no hay".

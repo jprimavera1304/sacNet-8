@@ -77,6 +77,35 @@ public class PrestamosService : IPrestamosService
             && request.FechaPrestamo!.Value.Date > request.FechaInicioPagos.Value.Date)
             throw new ArgumentException("La fecha de inicio de los pagos no puede ser anterior a la fecha del prestamo.");
 
+        // Prestamos.cs:398-409 — LA REGLA DEL PAGO INMEDIATO.
+        //
+        // Un prestamo de pago inmediato se descuenta completo en el periodo de
+        // nomina que esta corriendo. Si se fecha DESPUES del cierre de ese
+        // periodo, el descuento no cae en ningun lado: el prestamo queda vivo,
+        // con saldo, y nadie lo cobra nunca. Mac31 no deja capturarlo; el web si
+        // dejaba, porque todas las validaciones de fecha estaban metidas dentro
+        // del `if (!PagoInmediato)` y esta es justo la que aplica al caso
+        // contrario.
+        //
+        // Sin periodo abierto NO se bloquea: Mac31 en esa situacion cierra la
+        // forma entera (Prestamos.cs:87-92) porque no puede ni abrirse. Traer
+        // ese portazo al web seria peor que dejar pasar el alta — aqui el
+        // prestamo se guarda igual y la nomina lo recoge cuando se abra el
+        // periodo. Lo que no se puede es inventar un tope que no existe.
+        if (request.PagoInmediato)
+        {
+            var finDePeriodo = await _repository.FinDelPeriodoNominaAbiertoAsync(ct);
+            if (finDePeriodo is not null && request.FechaPrestamo!.Value.Date > finDePeriodo.Value.Date)
+            {
+                // La fecha va EN el mensaje. "No puede ser mayor" sin decir mayor
+                // a que deja a quien captura probando fechas a ciegas; es ademas
+                // lo que hace Mac31, que concatena FechaFinalFtm.
+                throw new ArgumentException(
+                    "Un prestamo de pago inmediato se descuenta en el periodo de nomina en curso, "
+                    + $"asi que su fecha no puede ser posterior al {finDePeriodo.Value:dd/MM/yyyy}.");
+            }
+        }
+
         // Prestamos.cs:421 — el motivo es obligatorio. Es la unica explicacion
         // de por que existe el prestamo, y es lo primero que se busca cuando
         // alguien reclama un descuento en su recibo.

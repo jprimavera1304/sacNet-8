@@ -25,4 +25,19 @@ public interface IPrestamosRepository
     /// avisarlo. Despues del alta ya no se distingue.
     /// </summary>
     Task<bool> TienePrestamoAbiertoAsync(int idEmpleado, CancellationToken ct = default);
+
+    /// <summary>
+    /// La FechaFinal del periodo de NOMINA que esta abierto, o null si no hay
+    /// ninguno.
+    ///
+    /// Es el tope de la regla de PAGO INMEDIATO de Mac31
+    /// (Legacy/Mac31/Mac31/Forms/Nomina/Prestamos.cs:398-409): un prestamo que
+    /// se cobra de golpe se descuenta en el periodo que esta corriendo, asi que
+    /// fecharlo despues del cierre de ese periodo hace que el descuento no se
+    /// aplique nunca. El prestamo se queda vivo y nadie lo cobra.
+    ///
+    /// Mac31 lo lee igual: ConsultarPeriodosTipoSueldo con IDPeriodoStatus = 1,
+    /// IDTipoSueldo = Nomina (1) y orden descendente, y se queda con Rows[0].
+    /// </summary>
+    Task<DateTime?> FinDelPeriodoNominaAbiertoAsync(CancellationToken ct = default);
 }
