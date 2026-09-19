@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 
 namespace ISL_Service.Infrastructure.Reports;
 
@@ -25,7 +25,32 @@ namespace ISL_Service.Infrastructure.Reports;
 */
 public static class RemisionFormatoLegacy
 {
-    public static readonly CultureInfo Cultura = CultureInfo.GetCultureInfo("es-MX");
+    /*
+      LA CULTURA SE FIJA Y ADEMAS SE LE CLAVAN LOS DESIGNADORES DE AM/PM.
+
+      Legacy corre sobre .NET Framework, donde es-MX da la hora en 12 horas con
+      "a. m." / "p. m.". Nosotros corremos sobre .NET 8, que toma sus datos de
+      ICU y ahi es-MX es de 24 horas: el papel salia "11:18:58" donde Mac31
+      imprime "11:19:01 a. m.".
+
+      No basta con pedir el formato de 12 horas: el texto del designador tambien
+      cambia entre versiones de ICU (hay entornos donde es "a.m." sin espacios, y
+      otros donde viene con espacio duro). Se escriben a mano para que el papel
+      salga igual en cualquier maquina donde se despliegue, que es justo lo que
+      no se puede dejar al azar en un documento que se imprime y se archiva.
+    */
+    public static readonly CultureInfo Cultura = CrearCultura();
+
+    /* El formato con el que legacy escribe una fecha con hora. */
+    private const string FormatoFechaHora = "dd/MM/yyyy hh:mm:ss tt";
+
+    private static CultureInfo CrearCultura()
+    {
+        var cultura = (CultureInfo)CultureInfo.GetCultureInfo("es-MX").Clone();
+        cultura.DateTimeFormat.AMDesignator = "a. m.";
+        cultura.DateTimeFormat.PMDesignator = "p. m.";
+        return cultura;
+    }
 
     /// Convierte el valor crudo de una columna a texto igual que lo hace legacy.
     public static string ValorDeColumna(object? valor)
@@ -36,6 +61,12 @@ public static class RemisionFormatoLegacy
         return valor switch
         {
             string s => s,
+            /*
+              Las fechas van con patron explicito y no con el ToString por
+              omision: el de .NET 8 las escribe en 24 horas y sin designador, y
+              el papel tiene que decir "11:19:01 a. m." como el de Mac31.
+            */
+            DateTime fecha => fecha.ToString(FormatoFechaHora, Cultura),
             IFormattable f => f.ToString(null, Cultura),
             _ => valor.ToString() ?? ""
         };
