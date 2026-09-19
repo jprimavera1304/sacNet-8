@@ -24,6 +24,27 @@ public interface IRemisionImpresionRepository
         int idVenta,
         int idUsuarioImpresion,
         int idDescuento,
+        int primerImpresion,
+        int reimpresion,
+        string equipoImpresion,
+        CancellationToken ct);
+
+    /*
+      QUIEN YA IMPRIMIO CADA UNA, ANTES DE PEDIR EL PAPEL
+
+      sp_n_VentasInformacion rechaza la primera impresion de una remision ya
+      impresa y devuelve el motivo, pero lo hace cuando el navegador YA abrio la
+      pestaña: el usuario ve aparecer una hoja y desaparecer un texto de error.
+
+      Con esto se pregunta antes, con la MISMA frase que arma el procedimiento
+      (el bloque `IF @PrimerImpresion = 1 AND @NombreUsuarioReimpresion <> ''`),
+      para poder decirlo en la pantalla donde se apreto el boton y ofrecer
+      Reimprimir, que es lo que legacy hace ir a buscar a mano.
+
+      Es una SELECT: no marca nada. Lo que marca es el procedimiento, despues.
+    */
+    Task<List<RemisionImpresionPrevia>> ConsultarImpresionesPreviasAsync(
+        IReadOnlyCollection<int> idsVenta,
         CancellationToken ct);
 
     /*
@@ -49,6 +70,17 @@ public interface IRemisionImpresionRepository
         int idVenta,
         int idUsuarioImpresion,
         CancellationToken ct);
+}
+
+/// Una remision que ya tiene sello de impresion, con quien y cuando, para poder
+/// repetir el mensaje de legacy palabra por palabra.
+public sealed class RemisionImpresionPrevia
+{
+    public int IdVenta { get; init; }
+    public string FolioFtm { get; init; } = "";
+    public string Usuario { get; init; } = "";
+    public string Cuando { get; init; } = "";
+    public string Equipo { get; init; } = "";
 }
 
 /// Las dos imagenes del papel, ya listas para meterlas en el html.

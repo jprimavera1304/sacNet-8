@@ -39,7 +39,13 @@ public class RemisionImpresionService : IRemisionImpresionService
         _repository = repository;
     }
 
-    public async Task<RemisionPdf> GenerarAsync(IReadOnlyList<int> idsVenta, int idUsuarioImpresion, CancellationToken ct)
+    public async Task<RemisionPdf> GenerarAsync(
+        IReadOnlyList<int> idsVenta,
+        int idUsuarioImpresion,
+        int primerImpresion,
+        int reimpresion,
+        string equipoImpresion,
+        CancellationToken ct)
     {
         if (idsVenta.Count == 0)
             throw new InvalidOperationException("No se indico ninguna remision.");
@@ -63,7 +69,8 @@ public class RemisionImpresionService : IRemisionImpresionService
 
         foreach (var idVenta in idsVenta)
         {
-            var resultado = await _repository.ConsultarDatosVentaAsync(idVenta, idUsuarioImpresion, 0, ct);
+            var resultado = await _repository.ConsultarDatosVentaAsync(
+                idVenta, idUsuarioImpresion, 0, primerImpresion, reimpresion, equipoImpresion, ct);
 
             if (resultado.Datos is null)
             {

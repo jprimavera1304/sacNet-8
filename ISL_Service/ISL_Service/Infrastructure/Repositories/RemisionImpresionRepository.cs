@@ -84,6 +84,9 @@ public class RemisionImpresionRepository : IRemisionImpresionRepository
         int idVenta,
         int idUsuarioImpresion,
         int idDescuento,
+        int primerImpresion,
+        int reimpresion,
+        string equipoImpresion,
         CancellationToken ct)
     {
         await using var conn = GetConnection();
@@ -97,14 +100,27 @@ public class RemisionImpresionRepository : IRemisionImpresionRepository
                 ["@IDVenta"] = idVenta,
                 ["@IDUsuarioImpresion"] = idUsuarioImpresion,
                 /*
-                  Sin equipo y sin "primera impresion", igual que MacReportes
-                  cuando la remision se ve en pantalla. Pedir primera impresion
-                  haria que el procedimiento RECHAZARA toda remision que alguien
-                  ya haya impreso, que es justo lo que se consulta desde el web.
+                  LAS BANDERAS AHORA LLEGAN DE ARRIBA, NO SE FIJAN EN CERO.
+
+                  Antes iban en cero siempre, con el argumento de que pedir
+                  primera impresion haria que el procedimiento rechazara toda
+                  remision ya impresa. Eso es cierto, pero es exactamente lo que
+                  hace Mac31 cuando alguien aprieta IMPRIMIR: el rechazo es la
+                  funcion del boton, no un estorbo (ConsultarVentas.cs:4213).
+
+                  Quien decide que valores llegan aqui es VentasImpresionReglas:
+                  Pantalla manda 0 y 0 —y por eso ver una remision sigue sin
+                  bloquear nada, como hasta ahora—, Imprimir manda 1 y 0, y
+                  Reimprimir manda 0 y 1. En Zaragoza siempre llegan 0 y 0
+                  porque alla legacy ni siquiera pasa por este camino.
+
+                  El equipo se manda igual que legacy —alli va el nombre de la
+                  maquina— porque el procedimiento lo GUARDA en Ventas y en
+                  Pedidos; dejarlo vacio dejaba el rastro a medias.
                 */
-                ["@EquipoImpresion"] = "",
-                ["@PrimerImpresion"] = 0,
-                ["@Reimpresion"] = 0
+                ["@EquipoImpresion"] = equipoImpresion ?? "",
+                ["@PrimerImpresion"] = primerImpresion,
+                ["@Reimpresion"] = reimpresion
             },
             ct);
 
@@ -152,6 +168,70 @@ public class RemisionImpresionRepository : IRemisionImpresionRepository
         };
 
         return new RemisionDatosVentaResultado { Datos = datos };
+    }
+
+    /*
+      LA UNICA CONSULTA DE ESTE ARCHIVO QUE NO ES UN sp_n_
+
+      Y es a proposito: no existe procedimiento de legacy que conteste "¿quien
+      imprimio esto?" sin imprimirlo de paso. El unico que lo sabe es
+      sp_n_VentasInformacion, y ese ESCRIBE (sella la primera impresion), asi
+      que llamarlo solo para preguntar seria marcar papeles sin querer.
+
+      La consulta es la misma que arma el mensaje dentro del procedimiento
+      —Ventas + Usuarios y fn_DevuelvePrefijoFolio para el folio con prefijo—,
+      copiada del bloque `IF @PrimerImpresion = 1`. No se toca ninguna tabla.
+
+      La funcion del folio existe igual en las dos bases; se comprobo
+      ejecutandola en Produccion_svr y en MacZ.
+    */
+    public async Task<List<RemisionImpresionPrevia>> ConsultarImpresionesPreviasAsync(
+        IReadOnlyCollection<int> idsVenta,
+        CancellationToken ct)
+    {
+        var ids = idsVenta.Where(x => x > 0).Distinct().ToList();
+        if (ids.Count == 0)
+            return new List<RemisionImpresionPrevia>();
+
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        /* Un parametro por id: nada de concatenar la lista dentro del texto. */
+        var marcadores = string.Join(",", ids.Select((_, i) => "@id" + i));
+
+        await using var cmd = new SqlCommand(
+            "SELECT V.IDVenta, " +
+            "       dbo.fn_DevuelvePrefijoFolio(V.IDVenta, V.Folio, V.SoloServicios, V.SoloAceites, " +
+            "                                   V.SoloLogistica, V.SoloDevueltaCliente, V.IDTipoDocumento) AS FolioFtm, " +
+            "       ISNULL(U.Usuario, '') AS Usuario, " +
+            "       ISNULL(FORMAT(V.FechaImpresion, 'dd-MM-yyyy HH:mm'), '') AS Cuando, " +
+            "       ISNULL(V.EquipoImpresion, '') AS Equipo " +
+            "FROM Ventas V " +
+            "     LEFT JOIN Usuarios U ON U.IDUsuario = V.IDUsuarioImpresion " +
+            $"WHERE V.IDVenta IN ({marcadores}) AND ISNULL(V.IDUsuarioImpresion, 0) <> 0",
+            conn)
+        {
+            CommandTimeout = CommandTimeoutSeconds
+        };
+
+        for (var i = 0; i < ids.Count; i++)
+            cmd.Parameters.AddWithValue("@id" + i, ids[i]);
+
+        var previas = new List<RemisionImpresionPrevia>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            previas.Add(new RemisionImpresionPrevia
+            {
+                IdVenta = reader.GetInt32(0),
+                FolioFtm = Convert.ToString(reader[1]) ?? "",
+                Usuario = Convert.ToString(reader[2]) ?? "",
+                Cuando = Convert.ToString(reader[3]) ?? "",
+                Equipo = Convert.ToString(reader[4]) ?? ""
+            });
+        }
+
+        return previas;
     }
 
     /*
@@ -241,10 +321,18 @@ public class RemisionImpresionRepository : IRemisionImpresionRepository
                 ["@IDVenta"] = idVenta,
                 ["@IDUsuarioImpresion"] = idUsuarioImpresion,
                 /*
-                  Sin equipo y sin primera impresion, por lo mismo que en Tauro:
-                  pedir primera impresion haria que el procedimiento RECHAZARA
-                  toda remision que alguien ya imprimio, que es justo la que se
-                  consulta desde el web.
+                  AQUI SI SE QUEDAN EN CERO, Y NO ES UN OLVIDO.
+
+                  En Zaragoza, Imprimir y Reimprimir NO mandan banderas: la rama
+                  de ZARA en Imprimir() (ConsultarVentas.cs, bloque
+                  `funcionalidad.Contains("ZARA")` con EsCentroServicio == 0)
+                  llama a VerVenta y se sale antes del servicio que las lleva, y
+                  la de Centro de Servicio declara `PrimerImpresion = 0,
+                  Reimpresion = 0` con todas sus letras.
+
+                  O sea: alla los tres botones entregan el mismo papel. Poner un
+                  1 aqui haria que el web de Zaragoza rechazara remisiones que
+                  Mac31 imprime sin chistar. Ver VentasImpresionReglas.Banderas.
                 */
                 ["@EquipoImpresion"] = "",
                 ["@PrimerImpresion"] = 0,

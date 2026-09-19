@@ -75,15 +75,61 @@ public class VentasConsultaController : ControllerBase
       navegador la bloquearia por emergente), asi que lo unico que le falta es a
       donde apuntarla.
     */
+    /*
+      PEDIDOS FALTANTES
+
+      GET y sin cuerpo porque en Mac31 tampoco se le pasa nada: el boton
+      (ConsultarVentas.cs:3472) llama derecho a la consulta y el procedimiento
+      resuelve solo el dia y la empresa.
+    */
+    [HttpGet("pedidos-faltantes")]
+    public async Task<IActionResult> PedidosFaltantes(CancellationToken ct)
+    {
+        var data = await _service.ConsultarPedidosFaltantesAsync(ct);
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(new { ok = true, message = "Pedidos faltantes consultados.", data });
+    }
+
+    /*
+      LO QUE HAY QUE PREGUNTAR ANTES
+
+      Mac31 pregunta antes de imprimir: contrasena si toca, confirmacion de
+      reimpresion, dialogo de impresora. Aqui eso se resuelve en una llamada
+      aparte porque el navegador obliga: la pestaña del PDF tiene que abrirse en
+      el mismo clic o el bloqueador de emergentes se la come, asi que la
+      pantalla necesita saber si va a abrir una pestaña o un dialogo ANTES de
+      pedir nada.
+    */
+    [HttpPost("reporte/preparar")]
+    public async Task<IActionResult> PrepararReporte([FromBody] VentasReporteRequest? request, CancellationToken ct)
+    {
+        try
+        {
+            var data = await _service.PrepararReporteAsync(request ?? new VentasReporteRequest(), ct);
+            Response.Headers["Cache-Control"] = "no-store";
+            return Ok(new { ok = true, message = "Listo.", data });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { ok = false, message = ex.Message });
+        }
+    }
+
     [HttpPost("reporte")]
-    public IActionResult Reporte([FromBody] VentasReporteRequest? request)
+    public async Task<IActionResult> Reporte([FromBody] VentasReporteRequest? request, CancellationToken ct)
     {
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
 
         string ticket;
         try
         {
-            ticket = _service.CrearTicketReporte(request ?? new VentasReporteRequest(), idUsuario);
+            /*
+              El equipo sale del token, no del cuerpo: es lo que queda escrito en
+              la venta como "desde donde se imprimio". Si viajara en el body,
+              cualquiera podria firmar una impresion a nombre de otra maquina.
+            */
+            var equipo = _currentUserAccessor.GetUsername(User, Environment.MachineName);
+            ticket = await _service.CrearTicketReporteAsync(request ?? new VentasReporteRequest(), idUsuario, equipo, ct);
         }
         catch (InvalidOperationException ex)
         {
@@ -135,7 +181,20 @@ public class VentasConsultaController : ControllerBase
         RemisionPdf pdf;
         try
         {
-            pdf = await _remisiones.GenerarAsync(pase.IdsVenta, pase.IdUsuario, ct);
+            /*
+              El equipo sale del PASE y no de esta peticion: este GET es
+              anonimo, asi que aqui ya no se sabe quien lo pidio y
+              GetUsername devolveria el nombre de la maquina del SERVIDOR.
+              Ese dato lo guarda el procedimiento en Ventas y en Pedidos: dejar
+              ahi "el servidor" seria borrar el rastro, no guardarlo.
+            */
+            pdf = await _remisiones.GenerarAsync(
+                pase.IdsVenta,
+                pase.IdUsuario,
+                pase.PrimerImpresion,
+                pase.Reimpresion,
+                pase.Equipo,
+                ct);
         }
         catch (InvalidOperationException ex)
         {
