@@ -1,4 +1,4 @@
-using ISL_Service.Application.Interfaces;
+﻿using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Mvc;
 
@@ -51,6 +51,18 @@ public abstract class PermisoControllerBase : ControllerBase
         if (userId is null)
             return Unauthorized(new { ok = false, message = "Token invalido." });
 
+        // EL SUPERADMIN PASA.
+        //
+        // Faltaba, y el sintoma era el peor posible: el boton se veia encendido y
+        // la accion contestaba "no tienes permiso". El front deja pasar al
+        // superadmin (nucleo/permisos.ts, `puede`) y aqui no, asi que las dos
+        // mitades de la aplicacion opinaban distinto sobre la misma persona.
+        //
+        // Un boton encendido que al pulsarlo dice que no se puede es peor que un
+        // boton apagado: te hace dudar de tus permisos en vez de del programa.
+        if (Application.Security.CurrentUser.IsSuperAdmin(User))
+            return null;
+
         var empresaId = CurrentUser.GetCompanyId(User) ?? 0;
         var rol = CurrentUser.GetRole(User);
         var snapshot = await PermissionService.GetPermissionsAsync(userId.Value, empresaId, rol, ct);
@@ -61,12 +73,42 @@ public abstract class PermisoControllerBase : ControllerBase
         if (!snapshot.PermissionsEnabled)
             return null;
 
+        // Se compara TAMBIEN sin separadores, igual que el front.
+        //
+        // El catalogo de permisos se escribio a mano a lo largo de los años y
+        // conviven "ventas.cancelar", "ventas_cancelar" y "Ventas Cancelar" para
+        // la misma cosa. El front ya resolvia eso normalizando ("firma") y aqui
+        // se comparaba exacto: un permiso guardado con guion bajo encendia el
+        // boton y despues rebotaba en la API.
+        //
+        // No afloja la seguridad: quita los separadores, no los nombres. Sigue
+        // haciendo falta tener el permiso.
         var tiene = snapshot.Permissions.Any(
-            x => permisos.Any(p => string.Equals(x, p, StringComparison.OrdinalIgnoreCase)));
+            x => permisos.Any(p =>
+                string.Equals(x, p, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(SinSeparadores(x), SinSeparadores(p), StringComparison.OrdinalIgnoreCase)));
         if (tiene)
             return null;
 
         return StatusCode(StatusCodes.Status403Forbidden, new { ok = false, message = "No tienes permiso para esta accion." });
+    }
+
+    /// <summary>
+    /// Deja solo letras y numeros: "ventas.cancelar", "ventas_cancelar" y
+    /// "Ventas Cancelar" terminan siendo la misma cadena. Es exactamente lo que
+    /// hace `firma` en el front (nucleo/permisos.ts) — las dos mitades tienen
+    /// que opinar igual o el boton dice una cosa y la API otra.
+    /// </summary>
+    private static string SinSeparadores(string? valor)
+    {
+        if (string.IsNullOrEmpty(valor)) return string.Empty;
+
+        var sb = new System.Text.StringBuilder(valor.Length);
+        foreach (var c in valor)
+        {
+            if (char.IsLetterOrDigit(c)) sb.Append(char.ToLowerInvariant(c));
+        }
+        return sb.ToString();
     }
 
     /// <summary>
