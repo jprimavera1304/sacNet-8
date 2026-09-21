@@ -56,6 +56,16 @@ public class MovimientoCascoCambioDto
     public DateTime? fechaCreacion { get; set; }
 
     /*
+      QUIEN CANCELO Y CUANDO. Se guardaban desde siempre y no las leia nadie: el
+      motivo solo dice POR QUE, y en una cuenta que dos empresas comparan
+      renglon por renglon, quien lo hizo y que dia es la otra mitad.
+
+      Nulas mientras el movimiento este vivo, que es lo normal.
+    */
+    public string? usuarioCancelacion { get; set; }
+    public DateTime? fechaCancelacion { get; set; }
+
+    /*
       LOS DOS SALDOS QUE CORREN
 
       No salen de la base: los acumula el servicio recorriendo los movimientos
