@@ -34,7 +34,13 @@ public static class ReporteUsadosTicket
     {
         public DateTime? Desde { get; init; }
         public DateTime? Hasta { get; init; }
-        public bool IncluirCancelados { get; init; }
+        /*
+          "todos", "activos" o "cancelados". Va en el pase y no como parametro
+          suelto de la direccion por lo mismo que el periodo: si fuera editable
+          en la barra del navegador, el papel no diria lo mismo que autorizo
+          quien lo pidio.
+        */
+        public string Estatus { get; init; } = "todos";
         public bool PorRegistro { get; init; }
         public int IdUsuario { get; init; }
     }
@@ -43,12 +49,12 @@ public static class ReporteUsadosTicket
         string llave,
         DateTime? desde,
         DateTime? hasta,
-        bool incluirCancelados,
+        string estatus,
         bool porRegistro,
         int idUsuario)
     {
         var expira = DateTimeOffset.UtcNow.Add(Vigencia).ToUnixTimeSeconds();
-        var cuerpo = $"{Fecha(desde)}|{Fecha(hasta)}|{(incluirCancelados ? 1 : 0)}" +
+        var cuerpo = $"{Fecha(desde)}|{Fecha(hasta)}|{Limpio(estatus)}" +
                      $"|{(porRegistro ? 1 : 0)}|{idUsuario}|{expira}";
         return Base64Url(Encoding.UTF8.GetBytes(cuerpo)) + "." + Base64Url(Firma(llave, cuerpo));
     }
@@ -88,11 +94,25 @@ public static class ReporteUsadosTicket
         {
             Desde = LeerFecha(campos[0]),
             Hasta = LeerFecha(campos[1]),
-            IncluirCancelados = campos[2] == "1",
+            Estatus = Limpio(campos[2]),
             PorRegistro = campos[3] == "1",
             IdUsuario = int.TryParse(campos[4], out var idu) ? idu : 0
         };
     }
+
+    /*
+      Solo se aceptan los tres valores conocidos; cualquier otra cosa cae en
+      "todos". Este texto llega hasta un WHERE y hasta el encabezado del papel:
+      dejarlo pasar tal cual seria confiar en que nadie escriba nada raro en un
+      pase que ademas se puede intentar falsificar.
+    */
+    private static string Limpio(string? estatus)
+        => estatus switch
+        {
+            "activos" => "activos",
+            "cancelados" => "cancelados",
+            _ => "todos"
+        };
 
     /* Solo el dia: la hora no filtra nada aqui y alargaria el pase. */
     private static string Fecha(DateTime? valor) => valor?.ToString("yyyy-MM-dd") ?? "";

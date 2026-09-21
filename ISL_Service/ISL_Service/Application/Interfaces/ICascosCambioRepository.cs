@@ -16,6 +16,11 @@ public interface ICascosCambioRepository
 
     Task<List<DetalleCascoCambioDto>> ConsultarDetalleAsync(int idMovimiento, CancellationToken ct = default);
 
+    /// La carpeta de imagenes, el nombre del archivo del logo y el nombre con el
+    /// que la empresa se presenta hacia afuera. Sale de Constantes: cada empresa
+    /// tiene lo suyo, asi que no se puede empaquetar en el backend.
+    Task<(string PathImagenes, string Logo, string Empresa)> ConsultarMarcaEmpresaAsync(CancellationToken ct = default);
+
     Task<List<ResumenTipoCascoCambioDto>> ConsultarResumenAsync(
         DateTime? fechaInicio, DateTime? fechaFin, CancellationToken ct = default);
 
