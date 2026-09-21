@@ -15,6 +15,11 @@ public interface ICascosCambioService
 
     Task<List<DetalleCascoCambioDto>> ConsultarDetalleAsync(int idMovimiento, CancellationToken ct = default);
 
+    /// La marca para el reporte: el logo ya listo como data URI (vacio si no se
+    /// encontro el archivo — el papel sale sin logo antes que con una imagen
+    /// rota) y el nombre de la empresa para el pie.
+    Task<(string Logo, string Empresa)> ConsultarMarcaParaReporteAsync(CancellationToken ct = default);
+
     Task<List<ResumenTipoCascoCambioDto>> ConsultarResumenAsync(
         DateTime? fechaInicio, DateTime? fechaFin, CancellationToken ct = default);
 

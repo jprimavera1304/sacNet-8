@@ -218,7 +218,9 @@ public class CascosCambioController : PermisoControllerBase
     public async Task<IActionResult> Reporte(
         [FromQuery] DateTime? fechaInicio,
         [FromQuery] DateTime? fechaFin,
-        [FromQuery] bool incluirCancelados = false,
+        /* "todos", "activos" o "cancelados". Lo que llegue distinto se toma
+           como "todos" al firmar el pase. */
+        [FromQuery] string estatus = "todos",
         [FromQuery] bool filtrarPorRegistro = false,
         CancellationToken ct = default)
     {
@@ -227,7 +229,7 @@ public class CascosCambioController : PermisoControllerBase
 
         var llave = _configuration["Jwt:Key"] ?? "";
         var ticket = ReporteUsadosTicket.Firmar(
-            llave, fechaInicio?.Date, fechaFin?.Date, incluirCancelados, filtrarPorRegistro,
+            llave, fechaInicio?.Date, fechaFin?.Date, estatus, filtrarPorRegistro,
             CurrentUser.GetLegacyUserId(User));
 
         /*
@@ -268,11 +270,29 @@ public class CascosCambioController : PermisoControllerBase
                lo consume codigo. */
             return BadRequest("El enlace del reporte no es válido o ya venció. Vuelve a generarlo desde la pantalla.");
 
+        /*
+          EL PROCEDIMIENTO SOLO SABE DECIR DOS COSAS: con cancelados o sin
+          ellos. Para "solo cancelados" se le piden TODOS y se recorta aqui;
+          pedirle una tercera opcion significaria tocar el procedimiento para
+          una pregunta que no cambia como se consulta, solo que se enseña.
+
+          El saldo se calcula ANTES del recorte, y eso importa: el saldo corre
+          sobre la cuenta entera, asi que recortando primero saldria un saldo
+          que no existe en ningun lado.
+        */
+        var soloCancelados = pase.Estatus == "cancelados";
         var data = await _service.ConsultarMovimientosAsync(
-            pase.Desde, pase.Hasta, null, pase.IncluirCancelados, pase.PorRegistro, ct);
+            pase.Desde, pase.Hasta, null, pase.Estatus != "activos", pase.PorRegistro, ct);
+
+        var movimientos = soloCancelados
+            ? data.movimientos.Where(m => m.estatus == 2).ToList()
+            : data.movimientos;
+
+        var (logo, empresa) = await _service.ConsultarMarcaParaReporteAsync(ct);
 
         var html = UsadosHtmlBuilder.Construir(
-            data.movimientos, data.corte, pase.Desde, pase.Hasta, pase.PorRegistro);
+            movimientos, data.corte, pase.Desde, pase.Hasta, pase.PorRegistro, pase.Estatus,
+            logo);
 
         /*
           Apaisado: son siete columnas y en vertical el chofer y la remision se
@@ -280,7 +300,50 @@ public class CascosCambioController : PermisoControllerBase
           visor — sin el, el navegador usa el ultimo pedazo de la direccion y la
           pestaña dice "usados" con el icono generico.
         */
-        var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(html, "Landscape", "Usados a cambio", ct);
+        var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(
+            html, "Landscape", "Usados a cambio", ct,
+            new WkhtmltopdfHtmlPdfRenderer.Opciones
+            {
+                /*
+                  15 mm parejos: los del renderer (2 izq contra 8 der) son de la
+                  remision, y en una tabla de siete columnas dejan el contenido
+                  pegado al filo izquierdo y descentrado. El diseño pide 0.6 in;
+                  15 mm es eso mismo redondeado al milimetro, que es la unidad
+                  que entiende wkhtmltopdf.
+                */
+                MargenSuperior = 15,
+                MargenInferior = 15,
+                MargenIzquierdo = 15,
+                MargenDerecho = 15,
+                /*
+                  El logo entra a 3015 px de ancho y con el valor por omision
+                  sale reducido a 520: a ese tamaño los contornos blancos de las
+                  letras se promedian con el fondo y la marca se ve lavada, como
+                  si fuera transparente.
+
+                  Con 900 entra a unos 1400 px para dibujarse a 152: sobra
+                  resolucion para cualquier zoom y para la impresora, y el PDF
+                  pesa una cuarta parte que con el maximo, que embebia el
+                  archivo entero de 3015 px sin necesidad.
+                */
+                ImagenDpi = 900,
+                /*
+                  EL PIE VA EN LA FRANJA DE LA HOJA, no al final del cuerpo.
+
+                  Siendo un parrafo mas del documento, su margen podia no caber
+                  en lo que quedaba de pagina y arrastraba una hoja entera en
+                  blanco para enseñar una sola linea. Aqui vive fuera del flujo:
+                  no empuja nada y sale en TODAS las hojas, que es justo lo que
+                  se espera de un "impreso el".
+
+                  Y de paso el numero de pagina, que en un reporte de catorce
+                  hojas entregado a otra empresa es lo que permite decir "mira
+                  la 7" y comprobar que no falta ninguna.
+                */
+                PieIzquierdo = UsadosHtmlBuilder.TextoDePie(empresa),
+                PieDerecho = "[page] / [topage]",
+                PieConLinea = true
+            });
 
         Response.Headers["Cache-Control"] = "no-store";
         return File(pdf, "application/pdf");

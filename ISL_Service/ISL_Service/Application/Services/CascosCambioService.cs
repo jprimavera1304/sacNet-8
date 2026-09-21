@@ -164,6 +164,46 @@ public class CascosCambioService : ICascosCambioService
         return await _repository.ConsultarDetalleAsync(idMovimiento, ct);
     }
 
+    /*
+      EL LOGO DEL REPORTE, YA COMO DATA URI
+
+      Va incrustado en el HTML y no como una direccion: wkhtmltopdf corre en
+      otro proceso y no comparte la sesion ni la red del servidor, asi que un
+      <img src="http://..."> sale como imagen rota en el PDF.
+
+      Si el archivo no esta —la carpeta de imagenes vive en el servidor de
+      legacy y este backend no tiene por que correr ahi— se devuelve vacio y el
+      papel sale SIN logo. Una imagen rota en un documento que se le entrega a
+      la otra empresa se ve peor que no tener logo.
+    */
+    public async Task<(string Logo, string Empresa)> ConsultarMarcaParaReporteAsync(CancellationToken ct = default)
+    {
+        var (pathImagenes, logo, empresa) = await _repository.ConsultarMarcaEmpresaAsync(ct);
+        if (string.IsNullOrWhiteSpace(logo)) return ("", empresa);
+
+        try
+        {
+            var ruta = Path.Combine(pathImagenes, logo);
+            if (!File.Exists(ruta)) return ("", empresa);
+
+            var tipo = Path.GetExtension(ruta).ToLowerInvariant() switch
+            {
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".svg" => "image/svg+xml",
+                ".webp" => "image/webp",
+                _ => "image/png"
+            };
+
+            var bytes = await File.ReadAllBytesAsync(ruta, ct);
+            return ($"data:{tipo};base64,{Convert.ToBase64String(bytes)}", empresa);
+        }
+        catch
+        {
+            /* Un logo ilegible no puede tumbar el reporte: sale sin el. */
+            return ("", empresa);
+        }
+    }
+
     public async Task<List<ResumenTipoCascoCambioDto>> ConsultarResumenAsync(
         DateTime? fechaInicio, DateTime? fechaFin, CancellationToken ct = default)
     {

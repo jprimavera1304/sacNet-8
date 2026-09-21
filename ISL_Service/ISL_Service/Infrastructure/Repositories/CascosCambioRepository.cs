@@ -72,6 +72,42 @@ public class CascosCambioRepository : ICascosCambioRepository
         return Funciones.DataTableToList<MovimientoCascoCambioDto>(dt);
     }
 
+    /*
+      EL LOGO DE LA EMPRESA PARA EL REPORTE
+
+      Sale de Constantes, igual que los reportes de legacy: PathImagenes es una
+      carpeta del servidor y LogoMacReportes el nombre del archivo. Cada empresa
+      tiene el suyo —tauro_logo.jpg en Tauro, Logo_Mac.png en Zaragoza— asi que
+      no se puede empaquetar uno solo en el backend.
+
+      Devuelve las dos piezas tal cual y deja que quien arma el papel decida que
+      hacer si el archivo no esta: aqui no se sabe si el reporte quiere un
+      sustituto o prefiere salir sin logo.
+    */
+    public async Task<(string PathImagenes, string Logo, string Empresa)> ConsultarMarcaEmpresaAsync(CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = conn.CreateCommand();
+        /*
+          FacturasCorreoNombre es el nombre con el que la empresa se presenta
+          hacia afuera ("Refacciones Automotrices TAURO", "Distribuidora de
+          Acumuladores Zaragoza"), que es justo lo que tiene que decir el pie de
+          un papel que se le entrega a la otra empresa. Los otros campos de
+          Constantes son internos: NombrePDF dice "Mac21Fact" y
+          NombreCentroServicio viene vacio en las dos bases.
+        */
+        cmd.CommandText =
+            "SELECT TOP 1 PathImagenes, LogoMacReportes, FacturasCorreoNombre FROM dbo.Constantes";
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct)) return ("", "", "");
+
+        string Texto(int i) => reader.IsDBNull(i) ? "" : reader.GetString(i).Trim();
+        return (Texto(0), Texto(1), Texto(2));
+    }
+
     public async Task<List<DetalleCascoCambioDto>> ConsultarDetalleAsync(int idMovimiento, CancellationToken ct = default)
     {
         await using var conn = GetConnection();
