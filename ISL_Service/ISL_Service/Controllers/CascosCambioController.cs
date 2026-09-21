@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.CascosCambio;
+﻿using ISL_Service.Application.DTOs.CascosCambio;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -79,12 +79,18 @@ public class CascosCambioController : PermisoControllerBase
         [FromQuery] DateTime? fechaFin,
         [FromQuery] int? tipoMovimiento,
         [FromQuery] bool incluirCancelados = false,
+        /*
+          Por cual de las dos fechas se filtra. false —el valor por omision— es
+          la fecha que se teclea al capturar, que es como se ha comportado
+          siempre: quien no mande el parametro ve lo mismo que antes.
+        */
+        [FromQuery] bool filtrarPorRegistro = false,
         CancellationToken ct = default)
     {
         var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
         if (sinPermiso != null) return sinPermiso;
 
-        var data = await _service.ConsultarMovimientosAsync(fechaInicio, fechaFin, tipoMovimiento, incluirCancelados, ct);
+        var data = await _service.ConsultarMovimientosAsync(fechaInicio, fechaFin, tipoMovimiento, incluirCancelados, filtrarPorRegistro, ct);
         return Ok(new
         {
             ok = true,

@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.CascosCambio;
+﻿using ISL_Service.Application.DTOs.CascosCambio;
 
 namespace ISL_Service.Application.Interfaces;
 
@@ -12,7 +12,7 @@ public interface ICascosCambioRepository
 
     Task<List<MovimientoCascoCambioDto>> ConsultarMovimientosAsync(
         DateTime? fechaInicio, DateTime? fechaFin, int? tipoMovimiento, bool incluirCancelados,
-        CancellationToken ct = default);
+        bool filtrarPorRegistro, CancellationToken ct = default);
 
     Task<List<DetalleCascoCambioDto>> ConsultarDetalleAsync(int idMovimiento, CancellationToken ct = default);
 
