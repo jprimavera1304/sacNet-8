@@ -1,6 +1,7 @@
 ﻿using ISL_Service.Application.DTOs.CascosCambio;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
+using ISL_Service.Infrastructure.Reports;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -36,13 +37,18 @@ public class CascosCambioController : PermisoControllerBase
 
     private readonly ICascosCambioService _service;
 
+    /* Solo para la llave con la que se firma el pase del reporte. */
+    private readonly IConfiguration _configuration;
+
     public CascosCambioController(
         ICascosCambioService service,
         ICurrentUserAccessor currentUser,
-        IPermissionService permissionService)
+        IPermissionService permissionService,
+        IConfiguration configuration)
         : base(currentUser, permissionService)
     {
         _service = service;
+        _configuration = configuration;
     }
 
     /// <summary>
@@ -196,5 +202,87 @@ public class CascosCambioController : PermisoControllerBase
 
         var data = await _service.SincronizarPreciosContraparteAsync(ct);
         return Ok(new { ok = data.Ok, message = data.Mensaje, data });
+    }
+
+    /// <summary>
+    /// Pide el reporte del periodo y devuelve la direccion donde esta el PDF.
+    ///
+    /// DOS PASOS Y NO UNO, igual que la remision de Ventas: esta llamada va
+    /// autenticada y solo entrega un enlace; el PDF lo baja la pestaña nueva.
+    /// Devolver aqui el PDF obligaria a la pantalla a cargarse los megabytes en
+    /// memoria para volver a soltarlos, y el navegador ya sabe abrir una
+    /// direccion.
+    /// </summary>
+    [HttpPost("reporte")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> Reporte(
+        [FromQuery] DateTime? fechaInicio,
+        [FromQuery] DateTime? fechaFin,
+        [FromQuery] bool incluirCancelados = false,
+        [FromQuery] bool filtrarPorRegistro = false,
+        CancellationToken ct = default)
+    {
+        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        if (sinPermiso != null) return sinPermiso;
+
+        var llave = _configuration["Jwt:Key"] ?? "";
+        var ticket = ReporteUsadosTicket.Firmar(
+            llave, fechaInicio?.Date, fechaFin?.Date, incluirCancelados, filtrarPorRegistro,
+            CurrentUser.GetLegacyUserId(User));
+
+        /*
+          La direccion se arma con el esquema, host y ruta base de ESTA peticion
+          y no con una configuracion: asi sirve igual en local, detras del proxy
+          y en produccion, sin una clave mas que mantener y que se pueda quedar
+          apuntando al sitio equivocado.
+        */
+        var pathBase = Request.PathBase.HasValue ? Request.PathBase.Value : "";
+        var url = $"{Request.Scheme}://{Request.Host}{pathBase}/usados?t={Uri.EscapeDataString(ticket)}";
+
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(new { ok = true, message = "Reporte listo.", data = new { url } });
+    }
+
+    /// <summary>
+    /// Entrega el PDF.
+    ///
+    /// ANONIMO A PROPOSITO: lo abre una pestaña nueva del navegador, que no
+    /// manda el encabezado Authorization. Lo que autoriza es el pase firmado
+    /// del parametro "t", que trae el periodo, el usuario y una vigencia corta.
+    ///
+    /// La direccion es corta —"/usados"— y no el organigrama del backend: lo
+    /// que se ve en la barra del navegador lo mira una persona que solo queria
+    /// un papel. Empieza con "/" para salirse del prefijo del controlador.
+    ///
+    /// El PDF se genera al vuelo y no se guarda: una cancelacion posterior
+    /// tiene que verse la proxima vez que se imprima.
+    /// </summary>
+    [HttpGet("/usados")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ReportePdf([FromQuery] string? t, CancellationToken ct)
+    {
+        var pase = ReporteUsadosTicket.Validar(_configuration["Jwt:Key"] ?? "", t);
+        if (pase is null)
+            /* En texto y no en json: esto se ve en una pestaña del navegador, no
+               lo consume codigo. */
+            return BadRequest("El enlace del reporte no es válido o ya venció. Vuelve a generarlo desde la pantalla.");
+
+        var data = await _service.ConsultarMovimientosAsync(
+            pase.Desde, pase.Hasta, null, pase.IncluirCancelados, pase.PorRegistro, ct);
+
+        var html = UsadosHtmlBuilder.Construir(
+            data.movimientos, data.corte, pase.Desde, pase.Hasta, pase.PorRegistro);
+
+        /*
+          Apaisado: son siete columnas y en vertical el chofer y la remision se
+          parten en dos renglones. El titulo es lo que se lee en la pestaña del
+          visor — sin el, el navegador usa el ultimo pedazo de la direccion y la
+          pestaña dice "usados" con el icono generico.
+        */
+        var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(html, "Landscape", "Usados a cambio", ct);
+
+        Response.Headers["Cache-Control"] = "no-store";
+        return File(pdf, "application/pdf");
     }
 }
