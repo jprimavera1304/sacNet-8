@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.CascosCambio;
+﻿using ISL_Service.Application.DTOs.CascosCambio;
 using ISL_Service.Application.Interfaces;
 
 namespace ISL_Service.Application.Services;
@@ -44,7 +44,7 @@ public class CascosCambioService : ICascosCambioService
 
     public async Task<MovimientosCascosCambioResponse> ConsultarMovimientosAsync(
         DateTime? fechaInicio, DateTime? fechaFin, int? tipoMovimiento, bool incluirCancelados,
-        CancellationToken ct = default)
+        bool filtrarPorRegistro, CancellationToken ct = default)
     {
         if (fechaInicio.HasValue && fechaFin.HasValue && fechaFin.Value.Date < fechaInicio.Value.Date)
             throw new ArgumentException("La fecha final no puede ser anterior a la inicial.");
@@ -61,7 +61,7 @@ public class CascosCambioService : ICascosCambioService
           numero asi, con cara de total, es peor que no enseñar ninguno.
         */
         var todos = await _repository.ConsultarMovimientosAsync(
-            null, fechaFin, tipoMovimiento, incluirCancelados, ct);
+            null, fechaFin, tipoMovimiento, incluirCancelados, filtrarPorRegistro, ct);
 
         var corte = new CorteCascosCambioDto();
         var movimientos = new List<MovimientoCascoCambioDto>();
@@ -70,7 +70,21 @@ public class CascosCambioService : ICascosCambioService
 
         foreach (var m in todos)
         {
-            var enElPeriodo = desde is null || m.fecha.Date >= desde.Value;
+            /*
+              Se compara con la MISMA fecha por la que se filtro arriba. Si se
+              pidio por fecha de registro y aqui se mirara la del movimiento, el
+              corte diria una cosa y la lista otra.
+            */
+            /*
+              Si no hubiera fecha de registro se usa la del movimiento: un
+              renglon sin ella se quedaria fuera de TODOS los periodos y
+              desapareceria de la pantalla sin que nadie sepa por que. Mejor que
+              salga por su otra fecha que no salga.
+            */
+            var fechaQueManda = filtrarPorRegistro
+                ? (m.fechaCreacion?.Date ?? m.fecha.Date)
+                : m.fecha.Date;
+            var enElPeriodo = desde is null || fechaQueManda >= desde.Value;
 
             // Lo anterior al periodo mueve el saldo pero no se ve ni se suma al
             // corte: es historia, no es lo que se esta revisando.

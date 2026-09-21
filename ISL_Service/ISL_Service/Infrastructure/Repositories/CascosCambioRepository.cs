@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using ISL_Service.Application.DTOs.CascosCambio;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Data;
@@ -50,7 +50,7 @@ public class CascosCambioRepository : ICascosCambioRepository
 
     public async Task<List<MovimientoCascoCambioDto>> ConsultarMovimientosAsync(
         DateTime? fechaInicio, DateTime? fechaFin, int? tipoMovimiento, bool incluirCancelados,
-        CancellationToken ct = default)
+        bool filtrarPorRegistro, CancellationToken ct = default)
     {
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
@@ -60,6 +60,13 @@ public class CascosCambioRepository : ICascosCambioRepository
         cmd.Parameters.AddWithValue("@FechaFin", (object?)fechaFin?.Date ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@TipoMovimiento", (object?)tipoMovimiento ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@IncluirCancelados", incluirCancelados ? 1 : 0);
+        /*
+          Por cual de las dos fechas se filtra. Un movimiento tiene la que se
+          TECLEA (cuando se entregaron los cascos) y la de REGISTRO (cuando se
+          capturo), y son preguntas distintas: "que entregamos ayer" no es lo
+          mismo que "que capturamos ayer".
+        */
+        cmd.Parameters.AddWithValue("@FiltrarPorRegistro", filtrarPorRegistro ? 1 : 0);
 
         var dt = await FillAsync(cmd, ct);
         return Funciones.DataTableToList<MovimientoCascoCambioDto>(dt);
