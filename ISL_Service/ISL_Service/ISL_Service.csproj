@@ -52,7 +52,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Assets\Logos\Logo_Zaragoza.png" CopyToOutputDirectory="PreserveNewest" />
+    <!--
+      LOS LOGOS DE LAS EMPRESAS VIAJAN CON EL BACKEND
+
+      En Mac31 los reportes los leen de una carpeta del servidor de legacy
+      (C:\Mac21\imagenes\, C:\MacZ\imagenes\) y ahi siguen siendo la fuente
+      preferida. Pero este backend no corre en esa maquina: en produccion esta
+      en Azure, donde esa carpeta no existe, y el reporte salia SIN logo.
+
+      Se empaquetan con el mismo NOMBRE DE ARCHIVO que tienen alla, para que la
+      busqueda sea directa: se mira la carpeta de legacy y, si no esta, aqui.
+      Sin tabla de equivalencias que mantener.
+    -->
+    <Content Include="Assets\Logos\**\*" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Wkhtmltopdf\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
