@@ -183,8 +183,8 @@ public class CascosCambioService : ICascosCambioService
 
         try
         {
-            var ruta = Path.Combine(pathImagenes, logo);
-            if (!File.Exists(ruta)) return ("", empresa);
+            var ruta = RutaDelLogo(pathImagenes, logo);
+            if (ruta is null) return ("", empresa);
 
             var tipo = Path.GetExtension(ruta).ToLowerInvariant() switch
             {
@@ -202,6 +202,34 @@ public class CascosCambioService : ICascosCambioService
             /* Un logo ilegible no puede tumbar el reporte: sale sin el. */
             return ("", empresa);
         }
+    }
+
+    /*
+      DONDE ESTA EL LOGO: PRIMERO EL DE LEGACY, LUEGO EL EMPAQUETADO
+
+      1. La carpeta de legacy (Constantes.PathImagenes). Es la fuente buena: si
+         alguien cambia ahi el logo, el reporte lo recoge sin desplegar nada.
+      2. Assets/Logos, que viaja con el backend, con el MISMO nombre de archivo.
+
+      El segundo camino existe porque en produccion este backend corre en Azure
+      y la carpeta de legacy no esta ahi: el logo salia vacio en produccion y
+      completo en local, que es exactamente lo que se reporto. Empaquetarlo con
+      el mismo nombre evita una tabla de equivalencias entre empresa y archivo —
+      la equivalencia ya la dice Constantes.
+
+      Null si no esta en ninguno de los dos: el papel sale SIN logo antes que
+      con una imagen rota.
+    */
+    private static string? RutaDelLogo(string pathImagenes, string logo)
+    {
+        if (!string.IsNullOrWhiteSpace(pathImagenes))
+        {
+            var deLegacy = Path.Combine(pathImagenes, logo);
+            if (File.Exists(deLegacy)) return deLegacy;
+        }
+
+        var empaquetado = Path.Combine(AppContext.BaseDirectory, "Assets", "Logos", logo);
+        return File.Exists(empaquetado) ? empaquetado : null;
     }
 
     public async Task<List<ResumenTipoCascoCambioDto>> ConsultarResumenAsync(

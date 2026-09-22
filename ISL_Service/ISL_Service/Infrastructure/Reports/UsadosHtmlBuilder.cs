@@ -130,12 +130,20 @@ public static class UsadosHtmlBuilder
         */
         html.Append("<table class=\"cabecera\"><tr>");
 
-        /* Sin logo si no se encontro el archivo: una imagen rota en un
-           documento que se le entrega a la otra empresa se ve peor que nada. */
-        html.Append("<td class=\"celdaLogo\">");
+        /*
+          Sin logo si no se encontro el archivo: una imagen rota en un documento
+          que se le entrega a la otra empresa se ve peor que nada.
+
+          Y en ese caso la celda NO se pinta, no se pinta vacia: una celda de
+          164 px en blanco dejaria el titulo descolgado hacia la derecha, como
+          si faltara algo. Sin ella, el encabezado se cierra solo.
+        */
         if (!string.IsNullOrWhiteSpace(logoDataUri))
-            html.Append("<img class=\"logo\" src=\"").Append(logoDataUri).Append("\" alt=\"\">");
-        html.Append("</td>");
+        {
+            html.Append("<td class=\"celdaLogo\"><img class=\"logo\" src=\"")
+                .Append(logoDataUri)
+                .Append("\" alt=\"\"></td>");
+        }
 
         html.Append("<td class=\"celdaTitulo\">");
         html.Append("<p class=\"titulo\">Usados a cambio</p>");
