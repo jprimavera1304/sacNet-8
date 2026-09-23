@@ -933,37 +933,20 @@ WHERE EmpresaId = @EmpresaId
                 throw new KeyNotFoundException($"Modulo no encontrado: {key}");
         }
 
-        if (idStatus == 2)
-        {
-            var schema = await GetSchemaAsync(conn, ct);
-            await using (var clearRolePermsCmd = new SqlCommand($@"
-DELETE rp
-FROM dbo.WRolPermiso rp
-INNER JOIN dbo.WPermiso p
-    ON p.EmpresaId = rp.EmpresaId
-   AND p.{Q(schema.PermissionIdColumn)} = rp.{Q(schema.RolePermPermissionIdColumn)}
-WHERE rp.EmpresaId = @EmpresaId
-  AND p.Clave LIKE @Prefix;", conn, (SqlTransaction)tx))
-            {
-                clearRolePermsCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
-                clearRolePermsCmd.Parameters.Add(new SqlParameter("@Prefix", SqlDbType.NVarChar, 200) { Value = $"{key}.%" });
-                await clearRolePermsCmd.ExecuteNonQueryAsync(ct);
-            }
+        /*
+          APAGAR YA NO BORRA NADA.
 
-            await using (var clearUserOverridesCmd = new SqlCommand($@"
-DELETE up
-FROM dbo.WUsuarioPermiso up
-INNER JOIN dbo.WPermiso p
-    ON p.EmpresaId = up.EmpresaId
-   AND p.{Q(schema.PermissionIdColumn)} = up.{Q(schema.UserPermPermissionIdColumn)}
-WHERE up.EmpresaId = @EmpresaId
-  AND p.Clave LIKE @Prefix;", conn, (SqlTransaction)tx))
-            {
-                clearUserOverridesCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
-                clearUserOverridesCmd.Parameters.Add(new SqlParameter("@Prefix", SqlDbType.NVarChar, 200) { Value = $"{key}.%" });
-                await clearUserOverridesCmd.ExecuteNonQueryAsync(ct);
-            }
-        }
+          Aqui se borraban todas las filas de WRolPermiso y de WUsuarioPermiso
+          del modulo. Era necesario mientras el calculo de permisos no miraba el
+          estatus: sin ese borrado, apagar no quitaba el acceso.
+
+          Ahora lo mira (ver LoadEffectivePermissionsAsync), asi que el borrado
+          sobra — y era irreversible: apagar un modulo por equivocacion obligaba
+          a repartir a mano lo que tenia cada rol y cada persona, sin ninguna
+          forma de saber que era.
+
+          Apagar y volver a prender deja las cosas como estaban.
+        */
 
         await using var readCmd = new SqlCommand(@"
 SELECT TOP 1 ModuloClave, COALESCE(NULLIF(Nombre,''), ModuloClave) AS Nombre, IdStatus
@@ -1593,14 +1576,77 @@ ORDER BY pu.Clave;";
         cmd.Parameters.Add(new SqlParameter("@RolCodigo", SqlDbType.NVarChar, 30) { Value = rolCodigo });
 
         var permissions = new List<string>();
+        await using (var reader = await cmd.ExecuteReaderAsync(ct))
+        {
+            while (await reader.ReadAsync(ct))
+            {
+                var clave = reader.GetString(reader.GetOrdinal("Clave"));
+                if (!string.IsNullOrWhiteSpace(clave))
+                    permissions.Add(clave);
+            }
+        }
+
+        /*
+          UN MODULO APAGADO NO DA NINGUN PERMISO.
+
+          Antes esto no se miraba aqui, y por eso apagar un modulo tenia que
+          BORRAR los permisos de los roles y los ajustes de cada usuario: era lo
+          unico que de verdad quitaba el acceso. El precio era que apagarlo no se
+          podia deshacer — al volver a prenderlo habia que repartir todo otra vez
+          a mano, y nadie se acordaba de que tenia quien.
+
+          Mirandolo aqui, apagar un modulo deja de destruir nada: los permisos se
+          quedan guardados, simplemente no cuentan mientras este apagado. Volver a
+          prenderlo devuelve las cosas como estaban.
+
+          SE EXCLUYE SOLO LO QUE ESTA APAGADO A PROPOSITO, nunca "lo que no esta
+          encendido". Si dbo.WModulo no existe, o esta vacia, o no tiene renglon
+          para un modulo, no se quita nada: una base sin ese catalogo seguiria
+          funcionando igual. Al reves —exigir que cada modulo este listado— una
+          tabla vacia dejaria a todo el mundo sin permisos.
+        */
+        var apagados = await LoadInactiveModuleKeysAsync(conn, empresaId, ct);
+        if (apagados.Count == 0)
+            return permissions;
+
+        return permissions
+            .Where(clave => !EsDeModuloApagado(clave, apagados))
+            .ToList();
+    }
+
+    private static bool EsDeModuloApagado(string clave, HashSet<string> apagados)
+    {
+        var punto = clave.IndexOf('.');
+        if (punto <= 0) return false;
+        return apagados.Contains(clave.Substring(0, punto));
+    }
+
+    /// Las claves de los modulos marcados como inactivos para esta empresa.
+    /// Vacio si la tabla no existe: ver la razon arriba.
+    private static async Task<HashSet<string>> LoadInactiveModuleKeysAsync(
+        SqlConnection conn,
+        int empresaId,
+        CancellationToken ct)
+    {
+        var apagados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!await TableExistsAsync(conn, "WModulo", ct))
+            return apagados;
+
+        await using var cmd = new SqlCommand(@"
+SELECT ModuloClave
+FROM dbo.WModulo
+WHERE EmpresaId = @EmpresaId
+  AND IdStatus = 2;", conn);
+        cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct))
         {
-            var clave = reader.GetString(reader.GetOrdinal("Clave"));
+            var clave = reader.GetString(0);
             if (!string.IsNullOrWhiteSpace(clave))
-                permissions.Add(clave);
+                apagados.Add(clave.Trim());
         }
-        return permissions;
+        return apagados;
     }
 
     private async Task<CapabilitySchema> GetSchemaAsync(SqlConnection conn, CancellationToken ct)

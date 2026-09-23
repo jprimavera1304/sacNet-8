@@ -49,10 +49,35 @@ public class UsuariosController : ControllerBase
         var rol = _currentUserAccessor.GetRole(User);
         var snapshot = await _permissionService.GetPermissionsAsync(userId.Value, empresaId, rol, ct);
 
-        // Instalacion sin modelo de permisos: no hay nada contra que comparar y negar
-        // dejaria muerta una funcion en bases que hoy trabajan.
+        /*
+          INSTALACION SIN MODELO DE PERMISOS.
+
+          Cuando el tenant no tiene el modelo prendido no hay nada contra que
+          comparar, y negar dejaria muerta una funcion en bases que hoy trabajan.
+          Por eso se deja pasar... pero NO a cualquiera.
+
+          Esto lo usa hoy un solo endpoint: el que devuelve la contraseña de una
+          persona en claro. Dejar pasar a todo el mundo ahi significaba que, en
+          una base sin permisos configurados, cualquiera con sesion podia leer la
+          contraseña de cualquiera. El respaldo pensado para no romper nada
+          abria la puerta mas sensible que hay.
+
+          Sin modelo de permisos, el criterio que queda es el rol: solo quien
+          administra. Es menos preciso, pero es el que existe.
+        */
         if (!snapshot.PermissionsEnabled)
-            return null;
+        {
+            var esAdministrador =
+                string.Equals(rol, "SuperAdmin", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(rol, "SUPER_ADMIN", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(rol, "Admin", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(rol, "ADMIN", StringComparison.OrdinalIgnoreCase);
+
+            return esAdministrador
+                ? null
+                : StatusCode(StatusCodes.Status403Forbidden,
+                    new { ok = false, message = "No tienes permiso para esta accion." });
+        }
 
         var tiene = snapshot.Permissions.Any(x => string.Equals(x, permiso, StringComparison.OrdinalIgnoreCase));
         if (tiene)
