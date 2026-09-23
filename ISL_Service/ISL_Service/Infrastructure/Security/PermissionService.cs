@@ -205,6 +205,11 @@ public sealed class PermissionService : IPermissionService
 
     private static readonly LegacyModuleBinding PrestamosBinding = new(
         PrestamosModuleKey, "Prestamos", PrestamosLegacyForm, PrestamosLegacyPermissionMap, PrestamosWebPermissionSeeds);
+    /* Estatico A PROPOSITO: PermissionService es Scoped, o sea una instancia
+       nueva por peticion. Un candado de instancia no sincronizaria nada, que es
+       justo lo que hay que evitar aqui. */
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> _candados = new();
+
     private static readonly TimeSpan ActiveCacheTtl = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan StaleCacheTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan SchemaCacheTtl = TimeSpan.FromMinutes(15);
@@ -374,8 +379,30 @@ public sealed class PermissionService : IPermissionService
         if (_cache.TryGetValue<PermissionSnapshot>(cacheKey, out var cached) && cached is not null)
             return cached;
 
+        /*
+          UNA SOLA RECONSTRUCCION A LA VEZ, POR USUARIO.
+
+          Al abrir la app salen varias peticiones casi a la vez (/api/me sale
+          dos veces, y /api/modulos/disponibles pide lo mismo). Si la cache
+          acaba de vencer, TODAS fallan el intento a la vez y TODAS se ponen a
+          reconstruir lo mismo. En los registros de produccion se ven tres
+          respuestas de 8 segundos en el mismo par de segundos: no eran tres
+          usuarios, era uno abriendo la app.
+
+          Con esto, la primera reconstruye y las demas esperan y se llevan el
+          mismo resultado. Ademas de ir mas rapido, deja de multiplicarse el
+          trabajo contra la base justo en el momento de mas prisa.
+
+          El candado es POR USUARIO: dos personas distintas no se estorban.
+        */
+        var candado = _candados.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
+        await candado.WaitAsync(ct);
         try
         {
+            /* Puede haberla dejado quien iba delante mientras se esperaba. */
+            if (_cache.TryGetValue<PermissionSnapshot>(cacheKey, out var reciente) && reciente is not null)
+                return reciente;
+
             var snapshot = await BuildSnapshotAsync(userId, empresaId, rolLegacy, ct);
             _cache.Set(cacheKey, snapshot, ActiveCacheTtl);
             _cache.Set(staleCacheKey, snapshot, StaleCacheTtl);
@@ -388,6 +415,10 @@ public sealed class PermissionService : IPermissionService
                 return stale;
 
             return BuildLegacyFallback(userId, empresaId, rolLegacy);
+        }
+        finally
+        {
+            candado.Release();
         }
     }
 
@@ -1985,28 +2016,12 @@ END", conn);
             .Select(x => new PermissionSeed(x.Key, x.Name, ReportesModuleKey))
             .Prepend(new PermissionSeed(ReportesViewPermission, "Reportes - Ver modulo", ReportesModuleKey))
             .ToList();
-        foreach (var seed in permissionRows)
-        {
-            await using var cmd = new SqlCommand(@"
-IF EXISTS (SELECT 1 FROM dbo.WPermiso WHERE EmpresaId = @EmpresaId AND Clave = @Clave)
-BEGIN
-    UPDATE dbo.WPermiso
-       SET Nombre = @Nombre,
-           Descripcion = CASE WHEN COL_LENGTH('dbo.WPermiso','Descripcion') IS NOT NULL THEN @Descripcion ELSE Descripcion END
-     WHERE EmpresaId = @EmpresaId
-       AND Clave = @Clave;
-END
-ELSE
-BEGIN
-    INSERT INTO dbo.WPermiso (EmpresaId, Clave, Nombre, Descripcion, FechaCreacion)
-    VALUES (@EmpresaId, @Clave, @Nombre, @Descripcion, SYSUTCDATETIME());
-END", conn);
-            cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
-            cmd.Parameters.Add(new SqlParameter("@Clave", SqlDbType.NVarChar, 200) { Value = seed.Key });
-            cmd.Parameters.Add(new SqlParameter("@Nombre", SqlDbType.NVarChar, 200) { Value = seed.Name });
-            cmd.Parameters.Add(new SqlParameter("@Descripcion", SqlDbType.NVarChar, 500) { Value = seed.Key == ReportesViewPermission ? "reportes.web" : "reportes.legacy" });
-            await cmd.ExecuteNonQueryAsync(ct);
-        }
+        await SincronizarCatalogoDePermisosAsync(
+            conn,
+            empresaId,
+            permissionRows,
+            seed => seed.Key == ReportesViewPermission ? "reportes.web" : "reportes.legacy",
+            ct);
 
         return reportCatalog.ToDictionary(x => x.Key, StringComparer.OrdinalIgnoreCase);
     }
@@ -2260,28 +2275,14 @@ END", conn);
             .Select(x => x.First())
             .ToList();
 
-        foreach (var seed in permissionRows)
-        {
-            await using var cmd = new SqlCommand(@"
-IF EXISTS (SELECT 1 FROM dbo.WPermiso WHERE EmpresaId = @EmpresaId AND Clave = @Clave)
-BEGIN
-    UPDATE dbo.WPermiso
-       SET Nombre = @Nombre,
-           Descripcion = CASE WHEN COL_LENGTH('dbo.WPermiso','Descripcion') IS NOT NULL THEN @Descripcion ELSE Descripcion END
-     WHERE EmpresaId = @EmpresaId
-       AND Clave = @Clave;
-END
-ELSE
-BEGIN
-    INSERT INTO dbo.WPermiso (EmpresaId, Clave, Nombre, Descripcion, FechaCreacion)
-    VALUES (@EmpresaId, @Clave, @Nombre, @Descripcion, SYSUTCDATETIME());
-END", conn);
-            cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
-            cmd.Parameters.Add(new SqlParameter("@Clave", SqlDbType.NVarChar, 200) { Value = seed.Key });
-            cmd.Parameters.Add(new SqlParameter("@Nombre", SqlDbType.NVarChar, 200) { Value = seed.Name });
-            cmd.Parameters.Add(new SqlParameter("@Descripcion", SqlDbType.NVarChar, 500) { Value = binding.WebSeeds.Any(x => x.Key.Equals(seed.Key, StringComparison.OrdinalIgnoreCase)) ? $"{binding.ModuleKey}.web" : $"{binding.ModuleKey}.legacy" });
-            await cmd.ExecuteNonQueryAsync(ct);
-        }
+        await SincronizarCatalogoDePermisosAsync(
+            conn,
+            empresaId,
+            permissionRows,
+            seed => binding.WebSeeds.Any(x => x.Key.Equals(seed.Key, StringComparison.OrdinalIgnoreCase))
+                ? $"{binding.ModuleKey}.web"
+                : $"{binding.ModuleKey}.legacy",
+            ct);
 
         return ventasCatalog.ToDictionary(x => x.Key, StringComparer.OrdinalIgnoreCase);
     }
@@ -2841,6 +2842,105 @@ WHERE EmpresaId = @EmpresaId
 
     private sealed record OverrideTypeTokens(string AllowToken, string DenyToken);
     private sealed record UserPermColumns(int TipoMaxChars, int MotivoMaxChars);
+
+    /*
+      SEMBRAR EL CATALOGO SIN REESCRIBIRLO ENTERO EN CADA PETICION
+
+      Esto asegura que cada permiso de legacy exista en WPermiso y tenga el
+      nombre al dia. Antes lo hacia con un upsert POR PERMISO, siempre, hubiera
+      cambiado algo o no.
+
+      Lo que costaba, medido: una sola llamada a /api/me disparaba 219 consultas
+      a la base, y 182 de ellas eran este bucle —91 "IF EXISTS" y 91 "UPDATE"—
+      escribiendo exactamente los mismos valores que ya estaban.
+
+      En local no se notaba porque la base esta en la misma maquina y cada ida y
+      vuelta cuesta casi cero. Contra la base de la oficina, cada una cuesta
+      decenas de milisegundos, y 182 seguidas son los segundos que el usuario
+      veia al abrir la app. El trabajo no estaba en la base: estaba en el viaje,
+      repetido 182 veces.
+
+      Ahora se pregunta PRIMERO —una sola consulta— como esta el catalogo, y se
+      escribe unicamente lo que falta o lo que de verdad cambio. En el caso
+      normal, que es que no haya cambiado nada, queda en UNA consulta y CERO
+      escrituras.
+
+      POR QUE COMPARAR CONTRA LA BASE Y NO GUARDARLO EN MEMORIA: un recordatorio
+      en memoria se equivoca en cuanto alguien toca la tabla por fuera —o cuando
+      hay mas de una instancia, o cuando el proceso reinicia—, y entonces el
+      permiso que falta no se vuelve a crear. Preguntando, se arregla solo.
+    */
+    private static async Task<int> SincronizarCatalogoDePermisosAsync(
+        SqlConnection conn,
+        int empresaId,
+        IReadOnlyList<PermissionSeed> semillas,
+        Func<PermissionSeed, string> descripcionDe,
+        CancellationToken ct)
+    {
+        if (semillas.Count == 0)
+            return 0;
+
+        var columnas = await GetTableColumnsAsync(conn, "WPermiso", ct);
+        var hayDescripcion = columnas.Contains("Descripcion");
+
+        /* Como esta hoy. Se piden los de la empresa entera y no los 91 por
+           nombre: es la misma ida y vuelta y no hay que armar 91 parametros. */
+        var actuales = new Dictionary<string, (string Nombre, string Descripcion)>(StringComparer.OrdinalIgnoreCase);
+        await using (var lectura = new SqlCommand(
+            hayDescripcion
+                ? "SELECT Clave, ISNULL(Nombre, '') AS Nombre, ISNULL(Descripcion, '') AS Descripcion FROM dbo.WPermiso WHERE EmpresaId = @EmpresaId;"
+                : "SELECT Clave, ISNULL(Nombre, '') AS Nombre, '' AS Descripcion FROM dbo.WPermiso WHERE EmpresaId = @EmpresaId;",
+            conn))
+        {
+            lectura.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+            await using var reader = await lectura.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                var clave = reader.GetString(0);
+                if (!string.IsNullOrWhiteSpace(clave))
+                    actuales[clave.Trim()] = (reader.GetString(1), reader.GetString(2));
+            }
+        }
+
+        var escritos = 0;
+        foreach (var seed in semillas)
+        {
+            var descripcion = descripcionDe(seed);
+
+            /* Ya esta igual: no se toca. Escribir lo mismo no solo cuesta el
+               viaje, ademas mueve FechaActualizacion y hace parecer que alguien
+               cambio permisos cuando nadie los cambio. */
+            if (actuales.TryGetValue(seed.Key, out var actual)
+                && string.Equals(actual.Nombre, seed.Name, StringComparison.Ordinal)
+                && (!hayDescripcion || string.Equals(actual.Descripcion, descripcion, StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            await using var cmd = new SqlCommand(@"
+IF EXISTS (SELECT 1 FROM dbo.WPermiso WHERE EmpresaId = @EmpresaId AND Clave = @Clave)
+BEGIN
+    UPDATE dbo.WPermiso
+       SET Nombre = @Nombre,
+           Descripcion = CASE WHEN COL_LENGTH('dbo.WPermiso','Descripcion') IS NOT NULL THEN @Descripcion ELSE Descripcion END
+     WHERE EmpresaId = @EmpresaId
+       AND Clave = @Clave;
+END
+ELSE
+BEGIN
+    INSERT INTO dbo.WPermiso (EmpresaId, Clave, Nombre, Descripcion, FechaCreacion)
+    VALUES (@EmpresaId, @Clave, @Nombre, @Descripcion, SYSUTCDATETIME());
+END", conn);
+            cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+            cmd.Parameters.Add(new SqlParameter("@Clave", SqlDbType.NVarChar, 200) { Value = seed.Key });
+            cmd.Parameters.Add(new SqlParameter("@Nombre", SqlDbType.NVarChar, 200) { Value = seed.Name });
+            cmd.Parameters.Add(new SqlParameter("@Descripcion", SqlDbType.NVarChar, 500) { Value = descripcion });
+            await cmd.ExecuteNonQueryAsync(ct);
+            escritos++;
+        }
+
+        return escritos;
+    }
 
     private sealed record PermissionSeed(string Key, string Name, string Module);
     private sealed record ReportPermissionInfo(
