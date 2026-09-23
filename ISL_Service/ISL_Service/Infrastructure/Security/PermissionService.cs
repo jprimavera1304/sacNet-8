@@ -1614,8 +1614,15 @@ ORDER BY pu.Clave;";
             .ToList();
     }
 
-    private static bool EsDeModuloApagado(string clave, HashSet<string> apagados)
+    /// Si una clave de permiso pertenece a alguno de los modulos apagados.
+    ///
+    /// Publica para poder comprobarla: la regla parece obvia y tiene una trampa.
+    /// El modulo es lo que va ANTES DEL PRIMER PUNTO, y se compara completo. Si
+    /// se comparara "empieza con", apagar `reportes` apagaria tambien
+    /// `reportesx`, y apagar `ventas` se llevaria por delante `ventas_moviles`.
+    public static bool EsDeModuloApagado(string clave, HashSet<string> apagados)
     {
+        if (string.IsNullOrWhiteSpace(clave)) return false;
         var punto = clave.IndexOf('.');
         if (punto <= 0) return false;
         return apagados.Contains(clave.Substring(0, punto));
