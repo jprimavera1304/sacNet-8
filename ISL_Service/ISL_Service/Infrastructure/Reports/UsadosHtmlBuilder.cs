@@ -351,14 +351,31 @@ public static class UsadosHtmlBuilder
       @page { margin: 0.6in; }
 
       /*
-        La tipografia del diseño. Questrial se queda en la lista aunque no se
-        descargue —wkhtmltopdf corre sin garantia de red y una fuente que a
-        veces llega da dos papeles distintos—: si algun dia esta instalada,
-        entra sola.
+        LA TIPOGRAFIA ESTA FIJADA A PROPOSITO, Y NO ES LA DEL DISEÑO
+
+        El diseño pide Century Gothic con Questrial de respaldo. Ninguna de las
+        dos esta donde se genera el papel:
+
+          * Century Gothic viene con Microsoft Office, NO con Windows. Un
+            servidor no la tiene, y ponerla ahi sin licencia de Office no es
+            algo que se pueda hacer a la ligera.
+          * Questrial se descarga de Google Fonts, y wkhtmltopdf corre en otro
+            proceso sin garantia de red.
+
+        Dejarlas primero en la lista tenia una consecuencia medible, no teorica:
+        el MISMO reporte salia de 11 hojas generado en una maquina con Office y
+        de 10 en el servidor, porque las metricas de la fuente cambian y con
+        ellas los cortes de renglon. Un documento que se le entrega a otra
+        empresa no puede depender de que la maquina tenga Office instalado.
+
+        Segoe UI viene con Windows desde hace mas de quince años: esta en el
+        servidor y en cualquier PC donde se pruebe. Asi el papel es el mismo
+        salga de donde salga, que es todo el punto de haber sacado esto del
+        window.print() del navegador.
       */
       body {
         margin: 0;
-        font-family: 'Century Gothic', Questrial, 'Segoe UI', Roboto, Arial, sans-serif;
+        font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
         color: rgba(10,15,30,.92);
         font-size: 10.5px;
       }
