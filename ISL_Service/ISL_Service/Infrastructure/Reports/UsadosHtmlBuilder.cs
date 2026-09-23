@@ -237,7 +237,10 @@ public static class UsadosHtmlBuilder
         var html = new StringBuilder();
         /* Mismo motivo que el encabezado: nada de flex. Una tabla de dos
            celdas, la primera vacia, empuja el corte a la derecha. */
-        html.Append("<table class=\"corteCaja\"><tr><td></td><td class=\"corteHueco\">");
+        /* Oculto por peticion, igual que en el reporte nuevo, para que los dos
+           entreguen el mismo papel. El saldo al corte del ENCABEZADO se queda:
+           ese no es la linea del final. */
+        html.Append("<table class=\"corteCaja oculto\"><tr><td></td><td class=\"corteHueco\">");
         html.Append("<table class=\"corte\"><tbody>");
         html.Append(Renglon("Saldo anterior", Dinero(corte.saldoAnterior)));
         html.Append(Renglon("Entregas", Dinero(corte.entregas)));
@@ -470,6 +473,9 @@ public static class UsadosHtmlBuilder
 
       /* EL CORTE DEL FINAL NO SE PARTE: si cayera en el filo de la hoja, el
          rotulo quedaria en una pagina y su numero en la siguiente. */
+      /* Se oculta, no se quita: enseñarlo otra vez es borrar una palabra. */
+      .oculto { display: none; }
+
       .corteCaja { width: 100%; border-collapse: collapse; margin-top: 14px; page-break-inside: avoid; }
       /* La celda de la derecha se encoge a su contenido; la vacia de al lado se
          queda todo el hueco y empuja el corte a la orilla. */

@@ -533,8 +533,18 @@ public static class UsadosLegacyHtmlBuilder
         if (m.fechaCancelacion.HasValue)
             texto.Append(" el ").Append(m.fechaCancelacion.Value.ToString("dd/MM/yyyy HH:mm", Cultura));
 
+        /*
+          El motivo queda OCULTO por peticion: en el papel basta con quien
+          cancelo y cuando, que es lo que se comprueba. El motivo es una nota
+          interna y a veces trae texto que no esta escrito para un tercero.
+
+          El <br> va DENTRO del span, no fuera: fuera quedaria un salto de linea
+          suelto y la celda crearia una segunda linea vacia debajo de la fecha.
+        */
         if (!string.IsNullOrWhiteSpace(m.motivoCancelacion))
-            texto.Append("<br><b>Motivo:</b> ").Append(Texto(m.motivoCancelacion!.Trim()));
+            texto.Append("<span class=\"oculto\"><br><b>Motivo:</b> ")
+                 .Append(Texto(m.motivoCancelacion!.Trim()))
+                 .Append("</span>");
 
         return texto.ToString();
     }
@@ -556,7 +566,10 @@ public static class UsadosLegacyHtmlBuilder
     private static string RenglonCorte(int columnas, CorteCascosCambioDto corte)
     {
         var linea = new StringBuilder();
-        linea.Append("<tr class=\"corte fuerte\"><td class=\"der\" colspan=\"").Append(columnas).Append("\">");
+        /* Oculto por peticion: los totales de la fila de arriba ya cierran el
+           papel, y el saldo corrido es de la pantalla, no de lo que se entrega.
+           Se sigue calculando; quitar "oculto" lo devuelve. */
+        linea.Append("<tr class=\"corte fuerte oculto\"><td class=\"der\" colspan=\"").Append(columnas).Append("\">");
         linea.Append("<span class=\"corteDato\">Saldo anterior: <b>")
              .Append(Texto(Dinero(corte.saldoAnterior))).Append("</b></span>");
         linea.Append("<span class=\"corteDato\">Entrega de usados: <b>")
@@ -739,6 +752,20 @@ public static class UsadosLegacyHtmlBuilder
          una y el rotulo de la siguiente se leen como un solo dato.
          (Sin comillas en este comentario: va dentro de una cadena verbatim de
          C# y ahi cada comilla tendria que ir doblada.) */
+      /*
+         SE OCULTA, NO SE QUITA.
+
+         Lo que se esconde con esto sigue calculandose y viajando en el HTML:
+         volver a enseñarlo es borrar una palabra. Si se arrancara el codigo,
+         volver atras seria rehacerlo y arriesgarse a que no cuadre con lo que
+         ya se imprimio.
+
+         Ojo: esta regla esta repetida a proposito en la hoja del encabezado.
+         El encabezado es otro documento —wkhtmltopdf los junta al final— y no
+         hereda ni una linea de esta.
+      */
+      .oculto { display: none; }
+
       .corteDato { margin-right: 26px; white-space: nowrap; }
       /* El saldo al corte, mas grande y sin margen: cierra la linea. */
       .corteSaldo { font-size: 11.5pt; white-space: nowrap; }
