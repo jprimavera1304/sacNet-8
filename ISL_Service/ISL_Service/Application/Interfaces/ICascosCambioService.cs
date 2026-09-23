@@ -15,6 +15,15 @@ public interface ICascosCambioService
 
     Task<List<DetalleCascoCambioDto>> ConsultarDetalleAsync(int idMovimiento, CancellationToken ct = default);
 
+    /// <summary>
+    /// El desglose por tipo del periodo entero, ya agrupado por movimiento: la
+    /// llave es el idMovimiento y el valor sus piezas por tipo de usado. Es lo
+    /// que pinta las columnas MINI CHICO(1) ... JUMBO(7) del reporte con
+    /// detalle.
+    /// </summary>
+    Task<Dictionary<int, List<DetallePeriodoCascoCambioDto>>> ConsultarDetallePeriodoAsync(
+        DateTime? fechaInicio, DateTime? fechaFin, bool filtrarPorRegistro, CancellationToken ct = default);
+
     /// La marca para el reporte: el logo ya listo como data URI (vacio si no se
     /// encontro el archivo — el papel sale sin logo antes que con una imagen
     /// rota) y el nombre de la empresa para el pie.

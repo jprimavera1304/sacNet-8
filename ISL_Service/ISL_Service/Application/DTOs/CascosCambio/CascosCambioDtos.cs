@@ -92,6 +92,30 @@ public class DetalleCascoCambioDto
     public decimal diferencia { get; set; }
 }
 
+/*
+  UN RENGLON DEL DESGLOSE, PERO DE TODO UN PERIODO
+
+  Es lo que devuelve sp_w_ConsultarCascosCambioDetallePeriodo: la pieza minima
+  que necesita el reporte "con detalle" —que movimiento, que tipo y cuantas
+  piezas— y NADA MAS.
+
+  No es DetalleCascoCambioDto recortado por gusto: aquel trae los dos precios y
+  los tres importes de cada renglon porque la pantalla del "Ver" los enseña. El
+  papel con detalle no: sus columnas por tipo son PIEZAS, y el dinero ya va en
+  la columna de importe del movimiento. Traer seis decimales por renglon que
+  nadie va a imprimir son 693 renglones de lastre en un mes cualquiera.
+*/
+public class DetallePeriodoCascoCambioDto
+{
+    public int idMovimiento { get; set; }
+    public int idTipoUsado { get; set; }
+    /* 'MINI CHICO(1)', 'CHICO(2)', ... Es el rotulo corto de la columna. */
+    public string? clave { get; set; }
+    public string? nombre { get; set; }
+    public int orden { get; set; }
+    public int piezas { get; set; }
+}
+
 public class ResumenTipoCascoCambioDto
 {
     public int idTipoUsado { get; set; }

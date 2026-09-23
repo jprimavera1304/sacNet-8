@@ -16,6 +16,14 @@ public interface ICascosCambioRepository
 
     Task<List<DetalleCascoCambioDto>> ConsultarDetalleAsync(int idMovimiento, CancellationToken ct = default);
 
+    /// <summary>
+    /// El desglose por tipo de TODOS los movimientos de un periodo, en una sola
+    /// llamada. Devuelve de mas a proposito —no filtra por estatus— porque quien
+    /// lo pide ya sabe que movimientos va a enseñar y busca por idMovimiento.
+    /// </summary>
+    Task<List<DetallePeriodoCascoCambioDto>> ConsultarDetallePeriodoAsync(
+        DateTime? fechaInicio, DateTime? fechaFin, bool filtrarPorRegistro, CancellationToken ct = default);
+
     /// La carpeta de imagenes, el nombre del archivo del logo y el nombre con el
     /// que la empresa se presenta hacia afuera. Sale de Constantes: cada empresa
     /// tiene lo suyo, asi que no se puede empaquetar en el backend.

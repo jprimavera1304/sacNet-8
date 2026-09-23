@@ -165,6 +165,30 @@ public class CascosCambioService : ICascosCambioService
     }
 
     /*
+      EL DESGLOSE DEL PERIODO, YA AGRUPADO POR MOVIMIENTO
+
+      La base devuelve renglones sueltos (movimiento, tipo, piezas) y aqui se
+      vuelven un diccionario. Se agrupa AQUI y no en quien arma el papel por lo
+      de siempre: si el reporte tuviera que recorrer 693 renglones por cada una
+      de sus 234 filas para encontrar los suyos, serian 160 mil comparaciones
+      para imprimir un mes. Agrupado una vez, cada fila busca la suya de golpe.
+
+      Un movimiento sin renglones —un pago, un saldo inicial— simplemente no
+      esta en el diccionario, y el papel pinta sus columnas vacias. No se
+      inventa una lista vacia por cada uno: no hay nada que enseñar.
+    */
+    public async Task<Dictionary<int, List<DetallePeriodoCascoCambioDto>>> ConsultarDetallePeriodoAsync(
+        DateTime? fechaInicio, DateTime? fechaFin, bool filtrarPorRegistro, CancellationToken ct = default)
+    {
+        var renglones = await _repository.ConsultarDetallePeriodoAsync(
+            fechaInicio, fechaFin, filtrarPorRegistro, ct);
+
+        return renglones
+            .GroupBy(r => r.idMovimiento)
+            .ToDictionary(g => g.Key, g => g.OrderBy(r => r.orden).ToList());
+    }
+
+    /*
       EL LOGO DEL REPORTE, YA COMO DATA URI
 
       Va incrustado en el HTML y no como una direccion: wkhtmltopdf corre en
@@ -257,18 +281,18 @@ public class CascosCambioService : ICascosCambioService
         // pero la que manda es la de la base: es la unica que nadie puede
         // saltarse llamando al API de otra forma.
         if (request.TipoMovimiento is TipoEntrega or TipoPedido && conPiezas == 0)
-            throw new ArgumentException("Capture al menos un tipo de casco con piezas.");
+            throw new ArgumentException("Capture al menos un tipo de usado con cantidad.");
 
         if (request.TipoMovimiento is TipoPago or TipoSaldoInicial)
         {
             if (conPiezas > 0)
-                throw new ArgumentException("Un movimiento de dinero no lleva piezas.");
+                throw new ArgumentException("Un movimiento de dinero no lleva usados.");
             if (request.Importe <= 0)
                 throw new ArgumentException("El importe debe ser mayor que cero.");
         }
 
         if ((request.Piezas ?? new List<PiezasPorTipoRequest>()).Any(p => p != null && p.Piezas < 0))
-            throw new ArgumentException("Las piezas no pueden ser negativas.");
+            throw new ArgumentException("Los usados no pueden ser negativos.");
 
         var (ok, mensaje, id, advertencia) = await _repository.InsertarAsync(request, usuario, ct);
         if (!ok)

@@ -74,6 +74,53 @@ public static class WkhtmltopdfHtmlPdfRenderer
 
         /// Una raya encima del pie, como la del diseño.
         public bool PieConLinea { get; init; }
+
+        /*
+          LA FUENTE DEL PIE, QUE POR OMISION NO ES LA DEL DOCUMENTO
+
+          wkhtmltopdf dibuja el pie con SU tipografia, no con la del HTML —el
+          pie no es parte del documento—. Y la suya es Arial: se ve en el PDF
+          terminado, que embebe Arial ademas de la fuente del cuerpo aunque en
+          el HTML no aparezca Arial por ningun lado.
+
+          En un reporte que se pidio "todo en Tahoma", ese renglon de abajo era
+          el unico que no lo estaba. Null deja lo de siempre, para no mover el
+          pie de ningun papel que ya este bien.
+        */
+        public string? PieFuente { get; init; }
+
+        /*
+          EL ENCABEZADO QUE SE REPITE EN TODAS LAS HOJAS, Y POR QUE ES UN HTML
+          APARTE Y NO EL PRINCIPIO DEL DOCUMENTO
+
+          Un encabezado escrito al principio del cuerpo sale UNA vez, en la hoja
+          uno. Lo que pidio el cliente —el logo, el titulo, quien imprimio, la
+          hora y "Pag: 1 de 2" arriba de CADA hoja— no se puede hacer asi: no
+          hay forma de que el cuerpo sepa en que pagina va.
+
+          wkhtmltopdf lo resuelve con un documento separado que dibuja en la
+          franja superior de cada hoja, y le pasa el numero de pagina en la
+          direccion (?page=3&topage=14). Por eso las marcas [page] y [topage]
+          SOLO valen en el encabezado y el pie: en el cuerpo se imprimen
+          literales, con corchetes y todo.
+
+          Aqui se recibe el HTML ya armado —no una ruta— y el renderer lo
+          escribe junto al documento en la carpeta temporal: quien arma un
+          reporte no tiene por que saber que wkhtmltopdf necesita un archivo.
+
+          Null = ningun encabezado, que es lo de siempre. La remision de Ventas
+          no pasa esto y sale exactamente igual que antes.
+        */
+        public string? EncabezadoHtml { get; init; }
+
+        /*
+          Cuanto aire queda entre el encabezado y donde empieza la tabla, en
+          milimetros. Va aparte del margen superior porque son dos cosas: el
+          margen es el hueco donde CABE el encabezado, y esto es la separacion
+          entre el y el contenido. Sin esto, el primer renglon de la tabla se
+          pega a la linea del encabezado.
+        */
+        public int? EspacioEncabezado { get; init; }
     }
 
     public static async Task<byte[]> RenderAsync(
@@ -96,8 +143,18 @@ public static class WkhtmltopdfHtmlPdfRenderer
         var token = Guid.NewGuid().ToString("N");
         var htmlPath = Path.Combine(tempRoot, $"{token}.html");
         var pdfPath = Path.Combine(tempRoot, $"{token}.pdf");
+        /*
+          El encabezado tiene que ser un ARCHIVO: --header-html recibe una
+          direccion, no un texto. Se escribe al lado del documento y se borra
+          con el, para que un reporte que falle no deje basura en la carpeta.
+        */
+        var headerPath = string.IsNullOrWhiteSpace(opciones?.EncabezadoHtml)
+            ? null
+            : Path.Combine(tempRoot, $"{token}.header.html");
 
         await File.WriteAllTextAsync(htmlPath, html, new UTF8Encoding(false), ct);
+        if (headerPath != null)
+            await File.WriteAllTextAsync(headerPath, opciones!.EncabezadoHtml!, new UTF8Encoding(false), ct);
 
         try
         {
@@ -146,6 +203,12 @@ public static class WkhtmltopdfHtmlPdfRenderer
             {
                 /* Chico y separado del contenido: el pie acompaña, no compite
                    con lo que se vino a leer. */
+                if (!string.IsNullOrWhiteSpace(opciones.PieFuente))
+                {
+                    startInfo.ArgumentList.Add("--footer-font-name");
+                    startInfo.ArgumentList.Add(opciones.PieFuente!);
+                }
+
                 startInfo.ArgumentList.Add("--footer-font-size");
                 startInfo.ArgumentList.Add("7");
                 startInfo.ArgumentList.Add("--footer-spacing");
@@ -153,6 +216,14 @@ public static class WkhtmltopdfHtmlPdfRenderer
 
                 if (opciones.PieConLinea)
                     startInfo.ArgumentList.Add("--footer-line");
+            }
+
+            if (headerPath != null)
+            {
+                startInfo.ArgumentList.Add("--header-html");
+                startInfo.ArgumentList.Add(headerPath);
+                startInfo.ArgumentList.Add("--header-spacing");
+                startInfo.ArgumentList.Add((opciones?.EspacioEncabezado ?? 4).ToString());
             }
 
             if (opciones?.ImagenDpi is int dpi)
@@ -182,6 +253,7 @@ public static class WkhtmltopdfHtmlPdfRenderer
         {
             TryDelete(htmlPath);
             TryDelete(pdfPath);
+            if (headerPath != null) TryDelete(headerPath);
         }
     }
 

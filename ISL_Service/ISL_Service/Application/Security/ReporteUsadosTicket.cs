@@ -25,6 +25,28 @@ namespace ISL_Service.Application.Security;
   LOS DIEZ MINUTOS son para que el enlace no sirva de aqui a mañana si queda en
   el historial del navegador. Da de sobra para abrir el PDF y no para guardarlo
   como una puerta.
+
+  ---------------------------------------------------------------------------
+  EL CUERPO CRECIO, Y LOS PASES VIEJOS SIGUEN VALIENDO
+  ---------------------------------------------------------------------------
+  El cuerpo eran seis campos separados por "|" y ahora son ocho: se le agregaron
+  la VARIANTE del reporte y el NOMBRE de quien lo pidio (que el papel imprime
+  arriba, en todas las hojas).
+
+  Los dos nuevos van AL FINAL, DESPUES de la caducidad, y no en medio. Eso es lo
+  que hace que un pase de los de antes —uno que se acaba de firmar y esta camino
+  del navegador justo cuando se despliega esto— siga siendo legible: sus seis
+  campos se leen en las mismas seis posiciones, incluida la caducidad, que es la
+  unica que no puede moverse sin que el pase parezca vencido o eterno.
+
+  Un pase de seis campos se entiende como lo que era: el reporte tal como estaba
+  antes de esto (variante "clasico") y sin nombre de usuario. Nadie ve un enlace
+  roto por haber desplegado a media tarde, y el papel que salga sera exactamente
+  el que esa persona pidio.
+
+  La alternativa era no hacer nada y aceptar que durante diez minutos cada
+  enlace abierto diera "el enlace no es valido". Diez minutos de reportes que no
+  salen, por no escribir dos campos al final.
 */
 public static class ReporteUsadosTicket
 {
@@ -43,6 +65,31 @@ public static class ReporteUsadosTicket
         public string Estatus { get; init; } = "todos";
         public bool PorRegistro { get; init; }
         public int IdUsuario { get; init; }
+
+        /*
+          CUAL DE LOS TRES PAPELES SE IMPRIME:
+
+            "clasico" - el reporte de siempre (UsadosHtmlBuilder). Es lo que
+                        recibe un pase de los viejos, de seis campos.
+            "simple"  - el nuevo, con la estetica de los reportes de legacy: una
+                        fila por movimiento.
+            "detalle" - el nuevo, ademas con una columna por tipo de usado.
+
+          Va EN EL PASE y no como parametro suelto por lo mismo que el periodo:
+          todo lo que decide que dice el papel se firma junto, o alguien cambia
+          una letra en la barra del navegador y saca otro documento.
+        */
+        public string Variante { get; init; } = "clasico";
+
+        /*
+          QUIEN PIDIO EL PAPEL. Se imprime arriba, en todas las hojas: lo pidio
+          el cliente y no es adorno — cuando una copia de un reporte aparece
+          sobre un escritorio, lo primero que hace falta saber es quien la saco.
+
+          Viaja en el pase porque el GET que entrega el PDF es anonimo: ahi ya
+          no hay token del que sacarlo.
+        */
+        public string Usuario { get; init; } = "";
     }
 
     public static string Firmar(
@@ -51,11 +98,14 @@ public static class ReporteUsadosTicket
         DateTime? hasta,
         string estatus,
         bool porRegistro,
-        int idUsuario)
+        int idUsuario,
+        string variante = "clasico",
+        string usuario = "")
     {
         var expira = DateTimeOffset.UtcNow.Add(Vigencia).ToUnixTimeSeconds();
         var cuerpo = $"{Fecha(desde)}|{Fecha(hasta)}|{Limpio(estatus)}" +
-                     $"|{(porRegistro ? 1 : 0)}|{idUsuario}|{expira}";
+                     $"|{(porRegistro ? 1 : 0)}|{idUsuario}|{expira}" +
+                     $"|{LimpiaVariante(variante)}|{SinSeparador(usuario)}";
         return Base64Url(Encoding.UTF8.GetBytes(cuerpo)) + "." + Base64Url(Firma(llave, cuerpo));
     }
 
@@ -84,7 +134,12 @@ public static class ReporteUsadosTicket
             return null;
 
         var campos = cuerpo.Split('|');
-        if (campos.Length != 6) return null;
+        /*
+          SEIS O OCHO, NO CUALQUIER COSA. Seis son los pases de antes de que
+          existieran las variantes; ocho los de ahora. Cualquier otro numero es
+          un pase de una version que no conocemos y no se adivina que queria.
+        */
+        if (campos.Length != 6 && campos.Length != 8) return null;
 
         if (!long.TryParse(campos[5], out var expira) ||
             DateTimeOffset.UtcNow.ToUnixTimeSeconds() > expira)
@@ -96,7 +151,10 @@ public static class ReporteUsadosTicket
             Hasta = LeerFecha(campos[1]),
             Estatus = Limpio(campos[2]),
             PorRegistro = campos[3] == "1",
-            IdUsuario = int.TryParse(campos[4], out var idu) ? idu : 0
+            IdUsuario = int.TryParse(campos[4], out var idu) ? idu : 0,
+            /* Un pase viejo pidio el reporte que habia entonces. */
+            Variante = campos.Length == 8 ? LimpiaVariante(campos[6]) : "clasico",
+            Usuario = campos.Length == 8 ? campos[7] : ""
         };
     }
 
@@ -113,6 +171,34 @@ public static class ReporteUsadosTicket
             "cancelados" => "cancelados",
             _ => "todos"
         };
+
+    /*
+      Igual que el estatus: solo los tres valores conocidos, y lo que no se
+      reconozca cae en el reporte de siempre. Este texto elige QUE codigo arma
+      el papel; aceptarlo tal cual seria dejar que un pase manipulado dirija el
+      programa.
+    */
+    private static string LimpiaVariante(string? variante)
+        => variante switch
+        {
+            "simple" => "simple",
+            "detalle" => "detalle",
+            _ => "clasico"
+        };
+
+    /*
+      EL NOMBRE NO PUEDE LLEVAR EL SEPARADOR. Un usuario que se llamara "a|b"
+      partiria el cuerpo en nueve campos y el pase —firmado y todo— se leeria
+      mal. Se cambia por un espacio, que es lo unico que no cambia nada mas.
+
+      Y se corta a 60: el nombre se imprime en un renglon del encabezado, y uno
+      de trescientas letras no lo hace ilegible, hace ilegible el encabezado.
+    */
+    private static string SinSeparador(string? texto)
+    {
+        var limpio = (texto ?? "").Replace('|', ' ').Trim();
+        return limpio.Length > 60 ? limpio[..60] : limpio;
+    }
 
     /* Solo el dia: la hora no filtra nada aqui y alargaria el pase. */
     private static string Fecha(DateTime? valor) => valor?.ToString("yyyy-MM-dd") ?? "";
