@@ -423,10 +423,34 @@ WHERE Id = @Id
         if (!await TableHasColumnAsync(conn, "dbo", "Usuarios", "Contrasena", ct))
             return null;
 
-        await using var cmd = new SqlCommand(@"
+        /*
+          MAC31 GUARDA LA CONTRASEÑA DOS VECES, Y SOLO UNA SE PUEDE LEER.
+
+          `Contrasena` esta CIFRADA en buena parte de los renglones —medido en la
+          base: 39 de 67 miden 62 caracteres— y `contrasenaDesc` es la copia
+          legible, que tienen 66 de los 67.
+
+          Se leia solo `Contrasena`, asi que a quien la tuviera cifrada la
+          pantalla le enseñaba el galimatias tal cual:
+          "0MO6IFQD4UIDULXDU7I5IMI5UOEUDK9..." en vez de "NAOLANY22". No fallaba
+          nada, solo mostraba basura, que es peor: parece un dato.
+
+          Se prefiere la legible y se cae a la otra solo si falta.
+        */
+        var hayColumnaLegible =
+            await TableHasColumnAsync(conn, "dbo", "Usuarios", "contrasenaDesc", ct);
+
+        var sql = hayColumnaLegible
+            ? @"
+SELECT TOP 1 ISNULL(NULLIF(LTRIM(RTRIM(contrasenaDesc)), ''), Contrasena)
+FROM dbo.Usuarios
+WHERE UPPER(LTRIM(RTRIM(CAST(Usuario AS NVARCHAR(150))))) = UPPER(LTRIM(RTRIM(@Usuario)));"
+            : @"
 SELECT TOP 1 Contrasena
 FROM dbo.Usuarios
-WHERE UPPER(LTRIM(RTRIM(CAST(Usuario AS NVARCHAR(150))))) = UPPER(LTRIM(RTRIM(@Usuario)));", conn)
+WHERE UPPER(LTRIM(RTRIM(CAST(Usuario AS NVARCHAR(150))))) = UPPER(LTRIM(RTRIM(@Usuario)));";
+
+        await using var cmd = new SqlCommand(sql, conn)
         {
             CommandType = CommandType.Text,
             CommandTimeout = 30
@@ -435,7 +459,30 @@ WHERE UPPER(LTRIM(RTRIM(CAST(Usuario AS NVARCHAR(150))))) = UPPER(LTRIM(RTRIM(@U
 
         var raw = await cmd.ExecuteScalarAsync(ct);
         if (raw is null || raw is DBNull) return null;
-        return raw.ToString();
+
+        var valor = raw.ToString() ?? string.Empty;
+        return PareceLegible(valor) ? valor : null;
+    }
+
+    /*
+      SI LO QUE SE SACO SE PUEDE ENSEÑAR.
+
+      Cuando falta la copia legible se cae a la cifrada, y esa no sirve de nada
+      en pantalla. Mas vale decir "no se pudo obtener" que pintar cuarenta
+      simbolos: lo primero se entiende, lo segundo se confunde con la contraseña.
+
+      El criterio es el largo y los caracteres: una contraseña que una persona
+      escribe no pasa de 30 y es imprimible. Lo cifrado aqui mide 62.
+    */
+    private static bool PareceLegible(string valor)
+    {
+        var limpio = valor.Trim();
+        if (limpio.Length == 0 || limpio.Length > 30) return false;
+        foreach (var c in limpio)
+        {
+            if (c < 32 || c > 126) return false;
+        }
+        return true;
     }
 
     public async Task<Usuario> UpdateUsuarioAndRolAsync(Guid userId, string usuarioNuevo, string rolNuevo, CancellationToken ct)
