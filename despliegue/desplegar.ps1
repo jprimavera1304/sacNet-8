@@ -52,7 +52,38 @@ foreach ($s in $listaSitios) {
                 $fs.Close(); $libre = $true
             } catch { Start-Sleep -Milliseconds 300 }
         }
-        if (-not $libre) { throw "la aplicacion no solto los archivos en 30 s" }
+        <#
+          SI NO SUELTA, EL PROBLEMA NO SIEMPRE ES QUE FALTE TIEMPO.
+
+          Paso de verdad: el proceso de trabajo de un sitio se quedo colgado. Ni
+          app_offline ni parar el pool lo movieron —se quedo en "Stopping" para
+          siempre— y el despliegue fallaba una y otra vez sin decir por que.
+          Esperar mas no habria servido: no estaba tardando, estaba trabado.
+
+          Asi que cuando se acaba el plazo se busca el w3wp DE ESTE POOL y se le
+          termina. No es lo mismo que "reiniciar IIS": solo cae este sitio, los
+          otros ni se enteran. Y se distingue por la linea de comandos, donde IIS
+          escribe el nombre del pool.
+        #>
+        if (-not $libre) {
+            $w3wp = Get-CimInstance Win32_Process -Filter "Name='w3wp.exe'" |
+                    Where-Object { $_.CommandLine -like "*pool-$s*" }
+
+            if ($w3wp) {
+                "$s : el proceso no respondia, se termina el PID $($w3wp.ProcessId)"
+                Stop-Process -Id $w3wp.ProcessId -Force -ErrorAction SilentlyContinue
+
+                $limite2 = (Get-Date).AddSeconds(15)
+                while (-not $libre -and (Get-Date) -lt $limite2) {
+                    try {
+                        $fs = [IO.File]::Open($dll, 'Open', 'ReadWrite', 'None')
+                        $fs.Close(); $libre = $true
+                    } catch { Start-Sleep -Milliseconds 300 }
+                }
+            }
+        }
+
+        if (-not $libre) { throw "la aplicacion no solto los archivos ni terminando su proceso" }
 
         # tar devuelve != 0 si algo fallo. ANTES no se miraba, y ahi estaba el
         # problema: un despliegue a medias se reportaba como bueno.
@@ -78,6 +109,9 @@ foreach ($s in $listaSitios) {
 }
 
 if ($fallos.Count -gt 0) {
-    Write-Error ("Fallaron: " + ($fallos -join ' | '))
+    # Se dice CUALES fallaron y no "fallo el despliegue": los demas si quedaron
+    # actualizados, y dar a entender lo contrario manda a revisar lo que ya esta
+    # bien mientras lo roto sigue roto.
+    Write-Error ("Siguen con la version anterior: " + ($fallos -join ' | '))
     exit 1
 }

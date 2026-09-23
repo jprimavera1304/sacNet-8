@@ -42,19 +42,28 @@ echo "==> desplegando en: ${SITIOS[*]}"
 LISTA=$(IFS=,; echo "${SITIOS[*]}")
 if ! ssh "$SERVIDOR" "powershell -NoProfile -ExecutionPolicy Bypass -File C:\desplegar.ps1 -Sitios $LISTA"; then
   echo
-  echo "!! EL DESPLIEGUE FALLO. Lo que esta arriba dice cual y por que."
-  echo "!! Los sitios siguen con la version anterior."
+  echo "!! FALLO ALGUN SITIO. La linea de arriba dice cual y por que."
+  echo "!! Los que no aparecen ahi SI quedaron actualizados."
   exit 1
 fi
 
+# La comprobacion va contra la IP del servidor con --resolve, no por DNS. Asi
+# se comprueba EL SITIO QUE SE ACABA DE TOCAR aunque su nombre todavia apunte a
+# otro lado — que es justo el caso de los que aun no se han mudado.
 echo "==> comprobando"
 for s in "${SITIOS[@]}"; do
+  # sportsleague solo tiene atadura de http: su nombre sigue en Azure y no se
+  # le emitio certificado. Sin distinguirlo, el curl a https no encuentra
+  # atadura y el script se cae al final, despues de haber desplegado bien.
+  ESQUEMA=https; PUERTO=443
   case $s in
-    tauro)    H=api.mactauro.com ;;
-    zaragoza) H=api.zaragozamac.com ;;
-    sac)      H=api.sacmac.net ;;
+    tauro)        H=api.mactauro.com ;;
+    zaragoza)     H=api.zaragozamac.com ;;
+    sac)          H=api.sacmac.net ;;
+    sportsleague) H=api.integralsportsleague.net; ESQUEMA=http; PUERTO=80 ;;
+    *)            echo "    $s : sin comprobacion definida"; continue ;;
   esac
-  printf "    %-10s " "$s"
-  curl -sk --max-time 30 --resolve "$H:443:217.77.4.233" "https://$H/dbcheck" | head -c 120
+  printf "    %-13s " "$s"
+  curl -sk --max-time 30 --resolve "$H:$PUERTO:217.77.4.233" "$ESQUEMA://$H/dbcheck" | head -c 120
   echo
 done
