@@ -47,6 +47,26 @@ public class UsuariosController : ControllerBase
 
         var empresaId = _currentUserAccessor.GetCompanyId(User) ?? 0;
         var rol = _currentUserAccessor.GetRole(User);
+
+        /*
+          EL SUPERADMIN PASA, IGUAL QUE EN TODO LO DEMAS.
+
+          Este es el unico sitio del sistema donde el permiso se comprueba a
+          mano en vez de con una politica, y al escribirlo se quedo sin el atajo
+          que PermissionAuthorizationHandler aplica en todos los endpoints: ahi
+          el SuperAdmin pasa sin consultar nada.
+
+          El resultado era desconcertante: quien administra el sistema —y por
+          tanto no tiene por que tener el permiso suelto `usuarios.password.ver`
+          en su lista— era justamente el unico que no podia ver contraseñas. El
+          boton se escondia solo y parecia que la funcion no existiera.
+        */
+        if (string.Equals(rol, "SuperAdmin", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(rol, "SUPER_ADMIN", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
         var snapshot = await _permissionService.GetPermissionsAsync(userId.Value, empresaId, rol, ct);
 
         /*
