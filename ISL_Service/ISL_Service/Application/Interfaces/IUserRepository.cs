@@ -1,4 +1,4 @@
-using ISL_Service.Application.Models;
+﻿using ISL_Service.Application.Models;
 using ISL_Service.Domain.Entities;
 
 namespace ISL_Service.Application.Interfaces;
@@ -14,6 +14,10 @@ public interface IUserRepository
 
     // empresaId se ignora: en este modelo por base EmpresaId siempre es 1.
     Task<List<Usuario>> ListAsync(int? empresaId, CancellationToken ct);
+
+    /// El IDUsuario de Mac31 de cada usuario web que tenga gemelo alla,
+    /// indexado por nombre de usuario en mayusculas. Una sola consulta.
+    Task<Dictionary<string, int>> ListLegacyLinksAsync(CancellationToken ct);
 
     Task AddAsync(Usuario user, CancellationToken ct);
     Task UpdateAsync(Usuario user, CancellationToken ct);

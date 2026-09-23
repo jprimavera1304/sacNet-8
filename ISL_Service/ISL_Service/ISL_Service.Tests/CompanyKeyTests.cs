@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
@@ -163,6 +163,8 @@ public class CompanyKeyTests
         public Task<bool> ExistsByUsuarioAsync(string usuario, CancellationToken ct) => Task.FromResult(false);
         public Task<List<RoleCatalogItem>> ListRolesCatalogAsync(int empresaId, CancellationToken ct) => Task.FromResult(new List<RoleCatalogItem>());
         public Task<List<Usuario>> ListAsync(int? empresaId, CancellationToken ct) => Task.FromResult(new List<Usuario>());
+        public Task<Dictionary<string, int>> ListLegacyLinksAsync(CancellationToken ct) =>
+            Task.FromResult(new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase));
         public Task AddAsync(Usuario user, CancellationToken ct) => Task.CompletedTask;
         public Task UpdateAsync(Usuario user, CancellationToken ct) => Task.CompletedTask;
         public Task<Usuario> UpsertWebAndLegacyAsync(string usuario, string contrasenaPlano, string contrasenaHashWeb, string nombre, string rol, bool debeCambiarContrasena, int estado, CancellationToken ct) => Task.FromResult(new Usuario());

@@ -213,6 +213,43 @@ ORDER BY Codigo;", conn);
             .ToListAsync(ct);
     }
 
+    /*
+      EL ENLACE CON MAC31, DE TODOS DE UNA VEZ.
+
+      Se hace con UNA consulta y no preguntando usuario por usuario: la lista de
+      usuarios es la pantalla que mas se abre de este modulo, y una llamada por
+      renglon contra la base de la oficina se nota.
+
+      El join es por texto porque no hay otra cosa: UsuarioWeb no guarda el
+      IDUsuario de Mac31. Esa es justamente la fragilidad que esta columna viene
+      a hacer visible.
+    */
+    public async Task<Dictionary<string, int>> ListLegacyLinksAsync(CancellationToken ct)
+    {
+        var enlaces = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        await using var conn = new SqlConnection(_db.Database.GetConnectionString());
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(@"
+SELECT UPPER(LTRIM(RTRIM(u.Usuario))) AS Usuario, MIN(u.IDUsuario) AS IDUsuario
+FROM dbo.Usuarios u
+WHERE ISNULL(u.Usuario, '') <> ''
+GROUP BY UPPER(LTRIM(RTRIM(u.Usuario)));", conn)
+        {
+            CommandTimeout = 30
+        };
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            var usuario = reader.GetString(0);
+            if (!string.IsNullOrWhiteSpace(usuario))
+                enlaces[usuario] = reader.GetInt32(1);
+        }
+        return enlaces;
+    }
+
     public async Task AddAsync(Usuario user, CancellationToken ct)
     {
         user.EmpresaId = await ResolveEmpresaIdAsync(ct);
