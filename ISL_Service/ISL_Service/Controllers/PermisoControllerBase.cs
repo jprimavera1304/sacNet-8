@@ -42,14 +42,43 @@ public abstract class PermisoControllerBase : ControllerBase
     }
 
     /// <summary>
-    /// Devuelve el 403 (o 401) a regresar si al usuario le faltan TODOS los
-    /// permisos de la lista, o null si puede pasar.
+    /// Lo que puede el usuario del token, leido UNA sola vez.
+    ///
+    /// Existe porque una pantalla puede tener que decidir sobre decenas de
+    /// permisos en la misma peticion — el menu de reportes son 53 — y llamar a
+    /// ExigirPermisoAsync 53 veces vuelve a preguntar lo mismo 53 veces.
     /// </summary>
-    protected async Task<IActionResult?> ExigirPermisoAsync(string[] permisos, CancellationToken ct)
+    /// <param name="TokenValido">false = el token no dice quien es.</param>
+    /// <param name="TodoPermitido">
+    /// SuperAdmin, o instalacion sin modelo de permisos: pasa todo y
+    /// <see cref="Permisos"/> viene vacio a proposito.
+    /// </param>
+    protected sealed record PermisosDelUsuario(
+        bool TokenValido,
+        bool TodoPermitido,
+        IReadOnlyCollection<string> Permisos)
+    {
+        /// <summary>Si tiene ALGUNO de esos permisos.</summary>
+        public bool Tiene(params string[] permisos)
+        {
+            if (TodoPermitido) return true;
+            if (!TokenValido) return false;
+
+            return Permisos.Any(
+                x => permisos.Any(p =>
+                    string.Equals(x, p, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(SinSeparadores(x), SinSeparadores(p), StringComparison.OrdinalIgnoreCase)));
+        }
+    }
+
+    /// <summary>
+    /// Lee el snapshot de permisos del usuario del token.
+    /// </summary>
+    protected async Task<PermisosDelUsuario> LeerPermisosAsync(CancellationToken ct)
     {
         var userId = CurrentUser.GetUserId(User);
         if (userId is null)
-            return Unauthorized(new { ok = false, message = "Token invalido." });
+            return new PermisosDelUsuario(false, false, Array.Empty<string>());
 
         // EL SUPERADMIN PASA.
         //
@@ -61,7 +90,7 @@ public abstract class PermisoControllerBase : ControllerBase
         // Un boton encendido que al pulsarlo dice que no se puede es peor que un
         // boton apagado: te hace dudar de tus permisos en vez de del programa.
         if (Application.Security.CurrentUser.IsSuperAdmin(User))
-            return null;
+            return new PermisosDelUsuario(true, true, Array.Empty<string>());
 
         var empresaId = CurrentUser.GetCompanyId(User) ?? 0;
         var rol = CurrentUser.GetRole(User);
@@ -71,23 +100,22 @@ public abstract class PermisoControllerBase : ControllerBase
         // negar dejaria muertas bases que hoy funcionan. Pasa, igual que el
         // resto de la API.
         if (!snapshot.PermissionsEnabled)
-            return null;
+            return new PermisosDelUsuario(true, true, Array.Empty<string>());
 
-        // Se compara TAMBIEN sin separadores, igual que el front.
-        //
-        // El catalogo de permisos se escribio a mano a lo largo de los años y
-        // conviven "ventas.cancelar", "ventas_cancelar" y "Ventas Cancelar" para
-        // la misma cosa. El front ya resolvia eso normalizando ("firma") y aqui
-        // se comparaba exacto: un permiso guardado con guion bajo encendia el
-        // boton y despues rebotaba en la API.
-        //
-        // No afloja la seguridad: quita los separadores, no los nombres. Sigue
-        // haciendo falta tener el permiso.
-        var tiene = snapshot.Permissions.Any(
-            x => permisos.Any(p =>
-                string.Equals(x, p, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(SinSeparadores(x), SinSeparadores(p), StringComparison.OrdinalIgnoreCase)));
-        if (tiene)
+        return new PermisosDelUsuario(true, false, snapshot.Permissions);
+    }
+
+    /// <summary>
+    /// Devuelve el 403 (o 401) a regresar si al usuario le faltan TODOS los
+    /// permisos de la lista, o null si puede pasar.
+    /// </summary>
+    protected async Task<IActionResult?> ExigirPermisoAsync(string[] permisos, CancellationToken ct)
+    {
+        var puede = await LeerPermisosAsync(ct);
+        if (!puede.TokenValido)
+            return Unauthorized(new { ok = false, message = "Token invalido." });
+
+        if (puede.Tiene(permisos))
             return null;
 
         return StatusCode(StatusCodes.Status403Forbidden, new { ok = false, message = "No tienes permiso para esta accion." });

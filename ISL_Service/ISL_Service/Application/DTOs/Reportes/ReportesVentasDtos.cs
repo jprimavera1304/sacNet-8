@@ -171,3 +171,31 @@ public class ReportesVentasProductoItem
     public int IDMarca { get; set; }
     public string Marca { get; set; } = "";
 }
+
+/// <summary>
+/// Que reportes puede ver quien pregunta. Lo consumen el menu del web y el de
+/// la app; el mapeo reporte->permiso vive en ReportesCatalogo.
+/// </summary>
+public class ReportesPermisosResponse
+{
+    /// <summary>El maestro del modulo. Sin el no se llega ni a este endpoint.</summary>
+    public string PermisoModulo { get; set; } = "";
+
+    /// <summary>Los 53 reportes, en el orden del menu.</summary>
+    public List<ReportesPermisoItem> Reportes { get; set; } = new();
+
+    /// <summary>Solo las claves permitidas. Es lo unico que necesita un menu.</summary>
+    public List<string> ClavesPermitidas { get; set; } = new();
+}
+
+public class ReportesPermisoItem
+{
+    public string Clave { get; set; } = "";
+    public string Grupo { get; set; } = "";
+    public string Etiqueta { get; set; } = "";
+
+    /// <summary>null = ese reporte no tiene permiso propio todavia.</summary>
+    public string? Permiso { get; set; }
+
+    public bool Permitido { get; set; }
+}
