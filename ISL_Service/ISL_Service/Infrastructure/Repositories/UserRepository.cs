@@ -1,10 +1,11 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Data;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Models;
 using ISL_Service.Domain.Entities;
 using ISL_Service.Infrastructure.Data;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 
 namespace ISL_Service.Infrastructure.Repositories;
@@ -12,11 +13,17 @@ namespace ISL_Service.Infrastructure.Repositories;
 public class UserRepository : IUserRepository
 {
     private readonly AppDbContext _db;
+    private readonly ILogger<UserRepository> _logger;
     private static readonly ConcurrentDictionary<string, bool> ColumnCache = new(StringComparer.OrdinalIgnoreCase);
 
-    public UserRepository(AppDbContext db)
+    /// El numero con el que SQL Server dice "ese procedimiento no existe".
+    /// Es el UNICO fallo que justifica dar de alta solo en la tabla web.
+    private const int ProcedimientoNoExiste = 2812;
+
+    public UserRepository(AppDbContext db, ILogger<UserRepository> logger)
     {
         _db = db;
+        _logger = logger;
     }
 
     public async Task<Usuario?> GetByUsuarioAsync(string usuario, CancellationToken ct)
@@ -206,6 +213,43 @@ ORDER BY Codigo;", conn);
             .ToListAsync(ct);
     }
 
+    /*
+      EL ENLACE CON MAC31, DE TODOS DE UNA VEZ.
+
+      Se hace con UNA consulta y no preguntando usuario por usuario: la lista de
+      usuarios es la pantalla que mas se abre de este modulo, y una llamada por
+      renglon contra la base de la oficina se nota.
+
+      El join es por texto porque no hay otra cosa: UsuarioWeb no guarda el
+      IDUsuario de Mac31. Esa es justamente la fragilidad que esta columna viene
+      a hacer visible.
+    */
+    public async Task<Dictionary<string, int>> ListLegacyLinksAsync(CancellationToken ct)
+    {
+        var enlaces = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        await using var conn = new SqlConnection(_db.Database.GetConnectionString());
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(@"
+SELECT UPPER(LTRIM(RTRIM(u.Usuario))) AS Usuario, MIN(u.IDUsuario) AS IDUsuario
+FROM dbo.Usuarios u
+WHERE ISNULL(u.Usuario, '') <> ''
+GROUP BY UPPER(LTRIM(RTRIM(u.Usuario)));", conn)
+        {
+            CommandTimeout = 30
+        };
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            var usuario = reader.GetString(0);
+            if (!string.IsNullOrWhiteSpace(usuario))
+                enlaces[usuario] = reader.GetInt32(1);
+        }
+        return enlaces;
+    }
+
     public async Task AddAsync(Usuario user, CancellationToken ct)
     {
         user.EmpresaId = await ResolveEmpresaIdAsync(ct);
@@ -252,7 +296,16 @@ ORDER BY Codigo;", conn);
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             if (!await reader.ReadAsync(ct))
             {
-                return await UpsertWebOnlyAsync(usuario, contrasenaHashWeb, rol, debeCambiarContrasena, estado, ct);
+                /*
+                  El procedimiento corrio y no devolvio renglon. No se sabe que
+                  quedo escrito, asi que tampoco se puede decir que el alta
+                  salio bien: antes se caia al alta solo-web y se contestaba 200.
+                */
+                _logger.LogError(
+                    "dbo.sp_WebUsuario_Upsert no devolvio renglon para {Usuario}. Se aborta el alta.",
+                    usuario);
+                throw new InvalidOperationException(
+                    "El alta no se pudo confirmar. No se guardo nada a medias; intenta de nuevo.");
             }
 
             var resultId = reader.GetGuid(reader.GetOrdinal("Id"));
@@ -284,56 +337,59 @@ ORDER BY Codigo;", conn);
                 FechaActualizacion = resultFechaActualizacion
             };
         }
-        catch (SqlException)
+        catch (SqlException ex) when (ex.Number == ProcedimientoNoExiste)
         {
-            // Rollout gradual: si SP/tabla legacy no existe o falla, persistir en UsuarioWeb.
-            return await UpsertWebOnlyAsync(usuario, contrasenaHashWeb, rol, debeCambiarContrasena, estado, ct);
+            /*
+              FALTA EL PROCEDIMIENTO: TAMBIEN SE FALLA.
+
+              Aqui habia un respaldo que daba de alta solo en la tabla web
+              —pensado para un despliegue gradual, cuando habia bases sin el
+              procedimiento instalado—. Hoy el procedimiento existe en las tres
+              bases, asi que ese respaldo ya no protege de nada: lo unico que
+              sigue haciendo es crear usuarios a medias.
+
+              Y un usuario a medias es peor que ninguno: entra al web, no existe
+              en Mac31, no recibe permisos de alla, y reintentar el alta contesta
+              "ya existe" porque en el web si esta.
+            */
+            _logger.LogError(ex,
+                "Falta dbo.sp_WebUsuario_Upsert en esta base. No se da de alta a {Usuario}: "
+                + "un usuario solo en el web no sirve.",
+                usuario);
+            throw new InvalidOperationException(
+                "Esta base no tiene instalado el alta de usuarios de Mac31. "
+                + "No se creo nada; avisa a soporte.");
+        }
+        catch (SqlException ex)
+        {
+            /*
+              CUALQUIER OTRO FALLO SE CUENTA. NO SE DISIMULA.
+
+              Antes este catch atrapaba todo sin mirar el numero: si el alta en
+              Mac31 fallaba por lo que fuera, se guardaba solo en el web y la API
+              contestaba 200 con el usuario "creado". Quien lo dio de alta veia
+              exito, la persona no podia entrar a Mac31, y al reintentar salia
+              "El usuario ya existe" —porque en el web SI estaba— dejandolo
+              trabado para siempre.
+
+              Paso de verdad: en produccion quedo un usuario asi, creado el
+              15/02/2026, existiendo en el web y en ningun otro lado.
+
+              Un alta que no se completo tiene que fallar. Media alta silenciosa
+              es peor que ninguna: nadie sabe que hay algo que arreglar.
+            */
+            _logger.LogError(ex,
+                "Fallo el alta de {Usuario} en Mac31 (SQL {Numero}). No se guarda nada a medias.",
+                usuario, ex.Number);
+            throw;
         }
     }
 
-    private async Task<Usuario> UpsertWebOnlyAsync(
-        string usuario,
-        string contrasenaHashWeb,
-        string rol,
-        bool debeCambiarContrasena,
-        int estado,
-        CancellationToken ct)
-    {
-        var empresaId = await ResolveEmpresaIdAsync(ct);
-        var usuarioTrim = usuario.Trim();
-        var now = DateTime.UtcNow;
-
-        var entity = await _db.Usuarios
-            .FirstOrDefaultAsync(x => x.EmpresaId == empresaId && x.UsuarioNombre == usuarioTrim, ct);
-
-        if (entity is null)
-        {
-            entity = new Usuario
-            {
-                Id = Guid.NewGuid(),
-                UsuarioNombre = usuarioTrim,
-                ContrasenaHash = contrasenaHashWeb,
-                Rol = rol.Trim(),
-                EmpresaId = empresaId,
-                DebeCambiarContrasena = debeCambiarContrasena,
-                Estado = estado,
-                FechaCreacion = now,
-                FechaActualizacion = now
-            };
-            _db.Usuarios.Add(entity);
-        }
-        else
-        {
-            entity.ContrasenaHash = contrasenaHashWeb;
-            entity.Rol = rol.Trim();
-            entity.DebeCambiarContrasena = debeCambiarContrasena;
-            entity.Estado = estado;
-            entity.FechaActualizacion = now;
-        }
-
-        await _db.SaveChangesAsync(ct);
-        return entity;
-    }
+    /*
+      Aqui vivia UpsertWebOnlyAsync: daba de alta SOLO en la tabla web.
+      Se quito junto con el respaldo que lo llamaba. Si alguna vez hiciera falta
+      otra vez, que sea con una decision explicita y no como salida de un catch.
+    */
 
     private static async Task EnsureRolPersistedAsync(
         SqlConnection conn,
@@ -367,10 +423,34 @@ WHERE Id = @Id
         if (!await TableHasColumnAsync(conn, "dbo", "Usuarios", "Contrasena", ct))
             return null;
 
-        await using var cmd = new SqlCommand(@"
+        /*
+          MAC31 GUARDA LA CONTRASEÑA DOS VECES, Y SOLO UNA SE PUEDE LEER.
+
+          `Contrasena` esta CIFRADA en buena parte de los renglones —medido en la
+          base: 39 de 67 miden 62 caracteres— y `contrasenaDesc` es la copia
+          legible, que tienen 66 de los 67.
+
+          Se leia solo `Contrasena`, asi que a quien la tuviera cifrada la
+          pantalla le enseñaba el galimatias tal cual:
+          "0MO6IFQD4UIDULXDU7I5IMI5UOEUDK9..." en vez de "NAOLANY22". No fallaba
+          nada, solo mostraba basura, que es peor: parece un dato.
+
+          Se prefiere la legible y se cae a la otra solo si falta.
+        */
+        var hayColumnaLegible =
+            await TableHasColumnAsync(conn, "dbo", "Usuarios", "contrasenaDesc", ct);
+
+        var sql = hayColumnaLegible
+            ? @"
+SELECT TOP 1 ISNULL(NULLIF(LTRIM(RTRIM(contrasenaDesc)), ''), Contrasena)
+FROM dbo.Usuarios
+WHERE UPPER(LTRIM(RTRIM(CAST(Usuario AS NVARCHAR(150))))) = UPPER(LTRIM(RTRIM(@Usuario)));"
+            : @"
 SELECT TOP 1 Contrasena
 FROM dbo.Usuarios
-WHERE UPPER(LTRIM(RTRIM(CAST(Usuario AS NVARCHAR(150))))) = UPPER(LTRIM(RTRIM(@Usuario)));", conn)
+WHERE UPPER(LTRIM(RTRIM(CAST(Usuario AS NVARCHAR(150))))) = UPPER(LTRIM(RTRIM(@Usuario)));";
+
+        await using var cmd = new SqlCommand(sql, conn)
         {
             CommandType = CommandType.Text,
             CommandTimeout = 30
@@ -379,7 +459,30 @@ WHERE UPPER(LTRIM(RTRIM(CAST(Usuario AS NVARCHAR(150))))) = UPPER(LTRIM(RTRIM(@U
 
         var raw = await cmd.ExecuteScalarAsync(ct);
         if (raw is null || raw is DBNull) return null;
-        return raw.ToString();
+
+        var valor = raw.ToString() ?? string.Empty;
+        return PareceLegible(valor) ? valor : null;
+    }
+
+    /*
+      SI LO QUE SE SACO SE PUEDE ENSEÑAR.
+
+      Cuando falta la copia legible se cae a la cifrada, y esa no sirve de nada
+      en pantalla. Mas vale decir "no se pudo obtener" que pintar cuarenta
+      simbolos: lo primero se entiende, lo segundo se confunde con la contraseña.
+
+      El criterio es el largo y los caracteres: una contraseña que una persona
+      escribe no pasa de 30 y es imprimible. Lo cifrado aqui mide 62.
+    */
+    private static bool PareceLegible(string valor)
+    {
+        var limpio = valor.Trim();
+        if (limpio.Length == 0 || limpio.Length > 30) return false;
+        foreach (var c in limpio)
+        {
+            if (c < 32 || c > 126) return false;
+        }
+        return true;
     }
 
     public async Task<Usuario> UpdateUsuarioAndRolAsync(Guid userId, string usuarioNuevo, string rolNuevo, CancellationToken ct)

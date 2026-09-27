@@ -25,6 +25,13 @@ public class CascosCambioRepository : ICascosCambioRepository
     private const string SpTipos     = "dbo.sp_w_ConsultarTiposCascoCambio";
     private const string SpMovimientos = "dbo.sp_w_ConsultarCascosCambio";
     private const string SpDetalle   = "dbo.sp_w_ConsultarCascoCambioDetalle";
+    /*
+      El desglose de TODO un periodo en una llamada. No es un capricho de
+      rendimiento: el reporte "con detalle" de un mes cualquiera son 234
+      movimientos, y armarlo con SpDetalle —que recibe UN idMovimiento— serian
+      234 viajes a la base para un solo PDF.
+    */
+    private const string SpDetallePeriodo = "dbo.sp_w_ConsultarCascosCambioDetallePeriodo";
     private const string SpResumen   = "dbo.sp_w_ConsultarResumenCascosCambio";
     private const string SpInsertar  = "dbo.sp_w_InsertarCascoCambio";
     private const string SpCancelar  = "dbo.sp_w_CancelarCascoCambio";
@@ -118,6 +125,23 @@ public class CascosCambioRepository : ICascosCambioRepository
 
         var dt = await FillAsync(cmd, ct);
         return Funciones.DataTableToList<DetalleCascoCambioDto>(dt);
+    }
+
+    public async Task<List<DetallePeriodoCascoCambioDto>> ConsultarDetallePeriodoAsync(
+        DateTime? fechaInicio, DateTime? fechaFin, bool filtrarPorRegistro, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = Sp(SpDetallePeriodo, conn);
+        cmd.Parameters.AddWithValue("@FechaInicio", (object?)fechaInicio?.Date ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@FechaFin", (object?)fechaFin?.Date ?? DBNull.Value);
+        /* Por la MISMA fecha por la que se listaron los movimientos. Si aqui se
+           midiera por la otra, habria filas del papel con el desglose vacio. */
+        cmd.Parameters.AddWithValue("@FiltrarPorRegistro", filtrarPorRegistro ? 1 : 0);
+
+        var dt = await FillAsync(cmd, ct);
+        return Funciones.DataTableToList<DetallePeriodoCascoCambioDto>(dt);
     }
 
     public async Task<List<ResumenTipoCascoCambioDto>> ConsultarResumenAsync(

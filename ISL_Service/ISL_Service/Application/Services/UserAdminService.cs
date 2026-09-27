@@ -1,4 +1,5 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
+using Microsoft.Extensions.Logging;
 using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Exceptions;
@@ -19,10 +20,16 @@ public class UserAdminService : IUserAdminService
     private readonly IUserRepository _repo;
     private readonly IPermissionService _permissionService;
 
-    public UserAdminService(IUserRepository repo, IPermissionService permissionService)
+    private readonly ILogger<UserAdminService> _logger;
+
+    public UserAdminService(
+        IUserRepository repo,
+        IPermissionService permissionService,
+        ILogger<UserAdminService> logger)
     {
         _repo = repo;
         _permissionService = permissionService;
+        _logger = logger;
     }
 
     public async Task<CreateUserResponse> CreateUserAsync(CreateUserRequest req, ClaimsPrincipal actor, CancellationToken ct)
@@ -38,11 +45,17 @@ public class UserAdminService : IUserAdminService
 
         // Sin cambio forzado: la contrasena que escribio el administrador es la
         // definitiva, y el usuario entra con ella a la primera.
+        // Si no mandan nombre se usa el usuario, como se hacia antes: asi una
+        // peticion vieja sigue funcionando igual.
+        var nombrePersona = string.IsNullOrWhiteSpace(req.Nombre)
+            ? usuarioNombre
+            : req.Nombre!.Trim();
+
         var entity = await _repo.UpsertWebAndLegacyAsync(
             usuarioNombre,
             password,
             hash,
-            usuarioNombre,
+            nombrePersona,
             rol,
             debeCambiarContrasena: false,
             estado: ESTADO_ACTIVO,
@@ -74,7 +87,31 @@ public class UserAdminService : IUserAdminService
     {
         var empresaId = ResolveEmpresaId(actor);
         var list = await _repo.ListAsync(empresaId, ct);
-        return list.Select(Map).ToList();
+
+        /* Si esto falla, la lista se entrega igual sin la columna: no saber si
+           alguien esta en Mac31 es una molestia, no poder ver los usuarios es
+           quedarse sin la pantalla. */
+        Dictionary<string, int> enlaces;
+        try
+        {
+            enlaces = await _repo.ListLegacyLinksAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "No se pudo leer el enlace con Mac31; la lista va sin esa columna.");
+            enlaces = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        return list.Select(u =>
+        {
+            var respuesta = Map(u);
+            if (enlaces.TryGetValue(u.UsuarioNombre.Trim(), out var idLegacy))
+            {
+                respuesta.ExisteEnMac31 = true;
+                respuesta.IdUsuarioMac31 = idLegacy;
+            }
+            return respuesta;
+        }).ToList();
     }
 
     public async Task<List<UserRoleOptionResponse>> ListRolesCatalogAsync(ClaimsPrincipal actor, CancellationToken ct)
@@ -119,11 +156,15 @@ public class UserAdminService : IUserAdminService
         {
             var password = NormalizePassword(req.Password!);
             var hash = BCrypt.Net.BCrypt.HashPassword(password);
+            var nombrePersona = string.IsNullOrWhiteSpace(req.Nombre)
+                ? usuarioNuevo
+                : req.Nombre!.Trim();
+
             updated = await _repo.UpsertWebAndLegacyAsync(
                 usuarioNuevo,
                 password,
                 hash,
-                usuarioNuevo,
+                nombrePersona,
                 rolNuevo,
                 debeCambiarContrasena: false,
                 estado: updated.Estado,

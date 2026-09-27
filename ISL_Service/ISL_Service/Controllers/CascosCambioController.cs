@@ -222,6 +222,19 @@ public class CascosCambioController : PermisoControllerBase
            como "todos" al firmar el pase. */
         [FromQuery] string estatus = "todos",
         [FromQuery] bool filtrarPorRegistro = false,
+        /*
+          CUAL DE LOS TRES PAPELES.
+
+            "simple"  - el reporte nuevo, con la estetica de los reportes de
+                        Mac31: una fila por movimiento.
+            "detalle" - el mismo, ademas con una columna por tipo de usado.
+            "clasico" - el reporte anterior, tal cual estaba. Es el valor por
+                        omision A PROPOSITO: asi quien llame a esta accion sin
+                        el parametro —una integracion, un enlace guardado— sigue
+                        recibiendo exactamente el papel que recibia. La pantalla
+                        si manda siempre uno de los dos nuevos.
+        */
+        [FromQuery] string variante = "clasico",
         CancellationToken ct = default)
     {
         var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
@@ -230,7 +243,16 @@ public class CascosCambioController : PermisoControllerBase
         var llave = _configuration["Jwt:Key"] ?? "";
         var ticket = ReporteUsadosTicket.Firmar(
             llave, fechaInicio?.Date, fechaFin?.Date, estatus, filtrarPorRegistro,
-            CurrentUser.GetLegacyUserId(User));
+            CurrentUser.GetLegacyUserId(User),
+            variante,
+            /*
+              EL NOMBRE SE TOMA AQUI Y VIAJA EN EL PASE. Tiene que ser aqui: el
+              GET que entrega el PDF es anonimo —lo abre una pestaña nueva, que
+              no manda el token— y alli ya no hay de donde sacar quien lo pidio.
+              Vacio si el token no trae nombre: el encabezado se salta el renglon
+              antes que imprimir "Usuario: Sistema", que no es nadie.
+            */
+            CurrentUser.GetUsername(User, ""));
 
         /*
           La direccion se arma con el esquema, host y ruta base de ESTA peticion
@@ -290,6 +312,9 @@ public class CascosCambioController : PermisoControllerBase
 
         var (logo, empresa) = await _service.ConsultarMarcaParaReporteAsync(ct);
 
+        if (pase.Variante != "clasico")
+            return await PapelNuevoAsync(pase, movimientos, data.corte, logo, empresa, ct);
+
         var html = UsadosHtmlBuilder.Construir(
             movimientos, data.corte, pase.Desde, pase.Hasta, pase.PorRegistro, pase.Estatus,
             logo);
@@ -343,6 +368,93 @@ public class CascosCambioController : PermisoControllerBase
                 PieIzquierdo = UsadosHtmlBuilder.TextoDePie(empresa),
                 PieDerecho = "[page] / [topage]",
                 PieConLinea = true
+            });
+
+        Response.Headers["Cache-Control"] = "no-store";
+        return File(pdf, "application/pdf");
+    }
+
+    /*
+      EL REPORTE NUEVO, EL QUE COPIA LA ESTETICA DE LOS REPORTES DE LEGACY.
+
+      Sale por aparte y no dentro de la accion de arriba para que el papel de
+      siempre quede EXACTAMENTE como estaba: mismos margenes, mismo pie, mismo
+      builder. Este trae los suyos, y ninguno de los dos puede moverle nada al
+      otro.
+
+      SON DOS DOCUMENTOS Y NO UNO. El cuerpo lleva la tabla; el encabezado va en
+      un HTML aparte que wkhtmltopdf repite en la franja de arriba de CADA hoja
+      y al que le pasa el numero de pagina. Escribir el encabezado al principio
+      del cuerpo lo dejaria solo en la hoja uno, y sin forma de saber en que
+      pagina va: es justo lo que se pidio arreglar.
+    */
+    private async Task<IActionResult> PapelNuevoAsync(
+        ReporteUsadosTicket.Contenido pase,
+        IReadOnlyList<Application.DTOs.CascosCambio.MovimientoCascoCambioDto> movimientos,
+        Application.DTOs.CascosCambio.CorteCascosCambioDto? corte,
+        string logo,
+        string empresa,
+        CancellationToken ct)
+    {
+        var conDetalle = pase.Variante == "detalle";
+
+        /*
+          El desglose SOLO se pide en la variante que lo enseña. Son 693
+          renglones para un mes: traerlos para un papel que no los va a pintar
+          es una consulta entera de regalo en cada impresion.
+
+          Y se pide con el MISMO periodo y la MISMA fecha de filtro con los que
+          se listaron los movimientos, o habria filas con el desglose en blanco.
+        */
+        var detalle = conDetalle
+            ? await _service.ConsultarDetallePeriodoAsync(pase.Desde, pase.Hasta, pase.PorRegistro, ct)
+            : null;
+
+        var titulo = conDetalle ? "USADOS A CAMBIO - DETALLE" : "USADOS A CAMBIO";
+
+        var encabezado = UsadosLegacyHtmlBuilder.Encabezado(
+            titulo, empresa, logo, pase.Desde, pase.Hasta, pase.PorRegistro, pase.Estatus, pase.Usuario);
+
+        var html = UsadosLegacyHtmlBuilder.Cuerpo(movimientos, corte, detalle);
+
+        var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(
+            html, "Landscape", titulo, ct,
+            new WkhtmltopdfHtmlPdfRenderer.Opciones
+            {
+                /*
+                  EL MARGEN DE ARRIBA ES EL HUECO DONDE CABE EL ENCABEZADO, no un
+                  margen estetico. Con los 15 mm del reporte anterior, la franja
+                  de arriba pisaba la primera fila de la tabla: el encabezado de
+                  wkhtmltopdf no empuja el contenido, se dibuja encima de lo que
+                  haya. 24 mm es lo que miden el logo y sus dos renglones de
+                  texto, mas el aire de la raya.
+                */
+                MargenSuperior = 24,
+                EspacioEncabezado = 4,
+                MargenInferior = 12,
+                /* Parejos: con quince columnas, los 2/8 de la remision dejarian
+                   la tabla descentrada contra el filo izquierdo. */
+                MargenIzquierdo = 10,
+                MargenDerecho = 10,
+                /* El logo entra a 3015 px de ancho y a 160 de dibujo; sin subir
+                   el remuestreo, los contornos blancos de las letras se
+                   promedian con el fondo y la marca sale lavada. */
+                ImagenDpi = 900,
+                /*
+                  EL PIE YA NO LLEVA EL NUMERO DE PAGINA: ahora esta arriba, en
+                  el encabezado, que es donde se pidio. Repetirlo abajo seria
+                  decir dos veces lo mismo en la misma hoja.
+
+                  Queda el nombre de la empresa, que es lo que identifica el
+                  papel cuando se fotocopia suelto.
+                */
+                PieIzquierdo = string.IsNullOrWhiteSpace(empresa) ? null : empresa,
+                PieConLinea = false,
+                /* El pie lo dibuja wkhtmltopdf con SU fuente —Arial—, no con la
+                   del HTML. Sin esto, el papel salia entero en Tahoma menos el
+                   renglon de abajo, y el PDF embebia Arial nada mas para el. */
+                PieFuente = "Tahoma",
+                EncabezadoHtml = encabezado
             });
 
         Response.Headers["Cache-Control"] = "no-store";

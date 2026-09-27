@@ -47,12 +47,57 @@ public class UsuariosController : ControllerBase
 
         var empresaId = _currentUserAccessor.GetCompanyId(User) ?? 0;
         var rol = _currentUserAccessor.GetRole(User);
+
+        /*
+          EL SUPERADMIN PASA, IGUAL QUE EN TODO LO DEMAS.
+
+          Este es el unico sitio del sistema donde el permiso se comprueba a
+          mano en vez de con una politica, y al escribirlo se quedo sin el atajo
+          que PermissionAuthorizationHandler aplica en todos los endpoints: ahi
+          el SuperAdmin pasa sin consultar nada.
+
+          El resultado era desconcertante: quien administra el sistema —y por
+          tanto no tiene por que tener el permiso suelto `usuarios.password.ver`
+          en su lista— era justamente el unico que no podia ver contraseñas. El
+          boton se escondia solo y parecia que la funcion no existiera.
+        */
+        if (string.Equals(rol, "SuperAdmin", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(rol, "SUPER_ADMIN", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
         var snapshot = await _permissionService.GetPermissionsAsync(userId.Value, empresaId, rol, ct);
 
-        // Instalacion sin modelo de permisos: no hay nada contra que comparar y negar
-        // dejaria muerta una funcion en bases que hoy trabajan.
+        /*
+          INSTALACION SIN MODELO DE PERMISOS.
+
+          Cuando el tenant no tiene el modelo prendido no hay nada contra que
+          comparar, y negar dejaria muerta una funcion en bases que hoy trabajan.
+          Por eso se deja pasar... pero NO a cualquiera.
+
+          Esto lo usa hoy un solo endpoint: el que devuelve la contraseña de una
+          persona en claro. Dejar pasar a todo el mundo ahi significaba que, en
+          una base sin permisos configurados, cualquiera con sesion podia leer la
+          contraseña de cualquiera. El respaldo pensado para no romper nada
+          abria la puerta mas sensible que hay.
+
+          Sin modelo de permisos, el criterio que queda es el rol: solo quien
+          administra. Es menos preciso, pero es el que existe.
+        */
         if (!snapshot.PermissionsEnabled)
-            return null;
+        {
+            var esAdministrador =
+                string.Equals(rol, "SuperAdmin", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(rol, "SUPER_ADMIN", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(rol, "Admin", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(rol, "ADMIN", StringComparison.OrdinalIgnoreCase);
+
+            return esAdministrador
+                ? null
+                : StatusCode(StatusCodes.Status403Forbidden,
+                    new { ok = false, message = "No tienes permiso para esta accion." });
+        }
 
         var tiene = snapshot.Permissions.Any(x => string.Equals(x, permiso, StringComparison.OrdinalIgnoreCase));
         if (tiene)

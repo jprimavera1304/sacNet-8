@@ -205,6 +205,11 @@ public sealed class PermissionService : IPermissionService
 
     private static readonly LegacyModuleBinding PrestamosBinding = new(
         PrestamosModuleKey, "Prestamos", PrestamosLegacyForm, PrestamosLegacyPermissionMap, PrestamosWebPermissionSeeds);
+    /* Estatico A PROPOSITO: PermissionService es Scoped, o sea una instancia
+       nueva por peticion. Un candado de instancia no sincronizaria nada, que es
+       justo lo que hay que evitar aqui. */
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> _candados = new();
+
     private static readonly TimeSpan ActiveCacheTtl = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan StaleCacheTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan SchemaCacheTtl = TimeSpan.FromMinutes(15);
@@ -374,8 +379,30 @@ public sealed class PermissionService : IPermissionService
         if (_cache.TryGetValue<PermissionSnapshot>(cacheKey, out var cached) && cached is not null)
             return cached;
 
+        /*
+          UNA SOLA RECONSTRUCCION A LA VEZ, POR USUARIO.
+
+          Al abrir la app salen varias peticiones casi a la vez (/api/me sale
+          dos veces, y /api/modulos/disponibles pide lo mismo). Si la cache
+          acaba de vencer, TODAS fallan el intento a la vez y TODAS se ponen a
+          reconstruir lo mismo. En los registros de produccion se ven tres
+          respuestas de 8 segundos en el mismo par de segundos: no eran tres
+          usuarios, era uno abriendo la app.
+
+          Con esto, la primera reconstruye y las demas esperan y se llevan el
+          mismo resultado. Ademas de ir mas rapido, deja de multiplicarse el
+          trabajo contra la base justo en el momento de mas prisa.
+
+          El candado es POR USUARIO: dos personas distintas no se estorban.
+        */
+        var candado = _candados.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
+        await candado.WaitAsync(ct);
         try
         {
+            /* Puede haberla dejado quien iba delante mientras se esperaba. */
+            if (_cache.TryGetValue<PermissionSnapshot>(cacheKey, out var reciente) && reciente is not null)
+                return reciente;
+
             var snapshot = await BuildSnapshotAsync(userId, empresaId, rolLegacy, ct);
             _cache.Set(cacheKey, snapshot, ActiveCacheTtl);
             _cache.Set(staleCacheKey, snapshot, StaleCacheTtl);
@@ -388,6 +415,10 @@ public sealed class PermissionService : IPermissionService
                 return stale;
 
             return BuildLegacyFallback(userId, empresaId, rolLegacy);
+        }
+        finally
+        {
+            candado.Release();
         }
     }
 
@@ -902,37 +933,20 @@ WHERE EmpresaId = @EmpresaId
                 throw new KeyNotFoundException($"Modulo no encontrado: {key}");
         }
 
-        if (idStatus == 2)
-        {
-            var schema = await GetSchemaAsync(conn, ct);
-            await using (var clearRolePermsCmd = new SqlCommand($@"
-DELETE rp
-FROM dbo.WRolPermiso rp
-INNER JOIN dbo.WPermiso p
-    ON p.EmpresaId = rp.EmpresaId
-   AND p.{Q(schema.PermissionIdColumn)} = rp.{Q(schema.RolePermPermissionIdColumn)}
-WHERE rp.EmpresaId = @EmpresaId
-  AND p.Clave LIKE @Prefix;", conn, (SqlTransaction)tx))
-            {
-                clearRolePermsCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
-                clearRolePermsCmd.Parameters.Add(new SqlParameter("@Prefix", SqlDbType.NVarChar, 200) { Value = $"{key}.%" });
-                await clearRolePermsCmd.ExecuteNonQueryAsync(ct);
-            }
+        /*
+          APAGAR YA NO BORRA NADA.
 
-            await using (var clearUserOverridesCmd = new SqlCommand($@"
-DELETE up
-FROM dbo.WUsuarioPermiso up
-INNER JOIN dbo.WPermiso p
-    ON p.EmpresaId = up.EmpresaId
-   AND p.{Q(schema.PermissionIdColumn)} = up.{Q(schema.UserPermPermissionIdColumn)}
-WHERE up.EmpresaId = @EmpresaId
-  AND p.Clave LIKE @Prefix;", conn, (SqlTransaction)tx))
-            {
-                clearUserOverridesCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
-                clearUserOverridesCmd.Parameters.Add(new SqlParameter("@Prefix", SqlDbType.NVarChar, 200) { Value = $"{key}.%" });
-                await clearUserOverridesCmd.ExecuteNonQueryAsync(ct);
-            }
-        }
+          Aqui se borraban todas las filas de WRolPermiso y de WUsuarioPermiso
+          del modulo. Era necesario mientras el calculo de permisos no miraba el
+          estatus: sin ese borrado, apagar no quitaba el acceso.
+
+          Ahora lo mira (ver LoadEffectivePermissionsAsync), asi que el borrado
+          sobra — y era irreversible: apagar un modulo por equivocacion obligaba
+          a repartir a mano lo que tenia cada rol y cada persona, sin ninguna
+          forma de saber que era.
+
+          Apagar y volver a prender deja las cosas como estaban.
+        */
 
         await using var readCmd = new SqlCommand(@"
 SELECT TOP 1 ModuloClave, COALESCE(NULLIF(Nombre,''), ModuloClave) AS Nombre, IdStatus
@@ -1562,14 +1576,84 @@ ORDER BY pu.Clave;";
         cmd.Parameters.Add(new SqlParameter("@RolCodigo", SqlDbType.NVarChar, 30) { Value = rolCodigo });
 
         var permissions = new List<string>();
+        await using (var reader = await cmd.ExecuteReaderAsync(ct))
+        {
+            while (await reader.ReadAsync(ct))
+            {
+                var clave = reader.GetString(reader.GetOrdinal("Clave"));
+                if (!string.IsNullOrWhiteSpace(clave))
+                    permissions.Add(clave);
+            }
+        }
+
+        /*
+          UN MODULO APAGADO NO DA NINGUN PERMISO.
+
+          Antes esto no se miraba aqui, y por eso apagar un modulo tenia que
+          BORRAR los permisos de los roles y los ajustes de cada usuario: era lo
+          unico que de verdad quitaba el acceso. El precio era que apagarlo no se
+          podia deshacer — al volver a prenderlo habia que repartir todo otra vez
+          a mano, y nadie se acordaba de que tenia quien.
+
+          Mirandolo aqui, apagar un modulo deja de destruir nada: los permisos se
+          quedan guardados, simplemente no cuentan mientras este apagado. Volver a
+          prenderlo devuelve las cosas como estaban.
+
+          SE EXCLUYE SOLO LO QUE ESTA APAGADO A PROPOSITO, nunca "lo que no esta
+          encendido". Si dbo.WModulo no existe, o esta vacia, o no tiene renglon
+          para un modulo, no se quita nada: una base sin ese catalogo seguiria
+          funcionando igual. Al reves —exigir que cada modulo este listado— una
+          tabla vacia dejaria a todo el mundo sin permisos.
+        */
+        var apagados = await LoadInactiveModuleKeysAsync(conn, empresaId, ct);
+        if (apagados.Count == 0)
+            return permissions;
+
+        return permissions
+            .Where(clave => !EsDeModuloApagado(clave, apagados))
+            .ToList();
+    }
+
+    /// Si una clave de permiso pertenece a alguno de los modulos apagados.
+    ///
+    /// Publica para poder comprobarla: la regla parece obvia y tiene una trampa.
+    /// El modulo es lo que va ANTES DEL PRIMER PUNTO, y se compara completo. Si
+    /// se comparara "empieza con", apagar `reportes` apagaria tambien
+    /// `reportesx`, y apagar `ventas` se llevaria por delante `ventas_moviles`.
+    public static bool EsDeModuloApagado(string clave, HashSet<string> apagados)
+    {
+        if (string.IsNullOrWhiteSpace(clave)) return false;
+        var punto = clave.IndexOf('.');
+        if (punto <= 0) return false;
+        return apagados.Contains(clave.Substring(0, punto));
+    }
+
+    /// Las claves de los modulos marcados como inactivos para esta empresa.
+    /// Vacio si la tabla no existe: ver la razon arriba.
+    private static async Task<HashSet<string>> LoadInactiveModuleKeysAsync(
+        SqlConnection conn,
+        int empresaId,
+        CancellationToken ct)
+    {
+        var apagados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!await TableExistsAsync(conn, "WModulo", ct))
+            return apagados;
+
+        await using var cmd = new SqlCommand(@"
+SELECT ModuloClave
+FROM dbo.WModulo
+WHERE EmpresaId = @EmpresaId
+  AND IdStatus = 2;", conn);
+        cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct))
         {
-            var clave = reader.GetString(reader.GetOrdinal("Clave"));
+            var clave = reader.GetString(0);
             if (!string.IsNullOrWhiteSpace(clave))
-                permissions.Add(clave);
+                apagados.Add(clave.Trim());
         }
-        return permissions;
+        return apagados;
     }
 
     private async Task<CapabilitySchema> GetSchemaAsync(SqlConnection conn, CancellationToken ct)
@@ -1985,28 +2069,12 @@ END", conn);
             .Select(x => new PermissionSeed(x.Key, x.Name, ReportesModuleKey))
             .Prepend(new PermissionSeed(ReportesViewPermission, "Reportes - Ver modulo", ReportesModuleKey))
             .ToList();
-        foreach (var seed in permissionRows)
-        {
-            await using var cmd = new SqlCommand(@"
-IF EXISTS (SELECT 1 FROM dbo.WPermiso WHERE EmpresaId = @EmpresaId AND Clave = @Clave)
-BEGIN
-    UPDATE dbo.WPermiso
-       SET Nombre = @Nombre,
-           Descripcion = CASE WHEN COL_LENGTH('dbo.WPermiso','Descripcion') IS NOT NULL THEN @Descripcion ELSE Descripcion END
-     WHERE EmpresaId = @EmpresaId
-       AND Clave = @Clave;
-END
-ELSE
-BEGIN
-    INSERT INTO dbo.WPermiso (EmpresaId, Clave, Nombre, Descripcion, FechaCreacion)
-    VALUES (@EmpresaId, @Clave, @Nombre, @Descripcion, SYSUTCDATETIME());
-END", conn);
-            cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
-            cmd.Parameters.Add(new SqlParameter("@Clave", SqlDbType.NVarChar, 200) { Value = seed.Key });
-            cmd.Parameters.Add(new SqlParameter("@Nombre", SqlDbType.NVarChar, 200) { Value = seed.Name });
-            cmd.Parameters.Add(new SqlParameter("@Descripcion", SqlDbType.NVarChar, 500) { Value = seed.Key == ReportesViewPermission ? "reportes.web" : "reportes.legacy" });
-            await cmd.ExecuteNonQueryAsync(ct);
-        }
+        await SincronizarCatalogoDePermisosAsync(
+            conn,
+            empresaId,
+            permissionRows,
+            seed => seed.Key == ReportesViewPermission ? "reportes.web" : "reportes.legacy",
+            ct);
 
         return reportCatalog.ToDictionary(x => x.Key, StringComparer.OrdinalIgnoreCase);
     }
@@ -2260,28 +2328,14 @@ END", conn);
             .Select(x => x.First())
             .ToList();
 
-        foreach (var seed in permissionRows)
-        {
-            await using var cmd = new SqlCommand(@"
-IF EXISTS (SELECT 1 FROM dbo.WPermiso WHERE EmpresaId = @EmpresaId AND Clave = @Clave)
-BEGIN
-    UPDATE dbo.WPermiso
-       SET Nombre = @Nombre,
-           Descripcion = CASE WHEN COL_LENGTH('dbo.WPermiso','Descripcion') IS NOT NULL THEN @Descripcion ELSE Descripcion END
-     WHERE EmpresaId = @EmpresaId
-       AND Clave = @Clave;
-END
-ELSE
-BEGIN
-    INSERT INTO dbo.WPermiso (EmpresaId, Clave, Nombre, Descripcion, FechaCreacion)
-    VALUES (@EmpresaId, @Clave, @Nombre, @Descripcion, SYSUTCDATETIME());
-END", conn);
-            cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
-            cmd.Parameters.Add(new SqlParameter("@Clave", SqlDbType.NVarChar, 200) { Value = seed.Key });
-            cmd.Parameters.Add(new SqlParameter("@Nombre", SqlDbType.NVarChar, 200) { Value = seed.Name });
-            cmd.Parameters.Add(new SqlParameter("@Descripcion", SqlDbType.NVarChar, 500) { Value = binding.WebSeeds.Any(x => x.Key.Equals(seed.Key, StringComparison.OrdinalIgnoreCase)) ? $"{binding.ModuleKey}.web" : $"{binding.ModuleKey}.legacy" });
-            await cmd.ExecuteNonQueryAsync(ct);
-        }
+        await SincronizarCatalogoDePermisosAsync(
+            conn,
+            empresaId,
+            permissionRows,
+            seed => binding.WebSeeds.Any(x => x.Key.Equals(seed.Key, StringComparison.OrdinalIgnoreCase))
+                ? $"{binding.ModuleKey}.web"
+                : $"{binding.ModuleKey}.legacy",
+            ct);
 
         return ventasCatalog.ToDictionary(x => x.Key, StringComparer.OrdinalIgnoreCase);
     }
@@ -2841,6 +2895,105 @@ WHERE EmpresaId = @EmpresaId
 
     private sealed record OverrideTypeTokens(string AllowToken, string DenyToken);
     private sealed record UserPermColumns(int TipoMaxChars, int MotivoMaxChars);
+
+    /*
+      SEMBRAR EL CATALOGO SIN REESCRIBIRLO ENTERO EN CADA PETICION
+
+      Esto asegura que cada permiso de legacy exista en WPermiso y tenga el
+      nombre al dia. Antes lo hacia con un upsert POR PERMISO, siempre, hubiera
+      cambiado algo o no.
+
+      Lo que costaba, medido: una sola llamada a /api/me disparaba 219 consultas
+      a la base, y 182 de ellas eran este bucle —91 "IF EXISTS" y 91 "UPDATE"—
+      escribiendo exactamente los mismos valores que ya estaban.
+
+      En local no se notaba porque la base esta en la misma maquina y cada ida y
+      vuelta cuesta casi cero. Contra la base de la oficina, cada una cuesta
+      decenas de milisegundos, y 182 seguidas son los segundos que el usuario
+      veia al abrir la app. El trabajo no estaba en la base: estaba en el viaje,
+      repetido 182 veces.
+
+      Ahora se pregunta PRIMERO —una sola consulta— como esta el catalogo, y se
+      escribe unicamente lo que falta o lo que de verdad cambio. En el caso
+      normal, que es que no haya cambiado nada, queda en UNA consulta y CERO
+      escrituras.
+
+      POR QUE COMPARAR CONTRA LA BASE Y NO GUARDARLO EN MEMORIA: un recordatorio
+      en memoria se equivoca en cuanto alguien toca la tabla por fuera —o cuando
+      hay mas de una instancia, o cuando el proceso reinicia—, y entonces el
+      permiso que falta no se vuelve a crear. Preguntando, se arregla solo.
+    */
+    private static async Task<int> SincronizarCatalogoDePermisosAsync(
+        SqlConnection conn,
+        int empresaId,
+        IReadOnlyList<PermissionSeed> semillas,
+        Func<PermissionSeed, string> descripcionDe,
+        CancellationToken ct)
+    {
+        if (semillas.Count == 0)
+            return 0;
+
+        var columnas = await GetTableColumnsAsync(conn, "WPermiso", ct);
+        var hayDescripcion = columnas.Contains("Descripcion");
+
+        /* Como esta hoy. Se piden los de la empresa entera y no los 91 por
+           nombre: es la misma ida y vuelta y no hay que armar 91 parametros. */
+        var actuales = new Dictionary<string, (string Nombre, string Descripcion)>(StringComparer.OrdinalIgnoreCase);
+        await using (var lectura = new SqlCommand(
+            hayDescripcion
+                ? "SELECT Clave, ISNULL(Nombre, '') AS Nombre, ISNULL(Descripcion, '') AS Descripcion FROM dbo.WPermiso WHERE EmpresaId = @EmpresaId;"
+                : "SELECT Clave, ISNULL(Nombre, '') AS Nombre, '' AS Descripcion FROM dbo.WPermiso WHERE EmpresaId = @EmpresaId;",
+            conn))
+        {
+            lectura.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+            await using var reader = await lectura.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                var clave = reader.GetString(0);
+                if (!string.IsNullOrWhiteSpace(clave))
+                    actuales[clave.Trim()] = (reader.GetString(1), reader.GetString(2));
+            }
+        }
+
+        var escritos = 0;
+        foreach (var seed in semillas)
+        {
+            var descripcion = descripcionDe(seed);
+
+            /* Ya esta igual: no se toca. Escribir lo mismo no solo cuesta el
+               viaje, ademas mueve FechaActualizacion y hace parecer que alguien
+               cambio permisos cuando nadie los cambio. */
+            if (actuales.TryGetValue(seed.Key, out var actual)
+                && string.Equals(actual.Nombre, seed.Name, StringComparison.Ordinal)
+                && (!hayDescripcion || string.Equals(actual.Descripcion, descripcion, StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            await using var cmd = new SqlCommand(@"
+IF EXISTS (SELECT 1 FROM dbo.WPermiso WHERE EmpresaId = @EmpresaId AND Clave = @Clave)
+BEGIN
+    UPDATE dbo.WPermiso
+       SET Nombre = @Nombre,
+           Descripcion = CASE WHEN COL_LENGTH('dbo.WPermiso','Descripcion') IS NOT NULL THEN @Descripcion ELSE Descripcion END
+     WHERE EmpresaId = @EmpresaId
+       AND Clave = @Clave;
+END
+ELSE
+BEGIN
+    INSERT INTO dbo.WPermiso (EmpresaId, Clave, Nombre, Descripcion, FechaCreacion)
+    VALUES (@EmpresaId, @Clave, @Nombre, @Descripcion, SYSUTCDATETIME());
+END", conn);
+            cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+            cmd.Parameters.Add(new SqlParameter("@Clave", SqlDbType.NVarChar, 200) { Value = seed.Key });
+            cmd.Parameters.Add(new SqlParameter("@Nombre", SqlDbType.NVarChar, 200) { Value = seed.Name });
+            cmd.Parameters.Add(new SqlParameter("@Descripcion", SqlDbType.NVarChar, 500) { Value = descripcion });
+            await cmd.ExecuteNonQueryAsync(ct);
+            escritos++;
+        }
+
+        return escritos;
+    }
 
     private sealed record PermissionSeed(string Key, string Name, string Module);
     private sealed record ReportPermissionInfo(

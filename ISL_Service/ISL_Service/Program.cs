@@ -313,6 +313,34 @@ if (builder.Environment.IsDevelopment())
         .ToArray();
 }
 
+/*
+  EN DESARROLLO SE ACEPTA CUALQUIER PUERTO DE ESTA MISMA MAQUINA.
+
+  La lista de arriba nombra puertos uno por uno —5500, 5501, 5173— y cada vez
+  que el front se muda de puerto hay que acordarse de venir aqui. No nos
+  acordamos: el front nuevo paso a servirse en 5180, y con el se mudaron las
+  paginas del front ANTERIOR, que no pasan por el proxy de Vite sino que llaman
+  directas a localhost:5041. Todas sus llamadas empezaron a morir por CORS.
+
+  Y morian de la peor forma: /api/me fallaba, la pagina se quedaba sin permisos
+  y devolvia al inicio de golpe. Ni un error a la vista — parecia que el modulo
+  estuviera prohibido.
+
+  La comprobacion se queda dentro de IsDevelopment(): en produccion mandan los
+  origenes configurados y nada mas. Ahi Uri.IsLoopback no da nunca verdadero
+  para un dominio publico.
+*/
+static bool EsDeEstaMaquina(string? origin)
+{
+    if (string.IsNullOrWhiteSpace(origin)) return false;
+    if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri)) return false;
+    if (!string.IsNullOrEmpty(uri.UserInfo)) return false;
+    if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) return false;
+    return uri.IsLoopback;
+}
+
+var enDesarrollo = builder.Environment.IsDevelopment();
+
 var allowedOriginsSet = new HashSet<string>(allowedOrigins, StringComparer.OrdinalIgnoreCase);
 
 static bool IsAllowedAzurePreviewOrigin(string? origin, string[] allowedPrefixes)
@@ -336,6 +364,7 @@ builder.Services.AddCors(options =>
         policy
             .SetIsOriginAllowed(origin =>
                 allowedOriginsSet.Contains(origin) ||
+                (enDesarrollo && EsDeEstaMaquina(origin)) ||
                 IsAllowedAzurePreviewOrigin(origin, allowedPreviewPrefixes))
             .AllowAnyHeader()
             .AllowAnyMethod()
