@@ -21,6 +21,32 @@ public sealed class PermissionService : IPermissionService
     private const string UserPermColumnsCacheKey = "permissions:userperm-columns:v1";
     private const string ReportesModuleKey = "reportes";
     private const string ReportesViewPermission = "reportes.ver_modulo";
+
+    /*
+      LAS CLAVES DE REPORTES QUE SON DEL WEB Y NO DE MAC31.
+
+      Para `reportes.*` manda legacy: al leer se borra lo que diga el web y se
+      pone lo de Mac31. Pero `reportes.ver_modulo` NO existe en Mac31 —es la
+      llave del web, la que decide si sale la tarjeta de Reportes—, asi que el
+      borrado tambien se la llevaba: se guardaba en WUsuarioPermiso y
+      desaparecia en la siguiente lectura. Desde la pantalla se veia como
+      "le doy Guardar, dice que si, y al volver a entrar no esta".
+
+      Comprobado en produccion de Zaragoza: RICARDO tenia `reportes.ver_modulo`
+      con Tipo=allow en la base y aun asi la casilla salia apagada, porque en
+      Mac31 tiene CERO reportes encendidos y lo de Mac31 sustituia a lo del web.
+
+      Ventas, Empleados y Prestamos ya exceptuaban sus llaves del web
+      (VentasWebPermissionSeeds y compania). Reportes era la unica de las cuatro
+      familias que no lo hacia. Esto la iguala.
+    */
+    private static readonly HashSet<string> ReportesWebPermissionKeys =
+        new(StringComparer.OrdinalIgnoreCase) { ReportesViewPermission };
+
+    /* True si esta clave de reportes la manda Mac31 y hay que reemplazarla. */
+    private static bool EsReporteQueMandaLegacy(string clave) =>
+        clave.StartsWith($"{ReportesModuleKey}.", StringComparison.OrdinalIgnoreCase)
+        && !ReportesWebPermissionKeys.Contains(clave);
     private const string VentasModuleKey = "ventas";
     private const string VentasViewPermission = "ventas.ver_modulo";
     private const string VentasLegacyForm = "CONSULTA DE VENTAS";
@@ -584,8 +610,8 @@ WHERE up.EmpresaId = @EmpresaId;";
                 overrides[user.UserId] = row;
             }
 
-            row.Allow.RemoveAll(x => x.StartsWith($"{ReportesModuleKey}.", StringComparison.OrdinalIgnoreCase));
-            row.Deny.RemoveAll(x => x.StartsWith($"{ReportesModuleKey}.", StringComparison.OrdinalIgnoreCase));
+            row.Allow.RemoveAll(EsReporteQueMandaLegacy);
+            row.Deny.RemoveAll(EsReporteQueMandaLegacy);
             row.Allow.AddRange(legacyReports.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
             row.Deny.AddRange(legacyReports.Deny.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
             row.Allow.RemoveAll(x => x.StartsWith($"{VentasModuleKey}.", StringComparison.OrdinalIgnoreCase) && !VentasWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
@@ -1391,7 +1417,7 @@ WHERE t.name = 'WUsuarioPermiso';";
         if (reportCatalog.Count > 0)
         {
             var legacyReports = await LoadLegacyReportPermissionsForUserAsync(conn, empresaId, userId, reportCatalog, ct);
-            permissions.RemoveAll(x => x.StartsWith($"{ReportesModuleKey}.", StringComparison.OrdinalIgnoreCase));
+            permissions.RemoveAll(EsReporteQueMandaLegacy);
             permissions.AddRange(legacyReports.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
         }
         if (ventasCatalog.Count > 0)
