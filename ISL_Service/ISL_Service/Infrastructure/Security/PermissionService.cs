@@ -2217,13 +2217,39 @@ WHERE f.Descripcion = 'REPORTES'
 
         var effective = await LoadEffectivePermissionsFromWebAsync(conn, schema, userId, empresaId, rolLegacy, ct);
         var movementUserId = await ResolveMovementLegacyUserIdAsync(conn, ct);
+
+        /*
+          SE OTORGA Y TAMBIEN SE QUITA, PERO SOLO SI LA PANTALLA LO ENSEÑO.
+
+          Antes esto solo otorgaba. La razon era buena —guardar desde el web le
+          estaba borrando a la gente sus reportes de Mac31— pero dejaba una
+          puerta de un solo sentido: dabas un reporte, se escribia en Mac31, y
+          al volver a leer lo de Mac31 sustituia a lo del web, asi que la
+          casilla volvia a salir encendida y ya no habia forma de quitarla
+          desde ninguna de las dos pantallas.
+
+          Medido en produccion de Zaragoza (28-sep-2026): tres guardados
+          seguidos, uno con ocho reportes y dos sin ellos, los tres con
+          respuesta 200, y los ocho seguian encendidos en Mac31.
+
+          Que lo hace seguro ahora y no antes: el bootstrap ya mezcla lo de
+          Mac31 dentro de las casillas, asi que quien desmarca esta viendo el
+          estado de verdad y lo esta quitando a proposito. Antes el web no sabia
+          lo que habia en Mac31 y lo pisaba sin enterarse.
+
+          EL CANDADO: solo se toca si el modulo 'reportes' esta ENCENDIDO. Con
+          el modulo apagado sus permisos se caen del catalogo y la pantalla no
+          los enseña; sin este candado, guardar a alguien cualquier otra cosa le
+          apagaria en Mac31 todos los reportes que nadie vio ni pidio quitar.
+          Ese es exactamente el accidente viejo.
+        */
+        var activeModules = await GetActiveModulesAsync(conn, empresaId, ct);
+        var puedeQuitar = IsPermissionInActiveModule(ReportesViewPermission, activeModules);
+
         foreach (var report in reportCatalog.Values)
         {
-            // Solo se OTORGA. Nunca se revoca: mismo motivo que en el sync de
-            // ventas (ver SyncLegacyVentasPermissionsForUserAsync). Guardar
-            // permisos desde el web le estaba borrando a la gente sus reportes
-            // de Mac31.
-            if (!effective.Contains(report.Key))
+            var loTiene = effective.Contains(report.Key);
+            if (!loTiene && !puedeQuitar)
                 continue;
 
             await using var cmd = new SqlCommand("dbo.sp_n_ActualizarUsuarioFormaProceso", conn)
@@ -2232,7 +2258,7 @@ WHERE f.Descripcion = 'REPORTES'
             };
             cmd.Parameters.Add(new SqlParameter("@IDUsuario", SqlDbType.Int) { Value = legacyUserId.Value });
             cmd.Parameters.Add(new SqlParameter("@IDProceso", SqlDbType.Int) { Value = report.LegacyProcessId });
-            cmd.Parameters.Add(new SqlParameter("@IDStatus", SqlDbType.Int) { Value = 1 });
+            cmd.Parameters.Add(new SqlParameter("@IDStatus", SqlDbType.Int) { Value = loTiene ? 1 : 2 });
             cmd.Parameters.Add(new SqlParameter("@IDUsuarioMovimiento", SqlDbType.Int) { Value = movementUserId });
             await cmd.ExecuteNonQueryAsync(ct);
         }
