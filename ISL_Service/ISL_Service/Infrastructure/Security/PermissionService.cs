@@ -11,6 +11,8 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 
+using ISL_Service.Application.Security;
+
 namespace ISL_Service.Infrastructure.Security;
 
 public sealed class PermissionService : IPermissionService
@@ -43,10 +45,22 @@ public sealed class PermissionService : IPermissionService
     private static readonly HashSet<string> ReportesWebPermissionKeys =
         new(StringComparer.OrdinalIgnoreCase) { ReportesViewPermission };
 
+    /*
+      LOS PERMISOS DE CENTROS DE SERVICIO TAMBIEN SON DEL WEB.
+
+      'reportes.centros.cambiar' y 'reportes.centros.<numero>.ver' no existen en
+      Mac31 —alla cada centro tiene su propia instalacion apuntada a su base, no
+      hay nada que permitir—, asi que el reemplazo por lo de legacy tampoco debe
+      llevarselos. Se comparan por PREFIJO y no uno a uno porque son tantos como
+      centros haya, y aparecen solos cuando se da de alta uno nuevo.
+    */
+    private const string CentrosPermissionPrefix = PermisosDeCentros.Prefijo;
+
     /* True si esta clave de reportes la manda Mac31 y hay que reemplazarla. */
     private static bool EsReporteQueMandaLegacy(string clave) =>
         clave.StartsWith($"{ReportesModuleKey}.", StringComparison.OrdinalIgnoreCase)
-        && !ReportesWebPermissionKeys.Contains(clave);
+        && !ReportesWebPermissionKeys.Contains(clave)
+        && !clave.StartsWith(CentrosPermissionPrefix, StringComparison.OrdinalIgnoreCase);
     private const string VentasModuleKey = "ventas";
     private const string VentasViewPermission = "ventas.ver_modulo";
     private const string VentasLegacyForm = "CONSULTA DE VENTAS";
@@ -461,6 +475,7 @@ public sealed class PermissionService : IPermissionService
         var ventasCatalog = await EnsureVentasPermissionsSyncedAsync(conn, empresaId, ct);
         var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
         var prestamosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
+        await EnsureCentrosPermissionsSyncedAsync(conn, empresaId, ct);
 
         var response = new PermisosWebBootstrapResponse { PermissionsEnabled = true };
         var activeModules = await GetActiveModulesAsync(conn, empresaId, ct);
@@ -2057,6 +2072,63 @@ VALUES ({string.Join(", ", insertValues)});";
         if (permColumns.Contains("Descripcion"))
             cmd.Parameters.Add(new SqlParameter("@Descripcion", SqlDbType.NVarChar, 500) { Value = explicitDescription ?? $"{seed.Module}.seed" });
         await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    /*
+      DA DE ALTA LOS PERMISOS DE CENTROS DE SERVICIO, LEYENDOLOS DE LA TABLA.
+
+      Son dos cosas distintas y a proposito:
+
+        reportes.centros.cambiar        -> puede usar el selector. Sin esto no
+                                           lo ve siquiera, y todo sale de la
+                                           base principal como hasta hoy.
+        reportes.centros.<numero>.ver   -> uno por centro: a cuales puede entrar.
+
+      Separarlos es lo que permite "apagale el selector aunque tenga centros":
+      quitando el primero se acabo, sin tocar los doce de abajo.
+
+      Se generan desde dbo.CentrosServicio y no a mano en un script: el dia que
+      den de alta el centro 2013 aparece solo en la pantalla de permisos. Se usa
+      Numero y no IDCentro en la clave porque Numero es lo que la gente reconoce
+      (2004 = ORIENTE) y es estable entre bases.
+
+      Si la tabla no existe —empresa sin centros— no se crea nada y todo sigue
+      igual.
+    */
+    private static async Task EnsureCentrosPermissionsSyncedAsync(
+        SqlConnection conn,
+        int empresaId,
+        CancellationToken ct)
+    {
+        if (!await TableExistsAsync(conn, "CentrosServicio", ct))
+            return;
+
+        var semillas = new List<PermissionSeed>
+        {
+            new(PermisosDeCentros.Cambiar, "Reportes - Cambiar de centro", ReportesModuleKey)
+        };
+
+        await using (var cmd = new SqlCommand(@"
+SELECT Numero, NombreCentro
+FROM dbo.CentrosServicio
+WHERE IDStatus = 1 AND Numero IS NOT NULL
+ORDER BY Numero;", conn))
+        {
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                var numero = reader.GetInt32(0);
+                var nombre = (reader.IsDBNull(1) ? "" : reader.GetString(1)).Trim();
+                if (numero <= 0) continue;
+                semillas.Add(new PermissionSeed(
+                    PermisosDeCentros.Ver(numero),
+                    $"Reportes - Centro {(nombre.Length > 0 ? nombre : numero.ToString())}",
+                    ReportesModuleKey));
+            }
+        }
+
+        await SincronizarCatalogoDePermisosAsync(
+            conn, empresaId, semillas, _ => "reportes.centros", ct);
     }
 
     private async Task<Dictionary<string, ReportPermissionInfo>> EnsureLegacyReportPermissionsSyncedAsync(

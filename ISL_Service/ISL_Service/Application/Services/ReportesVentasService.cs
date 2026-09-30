@@ -134,22 +134,24 @@ public class ReportesVentasService : IReportesVentasService
 
     public Task<ReportesVentasPreviewResponse> ConsultarReporteVentasPorParametrosAsync(
         int parametrosLegacy,
+        int idCentro = 0,
         CancellationToken ct = default)
     {
         if (parametrosLegacy <= 0)
             throw new ArgumentException("psp requerido.");
 
-        return _repository.ConsultarReporteVentasPorParametrosAsync(parametrosLegacy, ct);
+        return _repository.ConsultarReporteVentasPorParametrosAsync(parametrosLegacy, idCentro, ct);
     }
 
     public Task<ReportesVentasFileResponse> GenerarReporteVentasExcelPorParametrosAsync(
         int parametrosLegacy,
+        int idCentro = 0,
         CancellationToken ct = default)
     {
         if (parametrosLegacy <= 0)
             throw new ArgumentException("psp requerido.");
 
-        return _repository.GenerarReporteVentasExcelPorParametrosAsync(parametrosLegacy, ct);
+        return _repository.GenerarReporteVentasExcelPorParametrosAsync(parametrosLegacy, idCentro, ct);
     }
 
     private static void Validate(ReportesVentasAcumuladoresProductosRequest request)

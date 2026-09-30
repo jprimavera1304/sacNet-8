@@ -56,11 +56,15 @@ public interface IReportesVentasRepository
         int parametrosLegacy,
         CancellationToken ct = default);
 
+    /// <param name="idCentro">Centro de servicio; 0 = la base principal.</param>
     Task<ReportesVentasPreviewResponse> ConsultarReporteVentasPorParametrosAsync(
         int parametrosLegacy,
+        int idCentro = 0,
         CancellationToken ct = default);
 
+    /// <param name="idCentro">Centro de servicio; 0 = la base principal.</param>
     Task<ReportesVentasFileResponse> GenerarReporteVentasExcelPorParametrosAsync(
         int parametrosLegacy,
+        int idCentro = 0,
         CancellationToken ct = default);
 }

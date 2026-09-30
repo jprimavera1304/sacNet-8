@@ -10,10 +10,30 @@ namespace ISL_Service.Infrastructure.Repositories;
 public partial class ReportesVentasRepository : IReportesVentasRepository
 {
     private readonly IConfiguration _configuration;
+    private readonly ICentrosServicioRepository _centros;
 
-    public ReportesVentasRepository(IConfiguration configuration)
+    public ReportesVentasRepository(IConfiguration configuration, ICentrosServicioRepository centros)
     {
         _configuration = configuration;
+        _centros = centros;
+    }
+
+    /*
+      DE UN IDCentro AL NOMBRE DE SU BASE.
+
+      Devuelve "" para la principal, que es lo que quiere decir "sin centro".
+      Si el Id no existe o esta inactivo tambien devuelve "" — no se inventa una
+      base ni se truena: se contesta con los datos de la matriz, que es el
+      comportamiento de siempre.
+
+      Es el UNICO camino del cliente a un nombre de base: llega un numero, sale
+      un nombre de la tabla. Nunca al reves.
+    */
+    private async Task<string> BaseDeCentroAsync(int idCentro, CancellationToken ct)
+    {
+        if (idCentro <= 0) return "";
+        var centro = await _centros.BuscarAsync(idCentro, ct);
+        return centro?.Base ?? "";
     }
 
     public async Task<ReportesVentasCatalogosResponse> ConsultarCatalogosAcumuladoresProductosAsync(
@@ -99,7 +119,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
     {
         var idReporte = ResolveReporte(request);
 
-        await using var conn = GetConnection();
+        await using var conn = GetConnection(await BaseDeCentroAsync(request.IdCentro, ct));
         await conn.OpenAsync(ct);
 
         var legacyParams = await BuildLegacyParamsAsync(conn, idReporte, request, ct);
@@ -122,7 +142,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
     {
         var idReporte = ResolveReporteRemisiones(request);
 
-        await using var conn = GetConnection();
+        await using var conn = GetConnection(await BaseDeCentroAsync(request.IdCentro, ct));
         await conn.OpenAsync(ct);
 
         var legacyParams = await BuildRemisionesLegacyParamsAsync(conn, request, ct);
@@ -145,7 +165,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
     {
         var idReporte = ResolveReporteFolios(request);
 
-        await using var conn = GetConnection();
+        await using var conn = GetConnection(await BaseDeCentroAsync(request.IdCentro, ct));
         await conn.OpenAsync(ct);
 
         var legacyParams = await BuildDocumentosVentaLegacyParamsAsync(conn, idReporte, request, ct);
@@ -168,7 +188,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
     {
         var idReporte = ResolveReporteFacturas(request);
 
-        await using var conn = GetConnection();
+        await using var conn = GetConnection(await BaseDeCentroAsync(request.IdCentro, ct));
         await conn.OpenAsync(ct);
 
         var legacyParams = await BuildDocumentosVentaLegacyParamsAsync(
@@ -197,7 +217,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
     {
         var idReporte = ResolveReporteConcentrados(request);
 
-        await using var conn = GetConnection();
+        await using var conn = GetConnection(await BaseDeCentroAsync(request.IdCentro, ct));
         await conn.OpenAsync(ct);
 
         var legacyParams = BuildConcentradosLegacyParams(request);
@@ -220,7 +240,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
     {
         var idReporte = ResolveReporteCobranza(request);
 
-        await using var conn = GetConnection();
+        await using var conn = GetConnection(await BaseDeCentroAsync(request.IdCentro, ct));
         await conn.OpenAsync(ct);
 
         var legacyParams = await BuildCobranzaLegacyParamsAsync(conn, request, ct);
@@ -243,7 +263,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
     {
         var idReporte = ResolveReporteLegacyVentas(request);
 
-        await using var conn = GetConnection();
+        await using var conn = GetConnection(await BaseDeCentroAsync(request.IdCentro, ct));
         await conn.OpenAsync(ct);
 
         var legacyParams = await BuildLegacyVentasParamsAsync(conn, idReporte, request, ct);
@@ -266,7 +286,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
     {
         var idReporte = ResolveReporte(request);
 
-        await using var conn = GetConnection();
+        await using var conn = GetConnection(await BaseDeCentroAsync(request.IdCentro, ct));
         await conn.OpenAsync(ct);
 
         var legacyParams = await BuildLegacyParamsAsync(conn, idReporte, request, ct);
@@ -312,9 +332,34 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
 
     public async Task<ReportesVentasPreviewResponse> ConsultarReporteVentasPorParametrosAsync(
         int parametrosLegacy,
+        int idCentro = 0,
         CancellationToken ct = default)
     {
-        await using var conn = GetConnection();
+        var reporte = await ArmarReportePorParametrosAsync(parametrosLegacy, idCentro, ct);
+
+        /*
+          Y aqui se le pone de donde salio. Va en UN solo lugar y no en las doce
+          ramas de abajo: si se sellara en cada una, la que se agregue manana
+          saldria sin marca y nadie lo notaria hasta que dos PDF identicos
+          trajeran numeros distintos.
+        */
+        var centro = idCentro > 0 ? await _centros.BuscarAsync(idCentro, ct) : null;
+        if (centro is not null)
+        {
+            reporte.NombreReporte = SelloDeCentro.Nombre(reporte.NombreReporte, centro.Nombre);
+            reporte.Html = SelloDeCentro.Html(reporte.Html, centro.Nombre);
+        }
+        return reporte;
+    }
+
+    private async Task<ReportesVentasPreviewResponse> ArmarReportePorParametrosAsync(
+        int parametrosLegacy,
+        int idCentro,
+        CancellationToken ct)
+    {
+        /* Los parametros se guardaron en la base del centro, asi que hay que
+           leerlos de ahi: el reporte entero vive en una sola base. */
+        await using var conn = GetConnection(await BaseDeCentroAsync(idCentro, ct));
         await conn.OpenAsync(ct);
 
         var row = await ConsultarParametrosRowAsync(conn, parametrosLegacy, ct);
@@ -360,9 +405,10 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
 
     public async Task<ReportesVentasFileResponse> GenerarReporteVentasExcelPorParametrosAsync(
         int parametrosLegacy,
+        int idCentro = 0,
         CancellationToken ct = default)
     {
-        await using var conn = GetConnection();
+        await using var conn = GetConnection(await BaseDeCentroAsync(idCentro, ct));
         await conn.OpenAsync(ct);
 
         var row = await ConsultarParametrosRowAsync(conn, parametrosLegacy, ct);
@@ -486,7 +532,22 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         };
     }
 
-    private SqlConnection GetConnection()
+    /*
+      DE QUE BASE SALEN LOS DATOS DE ESTE REPORTE.
+
+      Sin centro, la de siempre. Con centro, la suya: mismo servidor, mismo
+      usuario, solo cambia el catalogo (ver BaseDelCentro). El sistema es
+      identico en la matriz y en cada centro; lo unico que cambia es a quien se
+      le pregunta.
+
+      `baseDelCentro` NUNCA viene del navegador. El front manda un IDCentro y
+      quien resuelve el nombre es CentrosServicioRepository, contra la tabla, en
+      el servidor.
+
+      Solo lo usan los REPORTES. Los demas modulos siguen con su base y no se
+      enteran de que esto existe.
+    */
+    private SqlConnection GetConnection(string? baseDelCentro = null)
     {
         var cs = _configuration.GetConnectionString("Main")
             ?? _configuration.GetConnectionString("Mac3")
@@ -495,7 +556,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         if (string.IsNullOrWhiteSpace(cs))
             throw new InvalidOperationException("ConnectionString (Main/Mac3/Local/Default) no encontrada.");
 
-        var connector = new Mac3SqlServerConnector(cs);
+        var connector = new Mac3SqlServerConnector(BaseDelCentro.Apuntar(cs, baseDelCentro));
         return connector.GetConnection;
     }
 }

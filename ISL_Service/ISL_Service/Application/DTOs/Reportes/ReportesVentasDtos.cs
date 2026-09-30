@@ -4,6 +4,15 @@ namespace ISL_Service.Application.DTOs.Reportes;
 
 public class ReportesVentasAcumuladoresProductosRequest
 {
+    /*
+      DE QUE CENTRO SE SACA ESTE REPORTE. 0 = la matriz, como siempre.
+
+      Es un Id, no un nombre de base: el servidor lo resuelve contra
+      dbo.CentrosServicio. Dejar que el cliente mande el nombre seria dejarle
+      elegir a que base entrar.
+    */
+    public int IdCentro { get; set; }
+
     public DateTime FechaInicial { get; set; }
     public DateTime FechaFinal { get; set; }
     public string Categoria { get; set; } = "acumuladores";

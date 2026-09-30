@@ -15,15 +15,18 @@ public class ReportesVentasController : PermisoControllerBase
 {
     private readonly IReportesVentasService _service;
     private readonly ICurrentUserAccessor _currentUserAccessor;
+    private readonly ICentrosServicioRepository _centros;
 
     public ReportesVentasController(
         IReportesVentasService service,
         ICurrentUserAccessor currentUserAccessor,
+        ICentrosServicioRepository centros,
         IPermissionService permissionService)
         : base(currentUserAccessor, permissionService)
     {
         _service = service;
         _currentUserAccessor = currentUserAccessor;
+        _centros = centros;
     }
 
     [HttpGet("acumuladores-productos/catalogos")]
@@ -80,9 +83,12 @@ public class ReportesVentasController : PermisoControllerBase
         if (await ExigirPermisoReporteAsync("acumuladores_y_productos", ct) is { } negado)
             return negado;
 
+        if (await ExigirPermisoCentroAsync(request.IdCentro, ct) is { } centroNegado)
+            return centroNegado;
+
         HydrateLegacyContext(request);
         var result = await _service.GenerarAcumuladoresProductosAsync(request, ct);
-        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
+        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy, request.IdCentro);
 
         Response.Headers["Cache-Control"] = "no-store";
         return Ok(result);
@@ -102,9 +108,12 @@ public class ReportesVentasController : PermisoControllerBase
         if (await ExigirPermisoReporteAsync("remisiones", ct) is { } negado)
             return negado;
 
+        if (await ExigirPermisoCentroAsync(request.IdCentro, ct) is { } centroNegado)
+            return centroNegado;
+
         HydrateLegacyContext(request);
         var result = await _service.GenerarRemisionesAsync(request, ct);
-        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
+        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy, request.IdCentro);
 
         Response.Headers["Cache-Control"] = "no-store";
         return Ok(result);
@@ -124,9 +133,12 @@ public class ReportesVentasController : PermisoControllerBase
         if (await ExigirPermisoReporteAsync("folios", ct) is { } negado)
             return negado;
 
+        if (await ExigirPermisoCentroAsync(request.IdCentro, ct) is { } centroNegado)
+            return centroNegado;
+
         HydrateLegacyContext(request);
         var result = await _service.GenerarFoliosAsync(request, ct);
-        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
+        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy, request.IdCentro);
 
         Response.Headers["Cache-Control"] = "no-store";
         return Ok(result);
@@ -146,9 +158,12 @@ public class ReportesVentasController : PermisoControllerBase
         if (await ExigirPermisoReporteAsync("facturas", ct) is { } negado)
             return negado;
 
+        if (await ExigirPermisoCentroAsync(request.IdCentro, ct) is { } centroNegado)
+            return centroNegado;
+
         HydrateLegacyContext(request);
         var result = await _service.GenerarFacturasAsync(request, ct);
-        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
+        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy, request.IdCentro);
 
         Response.Headers["Cache-Control"] = "no-store";
         return Ok(result);
@@ -168,9 +183,12 @@ public class ReportesVentasController : PermisoControllerBase
         if (await ExigirPermisoReporteAsync("concentrados", ct) is { } negado)
             return negado;
 
+        if (await ExigirPermisoCentroAsync(request.IdCentro, ct) is { } centroNegado)
+            return centroNegado;
+
         HydrateLegacyContext(request);
         var result = await _service.GenerarConcentradosAsync(request, ct);
-        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
+        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy, request.IdCentro);
 
         Response.Headers["Cache-Control"] = "no-store";
         return Ok(result);
@@ -190,9 +208,12 @@ public class ReportesVentasController : PermisoControllerBase
         if (await ExigirPermisoReporteAsync("cobranza", ct) is { } negado)
             return negado;
 
+        if (await ExigirPermisoCentroAsync(request.IdCentro, ct) is { } centroNegado)
+            return centroNegado;
+
         HydrateLegacyContext(request);
         var result = await _service.GenerarCobranzaAsync(request, ct);
-        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
+        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy, request.IdCentro);
 
         Response.Headers["Cache-Control"] = "no-store";
         return Ok(result);
@@ -224,9 +245,12 @@ public class ReportesVentasController : PermisoControllerBase
         if (await ExigirPermisoReporteAsync(request.ReporteKey, ct) is { } negado)
             return negado;
 
+        if (await ExigirPermisoCentroAsync(request.IdCentro, ct) is { } centroNegado)
+            return centroNegado;
+
         HydrateLegacyContext(request);
         var result = await _service.GenerarLegacyVentasAsync(request, ct);
-        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy);
+        result.Url = BuildReportesV3WUrl(result.ParametrosLegacy, request.IdCentro);
 
         Response.Headers["Cache-Control"] = "no-store";
         return Ok(result);
@@ -246,6 +270,9 @@ public class ReportesVentasController : PermisoControllerBase
         if (await ExigirPermisoReporteAsync("acumuladores_y_productos", ct) is { } negado)
             return negado;
 
+        if (await ExigirPermisoCentroAsync(request.IdCentro, ct) is { } centroNegado)
+            return centroNegado;
+
         HydrateLegacyContext(request);
         var result = await _service.ConsultarAcumuladoresProductosAsync(request, ct);
         Response.Headers["Cache-Control"] = "no-store";
@@ -256,14 +283,26 @@ public class ReportesVentasController : PermisoControllerBase
     [HttpGet("ReportesV2")]
     [HttpGet("acumuladores-productos/pantalla")]
     [AllowAnonymous]
-    public async Task<IActionResult> VerAcumuladoresProductosPantalla([FromQuery] int psp, CancellationToken ct)
+    /// <param name="psp">El renglon de parametros que dejo "generar".</param>
+    /// <param name="c">
+    /// Centro de servicio; 0 o ausente = la base principal.
+    ///
+    /// Viaja en la direccion porque el reporte entero vive en UNA base: los
+    /// parametros se guardaron en la del centro, asi que hay que leerlos de
+    /// ahi. Sin este dato se buscarian en la matriz y saldria "no encontrado",
+    /// o peor, el reporte de otro.
+    /// </param>
+    public async Task<IActionResult> VerAcumuladoresProductosPantalla(
+        [FromQuery] int psp,
+        [FromQuery] int c,
+        CancellationToken ct)
     {
         if (psp <= 0)
             return BadRequest("psp requerido.");
 
         try
         {
-            var excel = await _service.GenerarReporteVentasExcelPorParametrosAsync(psp, ct);
+            var excel = await _service.GenerarReporteVentasExcelPorParametrosAsync(psp, c, ct);
             Response.Headers["Cache-Control"] = "no-store";
             return File(excel.Content, excel.ContentType, excel.FileName);
         }
@@ -271,7 +310,7 @@ public class ReportesVentasController : PermisoControllerBase
         {
         }
 
-        var result = await _service.ConsultarReporteVentasPorParametrosAsync(psp, ct);
+        var result = await _service.ConsultarReporteVentasPorParametrosAsync(psp, c, ct);
         /* El nombre del reporte es lo que se lee en la pestaña; sin el decia "pdf",
            que es el ultimo pedazo de la direccion. Ver RenderAsync. */
         var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(
@@ -293,6 +332,62 @@ public class ReportesVentasController : PermisoControllerBase
     /// mas que le hubieran quitado permisos. El mapeo reporte->permiso vive
     /// ahora en <see cref="ReportesCatalogo"/> y se publica aqui.
     /// </remarks>
+    /// <summary>
+    /// Los centros de servicio que ESTE usuario puede consultar.
+    /// </summary>
+    /// <remarks>
+    /// EL SISTEMA ES EL MISMO EN LA MATRIZ Y EN CADA CENTRO; lo unico que
+    /// cambia es la base de la que salen los datos. Este endpoint llena el
+    /// selector con el que se elige cual.
+    ///
+    /// Son DOS permisos y hacen cosas distintas:
+    ///
+    ///   reportes.centros.cambiar      -> puede usar el selector. Sin esto se
+    ///                                    contesta PuedeCambiar=false y una
+    ///                                    lista vacia: el front no lo pinta y
+    ///                                    todo sale de la matriz, como hasta
+    ///                                    hoy. Es el interruptor de arriba.
+    ///   reportes.centros.&lt;numero&gt;.ver -> a que centros puede entrar.
+    ///
+    /// Asi se puede apagar el selector a alguien SIN tocarle los doce permisos
+    /// de abajo, que es justo lo que se pidio.
+    ///
+    /// El nombre de la base NO viaja: el front recibe Ids y nombres para leer.
+    /// Quien traduce Id -> base es el servidor.
+    /// </remarks>
+    [HttpGet("centros")]
+    [Authorize(Policy = "perm:reportes.ver_modulo")]
+    [ProducesResponseType(typeof(CentrosServicioResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ConsultarCentros(CancellationToken ct)
+    {
+        var puede = await LeerPermisosAsync(ct);
+        if (!puede.TokenValido)
+            return Unauthorized(new { ok = false, message = "Token invalido." });
+
+        var respuesta = new CentrosServicioResponse
+        {
+            PuedeCambiar = puede.Tiene(PermisosDeCentros.Cambiar),
+            NombrePrincipal = "Principal"
+        };
+
+        if (respuesta.PuedeCambiar)
+        {
+            var centros = await _centros.ListarAsync(ct);
+            respuesta.Centros = centros
+                .Where(c => puede.Tiene(PermisosDeCentros.Ver(c.Numero)))
+                .Select(c => new CentroServicioOpcion
+                {
+                    IdCentro = c.IdCentro,
+                    Numero = c.Numero,
+                    Nombre = c.Nombre
+                })
+                .ToList();
+        }
+
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(respuesta);
+    }
+
     [HttpGet("permisos")]
     [Authorize(Policy = "perm:reportes.ver_modulo")]
     [ProducesResponseType(typeof(ReportesPermisosResponse), StatusCodes.Status200OK)]
@@ -353,11 +448,55 @@ public class ReportesVentasController : PermisoControllerBase
         });
     }
 
-    private string BuildReportesV3WUrl(string parametrosLegacy)
+    /*
+      La direccion con la que se abre el reporte. Si salio de un centro, el
+      centro VIAJA EN ELLA: los parametros se guardaron en la base de ese
+      centro, asi que quien luego abra la direccion tiene que ir a buscarlos
+      alla. Sin ese dato se buscarian en la matriz y saldria vacio.
+    */
+    private string BuildReportesV3WUrl(string parametrosLegacy, int idCentro = 0)
     {
         var psp = Uri.EscapeDataString(parametrosLegacy);
         var pathBase = Request.PathBase.HasValue ? Request.PathBase.Value : "";
-        return $"{Request.Scheme}://{Request.Host}{pathBase}/api/reportes/ventas/ReportesV3W?psp={psp}";
+        var centro = idCentro > 0 ? $"&c={idCentro}" : "";
+        return $"{Request.Scheme}://{Request.Host}{pathBase}/api/reportes/ventas/ReportesV3W?psp={psp}{centro}";
+    }
+
+    /*
+      PUEDE ESTE USUARIO SACAR REPORTES DE ESTE CENTRO.
+
+      Son dos candados y los dos tienen que abrir: el de usar el selector y el
+      del centro concreto. Se revisa AQUI, al generar, y no solo al pintar la
+      lista: la lista es una cortesia para el front, esto es lo que de verdad
+      decide de que base salen los datos.
+    */
+    private async Task<IActionResult?> ExigirPermisoCentroAsync(int idCentro, CancellationToken ct)
+    {
+        if (idCentro <= 0) return null;   // la matriz, como siempre
+
+        var puede = await LeerPermisosAsync(ct);
+        if (!puede.TokenValido)
+            return Unauthorized(new { ok = false, message = "Token invalido." });
+
+        if (!puede.Tiene(PermisosDeCentros.Cambiar))
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                ok = false,
+                message = $"Tu usuario no tiene el permiso {PermisosDeCentros.Cambiar}."
+            });
+
+        var centro = await _centros.BuscarAsync(idCentro, ct);
+        if (centro is null)
+            return BadRequest(new { ok = false, message = "Centro de servicio desconocido." });
+
+        if (!puede.Tiene(PermisosDeCentros.Ver(centro.Numero)))
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                ok = false,
+                message = $"Tu usuario no tiene permiso para el centro {centro.Nombre}."
+            });
+
+        return null;
     }
 
     private void HydrateLegacyContext(ReportesVentasAcumuladoresProductosRequest request)

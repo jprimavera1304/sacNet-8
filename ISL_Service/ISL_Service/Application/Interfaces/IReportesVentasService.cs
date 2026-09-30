@@ -58,9 +58,11 @@ public interface IReportesVentasService
 
     Task<ReportesVentasPreviewResponse> ConsultarReporteVentasPorParametrosAsync(
         int parametrosLegacy,
+        int idCentro = 0,
         CancellationToken ct = default);
 
     Task<ReportesVentasFileResponse> GenerarReporteVentasExcelPorParametrosAsync(
         int parametrosLegacy,
+        int idCentro = 0,
         CancellationToken ct = default);
 }

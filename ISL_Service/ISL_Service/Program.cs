@@ -159,6 +159,8 @@ builder.Services.AddScoped<IDashboardVentasReportRenderer, DashboardVentasXlsxRe
 builder.Services.AddHostedService<ReportEngineWarmupHostedService>();
 
 builder.Services.AddScoped<IReportesVentasRepository, ReportesVentasRepository>();
+/* El catalogo de centros de servicio: de el sale a que base apunta un reporte. */
+builder.Services.AddScoped<ICentrosServicioRepository, CentrosServicioRepository>();
 builder.Services.AddScoped<IReportesVentasService, ReportesVentasService>();
 
 builder.Services.AddScoped<IVentasPedidosRepository, VentasPedidosRepository>();
