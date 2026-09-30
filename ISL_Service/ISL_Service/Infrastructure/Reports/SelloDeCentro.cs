@@ -3,21 +3,31 @@ using System.Text.RegularExpressions;
 namespace ISL_Service.Infrastructure.Reports;
 
 /// <summary>
-/// Le pone al reporte de que centro salio.
+/// Le pone al reporte de que centro de servicio salio.
 /// </summary>
 /// <remarks>
-/// LEGACY NO LO TIENE Y AQUI SI HACE FALTA.
+/// LEGACY NO LO TIENE Y AQUI HACE FALTA.
 ///
 /// Se comprobo: el logo del encabezado es el mismo (Logo_Mac.png) en MacZ, en
-/// MacZCS1 y en MacZCS4, y no hay ninguna marca de base ni de empresa. En Mac31
-/// daba igual, porque cada centro tiene su propia instalacion apuntada a su
-/// base — la aplicacion ES el centro. Aqui hay un selector, asi que dos PDF del
-/// mismo reporte y del mismo periodo pueden traer numeros distintos y verse
-/// identicos. Eso es exactamente "generé y me lo dio mal".
+/// MacZCS1 y en MacZCS4, y no hay ninguna marca de base. En Mac31 daba igual,
+/// porque cada centro tiene su instalacion apuntada a su base — la aplicacion
+/// ES el centro. Con un selector no: el MISMO reporte, del mismo periodo,
+/// sacado de dos centros trae numeros distintos y se ve identico.
+///
+/// DONDE SE PONE. En el encabezado, junto a FECHAS / EMPRESA / ALMACEN, que es
+/// donde uno ya mira para saber de que es el reporte. En concreto justo antes
+/// de "Impresion:", que es otro dato del mismo renglon.
+///
+/// POR QUE AHI Y NO EN EL HUECO #ParametrosTexto# DE LA PLANTILLA: porque esto
+/// corre sobre el HTML YA ARMADO, y para entonces los #Tags# de la plantilla ya
+/// se sustituyeron. Apuntar a ese hueco habria sido codigo que no se ejecuta
+/// nunca — se ve razonable y no hace nada.
+///
+/// Si una plantilla no trae "Impresion:", se pone un aviso al principio: vale
+/// mas verlo feo que no verlo.
 ///
 /// SOLO SE SELLA CUANDO NO ES LA MATRIZ. Los reportes de la principal siguen
-/// saliendo byte por byte como hoy, que era la condicion: que no se vean
-/// distintos de los de Mac31.
+/// saliendo exactamente como hoy, que era la condicion.
 /// </remarks>
 public static class SelloDeCentro
 {
@@ -29,32 +39,37 @@ public static class SelloDeCentro
         return $"{nombreDelReporte} - Centro {centro}";
     }
 
-    /// <summary>
-    /// Mete una linea visible al principio del cuerpo del reporte.
-    /// </summary>
-    /// <remarks>
-    /// Se inserta despues de &lt;body&gt; y no se re-arma el HTML: el documento
-    /// lo produce el renderizador de siempre y aqui solo se le agrega una linea.
-    /// Si no hubiera &lt;body&gt; se pone al principio, que sigue siendo visible.
-    /// </remarks>
+    /// <summary>Mete "CENTRO: X" en el encabezado del reporte.</summary>
     public static string Html(string html, string? nombreDelCentro)
     {
         var centro = (nombreDelCentro ?? "").Trim();
         if (centro.Length == 0 || string.IsNullOrEmpty(html)) return html;
 
-        var linea =
+        var texto = Escapar(centro);
+
+        /* Junto a "Impresion:", otro dato del mismo encabezado. Se busca con
+           acento, sin el y como entidad HTML porque la plantilla lo guarda
+           como &oacute;. */
+        var impresion = Regex.Match(html, @"<span[^>]*>\s*Impresi(?:ó|&oacute;|o)n\s*:", RegexOptions.IgnoreCase);
+        if (impresion.Success)
+            return html.Insert(impresion.Index, $"{EnLinea(texto)} &nbsp;&nbsp;&nbsp; ");
+
+        /* Sin ese ancla: que se vea igual, aunque sea arriba de todo. */
+        var cuerpo = Regex.Match(html, "<body[^>]*>", RegexOptions.IgnoreCase);
+        var aviso =
             "<div style=\"font:600 13px Arial,sans-serif;color:#7a2e00;" +
             "background:#fff3e0;border:1px solid #ffb74d;border-radius:4px;" +
             "padding:6px 10px;margin:0 0 8px 0;text-align:center;\">" +
-            "Centro de servicio: " + Escapar(centro) +
-            "</div>";
+            "Centro de servicio: " + texto + "</div>";
 
-        var m = Regex.Match(html, "<body[^>]*>", RegexOptions.IgnoreCase);
-        if (m.Success)
-            return html.Insert(m.Index + m.Length, linea);
-
-        return linea + html;
+        return cuerpo.Success
+            ? html.Insert(cuerpo.Index + cuerpo.Length, aviso)
+            : aviso + html;
     }
+
+    /// <summary>Como se ve dentro del encabezado, igual que EMPRESA o ALMACEN.</summary>
+    private static string EnLinea(string centroYaEscapado) =>
+        $"<span style=\"font-size:11.5pt;font-weight:normal;\">CENTRO: <b>{centroYaEscapado}</b></span>";
 
     private static string Escapar(string texto) =>
         texto.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
