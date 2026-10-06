@@ -1,0 +1,229 @@
+IDReporte|NombreReporte|SP|spV2|Categoria|Master
+          5|Reporte de Ventas (GLOBAL)|sp_rptVentasCompleto_2||Empresa|0
+         10|Venta de Acumuladores||sp_n_rptVentasAcumuladoresGlobales|NA|0
+         15|Venta de Productos||sp_n_rptVentasCategoriaGlobales|NA|0
+         19|Remisiones Con Saldo a Favor||sp_n_rptVentasRemisionesGlobales|NA|0
+         20|Folios (GLOBAL)||sp_n_rptVentasFoliosGlobales|NA|0
+         21|Remisiones||sp_n_rptVentasRemisionesGlobales|NA|0
+         22|Reporte de Impuestos||sp_n_rptVentasRemisionesGlobales|NA|0
+         23|Folios Dinero y Usados||sp_n_rptVentasFoliosGlobales|NA|0
+         24|Facturas||sp_n_rptVentasFacturasGlobales|NA|0
+         25|Reporte de Ventas Folios (Mayoristas)|sp_rptVentasFolios_2||Empresa|0
+         30|Reporte de Ventas Folios (Locales)|sp_rptVentasFolios_2||Empresa|0
+         35|Reporte de Ventas Folios (Ajustes)|sp_rptVentasFolios_2||Empresa|0
+         40|Reporte de Ventas Folios (Devoluciones)|sp_rptVentasFolios_2||Empresa|0
+         45|Reporte de Ventas Folios Con IVA|sp_rptVentasFoliosIVA_2||Empresa|0
+         50|Reporte de Cobranza Folios Pagados|||NA|0
+         55|Reporte de Cobranza Folios Pendientes|sp_rptVentasSaldosPrincipal||Empresa|0
+         60|Reporte de Cobranza Folios Vencidos|sp_rptVentasSaldosPrincipal||Empresa|0
+         65|Reporte Cobranza Folios Pendientes y Vencidos|sp_rptVentasSaldosPrincipal||Empresa|0
+         70|Reporte Ventas Pagos Detallado (GLOBAL)|sp_rptVentasPagos_2||Empresa|0
+         71|Pagos Detallado||sp_n_rptVentasPagosGlobales|NA|0
+         72|Ventas Pagos Detallado Centro de Servicio||sp_n_rptVentasPagosGlobales|NA|0
+         73|Clientes Descuentos||sp_n_rptVentasPagosGlobales|NA|0
+         74|Pagos Transferencias Duplicadas||sp_n_rptVentasPagosTransferenciaGlobales|NA|0
+         75|Pagos Totalizado||sp_n_rptVentasPagosGlobales|NA|0
+         77|Pagos Detallado TAURO||sp_n_rptVentasPagosGlobales|NA|0
+         78|Pagos APLICADOS Por Dia||sp_n_rptVentasPagosGlobalesPorDia|NA|0
+         80|Reporte Ventas Pagos Efectivo|sp_rptVentasPagos_2||Empresa|0
+         85|Reporte de Descuentos|sp_rptVentasPagos_2||Empresa|0
+         90|Reporte Ventas Pagos Cheques (GLOBAL)|sp_rptVentasPagos_2||Empresa|70
+         95|Reporte Ventas Pagos Cheques Cobrados|sp_rptVentasPagos_2||Empresa|70
+        100|Reporte Ventas Pagos Cheques Devueltos|sp_rptVentasPagos_2||Empresa|70
+        102|Reporte Ventas Pagos Transferencia|sp_rptVentasPagos_2||Empresa|70
+        103|Clientes Globales||sp_n_rptClienteGlobales|NA|0
+        105|Clientes CON Compra||sp_n_rptClienteConCompraGlobales|NA|0
+        106|Clientes CON Compra Por DIA||sp_n_rptClienteConCompraPorDiaGlobales|NA|0
+        110|Clientes SIN Compra||sp_n_rptClienteSinCompraGlobales|NA|0
+        112|Clientes CON y SIN Compra||sp_n_rptClienteConSinCompraGlobales|NA|0
+        113|Clientes Con Descuentos||sp_n_rptClienteConDescuentosGlobales|NA|0
+        114|Clientes SIN Descuentos||sp_n_rptClienteSinDescuentosGlobales|NA|0
+        115|Reporte de Ventas Mensuales|sp_rptVentasMensual_2||Empresa|0
+        116|Clientes Compras Acumuladores, Moto y Lubricantes||sp_n_rptClienteCompraAcumMotoLub|NA|0
+        117|Reporte de Ventas por Cliente y por Marca|sp_rptVentasClientesCatMarca||Empresa|0
+        118|Clientes Compras Acumuladores, Moto y Lubricantes Mensual||sp_n_rptClienteCompraAcumMotoLubMensual|NA|0
+        119|Clientes Compras Acumuladores, Moto y Lubricantes Mensual Por Categoria||sp_n_rptClienteCompraAcumMotoLubMensual|NA|0
+        120|Compras Acumuladores||sp_n_rptComprasAcumuladoresGlobales|NA|0
+        121|Clientes Compras Acumuladores, Moto y Lubricantes Mensual (CLARIOS)||sp_n_rptClienteCompraAcumMotoLubClarios|NA|0
+        125|Compras Productos||sp_n_rptComprasCategoriaGlobales|NA|0
+        130|Reporte de Compras - Facturas||sp_n_rptComprasFoliosGlobales|NA|0
+        135|Reporte de Ventas Utilidad (GLOBAL)|sp_rptVentasUtilidad_2||Empresa|0
+        140|Utilidad Acumuladores||sp_n_rptVentasAcumuladoresUtilidad|NA|0
+        145|Utilidad Productos||sp_n_rptVentasCategoriaUtilidad|NA|0
+        150|Reporte de Cascos||sp_n_rptVentasUsadosCreditosGlobales|NA|0
+        155|Reporte de Autorizaciones|sp_Log_Autorizaciones||Empresa|0
+        160|Reporte de Ajuste a Usados|sp_AjusteTipoUsado||Empresa|0
+        200|Inventario Actual (GLOBAL)|sp_rptInventarioActualGlobal||NA|0
+        205|Inventario Actual de Acumuladores||sp_n_rptInventarioActualAcumuladores|NA|0
+        210|Inventario Actual de Productos||sp_n_rptInventarioActualCategoria|NA|0
+        212|Inventario Actual de Filtros||sp_n_rptInventarioActualCategoria|NA|0
+        215|Inventario Costo Actual (GLOBAL)|sp_rptInventarioActualGlobal||NA|0
+        220|Inventario Costo Actual Acumuladores||sp_n_rptInventarioActualAcumuladoresCosto|NA|0
+        225|Inventario Costo Actual Productos||sp_n_rptInventarioActualCategoriaCosto|NA|0
+        227|Inventario Costo Actual Filtros||sp_n_rptInventarioActualCategoriaCosto|NA|0
+        230|Ajustes al Inventario||sp_n_rptAjusteInventario|NA|0
+        235|Pedido Acumuladores||sp_n_rptAlmacenPedidoAcumuladores|NA|0
+        300|Reporte de Venta Acumuladores GLOBAL por Agentes|sp_rptVentasAcumuladoresAgentesGlobal||Agentes|0
+        305|Reporte Venta Acumuladores Agentes|sp_rptVentasAcumuladoresAgentes||Agentes|10
+        310|Reporte de Venta Productos por Agentes|sp_rptVentasCategoriaAgentes_2||Agentes|15
+        315|Reporte de Folios (GLOBAL) Agentes|sp_rptVentasFoliosAgentes_2||Agentes|20
+        320|Reporte de Ventas Folios (Mayoristas) por Agentes|sp_rptVentasFoliosAgentes_2||Agentes|0
+        325|Reporte de Ventas Folios (Ajustes) Agentes|sp_rptVentasFoliosAgentes_2||Agentes|35
+        330|Reporte de Ventas Folios (Devoluciones) Agentes|sp_rptVentasFoliosAgentes_2||Agentes|40
+        335|Reporte Cobranza Folios Pagados Agentes|sp_rptVentasSaldosPrincipalAgentes||Agentes|50
+        340|Reporte Cobranza Folios Pendientes Agentes|sp_rptVentasSaldosPrincipalAgentes||Agentes|55
+        345|Reporte Cobranza Folios Vencidos Agentes|sp_rptVentasSaldosPrincipalAgentes||Agentes|60
+        350|Reporte Cobranza Folios Pendientes y Vencidos Agentes|sp_rptVentasSaldosPrincipalAgentes||Agentes|65
+        355|Reporte Ventas Pagos Detallado (GLOBAL) Agentes|sp_rptVentasPagosAgentes_2||Agentes|70
+        360|Reporte Ventas Pagos Totalizado Agentes|sp_rptVentasPagosAgentes_2||Agentes|75
+        365|Reporte Ventas Pagos Efectivo Agentes|sp_rptVentasPagosAgentes_2||Agentes|80
+        370|Reporte de Descuentos Agentes|sp_rptVentasPagosAgentes_2||Agentes|85
+        375|Reporte Ventas Pagos Cheques (GLOBAL) por Agentes|sp_rptVentasPagosAgentes_2||Agentes|70
+        380|Reporte Ventas Pagos Cheques Cobrados por Agentes|sp_rptVentasPagosAgentes_2||Agentes|70
+        385|Reporte Ventas Pagos Cheques Devueltos por Agentes|sp_rptVentasPagosAgentes_2||Agentes|70
+        387|Reporte Ventas Pagos Transferencia por Agentes|sp_rptVentasPagosAgentes_2||Agentes|70
+        390|Reporte de Clientes CON Compra por Agentes|sp_n_rptClienteConCompraAgentes||Agentes|105
+        395|Reporte de Clientes SIN Compra por Agentes|sp_rptClienteSinCompraAgentes_2||Agentes|0
+        400|Reporte de Ventas Utilidad GLOBAL Totalizado por Agentes|sp_rptVentasUtilidadAgentes_2||Agentes|0
+        405|Reporte de Ventas Utilidad GLOBAL Detallado por Agentes|sp_rptVentasUtilidadAgentes_2||Agentes|0
+        415|Reporte de Ventas Utilidad Acumuladores Totalizado por Agentes|sp_rptVentasUtilidadAgentes_2||Agentes|0
+        420|Reporte de Ventas Utilidad Acumuladores por Agentes|sp_rptVentasUtilidadAgentes_2||Agentes|0
+        430|Reporte de Ventas Utilidad Productos Totalizado por Agentes|sp_rptVentasUtilidadAgentes_2||Agentes|0
+        435|Reporte de Ventas Utilidad Productos Detallado por Agentes|sp_rptVentasUtilidadAgentes_2||Agentes|0
+        440|Reporte de Ventas por Cliente y por Marca por Agentes|sp_rptVentasClientesCatMarcaAgentes||Agentes|0
+        445|Reporte de Clientes CON Direccion|sp_rptClientes||Empresa|0
+        450|Reporte de Clientes CON Direccion (NUEVOS)|sp_rptClientes||Empresa|0
+        451|Reporte de Clientes Con Descuentos Global (Acumuladores)|sp_rptClientesDescuentosAcumuladores||Empresa|0
+        452|Reporte de Clientes NUEVOS Con Descuentos Global (Acumuladores)|sp_rptClientesDescuentosAcumuladores||Empresa|0
+        453|Reporte de Clientes Con Descuentos Global (Productos)|sp_rptClientesDescuentosProductos||Empresa|0
+        454|Reporte de Clientes NUEVOS Con Descuentos Global (Productos)|sp_rptClientesDescuentosProductos||Empresa|0
+        455|Reporte de Ventas Creditos Usados por Agente|sp_rptVentasUsadosCreditosAgentes||Agentes|150
+        460|Reporte de Clientes CON Direccion por Agente|sp_rptClientesAgentes||Agentes|0
+        465|Reporte de Clientes CON Direccion por Agente (NUEVOS)|sp_rptClientesAgentes||Agentes|0
+        470|Reporte de Clientes Con Descuentos Acumuladores por Agentes|sp_rptClientesDescuentosAgentes||Agentes|0
+        475|Reporte de Clientes Con Descuentos Acumuladores por Agentes (NUEVOS)|sp_rptClientesDescuentosAgentes||Agentes|0
+        480|Reporte de Clientes Con Descuentos Productos por Agentes|sp_rptClientesDescuentosProductosAgentes||Agentes|0
+        485|Reporte de Clientes Con Descuentos Productos por Agentes (NUEVOS)|sp_rptClientesDescuentosProductosAgentes||Agentes|0
+        490|Comparativo Clientes Ventas y Pagos|sp_n_rptVentasPagosVsFolios_bak|||0
+        493|Comparativo Ventas y Pagos||sp_n_rptVentasPagosVsFoliosGlobales|NA|0
+        495|Comparativo Clientes Ventas y Pagos por Agentes|sp_n_rptVentasPagosVsFolios_bak|||490
+       1000|Impresion de Remision|sp_rptFacturaVentasDetalleMultiple||NA|0
+       1001|Impresion de Remision V2|sp_rptVentasInformacionMultiple|sp_rptVentasDetalleMultiple|sp_rptVentasUsadosCargoMultiple|sp_rptVentasUsadosCreditoMul||NA|0
+       1002|Impresion de Simulador|sp_rptVentasInformacionMultipleSimulador|sp_rptVentasDetalleMultipleSimulador|sp_rptVentasUsadosCargoMultipleSimulador|s||NA|0
+       1003|Factura||sp_n_rptFacturaElectronica|NA|0
+       1005|Concentrado||sp_n_rptConcentradoImprimirMultiple|sp_n_rptConcentradoUsadosImprimirMultiple|sp_n_rptConcentradoFoliosUsadosMultiple|NA|0
+       1006|Hoja de Cobro||sp_n_rptConcentradoCobroImprimirMultiple|sp_n_rptConcentradoUsadosImprimirMultiple|sp_n_rptConcentradoFoliosUsadosMultip|NA|0
+       1007|Factura Zaragoza|||NA|0
+       1008|Concentrado Devueltas||sp_n_rptConcentradoImprimirMultiple|sp_n_rptConcentradoUsadosImprimirMultiple|sp_n_rptConcentradoFoliosUsadosMultiple|NA|0
+       1010|Cobranza||sp_n_rptCobranzasGlobales|NA|0
+       1015|Compra|sp_rptCompraDetalle|sp_rptComprasUsadosCargoMultiple|sp_rptComprasUsadosCreditoMultiple||NA|0
+       1017|Compras Comprobaci¢n||sp_n_rptComprasComprobacionGlobales|NA|0
+       1024|Asistencia||sp_n_ConsultaEmpleadosTipoSueldoRecibo|NA|0
+       1025|Asistencia||sp_n_ConsultaEmpleadosTipoSueldoRecibo|NA|0
+       1026|Asistencias||sp_n_rptAsistenciasZaragoza|NA|0
+       1027|Vacaciones||sp_n_rptEmpleadosVacaciones|NA|0
+       1030|Liquidaciones Descuentos||sp_n_rptVentasDescuentosAjustes|NA|0
+       1035|Reporte de Acumuladores|sp_rptListaPreciosAcumuladores||Empresa|0
+       1105|Lista de Precios|sp_rptListaPreciosAcumuladores||NA|0
+       1115|Lista de Precios Productos|sp_rptListaPreciosCategoria||NA|0
+       1130|Inventario Anterior Global|sp_rptInventarioAnteriorGlobal||NA|0
+       1135|Inventario Faltante Acumuladores||sp_n_rptInventarioFaltanteAcumuladores|NA|0
+       1136|Pedido ACUMULADORES||sp_n_rptInventarioPedidosAcumuladores|NA|0
+       1137|Pedido ACUMULADORES||sp_n_rptInventarioPedidosAcumuladores|NA|0
+       1140|Inventario Faltante Productos||sp_n_rptInventarioFaltanteProductos|NA|0
+       1141|Inventario Faltante Filtros||sp_n_rptInventarioFaltanteProductos|NA|0
+       1145|Inventario Anterior de Acumuladores|sp_rptInventarioAnteriorAcumuladoresCongeladoV2||NA|0
+       1150|Inventario Anterior de Productos|sp_rptInventarioAnteriorCategoriaCongeladoV2||NA|0
+       1155|Movimientos al Inventario|sp_ConsultaMovAlmacenAcumladores||NA|0
+       1160|Cobranza Detallado||sp_n_rptVentasSaldosGlobales|NA|0
+       1161|Cobranza Detallado||sp_n_rptVentasSaldosGlobales|NA|0
+       1162|Cobranza Detallado||sp_n_rptVentasSaldosGlobales|NA|0
+       1165|Cobranza Totalizado||sp_n_rptVentasSaldosGlobales|NA|0
+       1166|Cobranza Totalizado||sp_n_rptVentasSaldosGlobales|NA|0
+       1170|Reporte de Rutas de Agentes||sp_n_rptVentasSaldosDesglosadoGlobales|NA|0
+       1172|Reporte de Cobranza||sp_n_rptVentasSaldosGlobalesZara|NA|0
+       1180|Folios SIN Asignar||sp_n_rptVentasFoliosSinAsignarGlobales|NA|0
+       1185|Concentrados Detalle||sp_n_rptConcentradosDetalle|NA|0
+       1190|Asistencias y Faltas||sp_n_rptAsistenciasGlobales|NA|0
+       1201|Remision Sin Precio||sp_n_rptVentasRemisionSinPrecio|NA|0
+       1210|Remision Centro Servicio||sp_n_rptVentasRemisionCentroServicio|NA|0
+       1220|Garantias Enviadas al Proveedor||sp_n_rptGarantiasProveedor|NA|0
+       1222|Garantias Devueltas al Cliente||sp_n_rptGarantiasDevueltasCliente|NA|0
+       1224|Garantias Remisionadas||sp_n_rptGarantiasRemisionadas|NA|0
+       1230|Reporte de Gasolina Detallado||sp_n_rptGasolinas|NA|0
+       1231|Reporte de Gasolina Mensual||sp_n_rptGasolinas|NA|0
+       1235|Reporte de Garantias||sp_n_rptConsultarGarantias|NA|0
+       1236|Registro de Garantias||sp_n_rptConsultarGarantiasRegistradas|NA|0
+       1240|Listas de Precios||sp_n_rptListasPrecios|NA|0
+       1241|Listas de Precios TAURO||sp_n_rptListasPrecios|NA|0
+       1243|Listas de Precios Personalizado TAURO||sp_n_rptListasPreciosTauroTodas|NA|0
+       1244|Listas de Precios Personalizado TAURO - Todas Menos Tauro||sp_n_rptListasPreciosTauroTodasMenosTauro|NA|0
+       1245|Listas de Precios||sp_n_rptListasPreciosProductos|NA|0
+       1246|Listas de Precios Personalizado TAURO - CRONOS,  GOHNER Y XTREME,  LTH      CALE, AMERICA, FP, DYNAMO||sp_n_rptListasPreciosTauro_CRO_GON_XT_LTH_CL_AM_FP_DY|NA|0
+       1247|Listas de Precios Personalizado TAURO - CRONOS,  GOHNER Y XTREME,  LTH      CALE, AMERICA, FP, DYNAMO||sp_n_rptListasPreciosTauro_FP_AM_LTH|NA|0
+       1250|Control Acumulado de Estimaciones||sp_n_rptMCContratosConceptosEstimaciones|NA|0
+       1251|Caratula de Estimaci¢n||sp_n_rptMCContratosConceptosEstimaciones|NA|0
+       1255|Comprobante de Cascos||sp_n_rptUsadosMovimientos|NA|0
+       1256|Venta de Cascos||sp_n_rptUsadosMovimientos|NA|0
+       1260|Comprobante de Cascos TAURO||sp_n_rptUsadosMovimientosDiario|NA|0
+       1300|Reporte de Autos||sp_n_rptAutos|NA|0
+       1305|Reporte de Vales||sp_n_rptConsultarVentasUsadosExcendentesGlobales|NA|0
+       1310|Factura Custom Zaragoza||sp_n_rptVentasFacturas|NA|0
+       1315|Corte Diario||sp_n_rptCorteDiario|NA|0
+       1317|Corte Diario Detalle MAC||sp_n_rptVentasPagosLiquidacion|NA|0
+       1319|Ventas Liquidaciones||sp_n_rptVentasPagosLiquidacion|NA|0
+       1320|Cortes||sp_n_rptCortes|NA|0
+       1325|Reporte de Movimientos al Almacen||sp_n_rptMovimientosAcumuladoresGlobales|NA|0
+       1330|Reporte de Gastos Detallado||sp_n_rptGastos|NA|0
+       1335|Reporte de Gastos Totalizado||sp_n_rptGastos|NA|0
+       1340|Constancia de Contratista||sp_n_rptConstanciaContratista|NA|0
+       1345|Corte Centro de Servicio||sp_n_rptCortesCS|NA|0
+       1350|Productos Movimientos||sp_n_rptProductosMovimientos|NA|0
+       1355|Ventas Cobros Dinero y Cascos||sp_n_rptVentasCobrosDineroCascosGlobales|NA|0
+       1360|Ventas Cobros DINERO||sp_n_rptVentasCobrosDineroCascosGlobales|NA|0
+       1365|Ventas Cobros CASCOS||sp_n_rptVentasCobrosDineroCascosGlobales|NA|0
+       1370|Estado de Cuenta||sp_n_rptVentasEstadoCuenta|NA|0
+       1375|Estado de Cuenta DINERO||sp_n_rptVentasEstadoCuentaGlobales|NA|0
+       1380|Estado de Cuenta CASCOS||sp_n_rptVentasEstadoCuentaGlobales|NA|0
+       1385|Aviacion Comprobante de Pago||sp_n_rptComprobanteAviacion|NA|0
+       1390|Aviacion Recaudaciones / Amortizaciones / Inscripciones||sp_n_rptEconomicosRecaAmortInscrip|NA|0
+       1395|Accesos Mac||sp_n_rptAccesosMac|NA|0
+       1400|Aviacion Comprobante de Devolucion Fianza||sp_n_rptComprobanteAviacion|NA|0
+       1405|Reporte de Transferencias Clientes||sp_n_rptBancoTranferenciasMovimientosGlobales|NA|0
+       1406|Reporte  de Transferencias||sp_n_rptBancoTranferenciasMovimientosGlobales|NA|0
+       1407|Reporte de Transferencias por Folio||sp_n_rptBancoTranferenciasMovimientosFoliosGlobales|NA|0
+       1410|Centros Remisiones||sp_n_rptRemisionesCentrosGlobales|NA|0
+       1415|Centros Pagos Entradas y Salidas||sp_n_rptPagosCentrosGlobales|NA|0
+       1420|Centros Garantias||sp_n_rptGarantiasCentrosGlobales|NA|0
+       1425|Reporte de Auxiliar de Recaudaci¢n||sp_n_rptRecaudacionesGlobales|NA|0
+       1426|Reporte Auxiliar de Cobranza Consolidada||sp_n_rptRecaudacionesConsolidadaGlobales|NA|0
+       1428|Reporte Auxiliar de Cobranza (DEP‡SITOS)||sp_n_rptRecaudacionesDepositosGlobales|NA|0
+       1429|Reporte Auxiliar de Cobranza||sp_n_rptRecaudacionesConsolidadaGlobales|NA|0
+       1430|Reporte Auxiliar de Fianza||sp_n_rptRecasFianzasGlobales|NA|0
+       1432|Reporte Auxiliar de Cobranza de Tarjetas||sp_n_rptRecaudacionesTarjetasGlobales|NA|0
+       1433|Reporte Auxiliar de Cobranza de Tarjetas por Econ¢mico||sp_n_rptRecaudacionesTarjetasGlobales|NA|0
+       1434|Reporte Auxiliar de Cobranza de Tarjetas por D°a||sp_n_rptRecaudacionesTarjetasGlobales|NA|0
+       1435|Archivo de Comprobacion de Productos||sp_n_rptConsultaProductosComprobacion|NA|0
+       1440|Reporte de Clientes Facturas RFC||sp_n_rptClientesInfoFacturacionGlobales|NA|0
+       1445|Reporte de Centros Servicio||sp_n_rptEntradasSalidasCentrosGlobales|NA|0
+       1450|Reporte de Distribuci¢n de Tarjeta||sp_n_rptAviacionDistribucionTarjeta|NA|0
+       1455|Reporte de Ingresos para Contabilidad||sp_n_rptIngresosContabilidad|NA|0
+       1460|Auxiliar de Mayor||sp_n_rptIngresosContabilidad|NA|0
+       1465|Hoja de Cobro - Total Cobrado DETALLADO||sp_n_rptCobrosGlobales|NA|0
+       1466|Hoja de Cobro - Total Cobrado TOTALIZADO||sp_n_rptCobrosGlobales|NA|0
+       1470|Hoja de Cobro - Cascos||sp_n_rptCobrosGlobales|NA|0
+       1475|Ventas de MotoBaterias Por Cliente||sp_n_rptVentasMotoGlobales|NA|0
+       1480|Ventas de MotoBaterias Por Folio||sp_n_rptVentasMotoGlobales|NA|0
+       1485|Ventas de MotoBaterias Por Codigo||sp_n_rptVentasMotoGlobales|NA|0
+       1490|Ventas de MotoBaterias Por Marca||sp_n_rptVentasMotoGlobales|NA|0
+       1495|Hoja de Cobro - Cheques||sp_n_rptCobrosDineroUsadosChequesGlobales|NA|0
+       1500|Catalogo de Operadores||sp_n_rptAviacionOperadoresGlobales|NA|0
+       1505|Balanza de Comprobaci¢n||sp_n_rptIngresosContabilidad|NA|0
+       1510|Balanza de Comprobaci¢n por Economico||sp_n_rptIngresosContabilidad|NA|0
+       1515|Poliza de Cheques||sp_n_rpPolizaCheques|NA|0
+       1520|Poliza de Cheques Excel||sp_n_rpPolizaCheques|NA|0
+       1525|Reporte de Economicos||sp_n_rptEconomicos|NA|0
+       1530|Poliza de Ingresos Excel||sp_n_rptPolizaIngresos|NA|0
+       1535|Cambios de Vigencia||sp_n_rptCambiosVigencia|NA|0
+       1540|Empleados Sueldos Excel||sp_n_rptEmpleadosTipoSueldo|NA|0
+       1545|Cortes Gastos||sp_n_rptCortesTipoGastos|NA|0
