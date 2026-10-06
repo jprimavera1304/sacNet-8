@@ -28,6 +28,7 @@ public class AsistenciasRepository : IAsistenciasRepository
     private const string SpPeriodos = "dbo.sp_n_ConsultaPeriodosTipoSueldo";
     private const string SpPeriodosDias = "dbo.sp_n_ConsultaPeriodosTipoSueldoDias";
     private const string SpRejilla = "dbo.sp_n_ConsultaEmpleadosPeriodoAsistencia";
+    private const string SpDiaria = "dbo.sp_n_ConsultaEmpleadosAsistenciaDiaria";
 
     private const string SpGuardarDia = "dbo.sp_w_GuardarAsistenciaDia";
     private const string SpEliminarDia = "dbo.sp_w_EliminarAsistenciaDia";
@@ -213,6 +214,40 @@ public class AsistenciasRepository : IAsistenciasRepository
         if (!row.Table.Columns.Contains(columna)) return default;
         var v = row[columna];
         return v == DBNull.Value ? default : Convert.ToDateTime(v, CultureInfo.InvariantCulture);
+    }
+
+
+    /// <summary>
+    /// Quien checo HOY. SIEMPRE hoy.
+    ///
+    /// EL PARAMETRO @Fecha DEL PROCEDIMIENTO NO SIRVE, Y HAY QUE SABERLO ANTES DE
+    /// INTENTAR USARLO: esta declarado como `varchar` SIN longitud —o sea
+    /// varchar(1), un solo caracter— y su cuerpo no lo referencia ni una vez. El
+    /// filtro esta clavado a `dias.FechaDia = CAST(GETDATE() as date)`. Legacy le
+    /// mandaba la cadena vacia a pelo (EmpleadoPeriodoAsistenciaRepository.cs:114)
+    /// y el campo de fecha de su propio DTO no participaba. Aqui se manda "" por
+    /// lo mismo, y el endpoint NO ofrece fecha: ofrecerla seria aceptar un dato
+    /// que la base tira.
+    ///
+    /// Si algun dia hace falta la asistencia de otro dia, ya existe:
+    /// GET /api/asistencias con el periodo, o GET /api/checador/asistencia?fecha=.
+    /// </summary>
+    public async Task<List<AsistenciaDiariaDto>> ConsultarAsistenciaDiariaAsync(bool mostrarNombres, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = Sp(SpDiaria, conn);
+        cmd.Parameters.AddWithValue("@Fecha", string.Empty);
+        cmd.Parameters.AddWithValue("@MostrarAsistenciasNombres", mostrarNombres ? 1 : 0);
+
+        var dt = new DataTable();
+        await using (var reader = await cmd.ExecuteReaderAsync(ct))
+        {
+            dt.Load(reader);
+        }
+
+        return Funciones.DataTableToList<AsistenciaDiariaDto>(dt);
     }
 
     private static SqlCommand Sp(string sp, SqlConnection conn)

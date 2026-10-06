@@ -8,6 +8,12 @@ public interface IAsistenciasRepository
 
     Task<List<DiaPeriodoDto>> ConsultarDiasAsync(int idPeriodoTipoSueldo, CancellationToken ct = default);
 
+    /// <summary>
+    /// Quien entro HOY y a que hora. Siempre hoy: no admite otra fecha (ver
+    /// AsistenciasRepository.ConsultarAsistenciaDiariaAsync).
+    /// </summary>
+    Task<List<AsistenciaDiariaDto>> ConsultarAsistenciaDiariaAsync(bool mostrarNombres, CancellationToken ct = default);
+
     Task<RejillaAsistenciaResponse> ConsultarRejillaAsync(
         int idPeriodoTipoSueldo, int idEmpleado, int idStatus, CancellationToken ct = default);
 

@@ -93,3 +93,27 @@ public static class AsistenciaStatus
     public static int Normalizar(int idStatus)
         => idStatus == Inactivos || idStatus == Todos ? idStatus : Activos;
 }
+
+
+/// <summary>
+/// Un empleado que checo HOY, con su hora de entrada y de salida.
+///
+/// Es la vista de pizarron de Mac31: quien esta y a que hora llego, del dia en
+/// curso. No es la rejilla del periodo (esa es RejillaAsistenciaResponse) ni la
+/// asistencia de un dia cualquiera: el procedimiento esta clavado a
+/// `FechaDia = CAST(GETDATE() as date)` y no acepta otra fecha.
+///
+/// `nombreEmpleado` puede venir con asteriscos. No es un error: en Tauro
+/// (Constantes.Funcionalidad = 'TAU') el procedimiento tapa el nombre con
+/// dieciocho asteriscos salvo que se pida verlo. Ver el endpoint.
+/// </summary>
+public class AsistenciaDiariaDto
+{
+    /// <summary>El dia, que siempre es hoy.</summary>
+    public DateTime? Fecha { get; set; }
+    public string NombreEmpleado { get; set; } = string.Empty;
+    /// <summary>"HH:mm", como lo formatea el procedimiento. Puede venir vacia.</summary>
+    public string? HoraEntrada { get; set; }
+    /// <summary>"HH:mm". Vacia mientras no se haya ido.</summary>
+    public string? HoraSalida { get; set; }
+}
