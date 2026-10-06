@@ -389,7 +389,35 @@ public sealed class PermissionService : IPermissionService
         new("cheques.ver", "Cheques - Ver", "cheques"),
         new("cheques.crear", "Cheques - Crear", "cheques"),
         new("cheques.editar", "Cheques - Editar", "cheques"),
-        new("cheques.activar", "Cheques - Cambiar estatus", "cheques")
+        new("cheques.activar", "Cheques - Cambiar estatus", "cheques"),
+
+        /*
+          PERMISOS DE LOS CATALOGOS DE SOLO LECTURA (ola 1 de la migracion de MacServicios2).
+
+          Son cinco y no uno porque el contenido no es igual de inocente:
+          * `catalogos.ver` es el desplegable de toda la vida (estados, ciudades, puestos,
+            unidades de medida...). Lo necesita cualquiera que capture algo.
+          * `catalogos.fe.ver` son los catalogos del SAT: solo los ve quien factura.
+          * `catalogos.galleros.ver` se separa porque el renglon de gallero trae su SALDO,
+            y el dinero no se reparte con el resto de los desplegables.
+          * `catalogos.recaudaciones.ver` es cajas, conceptos y auxiliares por economico:
+            es el modulo de recaudaciones, que no todas las empresas tienen.
+          * `catalogos.formas.ver` es el inventario de pantallas de Mac31. Quien lo consulta
+            esta administrando seguridad; no se mezcla con los desplegables de captura.
+          * `catalogos.marcas.ver` es la relacion categoria-marca del catalogo de productos.
+
+          No se reuso `ventas.consultar` ni `permisosweb.bootstrap`, que estaban a mano: el
+          primero lo manda Mac31 (seccion del puente con legacy) y darlo aqui lo borraria en el
+          siguiente calculo; el segundo significa "administrar permisos", que no es esto.
+          La familia `catalogos.*` es del WEB, no esta en la lista de las cuatro familias que
+          gobierna Mac31, asi que lo que se de desde la pantalla de permisos si se respeta.
+        */
+        new("catalogos.ver", "Catálogos - Consultar", "catalogos"),
+        new("catalogos.fe.ver", "Catálogos - Facturación electrónica", "catalogos"),
+        new("catalogos.galleros.ver", "Catálogos - Galleros y su saldo", "catalogos"),
+        new("catalogos.recaudaciones.ver", "Catálogos - Recaudaciones", "catalogos"),
+        new("catalogos.formas.ver", "Catálogos - Formas de Mac31", "catalogos"),
+        new("catalogos.marcas.ver", "Catálogos - Categorías y marcas", "catalogos")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)
