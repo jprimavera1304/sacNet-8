@@ -611,6 +611,7 @@ public class VentasConsultaRepository : IVentasConsultaRepository
 WITH PedidoTimeline AS (
     SELECT
         Ped.IDVenta,
+        Ped.IDPedido,
         CASE WHEN Ped.[Fecha Impreso] IS NULL THEN '----'
              ELSE FORMAT(Ped.[Fecha Impreso], 'dd-MM-yyyy HH:mm') + ' - ' + ISNULL(UsuImp.Usuario, '') + ' - ' + ISNULL(Ped.EquipoImpresion, '') END AS FechaImpresoFtm,
         CASE WHEN Ped.[Fecha Proceso] IS NULL THEN '----'
@@ -624,9 +625,8 @@ WITH PedidoTimeline AS (
     LEFT JOIN Usuarios UsuAut ON UsuAut.IDUsuario = Ped.IDUsuarioAutorizo
     WHERE Ped.IDVenta IN ({string.Join(",", paramNames)})
 )
-SELECT IDVenta, FechaImpresoFtm, FechaProcesoFtm, FechaAutorizoFtm
-FROM PedidoTimeline
-WHERE rn = 1;";
+SELECT IDVenta, IDPedido, FechaImpresoFtm, FechaProcesoFtm, FechaAutorizoFtm, rn
+FROM PedidoTimeline;";
 
         await using var cmd = new SqlCommand(sql, conn)
         {
@@ -637,25 +637,50 @@ WHERE rn = 1;";
         for (var i = 0; i < idsVenta.Count; i++)
             cmd.Parameters.AddWithValue(paramNames[i], idsVenta[i]);
 
-        var timelineByVenta = new Dictionary<int, Dictionary<string, object?>>();
+        // Se indexa por PEDIDO y, ademas, por VENTA con el pedido mas reciente.
+        // La consulta de pedidos devuelve UN RENGLON POR PEDIDO y una venta puede
+        // tener varios: si solo se indexara por venta, al pedido viejo se le
+        // pintarian las fechas del nuevo. La consulta de remisiones, en cambio,
+        // da un renglon por venta y no trae IDPedido, y para ese caso se conserva
+        // el indice por venta como respaldo.
+        var timelinePorPedido = new Dictionary<int, Dictionary<string, object?>>();
+        var timelinePorVenta = new Dictionary<int, Dictionary<string, object?>>();
         await using (var reader = await cmd.ExecuteReaderAsync(ct))
         {
             while (await reader.ReadAsync(ct))
             {
-                var idVenta = reader.GetInt32(reader.GetOrdinal("IDVenta"));
-                timelineByVenta[idVenta] = new Dictionary<string, object?>
+                var timeline = new Dictionary<string, object?>
                 {
                     ["FechaImpresoFtm"] = reader["FechaImpresoFtm"],
                     ["FechaProcesoFtm"] = reader["FechaProcesoFtm"],
                     ["FechaAutorizoFtm"] = reader["FechaAutorizoFtm"]
                 };
+
+                var idPedido = reader.GetInt32(reader.GetOrdinal("IDPedido"));
+                timelinePorPedido[idPedido] = timeline;
+
+                // rn = 1 es el pedido mas reciente de la venta.
+                if (reader.GetInt64(reader.GetOrdinal("rn")) == 1)
+                {
+                    var idVenta = reader.GetInt32(reader.GetOrdinal("IDVenta"));
+                    timelinePorVenta[idVenta] = timeline;
+                }
             }
         }
 
         foreach (var row in response.Rows)
         {
-            var idVenta = ReadRowInt(row, "IDVenta", "idVenta");
-            if (idVenta <= 0 || !timelineByVenta.TryGetValue(idVenta, out var timeline)) continue;
+            Dictionary<string, object?>? timeline = null;
+
+            var idPedido = ReadRowInt(row, "IDPedido", "idPedido");
+            if (idPedido > 0) timelinePorPedido.TryGetValue(idPedido, out timeline);
+
+            if (timeline is null)
+            {
+                var idVenta = ReadRowInt(row, "IDVenta", "idVenta");
+                if (idVenta <= 0 || !timelinePorVenta.TryGetValue(idVenta, out timeline)) continue;
+            }
+
             row["FechaImpresoFtm"] = timeline["FechaImpresoFtm"];
             row["FechaProcesoFtm"] = timeline["FechaProcesoFtm"];
             row["FechaAutorizoFtm"] = timeline["FechaAutorizoFtm"];
