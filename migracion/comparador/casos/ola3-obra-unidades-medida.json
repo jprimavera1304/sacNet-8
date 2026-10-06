@@ -1,0 +1,45 @@
+{
+  "nombre": "Obra - unidades de medida",
+  "_porque": [
+    "Legacy devuelve aqui `GenericResponse(List<DataRow>)`: Newtonsoft no tiene",
+    "converter para DataRow, asi que su JSON son las propiedades del objeto",
+    "(itemArray, table, rowState, hasErrors) y no las columnas. Se compara contra",
+    "`result.tablaLst.0.Table`, que es la tabla completa serializada como objetos",
+    "de verdad: es el unico lugar del payload de Legacy donde los datos salen con",
+    "el nombre de su columna.",
+    "OJO si este caso empieza a fallar con 'distinto numero de renglones': si la",
+    "consulta se queda sin filas, `tablaLst` llega vacio y `.0.Table` no existe.",
+    "En ese caso hay que quitar `camino_legacy` (el desenvoltorio por defecto ya",
+    "da [] en los dos lados)."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/mcunidadesmedida/consultar",
+    "body": {
+      "IDStatus": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/obra/catalogos/unidades-medida"
+  },
+  "camino_legacy": "result.tablaLst.0.Table",
+  "camino_nuevo": "data",
+  "ordenar_por": "IDUnidadMedida",
+  "solo_campos": [
+    "idUnidadMedida",
+    "idStatus",
+    "unidadMedida",
+    "estatus",
+    "esPorcentaje",
+    "soloUnidades"
+  ],
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Fuera `@Formato`: el interruptor 0/1 de Mac31 hace que el MISMO procedimiento devuelva otras columnas, con los encabezados en espanol. El Excel lo arma el front con los mismos datos.",
+    "Fuera `UnidadMedidaFtm`: el procedimiento lo arma como UnidadMedida + 'PORCENTAJE' SIN espacio ('%PORCENTAJE'). Con `esPorcentaje` el front lo escribe bien."
+  ]
+}

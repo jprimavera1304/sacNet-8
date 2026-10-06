@@ -1,0 +1,25 @@
+{
+  "nombre": "Obra - gerentes",
+  "_porque": [
+    "La tabla MC_Gerentes NO EXISTE en Produccion_svr. Legacy contesta",
+    "status 500 con \"Invalid object name 'MC_Gerentes'\" y el backend nuevo",
+    "contesta 500 con el mismo mensaje de SQL Server: los dos preguntan lo",
+    "mismo y la base no tiene de donde responder.",
+    "No es verificable aqui. Para verificarlo hace falta una base con el modulo",
+    "de obra instalado (una empresa con Constantes.EsAlcaldiaMC = 1)."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/mcgerentes/consultar",
+    "body": {}
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/obra/catalogos/gerentes"
+  },
+  "camino_nuevo": "data",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ]
+}

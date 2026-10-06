@@ -1,0 +1,29 @@
+{
+  "nombre": "Asistencia del dia",
+  "_porque": [
+    "Nadie ha checado hoy en esta base: los dos lados dan vacio.",
+    "SIEMPRE ES HOY en los dos lados y no acepta fecha. El procedimiento declara",
+    "un @Fecha que no usa en ninguna linea (y que ademas es varchar(1), un solo",
+    "caracter): su filtro esta clavado a `FechaDia = CAST(GETDATE() as date)`.",
+    "A Legacy se le manda el body vacio, que es MostrarAsistenciasNombres = 0."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/empleadosperiodoasistencias/diaria/consultar",
+    "body": {}
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/asistencias/diaria"
+  },
+  "camino_nuevo": "data",
+  "ordenar_por": "nombreEmpleado",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "EL INTERRUPTOR DE LOS NOMBRES YA NO VIENE DEL BODY. En Tauro el procedimiento tapa el nombre con dieciocho asteriscos cuando se le pide en 0 y lo ensena cuando se le pide en 1. Legacy dejaba ese 1 en el cuerpo de la peticion: cualquiera que supiera mandarlo destapaba la lista completa de quien llego y a que hora. En el nuevo lo decide el permiso `empleados.sueldo.ver`, y la respuesta trae `puedeVerNombres` para que la pantalla lo diga.",
+    "Legacy devolvia el `EmpleadoPeriodoAsistenciaDTO` completo (unas sesenta propiedades: diaEntrada1..7, asistencias...) con solo cuatro llenas. El nuevo tiene su propio DTO de cuatro campos."
+  ]
+}

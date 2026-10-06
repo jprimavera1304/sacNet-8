@@ -1,0 +1,50 @@
+{
+  "nombre": "Ficha de cliente - centros de servicio permitidos",
+  "_porque": [
+    "Cliente 1 e idEmpresa 0 (la base local) a los dos lados.",
+    "Igual que las bonificaciones: hay un renglon por centro activo, con",
+    "`permitido` en 0 donde no se le ha dado acceso.",
+    "OJO: el procedimiento REVIENTA si el cliente no existe \u2014 arma su consulta",
+    "concatenando el nombre del cliente, y con un id inexistente el nombre es",
+    "NULL, toda la cadena se vuelve NULL y EXEC(NULL) falla. De ahi que el nuevo",
+    "exija idCliente > 0."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/clientes/centroservicio/consultar",
+    "body": {
+      "IDCliente": 1,
+      "IDEmpresa": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/clientes/1/centros-servicio"
+  },
+  "camino_nuevo": "data",
+  "ordenar_por": "IDCentro",
+  "solo_campos": [
+    "idEmpresa",
+    "idClienteCentroServicio",
+    "idCliente",
+    "numeroCliente",
+    "nombreCliente",
+    "idCentro",
+    "nombreCentro",
+    "baseCentro",
+    "permitido",
+    "idUsuario",
+    "fecha",
+    "equipo"
+  ],
+  "ignorar": [
+    "result",
+    "mensaje",
+    "fecha"
+  ],
+  "diferencias_intencionales": [
+    "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla.",
+    "`fecha` se ignora en la comparacion A PROPOSITO. Legacy la declara DateTime NO nullable, asi que un centro que el cliente nunca ha tenido asignado \u2014el LEFT JOIN no trae renglon\u2014 sale con `0001-01-01T00:00:00`. El nuevo la declara anulable y manda null, que es lo que significa: no hay fecha. Un anio 1 en una pantalla se lee como un dato corrupto.",
+    "El nuevo publica `equipoModificacion` / `idUsuarioModificacion` / `usuarioModifico` con el nombre de la COLUMNA. El DTO de Legacy los llamaba `*Modifico` y el procedimiento los manda como `*Modificacion`: como el mapeo empareja por nombre exacto, en Legacy salian siempre vacios."
+  ]
+}

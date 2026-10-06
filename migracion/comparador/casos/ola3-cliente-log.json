@@ -1,0 +1,31 @@
+{
+  "nombre": "Ficha de cliente - bitacora de cambios",
+  "_porque": [
+    "Cliente 1, que en esta base no tiene movimientos: los dos lados dan vacio.",
+    "No hay filtro por fecha en ninguno de los dos, y es a proposito: el WHERE de",
+    "fechas del procedimiento esta COMENTADO en la base y sus dos parametros",
+    "tienen defaults de prueba de diciembre de 2024. Legacy tampoco los mandaba.",
+    "Ofrecer un rango que la base ignora es peor que no ofrecerlo."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/clientes/consultar/log",
+    "body": {
+      "IDCliente": 1
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/clientes/1/log"
+  },
+  "camino_nuevo": "data",
+  "ordenar_por": "IDClientesLog",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla.",
+    "Legacy devolvia el `ClienteDTO` COMPLETO (unas ochenta propiedades) con solo ocho llenas, porque reusaba el DTO del cliente para la bitacora. El nuevo tiene su propio DTO con los ocho campos que el procedimiento manda."
+  ]
+}

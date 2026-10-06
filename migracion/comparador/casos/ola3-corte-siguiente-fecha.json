@@ -1,0 +1,36 @@
+{
+  "nombre": "Corte de caja - siguiente fecha",
+  "_porque": [
+    "En Legacy este endpoint se llama `/consultar/actual` y recibe un IDCorte que",
+    "el procedimiento PISA en su primera linea con MAX(IDCorte). El nuevo no",
+    "recibe nada, porque no depende de nada.",
+    "Es el ultimo corte NO CANCELADO mas un dia, y si ese dia cae en domingo, mas",
+    "otro (el negocio no corta en domingo).",
+    "Se compara el primer renglon de Legacy contra el objeto del nuevo: Legacy",
+    "devuelve una lista de un elemento porque reusa el DTO de la lista de cortes."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cortes/consultar/actual",
+    "body": {}
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/cortes/siguiente-fecha"
+  },
+  "camino_legacy": "result.cortes.0",
+  "camino_nuevo": "data",
+  "solo_campos": [
+    "idCorte",
+    "fechaCorte"
+  ],
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla.",
+    "Fuera el parametro IDCorte, que el procedimiento ignora. Aceptarlo haria creer que el resultado depende de el.",
+    "Legacy devolvia el CorteDTO completo con todo en ceros salvo tres campos. El nuevo publica un objeto de dos campos."
+  ]
+}

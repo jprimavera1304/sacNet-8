@@ -1,0 +1,86 @@
+{
+  "nombre": "Catalogo de productos con precios",
+  "_porque": [
+    "Activos (idStatus 1) a los dos lados. Es la respuesta mas grande del lote",
+    "(3.3 MB en Legacy), asi que se comparan los campos que de verdad importan:",
+    "la identidad del producto, su clasificacion, su precio y su existencia.",
+    "No se pide `listaRoshfrans` ni `esCarga`: dentro del procedimiento cada uno",
+    "REINICIA el WHERE completo, tirando el status y los demas filtros, asi que",
+    "pedirlos aqui compararia otra consulta."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/productos/consultar",
+    "body": {
+      "IDStatus": 1,
+      "Clave": "",
+      "Descripcion": "",
+      "IDMarcaLst": [],
+      "IDCategoriaLst": [],
+      "IDGrupoCategoriaLst": [],
+      "PorcentajesDescuento": ""
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/productos",
+    "query": {
+      "idStatus": 1
+    }
+  },
+  "camino_nuevo": "data",
+  "ordenar_por": "IDProducto",
+  "solo_campos": [
+    "idGrupoCategoria",
+    "idCategoria",
+    "idMarca",
+    "idProducto",
+    "idTipoUsado",
+    "idStatus",
+    "grupoCategoria",
+    "categoria",
+    "marca",
+    "clave",
+    "idUnidadMedida",
+    "unidadMedida",
+    "numPiezas",
+    "descripcion",
+    "precioLista",
+    "precioLista2",
+    "precioListaCS",
+    "pesoKg",
+    "unidadMedidaSat",
+    "claveSat",
+    "tipoUsado",
+    "tipoUsadoCorto",
+    "status",
+    "observaciones",
+    "stock",
+    "stockMinimo",
+    "stockMaximo",
+    "litros",
+    "esServicio",
+    "mostrarLista",
+    "diferencia",
+    "precioListaAnterior",
+    "esCarga",
+    "codigoLista",
+    "idUsuarioModificacion",
+    "usuarioModificacion",
+    "fechaModificacion"
+  ],
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla. Aqui son `unidadMedidaFtm` ('12 PZAS / CAJA') y `ordenFtm`.",
+    "Fuera `MesAno`: el procedimiento calcula el nombre del mes y el anio con GETDATE() DENTRO de la base, igual en todos los renglones. Es el encabezado de la lista de precios impresa, no un dato del producto \u2014 y seria la fecha del servidor de base, no la del usuario.",
+    "Fuera `UltimaModificacion` ('usuario - fecha - equipo' en una sola cadena): los tres pedazos ya viajan por separado.",
+    "`PrecioListaConIvaRnd` y `PrecioRoshfransConIvaRnd` se publican como `precioListaConIva` y `precioRoshfransConIva`: ese 'Rnd' es mentira, el procedimiento NO redondea (multiplica por 1 + IVA/100 y ya), y el nombre le diria al front que puede imprimir el numero tal cual.",
+    "El nuevo AGREGA `descripcionSat` y `equipoModificacion`: el procedimiento las manda y el DTO de Legacy no las declaraba, asi que lo que se timbra y desde que maquina se cambio un precio no se podian revisar desde el web.",
+    "El nuevo ARMA los porcentajes de descuento a partir de una lista de numeros, con punto decimal invariante. Legacy pasaba la cadena ya delimitada tal cual venia en el body: los descuentos se aplican EN CASCADA y en el orden en que llegan, asi que un error de formato del cliente se volvia un precio equivocado sin ningun error visible.",
+    "El nuevo contesta 400 si se piden `listaRoshfrans` y `esCarga` juntos. En el procedimiento gana `esCarga` (su bloque va despues) pero los cursores de descuento corren igual: se pedia la lista Roshfrans, se recibia la de carga con precios descontados, y nada avisaba.",
+    "Nunca se manda `@Formato = 1`: esta ROTO en la base (concatena un segundo SELECT despues de la lista de columnas del primero, asi que el EXEC falla con error de sintaxis)."
+  ]
+}

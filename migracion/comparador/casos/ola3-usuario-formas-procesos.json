@@ -1,0 +1,47 @@
+{
+  "nombre": "Usuario - formas y procesos de Mac31",
+  "_porque": [
+    "Usuario 9 (el que usa el banco de pruebas). Son 368 renglones: el inventario",
+    "COMPLETO de botones de Mac31 con el acceso de ese usuario, porque el",
+    "procedimiento hace LEFT JOIN desde el catalogo.",
+    "El numero de formas CAMBIA con la empresa: el procedimiento ajusta su filtro",
+    "segun Constantes.EsAlcaldiaMC, AviacionIDCaja y EsAviacionServer. No es un",
+    "parametro, es la configuracion de la base."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/usuarios/formas/procesos/consultar",
+    "body": {
+      "IDUsuario": 9
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/usuarios/formas-procesos",
+    "query": {
+      "idUsuario": 9
+    }
+  },
+  "camino_nuevo": "data",
+  "ordenar_por": "IDProceso",
+  "solo_campos": [
+    "idUsuarioFormaProceso",
+    "idUsuario",
+    "idProceso",
+    "idForma",
+    "proceso",
+    "procesoDescripcion",
+    "forma",
+    "formaDescripcion",
+    "acceso",
+    "idPerfil"
+  ],
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo publica tambien `idStatus`, que el procedimiento manda y el DTO de Legacy no declaraba. Queda fuera de solo_campos porque Legacy no lo entrega.",
+    "Fuera `result` y `mensaje` de cada renglon."
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "nombre": "Ficha de cliente - datos de facturacion",
+  "_porque": [
+    "Se piden los activos (idStatus 1) a los dos lados: son 241 renglones en esta",
+    "base, suficientes para que la comparacion valga y sin arrastrar los",
+    "inactivos.",
+    "`direccion` SI se compara aunque sea texto preconcatenado: es la direccion",
+    "fiscal tal como la imprime la factura, y rearmarla en el front con otro orden",
+    "o otra puntuacion seria imprimir un domicilio distinto del que se timbro."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/clientes/facturacion/consultar",
+    "body": {
+      "IDStatus": 1,
+      "NombreFacturacion": "",
+      "RFC": ""
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/clientes/facturacion",
+    "query": {
+      "idStatus": 1
+    }
+  },
+  "camino_nuevo": "data",
+  "ordenar_por": "IDClienteFacturacion",
+  "solo_campos": [
+    "idClienteFacturacion",
+    "idCliente",
+    "idColonia",
+    "idStatus",
+    "nombreFacturacion",
+    "rfc",
+    "idUsuario",
+    "usuario",
+    "fecha",
+    "equipo",
+    "estatus",
+    "calle",
+    "numeroExterior",
+    "numeroInterior",
+    "colonia",
+    "codigoPostal",
+    "delegacionMunicipio",
+    "ciudad",
+    "estado",
+    "direccion",
+    "idFERegimenFiscal",
+    "feRegimenFiscal",
+    "idFEFormaPago",
+    "feFormaPago",
+    "idFEUsoCFDI",
+    "feUsoCFDI",
+    "idFEMetodoPago",
+    "feMetodoPago",
+    "email",
+    "email2",
+    "email3",
+    "email4",
+    "email5"
+  ],
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla.",
+    "Fuera `@Formato`: el interruptor 0/1 de Mac31 hace que el MISMO procedimiento devuelva otras columnas, con los encabezados en espanol. El Excel lo arma el front con los mismos datos.",
+    "El nuevo publica `idUsuarioModificacion` / `usuarioModificacion` / `fechaModificacion` / `equipoModificacion` con el nombre de la columna. El DTO de Legacy los llamaba `*Modifico` y nunca se llenaban: desde el web no se podia saber quien habia cambiado un RFC.",
+    "El nuevo quita el apostrofo del filtro de texto. No es cosmetico: el procedimiento concatena el filtro y lo corre con EXEC(@Sql), asi que el SqlParameter no protege adentro, y Legacy no lo saneaba en la rama de consulta."
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "nombre": "Usuario - fechas de operacion abiertas",
+  "_porque": [
+    "Usuario 9, que en esta base no tiene renglones en UsuariosFechas: los dos",
+    "lados dan vacio.",
+    "`idUsuario` es obligatorio de hecho: el WHERE del procedimiento siempre",
+    "compara contra el, no hay rama de 'todos', asi que con 0 devuelve vacio.",
+    "Nota de datos: la tabla es `UsuariosFechas`, SIN espacio. No es la",
+    "`[Usuarios Fechas]` (con espacio) que toca sp_n_ConsultaConstantes al rodar",
+    "la fecha de operacion."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/usuarios/fechas/consultar",
+    "body": {
+      "IDUsuario": 9
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/usuarios/fechas",
+    "query": {
+      "idUsuario": 9
+    }
+  },
+  "camino_nuevo": "data",
+  "ordenar_por": "IDUsuarioFecha",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla.",
+    "Fuera `result` y `mensaje` de cada renglon."
+  ]
+}

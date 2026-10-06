@@ -1,0 +1,33 @@
+{
+  "nombre": "Catalogo de condiciones de credito",
+  "_porque": [
+    "Legacy si tiene DTO tipado aqui (`result.condicionesCredito`), asi que el",
+    "desenvoltorio por defecto alcanza.",
+    "El filtro de texto busca por PREFIJO (LIKE 'texto%') en los dos lados: asi",
+    "lo hace el procedimiento."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/CatCondicionesCredito/consultar",
+    "body": {
+      "IDStatus": 0,
+      "CondicionCredito": ""
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/condiciones-credito"
+  },
+  "camino_nuevo": "data",
+  "ordenar_por": "IDCondicionCredito",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Fuera `@Formato`: el interruptor 0/1 de Mac31 hace que el MISMO procedimiento devuelva otras columnas, con los encabezados en espanol. El Excel lo arma el front con los mismos datos.",
+    "Fuera `result` y `mensaje` de cada renglon: son el hueco de error de los procedimientos de escritura y en una consulta salen 0/null siempre.",
+    "Fuera el filtro por dias de credito: el procedimiento recibe @DiasCredito y no lo usa en ninguna rama. Legacy ni lo mandaba.",
+    "El nuevo quita el apostrofo del filtro de texto. No es cosmetico: el procedimiento concatena el filtro y lo corre con EXEC(@Sql), asi que el SqlParameter no protege adentro, y Legacy no lo saneaba en la rama de consulta."
+  ]
+}

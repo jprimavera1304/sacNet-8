@@ -64,31 +64,39 @@ cuando falla es peligroso. El caso que lo destapó:
 Ahora lo decide el cuerpo del procedimiento, leído de `sys.sql_modules`
 (`clasificar-escrituras.py`). Resultado:
 
-| | antes | ahora |
+| | por el nombre | leyendo el procedimiento |
 |---|---|---|
-| Solo leen | 210 | **143** |
-| Escriben | 278 | **308** |
+| Solo leen | 210 | **102** |
+| Pueden escribir | 278 | **349** |
 | No se sabe (el SP no está en esta base) | 0 | **37** |
 
-**86 capacidades que decían leer, escriben.** Si esto no se hubiera revisado,
-tarde o temprano alguien las habría ejecutado creyéndolas inofensivas.
+**Más de cien capacidades que decían leer, escriben.** Si esto no se hubiera
+revisado, tarde o temprano alguien las habría ejecutado creyéndolas
+inofensivas.
 
 ### Sobre el método
 
 Se probaron tres formas y se quedó la tercera:
 
-1. Traer el texto de los ~600 procedimientos en un solo `SELECT`: **no sirve**,
-   sqlcmd parte y recorta las líneas largas.
-2. Detectarlo dentro de SQL con `LIKE '%INSERT %'`: robusto de transportar pero
-   **demasiado tosco** — marcaba 138 lecturas como escrituras (cuenta un INSERT
-   a una tabla temporal, o dentro de un comentario). Una señal que se equivoca
-   tanto no la mira nadie.
-3. Pedirlos uno por uno y analizarlos con cuidado, descartando `#temporales` y
-   variables de tabla. Son ~600 viajes y un par de minutos. **Es la que quedó.**
+1. Deducirlo del **nombre** del procedimiento. Rápido y equivocado.
+2. Traer el texto de cada procedimiento y analizarlo en Python. Lo correcto en
+   teoría, pero **sqlcmd recorta las definiciones largas**, así que el análisis
+   miraba solo el principio. Fallaba en silencio y en la dirección cara: así se
+   le escaparon cuatro procedimientos que sí escriben, entre ellos
+   `sp_n_CancelarBancoTransferencia`, que actualiza Ventas, Pagos y Clientes.
+3. **Detectarlo dentro de SQL**, donde vive el texto entero, descontando las
+   escrituras a tablas temporales. Solo cruza un 0 o un 1. Es la que quedó.
+
+El `si` **sobre-reporta a propósito**. No distingue una escritura real de un
+INSERT que quedó dentro de un bloque `/* */` con consultas de apunte, y los
+`sp_n_` tienen montones de esos arriba — `sp_n_ConsultaClientes`, por ejemplo,
+sale marcado por un `UPDATE Clientes ... WHERE IDCliente = 19222` que vive en
+ese bloque de notas.
 
 Ante la duda, el sesgo es decir "escribe": equivocarse así hace que alguien
 pruebe con más cuidado del necesario; equivocarse al revés hace que ejecute
-contra la base algo que creía inofensivo.
+contra la base algo que creía inofensivo. Por eso **`no` significa comprobado y
+`si` significa trátalo con cuidado**, no "escribe seguro".
 
 ## Qué hacer a partir de aquí
 

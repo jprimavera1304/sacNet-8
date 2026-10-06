@@ -1,0 +1,47 @@
+{
+  "nombre": "Catalogo de marcas",
+  "_porque": [
+    "Legacy tiene DTO tipado (`result.marcas`).",
+    "Se mandan lista vacia e IDMarca 0 para pedir todas. En el nuevo, el 0 se",
+    "DESCARTA antes de armar la cadena: el procedimiento NO tiene la guarda",
+    "`<> '0'` que si tienen los filtros de categoria, asi que un IDsMarca = '0'",
+    "se vuelve `IDMarca IN (0)` y devuelve CERO renglones. 'Sin filtro' tiene que",
+    "viajar como cadena vacia."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/marcas/consultar",
+    "body": {
+      "IDStatus": 0,
+      "Marca": "",
+      "IDMarcaLst": []
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/marcas"
+  },
+  "camino_nuevo": "data",
+  "ordenar_por": "IDMarca",
+  "solo_campos": [
+    "idMarca",
+    "idStatus",
+    "marca",
+    "marcaCorto",
+    "columnaConcentrado",
+    "columnaTemplate",
+    "columnaInventario",
+    "ordenListaPrecios",
+    "status"
+  ],
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Fuera `@Formato`: el interruptor 0/1 de Mac31 hace que el MISMO procedimiento devuelva otras columnas, con los encabezados en espanol. El Excel lo arma el front con los mismos datos.",
+    "Fuera `IDGrupoCategoria`, `IDCategoria`, `GrupoCategoria`, `Categoria` y `Marcado`: el DTO de Legacy las declara y este procedimiento NO las devuelve, asi que salian siempre en 0/null. Publicar un campo que nunca trae dato es mentir sobre el contrato.",
+    "Fuera `result` y `mensaje` de cada renglon.",
+    "El nuevo quita el apostrofo del filtro de texto. No es cosmetico: el procedimiento concatena el filtro y lo corre con EXEC(@Sql), asi que el SqlParameter no protege adentro, y Legacy no lo saneaba en la rama de consulta."
+  ]
+}

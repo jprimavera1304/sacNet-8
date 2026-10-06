@@ -1,0 +1,41 @@
+{
+  "nombre": "Catalogo de series de empresa",
+  "_porque": [
+    "Legacy devuelve aqui `GenericResponse(List<DataRow>)`: Newtonsoft no tiene",
+    "converter para DataRow, asi que su JSON son las propiedades del objeto",
+    "(itemArray, table, rowState, hasErrors) y no las columnas. Se compara contra",
+    "`result.tablaLst.0.Table`, que es la tabla completa serializada como objetos",
+    "de verdad: es el unico lugar del payload de Legacy donde los datos salen con",
+    "el nombre de su columna.",
+    "OJO si este caso empieza a fallar con 'distinto numero de renglones': si la",
+    "consulta se queda sin filas, `tablaLst` llega vacio y `.0.Table` no existe.",
+    "En ese caso hay que quitar `camino_legacy` (el desenvoltorio por defecto ya",
+    "da [] en los dos lados).",
+    "`IDFacturama` es TEXTO aunque se llame ID: la columna Empresas.IDFacturama",
+    "es varchar y trae un token ('dwySOmFMFMoLpfwWbLem7A2'). Declararlo int",
+    "reventaba la consulta completa con \"The input string ... was not in a",
+    "correct format\"; esta escrito en el DTO para que nadie lo 'arregle'."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/empresas/series/consultar",
+    "body": {
+      "IDStatus": 0,
+      "Nombre": ""
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/empresas-series"
+  },
+  "camino_legacy": "result.tablaLst.0.Table",
+  "camino_nuevo": "data",
+  "ordenar_por": "IDEmpresaSerie",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo quita el apostrofo del filtro de texto. No es cosmetico: el procedimiento concatena el filtro y lo corre con EXEC(@Sql), asi que el SqlParameter no protege adentro, y Legacy no lo saneaba en la rama de consulta."
+  ]
+}

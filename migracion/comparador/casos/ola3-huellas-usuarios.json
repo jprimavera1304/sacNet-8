@@ -1,0 +1,41 @@
+{
+  "nombre": "Huellas registradas de usuarios",
+  "_porque": [
+    "UsuariosHuellas esta vacia en esta base: los dos lados dan vacio.",
+    "A Legacy se le manda el valor magico IDUsuario = -1 ('todas') y los otros dos",
+    "en 0. En el nuevo eso se pide con origen=usuario&todas=true: el -1 no viaja",
+    "por HTTP, porque si viajara un `id=-1` por error de un front se volveria",
+    "'dame todas las huellas de la empresa' sin que nadie lo hubiera pedido.",
+    "OJO con los defaults de Legacy: el de @IDEmpleado en el procedimiento es -1,",
+    "asi que omitirlo trae las huellas de toda la nomina de regalo. Aqui se manda",
+    "0 explicito en los dos lados."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/huellas/consultar",
+    "body": {
+      "IDUsuario": -1,
+      "IDEmpleado": 0,
+      "IDCliente": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/huellas",
+    "query": {
+      "origen": "usuario",
+      "todas": "true"
+    }
+  },
+  "camino_nuevo": "data",
+  "ordenar_por": "idHuella",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo pide UN origen por llamada y devuelve ese. El procedimiento emite un result set POR CADA filtro que se cumple y Legacy leia solo `Tables[0]`: con dos origenes a la vez, las huellas del segundo se perdian sin aviso. Y con los tres en 0 no emite NINGUN result set, y Legacy contestaba 500.",
+    "El nuevo agrega `origen` ('usuario'/'empleado'/'cliente') y publica el id de la huella y el de la persona con nombres unicos (`idHuella`, `idPersona`). El DTO de Legacy declaraba los seis a la vez y en cada bloque cuatro salian en 0.",
+    "`huella` sale en base64 en los dos lados (byte[] serializado), asi que el lector de huellas del cliente no cambia."
+  ]
+}

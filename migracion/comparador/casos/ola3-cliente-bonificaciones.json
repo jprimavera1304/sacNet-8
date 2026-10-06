@@ -1,0 +1,47 @@
+{
+  "nombre": "Ficha de cliente - bonificaciones por tipo de usado",
+  "_porque": [
+    "Cliente 1 (CLIENTES LOCALES) porque tiene renglones en esta base.",
+    "El procedimiento devuelve UN RENGLON POR TIPO DE USADO ACTIVO, exista o no",
+    "la bonificacion del cliente (es un LEFT JOIN desde el catalogo). Un renglon",
+    "con idClienteBonificacion = 0 significa 'no hay bonificacion pactada', no",
+    "que falte un dato."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/clientes/bonificacion/consultar",
+    "body": {
+      "IDCliente": 1
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/clientes/1/bonificaciones"
+  },
+  "camino_nuevo": "data",
+  "ordenar_por": "IDTipoUsado",
+  "solo_campos": [
+    "idClienteBonificacion",
+    "idCliente",
+    "numeroCliente",
+    "nombreCliente",
+    "idTipoUsado",
+    "tipoUsado",
+    "bonificacion",
+    "idUsuarioAlta",
+    "fechaAlta",
+    "equipoAlta",
+    "fechaModificacion",
+    "equipoModifico",
+    "idUsuarioModifico"
+  ],
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla.",
+    "El nuevo AGREGA `usuarioModifico`: el procedimiento la manda y el DTO de Legacy no la declaraba, asi que el nombre de quien cambio una bonificacion nunca llegaba a la pantalla. Queda fuera de solo_campos porque Legacy no la entrega.",
+    "El nuevo traduce a nulo el literal `''` (dos apostrofos) que deja el ISNULL del procedimiento cuando no hay modificacion. Legacy lo pintaba tal cual."
+  ]
+}

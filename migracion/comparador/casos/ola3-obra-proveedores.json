@@ -1,0 +1,34 @@
+{
+  "nombre": "Obra - proveedores",
+  "_porque": [
+    "MC_Proveedores esta vacia en esta base: los dos lados devuelven cero",
+    "renglones. El envoltorio de Legacy aqui si es tipado (`result.proveedores`),",
+    "asi que el desenvoltorio por defecto lo resuelve solo."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/mcproveedores/consultar",
+    "body": {
+      "IDStatus": 0,
+      "Numero": "",
+      "Nombre": "",
+      "ApellidoPaterno": "",
+      "ApellidoMaterno": "",
+      "Rfc": ""
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/obra/proveedores"
+  },
+  "camino_nuevo": "data",
+  "ordenar_por": "IDProveedor",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla.",
+    "Fuera `@Formato`: el interruptor 0/1 de Mac31 hace que el MISMO procedimiento devuelva otras columnas, con los encabezados en espanol. El Excel lo arma el front con los mismos datos."
+  ]
+}

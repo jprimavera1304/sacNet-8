@@ -1,0 +1,28 @@
+{
+  "nombre": "Corte de caja CS - cobros",
+  "_porque": [
+    "NO ES VERIFICABLE EN ESTA BASE, y lo que falla es la base, no ninguno de los",
+    "dos backends: el procedimiento recorre con un CURSOR todos los renglones de",
+    "CentrosServicio con status 1 y consulta la base de CADA centro. Aqui estan",
+    "dados de alta MacZCS7, MacZCS8, MacZCS9 y MacZCS10, que no existen en este",
+    "servidor.",
+    "Legacy contesta status 500 con \"Invalid object name 'MacZCS7.dbo.Corte CS'\"",
+    "y el backend nuevo contesta 500 con exactamente los mismos cuatro mensajes de",
+    "SQL Server. Los dos preguntan lo mismo.",
+    "Para verificarlo hace falta un servidor con las bases de los centros."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cortescs/cobros/consultar",
+    "body": {}
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/cortes/centros-servicio/cobros"
+  },
+  "camino_nuevo": "data",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ]
+}

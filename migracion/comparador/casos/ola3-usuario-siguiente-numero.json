@@ -1,0 +1,33 @@
+{
+  "nombre": "Usuario - siguiente numero libre",
+  "_porque": [
+    "Legacy devuelve el UsuarioDTO completo con todo en ceros salvo NumUsuario, y",
+    "ademas un `usuarioPermisos` vacio que nunca se llena en esta ruta. Por eso",
+    "hace falta `camino_legacy`: dentro de `result` hay dos llaves y el",
+    "desenvoltorio por defecto no sabe cual es la buena.",
+    "NO RESERVA NADA: es MAX(NumUsuario)+1 entre los activos, calculado en el",
+    "momento. Dos altas simultaneas reciben el mismo numero, aqui y en Mac31."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/usuarios/consultar/nextid",
+    "body": {}
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/usuarios/siguiente-numero"
+  },
+  "camino_legacy": "result.usuarios.0",
+  "camino_nuevo": "data",
+  "solo_campos": [
+    "numUsuario"
+  ],
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Fuera el parametro IDUsuario, que el procedimiento declara y nunca usa.",
+    "El nuevo devuelve un objeto de un campo en vez del UsuarioDTO entero en ceros."
+  ]
+}

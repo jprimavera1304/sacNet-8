@@ -1,0 +1,71 @@
+{
+  "nombre": "Corte de caja - detalle",
+  "_porque": [
+    "Corte 1, que en esta base tiene renglones de gasto.",
+    "Devuelve la cabecera del corte REPETIDA en cada renglon de gasto: es la forma",
+    "que entrega el procedimiento y la que pinta la rejilla de Mac31.",
+    "Este endpoint NO llama a sp_n_ConsultaConstantes, y es justo por eso que se",
+    "pudo migrar como lectura."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cortes/consultar/detalle",
+    "body": {
+      "IDCorte": 1
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/cortes/1/detalle"
+  },
+  "camino_nuevo": "data",
+  "ordenar_por": "IDCorteDetalle",
+  "solo_campos": [
+    "idCorte",
+    "fechaCorte",
+    "noAplicadoDesglose",
+    "liquidacionTiendas",
+    "noAplicado",
+    "sobranteLiquidaciones",
+    "saeEsquina",
+    "saeEsquinaDomingo",
+    "saeLocalTauro",
+    "totalSae",
+    "macCamioneta",
+    "macAgentes",
+    "totalMac",
+    "transferencias",
+    "transferenciasTiendaEsquina",
+    "transferenciasLocalTauro",
+    "depositoCheque",
+    "depositoEfectivo",
+    "tarjetas",
+    "tarjetasTiendas",
+    "cheque",
+    "efectivo",
+    "morraya",
+    "totalGastos",
+    "totalDesglose",
+    "granTotal",
+    "observaciones",
+    "observacionesCheque",
+    "observacionesDepositosCheque",
+    "observacionesDepositoEfectivo",
+    "observacionesSobranteLiquidaciones",
+    "idCorteDetalle",
+    "idStatus",
+    "idTipoGasto",
+    "tipoGasto",
+    "concepto",
+    "monto"
+  ],
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla.",
+    "`NoAplicadoDesglose` viene DOS VECES en el SELECT del procedimiento (dos lineas distintas proyectan la misma columna). DataTable renombra la segunda a `NoAplicadoDesglose1`, que no empareja con nada y se descarta sola: se publica la primera.",
+    "Legacy devolvia el `CorteDetalleDTO` completo \u2014unos cuarenta campos de folio, saldos y cancelacion\u2014 que este procedimiento no entrega. El nuevo publica lo que hay."
+  ]
+}

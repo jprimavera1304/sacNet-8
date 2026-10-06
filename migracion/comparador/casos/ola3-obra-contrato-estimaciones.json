@@ -1,0 +1,29 @@
+{
+  "nombre": "Obra - estimaciones de contrato",
+  "_porque": [
+    "MC_ContratosEstimaciones esta vacia en esta base. Los dos lados dan vacio."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/mccontratos/estimaciones/consultar",
+    "body": {
+      "IDStatus": 0,
+      "Nombre": ""
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/obra/contratos/estimaciones"
+  },
+  "camino_nuevo": "data",
+  "ordenar_por": "IDContratoEstimacion",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla.",
+    "Fuera `@Formato`: el interruptor 0/1 de Mac31 hace que el MISMO procedimiento devuelva otras columnas, con los encabezados en espanol. El Excel lo arma el front con los mismos datos.",
+    "Fuera el filtro `Contrato` de Legacy. No servia y hacia dano: su service, al recibirlo, reconstruia el DTO dejando SOLO ese campo \u2014tirando idContrato, idStatus y nombre\u2014 y despues el repositorio ni lo mandaba al procedimiento, porque el procedimiento no tiene ese parametro. Buscar por nombre de contrato devolvia TODAS las estimaciones de TODOS los contratos."
+  ]
+}

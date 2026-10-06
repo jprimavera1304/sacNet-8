@@ -1,0 +1,31 @@
+{
+  "nombre": "Obra - grupos de contrato",
+  "_porque": [
+    "MC_ContratosGrupos esta vacia en esta base. Los dos lados dan vacio.",
+    "Con el `tablaLst` vacio el camino es `result.tablaLst` y no",
+    "`result.tablaLst.0.Table` (ver el caso de residentes). Cuando haya grupos",
+    "capturados hay que cambiarlo."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/mccontratos/grupos/consultar",
+    "body": {
+      "IDStatus": 0,
+      "Grupo": ""
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/obra/contratos/grupos"
+  },
+  "camino_legacy": "result.tablaLst",
+  "camino_nuevo": "data",
+  "ordenar_por": "IDContratoGrupo",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Fuera `@Formato`: el interruptor 0/1 de Mac31 hace que el MISMO procedimiento devuelva otras columnas, con los encabezados en espanol. El Excel lo arma el front con los mismos datos."
+  ]
+}

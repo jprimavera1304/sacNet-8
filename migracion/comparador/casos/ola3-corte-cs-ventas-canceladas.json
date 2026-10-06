@@ -1,0 +1,28 @@
+{
+  "nombre": "Corte de caja CS - ventas canceladas",
+  "_porque": [
+    "CortesVentasCanceladasCS esta vacia en esta base: los dos lados dan vacio.",
+    "Se manda IDCorte 0 a los dos, y hay que saber lo que eso significa: en este",
+    "procedimiento el 0 NO es 'todas', es `venCan.IDCorte IS NULL` \u2014 las",
+    "cancelaciones que aun no se han llevado a ningun corte."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cortescs/ventas/canceladas/consultar",
+    "body": {}
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/cortes/centros-servicio/ventas-canceladas"
+  },
+  "camino_nuevo": "data",
+  "ordenar_por": "IDCorteVentaCanceladaCS",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla.",
+    "El nuevo saca `sumaAbonos` del renglon y lo devuelve UNA vez, hermano de `data`. El procedimiento lo repite en cada fila y Legacy lo PERDIA entero: su DTO no declaraba la columna, asi que el total que la base calculaba no llegaba nunca a la pantalla."
+  ]
+}
