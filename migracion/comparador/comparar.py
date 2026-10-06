@@ -400,6 +400,39 @@ def correr_caso(caso, cred, verbose=False):
 
 # ---------------------------------------------------------------- principal
 
+def fecha_de_operacion():
+    """La fecha de operacion del negocio, para vigilar que no se mueva sola.
+
+    `sp_n_ConsultaConstantes` -que llaman 155 de las 488 capacidades de Legacy,
+    casi siempre como primer paso para leer los parametros de la empresa- NO es
+    una consulta: cuando la fecha esta atrasada hace el cierre del dia, congela
+    el inventario y la adelanta.
+
+    Si eso pasa a media corrida, el que pregunto primero movio la base y el
+    segundo ya leyo otra cosa. La diferencia que salga no seria del backend sino
+    del orden en que se pregunto, y es de las que se persiguen durante horas.
+    Por eso se mira antes y despues.
+    """
+    import subprocess
+    try:
+        r = subprocess.run(
+            ["sqlcmd", "-S", os.environ.get("MAC_SQL_SERVIDOR", "LAP-JUAND"),
+             "-d", os.environ.get("MAC_SQL_BASE", "Produccion_svr"),
+             "-U", os.environ.get("MAC_SQL_USUARIO", "sa"),
+             "-P", os.environ.get("MAC_SQL_CLAVE", "123"),
+             "-C", "-I", "-W", "-h", "-1",
+             "-Q", "SET NOCOUNT ON; SELECT CONVERT(varchar(10), FechaOperacion, 120) FROM dbo.Constantes;"],
+            capture_output=True, text=True, timeout=30,
+            env=dict(os.environ, MSYS_NO_PATHCONV="1"))
+        for linea in (r.stdout or "").splitlines():
+            t = linea.strip()
+            if re.match(r"^\d{4}-\d{2}-\d{2}$", t):
+                return t
+    except Exception:
+        pass
+    return None
+
+
 def casos_de(ruta):
     if os.path.isdir(ruta):
         return sorted(os.path.join(ruta, f) for f in os.listdir(ruta)
@@ -421,6 +454,7 @@ def main(argv):
         print("Pon MAC_SCRATCH, o LEGACY_TOKEN / NUEVO_TOKEN en el entorno.")
         return 2
 
+    fecha_antes = fecha_de_operacion()
     rutas = casos_de(objetivo)
     bien, mal = [], []
 
@@ -445,6 +479,20 @@ def main(argv):
 
     print("\n{} coinciden, {} con diferencias, {} casos".format(
         len(bien), len(mal), len(rutas)))
+
+    fecha_despues = fecha_de_operacion()
+    if fecha_antes and fecha_despues and fecha_antes != fecha_despues:
+        print("\n" + "!" * 70)
+        print("LA FECHA DE OPERACION CAMBIO DURANTE LA CORRIDA: {} -> {}".format(
+            fecha_antes, fecha_despues))
+        print("La disparo sp_n_ConsultaConstantes, que ademas congela el")
+        print("inventario del dia anterior. Lo que preguntaron Legacy y el")
+        print("backend nuevo NO salio del mismo estado, asi que estos")
+        print("resultados no valen: restaura la instantanea y repite.")
+        print("Ver CUIDADO-consultas-que-escriben.md")
+        print("!" * 70)
+        return 1
+
     return 1 if mal else 0
 
 
