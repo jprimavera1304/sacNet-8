@@ -132,6 +132,9 @@ builder.Services.AddScoped<IEmpresaService, EmpresaService>();
 builder.Services.AddScoped<ITarimaRepository, TarimaRepository>();
 builder.Services.AddScoped<ITarimaService, TarimaService>();
 builder.Services.AddScoped<ICatalogosRepository, CatalogosRepository>();
+// Los 28 catalogos de solo lectura que venian de MacServicios2 (ver CatalogosGeneralesController).
+builder.Services.AddScoped<ICatalogosGeneralesRepository, CatalogosGeneralesRepository>();
+builder.Services.AddScoped<ICatalogosGeneralesService, CatalogosGeneralesService>();
 builder.Services.AddScoped<ICategoriasRepository, CategoriasRepository>();
 builder.Services.AddScoped<ICategoriasService, CategoriasService>();
 builder.Services.AddScoped<IProfesoresRepository, ProfesoresRepository>();
