@@ -192,6 +192,20 @@ builder.Services.AddScoped<IVentasPedidoCapturaService, VentasPedidoCapturaServi
 builder.Services.AddScoped<IVentasUsadosRepository, VentasUsadosRepository>();
 builder.Services.AddScoped<IVentasUsadosService, VentasUsadosService>();
 
+/*
+  CONSULTAS DE VENTAS MIGRADAS DE MacServicios2 (ola 2, solo lectura).
+
+  Tres modulos: la cobranza (cobros, cobranzas y concentrados), los detalles de
+  usados y el catalogo de descuentos. No tocan nada: todos sus procedimientos se
+  comprobaron contra sys.sql_modules y ninguno escribe en una tabla real.
+*/
+builder.Services.AddScoped<IVentasCobranzaConsultaRepository, VentasCobranzaConsultaRepository>();
+builder.Services.AddScoped<IVentasCobranzaConsultaService, VentasCobranzaConsultaService>();
+builder.Services.AddScoped<IVentasUsadosConsultaRepository, VentasUsadosConsultaRepository>();
+builder.Services.AddScoped<IVentasUsadosConsultaService, VentasUsadosConsultaService>();
+builder.Services.AddScoped<IVentasDescuentosConsultaRepository, VentasDescuentosConsultaRepository>();
+builder.Services.AddScoped<IVentasDescuentosConsultaService, VentasDescuentosConsultaService>();
+
 // -------------------- ALMACEN CASCOS --------------------
 builder.Services.AddScoped<IAlmacenCascosRepository, AlmacenCascosRepository>();
 builder.Services.AddScoped<IAlmacenCascosService, AlmacenCascosService>();

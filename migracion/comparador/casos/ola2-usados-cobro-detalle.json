@@ -1,0 +1,68 @@
+{
+  "nombre": "Cobro de usados: renglones por tipo de casco",
+  "_porque": [
+    "VentasCobrosUsados esta vacia en Tauro, pero el procedimiento devuelve de",
+    "todas formas los 8 tipos de casco del catalogo con sus cantidades en cero:",
+    "es la rejilla que Mac31 pinta antes de capturar. Por eso el caso SI",
+    "compara 8 renglones y no un vacio.",
+    "",
+    "Dos parametros alternativos (@IDVentaCobroUsado, @IDCobro) y ninguna",
+    "transformacion en C# (VentasCobrosUsadoService.cs:27-51)."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/ventascobrosusados/consultar/detalle",
+    "body": {
+      "IDVentaCobroUsado": 1,
+      "IDCobro": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/ventas/usados/consulta/cobros/detalle",
+    "query": {
+      "idVentaCobroUsado": 1,
+      "idCobro": 0
+    }
+  },
+  "camino_legacy": "result.ventasCobrosUsados",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDTipoUsado",
+  "solo_campos": [
+    "Actual",
+    "CantidadUsado",
+    "CostoUsadoConIva",
+    "Empresa",
+    "Equipo",
+    "EquipoCancelacion",
+    "Fecha",
+    "FechaCancelacion",
+    "FechaCancelacionFtm",
+    "FechaFtm",
+    "IDCobro",
+    "IDEmpresa",
+    "IDTipoUsado",
+    "IDUsuario",
+    "IDUsuarioCancelacion",
+    "IDVentaCobroUsado",
+    "ImporteUsadoConIva",
+    "NumUsados",
+    "Observaciones",
+    "Orden",
+    "PesoKg",
+    "PesoKgUsados",
+    "TipoUsado",
+    "TipoUsadoCorto",
+    "TotalPesoKgUsados",
+    "TotalUsados",
+    "Usuario",
+    "UsuarioCancelacion"
+  ],
+  "diferencias_intencionales": [
+    "Legacy declara 13 campos que el procedimiento NO devuelve y salen en 0/null: EquipoCob, EquipoModificacionUsa, FechaCob, FechaCobFtm, FechaModificacionUsa, FechaModificacionUsaFtm, FolioCob, IDUsuarioCob, IDUsuarioModificacionUsa, ModificadaUsa, RepartidorCob, UsuarioCob, UsuarioModificacionUsa. Es relleno del DTO (DataTableToList empareja por nombre exacto y lo que no encuentra lo deja en su valor por omision), no un dato, asi que no se compara.",
+    "Fecha: el procedimiento la devuelve NULL en los ocho renglones (esta rejilla es el catalogo de tipos de casco, sin captura todavia). Legacy declara Fecha como DateTime NO anulable y entrega '0001-01-01T00:00:00'; el nuevo entrega null. La hermana FechaCancelacion si esta declarada DateTime? en Legacy y las dos coinciden en null, lo que confirma que la diferencia es del tipo del DTO y no del dato. NULL contra el valor por omision del DTO. En los renglones donde el procedimiento devuelve NULL, Legacy entrega 0 (int/decimal) y '0001-01-01T00:00:00' (DateTime), porque su DTO los declara NO anulables y DataTableToList deja el default; el nuevo entrega null, que es lo que dice la base. Mac31 pinta esas celdas EN BLANCO (la rejilla esta ligada al DataTable, no a un DTO tipado), asi que null es el valor fiel y el 0 de Legacy es una invencion de su capa de mapeo: un 0 en 'TotalPagar' se lee como 'no se pago nada', y no es lo mismo que 'este renglon no tiene pago'. Se dejan fuera de la comparacion SOLO las columnas afectadas."
+  ],
+  "ignorar": [
+    "Fecha"
+  ]
+}

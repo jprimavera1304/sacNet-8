@@ -1,0 +1,33 @@
+{
+  "nombre": "Concentrado: ¿se puede agregar este folio de venta?",
+  "_porque": [
+    "El mismo folio 135346 de la empresa 9. Aqui el procedimiento devuelve",
+    "ademas FechaValida, FechaMinima y Diff, que son de la regla de los dias",
+    "de antiguedad del concentrado (Constantes.DiasFolioConcentrado).",
+    "",
+    "A Legacy el folio se le manda en FolioInicialVenta por lo mismo que en",
+    "cobranzas: es de donde su repositorio toma @FolioVenta",
+    "(ConsultaConcentradosRepository.cs:177)."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/concentrados/validar",
+    "body": {
+      "IDEmpresaVenta": 9,
+      "FolioInicialVenta": "135346"
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/concentrados/validar-folio",
+    "body": {
+      "IDEmpresaVenta": 9,
+      "FolioVenta": "135346",
+      "IDConcentradoActual": 0,
+      "IDTipoDocumento": 0
+    }
+  },
+  "camino_legacy": "result.concentradosFolio",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDVenta"
+}

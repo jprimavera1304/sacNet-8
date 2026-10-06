@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Models;
@@ -417,7 +417,40 @@ public sealed class PermissionService : IPermissionService
         new("catalogos.galleros.ver", "Catálogos - Galleros y su saldo", "catalogos"),
         new("catalogos.recaudaciones.ver", "Catálogos - Recaudaciones", "catalogos"),
         new("catalogos.formas.ver", "Catálogos - Formas de Mac31", "catalogos"),
-        new("catalogos.marcas.ver", "Catálogos - Categorías y marcas", "catalogos")
+        new("catalogos.marcas.ver", "Catálogos - Categorías y marcas", "catalogos"),
+
+        /*
+          LAS DOS LLAVES DE LAS CONSULTAS DE VENTAS QUE SE MIGRARON DE MacServicios2.
+
+          POR QUE NO VAN EN LA FAMILIA `ventas.*`
+          Porque para `ventas.*` manda Mac31: al construir el snapshot se BORRA
+          del resultado todo lo que empiece por "ventas." y no este en
+          VentasWebPermissionSeeds, y se vuelve a calcular desde los botones de la
+          forma CONSULTA DE VENTAS. Una clave nueva ahi se guardaria en
+          WUsuarioPermiso y desapareceria en el siguiente calculo, sin error y sin
+          rastro — la misma cicatriz de "pendientes de autorizar".
+
+          POR QUE NO SE REUSO `ventas.consultar`
+          Es btnBuscar de la pantalla Consultar ventas. La cobranza son TRES
+          pantallas distintas de Mac31 (Cobranza, Concentrado y Cobro) y el
+          catalogo de descuentos es otra. Reusarlo ataria cosas que la gente
+          necesita por separado: hay quien cobra y no consulta ventas.
+
+          POR QUE NO SE AMARRARON AL PUENTE DE PERMISOS DE LEGACY
+          El puente (`LegacyModuleBinding`) va por UNA forma por modulo, y la
+          cobranza son tres. Amarrarlo obligaria a cambiar el puente, que es la
+          pieza que mas rompe de todo este archivo.
+
+          Asi que son del WEB, en familias nuevas, y por eso lo que se da desde
+          la pantalla de permisos SI se respeta. Quedan sembradas en codigo: no
+          se corrio ningun script contra la base; entran a WPermiso cuando
+          alguien sincronice el catalogo desde la pantalla de permisos.
+        */
+        new("cobranza.ver", "Cobranza - Consultar cobros, cobranzas y concentrados", "cobranza"),
+        // Un descuento es DINERO (el porcentaje que se le aplica a un cliente) y
+        // su bitacora dice quien lo movio: no es un desplegable de captura, asi
+        // que no cabe en `catalogos.ver` de la ola anterior.
+        new("descuentos.ver", "Descuentos - Consultar catálogo y bitácora", "descuentos")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)

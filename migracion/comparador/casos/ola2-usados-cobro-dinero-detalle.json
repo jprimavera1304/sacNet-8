@@ -1,0 +1,29 @@
+{
+  "nombre": "Cobro de dinero y usados: renglones",
+  "_porque": [
+    "CobrosDineroUsado esta vacia en Tauro (esta empresa no usa esa pantalla),",
+    "asi que los dos lados coinciden en el vacio. Para que valga de verdad hay",
+    "que volver a correrlo contra Zaragoza (MacZ), que si la usa.",
+    "",
+    "Dos parametros alternativos y ninguna transformacion en C#",
+    "(VentasCobrosDineroUsadoService.cs:28-53)."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/ventascobrosdinerousados/consultar/detalle",
+    "body": {
+      "IDCobroDineroUsado": 1,
+      "IDCobro": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/ventas/usados/consulta/cobros-dinero/detalle",
+    "query": {
+      "idCobroDineroUsado": 1,
+      "idCobro": 0
+    }
+  },
+  "camino_legacy": "result.cobrosDineroUsados",
+  "camino_nuevo": "data.rows"
+}

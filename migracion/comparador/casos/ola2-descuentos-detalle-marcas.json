@@ -1,0 +1,55 @@
+{
+  "nombre": "Descuento filtrado por dos marcas (la virgulilla de verdad)",
+  "_porque": [
+    "Este caso existe para probar UNA cosa: que la lista de ids se une con",
+    "virgulilla y no con coma. Con DOS marcas (94 ROSHFRANS y 87 OXI-CAR) el",
+    "procedimiento devuelve 67 renglones de los 129; con coma devolveria algo",
+    "distinto, y —esto es lo peligroso— con UNA sola marca funcionaria igual de",
+    "las dos formas, asi que un error de separador no se nota hasta que alguien",
+    "marca dos casillas.",
+    "",
+    "Legacy une con Variables.DELIMITADOR_PARAM_TILDE_SP",
+    "(DescuentoDetalleService.cs:34-36) y el nuevo con el mismo separador."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/descuentosdetalle/consultar",
+    "body": {
+      "IDDescuento": 53518,
+      "IDMarcaLst": [
+        94,
+        87
+      ],
+      "IDCategoriaLst": [],
+      "IDGrupoCategoriaLst": []
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/descuentos/detalle",
+    "body": {
+      "IDDescuento": 53518,
+      "IDsMarca": [
+        94,
+        87
+      ]
+    }
+  },
+  "camino_legacy": "result.descuentosDetalle",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDDescuentoDetalle",
+  "solo_campos": [
+    "Categoria",
+    "GrupoCategoria",
+    "IDCategoria",
+    "IDDescuento",
+    "IDDescuentoDetalle",
+    "IDGrupoCategoria",
+    "IDMarca",
+    "Marca",
+    "Porcentaje"
+  ],
+  "diferencias_intencionales": [
+    "Legacy declara 13 campos que el procedimiento NO devuelve y salen en 0/null: Accion, Equipo, EsBaja, Fecha, FechaFtm, IDDescuentoDetalleLog, IDUsuario, Incrementar, mensaje, PorcentajeAnterior, PorcentajeNuevo, result, Usuario. Es relleno del DTO (DataTableToList empareja por nombre exacto y lo que no encuentra lo deja en su valor por omision), no un dato, asi que no se compara."
+  ]
+}

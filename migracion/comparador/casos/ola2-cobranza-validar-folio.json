@@ -1,0 +1,43 @@
+{
+  "nombre": "Cobranza: ¿se puede agregar este folio de venta?",
+  "_porque": [
+    "IDVenta 369643 = Folio 135346 de la empresa 9 (REFTAU). Esta dentro del",
+    "concentrado 133102, que sigue abierto, asi que el procedimiento contesta",
+    "con el renglon de la venta y con las columnas Valido / Detalle /",
+    "ValidoAlmacen.",
+    "",
+    "A Legacy se le manda el folio en FolioInicialVenta, que es de donde su",
+    "repositorio lo saca para el parametro @FolioVenta",
+    "(ConsultaCobranzasRepository.cs:178). En el contrato nuevo el campo se",
+    "llama FolioVenta, que es lo que de verdad es.",
+    "",
+    "IDUsuarioActual NO se manda a Legacy: su DTO lo deja en 0 y en el backend",
+    "nuevo sale del token, que para el usuario de pruebas (BancoPruebas, sin",
+    "vinculo con Mac31) tambien es 0. Asi los dos lados preguntan lo mismo y la",
+    "columna ValidoAlmacen se compara de verdad."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cobranzas/validar",
+    "body": {
+      "IDEmpresaVenta": 9,
+      "FolioInicialVenta": "135346"
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/cobranzas/validar-folio",
+    "body": {
+      "IDEmpresaVenta": 9,
+      "FolioVenta": "135346",
+      "IDCobranzaActual": 0,
+      "IDTipoDocumento": 0
+    }
+  },
+  "camino_legacy": "result.cobranzasFolio",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDVenta",
+  "diferencias_intencionales": [
+    "Legacy mete el renglon en ConsultaCobranzasFolioDTO, que declara 'Saldofavor' y 'SaldofavorCascos' con f minuscula mientras el procedimiento devuelve 'SaldoFavor' y 'SaldoFavorCascos': DataTableToList empareja por nombre EXACTO y no los encuentra, asi que Legacy entrega 0 en esos dos campos y PIERDE el dato. El comparador no lo nota porque normaliza los nombres a minusculas, y por eso aqui los dos lados acaban comparando el valor real del procedimiento. El nuevo pasa los renglones crudos y no tiene el problema."
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "nombre": "Descuento: bitácora de cambios de porcentaje",
+  "_porque": [
+    "Descuento 53518: 11 renglones de bitacora del 01-03-2026, con el",
+    "porcentaje anterior y el nuevo, el usuario (ALVARELYS) y el equipo (PATY).",
+    "",
+    "Legacy manda TRES parametros (@IDDescuento, @IDCategoria, @IDMarca) aunque",
+    "el procedimiento declare cinco: los dos de fecha tienen valor por omision.",
+    "Comprobado ejecutandolo con tres parametros contra Produccion_svr. El nuevo",
+    "manda los mismos tres."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/descuentosdetalle/consultar/log",
+    "body": {
+      "IDDescuento": 53518,
+      "IDCategoria": 0,
+      "IDMarca": 0
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/descuentos/detalle/log",
+    "body": {
+      "IDDescuento": 53518,
+      "IDCategoria": 0,
+      "IDMarca": 0
+    }
+  },
+  "camino_legacy": "result.descuentosDetalle",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDDescuentoDetalleLog",
+  "solo_campos": [
+    "Accion",
+    "Categoria",
+    "Equipo",
+    "EsBaja",
+    "Fecha",
+    "FechaFtm",
+    "IDCategoria",
+    "IDDescuento",
+    "IDDescuentoDetalleLog",
+    "IDMarca",
+    "IDUsuario",
+    "Incrementar",
+    "Marca",
+    "PorcentajeAnterior",
+    "PorcentajeNuevo",
+    "Usuario"
+  ],
+  "diferencias_intencionales": [
+    "Legacy declara 6 campos que el procedimiento NO devuelve y salen en 0/null: GrupoCategoria, IDDescuentoDetalle, IDGrupoCategoria, mensaje, Porcentaje, result. Es relleno del DTO (DataTableToList empareja por nombre exacto y lo que no encuentra lo deja en su valor por omision), no un dato, asi que no se compara."
+  ]
+}

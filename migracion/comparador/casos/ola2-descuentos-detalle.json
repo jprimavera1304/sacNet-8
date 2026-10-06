@@ -1,0 +1,47 @@
+{
+  "nombre": "Descuento: porcentajes por categoria y marca",
+  "_porque": [
+    "Descuento 53518 (el ultimo de la base): 129 renglones.",
+    "",
+    "A Legacy hay que mandarle las TRES listas, aunque sean vacias. Su",
+    "DescuentoDetalleInputDTO tiene el constructor vacio, asi que las listas",
+    "llegan null y string.Join(null) lanza ArgumentNullException: sin ellas el",
+    "endpoint contesta 400 con el stack de la excepcion. Comprobado pidiendoselo",
+    "a Legacy. El backend nuevo inicializa las listas y no necesita que se las",
+    "manden."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/descuentosdetalle/consultar",
+    "body": {
+      "IDDescuento": 53518,
+      "IDMarcaLst": [],
+      "IDCategoriaLst": [],
+      "IDGrupoCategoriaLst": []
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/descuentos/detalle",
+    "body": {
+      "IDDescuento": 53518
+    }
+  },
+  "camino_legacy": "result.descuentosDetalle",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDDescuentoDetalle",
+  "solo_campos": [
+    "Categoria",
+    "GrupoCategoria",
+    "IDCategoria",
+    "IDDescuento",
+    "IDDescuentoDetalle",
+    "IDGrupoCategoria",
+    "IDMarca",
+    "Marca",
+    "Porcentaje"
+  ],
+  "diferencias_intencionales": [
+    "Legacy declara 13 campos que el procedimiento NO devuelve y salen en 0/null: Accion, Equipo, EsBaja, Fecha, FechaFtm, IDDescuentoDetalleLog, IDUsuario, Incrementar, mensaje, PorcentajeAnterior, PorcentajeNuevo, result, Usuario. Es relleno del DTO (DataTableToList empareja por nombre exacto y lo que no encuentra lo deja en su valor por omision), no un dato, asi que no se compara."
+  ]
+}

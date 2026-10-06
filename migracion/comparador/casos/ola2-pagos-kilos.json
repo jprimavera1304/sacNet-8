@@ -1,0 +1,36 @@
+{
+  "nombre": "Pagos por kilo de un cliente",
+  "_porque": [
+    "Se pide por IDCliente 1534 y SIN rango de fechas, a proposito: Legacy pasa",
+    "FechaInicial y FechaFinal TAL CUAL al procedimiento, sin convertir el",
+    "formato y sin pegarles la hora (ConsultaVentasPagosService.findKilosAsync,",
+    ":72-96) — es el unico de la familia que no lo hace. En esta base",
+    "formatoFechaDB vale 'MM-dd-yyyy', asi que un rango escrito como",
+    "'01-02-2026' lo lee el procedimiento como el 2 de enero. El backend nuevo",
+    "lo normaliza a ISO y por lo tanto NO coincidiria con Legacy en un rango.",
+    "Esa diferencia es deliberada y esta anotada abajo; comparar sin rango deja",
+    "ver lo que si tiene que coincidir.",
+    "",
+    "En Tauro la tabla de pagos por kilo esta vacia: los dos lados coinciden en",
+    "el vacio."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/consultaventaspagos/kilos/consultar",
+    "body": {
+      "IDCliente": 1534
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/cobros/pagos-kilos",
+    "body": {
+      "IDCliente": 1534
+    }
+  },
+  "camino_legacy": "result.ventasPagos",
+  "camino_nuevo": "data.rows",
+  "diferencias_intencionales": [
+    "El rango de fechas SI se normaliza en el backend nuevo y en Legacy no. Legacy manda la cadena de la pantalla sin tocarla a un procedimiento que espera el formato de la base (MM-dd-yyyy aqui), asi que un filtro 'del 1 al 28 de febrero' le llega como 'del 2 de enero al...'. El nuevo convierte a ISO yyyy-MM-dd y le pega 00:00:00 / 23:59:59 como el resto de la familia. El nuevo es mas fiel al filtro que pidio el usuario, no menos."
+  ]
+}

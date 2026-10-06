@@ -1,0 +1,70 @@
+{
+  "nombre": "Folios de venta sin asignar a un concentrado",
+  "_porque": [
+    "Empresa 9 y DevueltasA 0: 285 folios en esta base, con la columna",
+    "Repartidor en 'SIN ASIGNAR'. Es el renglonaje completo mas las columnas de",
+    "totales (TotalFolios, TotalCantidad...) repetidas en cada renglon, que es",
+    "como lo devuelve el procedimiento.",
+    "",
+    "La lista de empresas va con virgulilla en los dos lados: Legacy la une con",
+    "Variables.DELIMITADOR_PARAM_TILDE_SP (VentasFoliosService.cs:73) y el",
+    "nuevo con el mismo separador.",
+    "",
+    "Se ordena por Folio y no por IDVenta: el procedimiento NO devuelve IDVenta (lo declara el DTO de Legacy y sale en 0 en los 285 renglones), asi que ordenar por el dejaria las dos listas en el orden que quisiera el motor."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/ventasfolios/sinasignar/consultar",
+    "body": {
+      "IDsEmpresaLst": [
+        9
+      ],
+      "DevueltasA": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/ventas/folios-sin-asignar",
+    "query": {
+      "idsEmpresa": 9,
+      "devueltasA": 0
+    }
+  },
+  "camino_legacy": "result.ventasFolios",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "Folio",
+  "diferencias_intencionales": [
+    "El procedimiento devuelve 'FechaEmisionDate' (datetime) y 'FechaEmision' (texto dd-MM-yyyy HH:mm). VentasFoliosDTO de Legacy declara FechaEmision como string y NO declara FechaEmisionDate, asi que la tira. El nuevo pasa las dos: la de texto es para pintar y la de fecha es para ordenar, y ordenar por la de texto pone el 02-01 antes del 19-09.",
+    "Legacy declara 1 campos que el procedimiento NO devuelve y salen en 0/null: IDVenta. Es relleno del DTO (DataTableToList empareja por nombre exacto y lo que no encuentra lo deja en su valor por omision), no un dato, asi que no se compara.",
+    "El procedimiento devuelve 2 columnas que el DTO de Legacy NO declara y Legacy TIRA al mapear: FechaEmisionDate, FolioFtm. El nuevo las pasa tal cual: es mas fiel al procedimiento, no menos, y la pantalla las necesita."
+  ],
+  "solo_campos": [
+    "Acumuladores",
+    "Ajuste",
+    "Cancelada",
+    "Cantidad",
+    "Empresa",
+    "FechaCancelacion",
+    "FechaEmision",
+    "Folio",
+    "FolioConcentrado",
+    "IDCliente",
+    "IDEmpresa",
+    "Nombre",
+    "Numero",
+    "PorcentajeAjuste",
+    "Productos",
+    "Repartidor",
+    "Ticket",
+    "TotalAcumuladores",
+    "TotalCantidad",
+    "TotalFolios",
+    "TotalPagar",
+    "TotalProductos",
+    "TotalTotalPagar",
+    "TotalUsados",
+    "Usados",
+    "Usuario",
+    "Vigencia"
+  ]
+}

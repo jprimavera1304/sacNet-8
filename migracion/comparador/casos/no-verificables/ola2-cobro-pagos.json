@@ -1,0 +1,49 @@
+{
+  "nombre": "Cobro: pagos aplicados (sp_n_ConsultaVentasCobroPagos)",
+  "_porque": [
+    "NO VERIFICABLE POR UN DEFECTO DE LEGACY, no por el backend nuevo.",
+    "",
+    "Legacy no mapea esta tabla a un DTO: hace ds.Tables[0].AsEnumerable().ToList()",
+    "y responde new GenericResponse(List<DataRow>), asi que la propiedad es",
+    "result.tablaLst. Al serializar un DataRow, Json.NET no escribe las columnas:",
+    "escribe las propiedades del objeto DataRow. Comprobado pidiendoselo a Legacy",
+    "corriendo en localhost:63479; cada renglon llega asi:",
+    "",
+    "    { \"RowError\": \"\", \"RowState\": 4, \"Table\": {...}, \"ItemArray\": [...], \"HasErrors\": false }",
+    "",
+    "O sea: los NOMBRES de las columnas se perdieron. Solo queda ItemArray, que es",
+    "un arreglo posicional sin nombres. El comparador compara por nombre de campo",
+    "(es lo que lo hace util), asi que aqui no hay nada que comparar: el renglon de",
+    "Legacy no dice que es cada valor.",
+    "",
+    "El endpoint nuevo SI esta implementado y SI devuelve los renglones con sus",
+    "nombres de columna. Se verifico aparte, ejecutando el stored procedure con",
+    "sqlcmd y contrastando renglones y valores contra la respuesta del backend",
+    "nuevo; el detalle esta en migracion/ola-2-ventas-lecturas.md.",
+    "",
+    "Va en esta carpeta a proposito: comparar.py casos/ no entra en subcarpetas,",
+    "asi que la senal de la carpeta principal queda limpia sin esconder nada.",
+    "",
+    "Ademas, en Tauro no hay cobros: los dos lados dan vacio, asi que aunque",
+    "Legacy serializara bien no habria nada que comparar. Hay que volver a",
+    "correrlo contra Zaragoza (MacZ)."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cobrospagos/consultar",
+    "body": {
+      "IDConcentrado": 133102,
+      "Formato": 0
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/cobros/pagos",
+    "body": {
+      "IDConcentrado": 133102,
+      "Formato": 0
+    }
+  },
+  "camino_legacy": "result.tablaLst",
+  "camino_nuevo": "data.rows"
+}

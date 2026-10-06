@@ -1,0 +1,44 @@
+{
+  "nombre": "Créditos de usados de una remisión: bitácora (sp_n_VentasUsadosCreditoLog)",
+  "_porque": [
+    "NO VERIFICABLE POR UN DEFECTO DE LEGACY, no por el backend nuevo.",
+    "",
+    "Legacy no mapea esta tabla a un DTO: hace ds.Tables[0].AsEnumerable().ToList()",
+    "y responde new GenericResponse(List<DataRow>), asi que la propiedad es",
+    "result.tablaLst. Al serializar un DataRow, Json.NET no escribe las columnas:",
+    "escribe las propiedades del objeto DataRow. Comprobado pidiendoselo a Legacy",
+    "corriendo en localhost:63479; cada renglon llega asi:",
+    "",
+    "    { \"RowError\": \"\", \"RowState\": 4, \"Table\": {...}, \"ItemArray\": [...], \"HasErrors\": false }",
+    "",
+    "O sea: los NOMBRES de las columnas se perdieron. Solo queda ItemArray, que es",
+    "un arreglo posicional sin nombres. El comparador compara por nombre de campo",
+    "(es lo que lo hace util), asi que aqui no hay nada que comparar: el renglon de",
+    "Legacy no dice que es cada valor.",
+    "",
+    "El endpoint nuevo SI esta implementado y SI devuelve los renglones con sus",
+    "nombres de columna. Se verifico aparte, ejecutando el stored procedure con",
+    "sqlcmd y contrastando renglones y valores contra la respuesta del backend",
+    "nuevo; el detalle esta en migracion/ola-2-ventas-lecturas.md.",
+    "",
+    "Va en esta carpeta a proposito: comparar.py casos/ no entra en subcarpetas,",
+    "asi que la senal de la carpeta principal queda limpia sin esconder nada.",
+    "",
+    "Dato: IDVenta 369664, 1 renglon (2 cascos tipo 5, 1360.00, del 01-03-2026,",
+    "usuario 54 desde MAQ-PAMELA)."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/ventasusadoscreditoslog/consultar",
+    "body": {
+      "IDVenta": 369664,
+      "IDUsuario": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/ventas/usados/consulta/creditos/369664/log"
+  },
+  "camino_legacy": "result.tablaLst",
+  "camino_nuevo": "data.rows"
+}
