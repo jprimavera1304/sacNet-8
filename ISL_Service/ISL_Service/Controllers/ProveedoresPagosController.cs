@@ -1,11 +1,29 @@
 using ISL_Service.Application.DTOs.ProveedoresPagos;
 using ISL_Service.Application.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ISL_Service.Controllers
 {
+    /*
+        ESTE CONTROLADOR ESTABA ABIERTO DE PAR EN PAR.
+
+        No tenia [Authorize] ninguno: cualquiera que conociera la URL podia
+        consultar los pagos a proveedores y, peor, insertarlos, modificarlos y
+        cancelarlos sin identificarse. Tres de las cuatro acciones ESCRIBEN.
+
+        Los permisos ya existian -se sembraron con el modulo, PermissionService
+        los declara como pagosproveedores.ver/crear/editar/cancelar- y nadie los
+        habia conectado. Asi que esto no inventa un modelo nuevo: usa el que ya
+        estaba escrito y sin estrenar.
+
+        No rompe al web: su helper de red (docs/shared/js/safety/api.js) ya
+        adjunta el Bearer en toda peticion cuando hay sesion, asi que las
+        pantallas que ya lo usaban siguen igual.
+    */
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class ProveedoresPagosController : ControllerBase
     {
         private readonly ProveedoresPagosService _service;
@@ -17,6 +35,7 @@ namespace ISL_Service.Controllers
 
         // POST api/ProveedoresPagos/consultar
         [HttpPost("consultar")]
+        [Authorize(Policy = "perm:pagosproveedores.ver")]
         public IActionResult Consultar([FromBody] ProveedorPagoInputDTO input)
         {
             try
@@ -33,6 +52,7 @@ namespace ISL_Service.Controllers
 
         // POST api/ProveedoresPagos/insertar
         [HttpPost("insertar")]
+        [Authorize(Policy = "perm:pagosproveedores.crear")]
         public IActionResult Insertar([FromBody] ProveedorPagoInputDTO input)
         {
             try
@@ -49,6 +69,7 @@ namespace ISL_Service.Controllers
 
         // POST api/ProveedoresPagos/actualizar
         [HttpPost("actualizar")]
+        [Authorize(Policy = "perm:pagosproveedores.editar")]
         public IActionResult Actualizar([FromBody] ProveedorPagoInputDTO input)
         {
             try
@@ -64,6 +85,7 @@ namespace ISL_Service.Controllers
 
         // POST api/ProveedoresPagos/cancelar
         [HttpPost("cancelar")]
+        [Authorize(Policy = "perm:pagosproveedores.cancelar")]
         public IActionResult Cancelar([FromBody] ProveedorPagoInputDTO input)
         {
             try
