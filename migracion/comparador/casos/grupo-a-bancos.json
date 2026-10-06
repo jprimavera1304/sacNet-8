@@ -1,0 +1,34 @@
+{
+  "nombre": "Catalogo de bancos activos",
+  "_porque": [
+    "Legacy: CatBancosController -> CatBancoRepository.spConsultar manda",
+    "sp_n_ConsultaBancos @IDBanco, @IDStatus, @Banco, @Formato, @Identico.",
+    "El nuevo (VentasMultiPagoRepository.BancosAsync) manda esos cinco con",
+    "0 / 1 / '' / 0 / 0, y lo documenta en el comentario del propio metodo.",
+    "El catalogo nuevo no tiene ruta propia: viaja dentro de la pantalla de Multi",
+    "pago, que exige al menos un IDVenta. Se manda uno real (370852); aunque la",
+    "remision salga rechazada por estar pagada, el catalogo de bancos se entrega",
+    "igual, asi que la pregunta al SP de bancos es la misma en los dos lados."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catbancos/consultar",
+    "body": { "IDBanco": 0, "IDStatus": 1, "Banco": "", "Formato": 0, "Identico": 0 }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/multipago/pantalla",
+    "body": { "idsVenta": [370852] }
+  },
+  "camino_legacy": "result.bancos",
+  "camino_nuevo": "data.bancos",
+  "ordenar_por": "id",
+  "mapa_campos": { "IDBanco": "id", "Banco": "nombre" },
+  "solo_campos": ["id", "nombre"],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "Legacy manda ademas IDStatus, Status, result y mensaje; el nuevo entrega {id,nombre} porque es lo unico que necesita el desplegable de formas de pago.",
+    "El nuevo descarta renglones con id<=0.",
+    "No hay endpoint nuevo dedicado al catalogo de bancos: se sirve dentro de api/ventas/multipago/pantalla. Si alguna pantalla lo necesita suelto habra que exponerlo."
+  ]
+}

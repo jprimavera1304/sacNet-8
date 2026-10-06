@@ -1,0 +1,52 @@
+{
+  "nombre": "Saldos del cliente (pendientes y vencidos)",
+  "_porque": [
+    "El backend nuevo NO acepta filtros aqui: clava los mismos parametros que",
+    "Mac31 (@IDsEmpresa='', @IDAgente=0, @FechaInicial='', @DiasVencimiento=0,",
+    "@Status=4, @Formato=0) y pone en @FechaFinal la FechaOperacion de Constantes.",
+    "Por eso a legacy se le mandan EXACTAMENTE esos, y FechaFinal='06-10-2026'",
+    "porque la FechaOperacion de esta base es 2026-10-06 y legacy espera la fecha",
+    "en dd-MM-yyyy (la reordena con ConvertFtmDate, FormatoFechaDB=MM-dd-yyyy).",
+    "Cliente 20316 porque es el que tiene saldo en esta base."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/ventassaldos/consultar",
+    "body": {
+      "IDEmpresaLst": [],
+      "IDCliente": 20316,
+      "IDAgente": 0,
+      "FechaInicial": "",
+      "FechaFinal": "06-10-2026",
+      "DiasVencimiento": 0,
+      "Status": 4,
+      "Formato": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/ventas/saldos/cliente/20316"
+  },
+  "camino_legacy": "result.ventasSaldos",
+  "camino_nuevo": "data.renglones",
+  "ordenar_por": "saldo",
+  "mapa_campos": {
+    "DiasVencimientoMostrar": "diasVencimiento"
+  },
+  "solo_campos": [
+    "numero",
+    "nombre",
+    "total",
+    "cargos",
+    "abonos",
+    "descuentos",
+    "saldo",
+    "estatusMostrar",
+    "diasVencimiento"
+  ],
+  "diferencias_intencionales": [
+    "El procedimiento devuelve ~30 columnas y el contrato nuevo se queda con nueve: las que Mac31 pinta en el panel de saldos. Las otras (IDVenta, Empresa, Folio, las cuatro FechaVencimiento*, los cuatro Estatus* por concepto, PromedioVencimiento, NumFolios*) salen SIEMPRE en 0/null para esta llamada porque @Formato=0 no las llena.",
+    "DiasVencimientoMostrar llega de la base como texto ('222') y el contrato nuevo lo entrega como numero (222) con el nombre diasVencimiento. Es el mismo dato.",
+    "El nuevo agrega totalSaldo y maximoVencimiento, que Mac31 calcula en la pantalla sumando los renglones. No son datos nuevos, es la misma suma hecha en el servidor."
+  ]
+}

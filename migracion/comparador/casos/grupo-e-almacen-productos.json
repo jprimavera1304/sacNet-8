@@ -1,0 +1,87 @@
+{
+  "nombre": "Productos por almacen (catalogo de captura de pedido)",
+  "_porque": [
+    "Legacy: /api/almacenproductos/consultar corre sp_n_ConsultaConstantes (solo",
+    "para leer EsLuro, que hoy esta comentado y no cambia el SP) y despues",
+    "sp_n_ConsultaAlmacenProducto con los diez parametros del cuerpo.",
+    "El nuevo: POST api/ventas/pedidos/captura/productos/buscar corre el MISMO SP",
+    "pero fija por dentro @IDAlmacenProducto=0, @IDCategoria=0, @Descripcion='',",
+    "@Formato=0 y @Identico=0 (VentasPedidoCapturaRepository.cs:400-409).",
+    "Para preguntar LO MISMO se le mandan a Legacy esos mismos valores fijos y se",
+    "dejan variables solo los que el nuevo si acepta: IDAlmacen, IDProducto,",
+    "IDGrupoCategoria, Clave e IDEmpresaCS."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/almacenproductos/consultar",
+    "body": {
+      "IDAlmacenProducto": 0,
+      "IDAlmacen": 1,
+      "IDProducto": 0,
+      "IDGrupoCategoria": 0,
+      "IDCategoria": 0,
+      "Clave": "",
+      "Descripcion": "",
+      "Formato": 0,
+      "Identico": 0,
+      "IDEmpresaCS": 0
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/pedidos/captura/productos/buscar",
+    "body": {
+      "IDAlmacen": 1,
+      "IDProducto": 0,
+      "IDGrupoCategoria": 0,
+      "IDEmpresaCS": 0,
+      "Clave": ""
+    }
+  },
+  "camino_legacy": "result.almacenProductos",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDProducto",
+  "diferencias_intencionales": [
+    "El nuevo agrega dos columnas que Legacy no tiene: ExistenciaDisponible y ExistenciaDisponibleFtm (existencia real menos lo apartado en pedidos vivos, via sp_w_ConsultaExistenciaComprometida). Es informacion NUEVA, no una diferencia en lo que ya habia: en Mac31 el apartado no se restaba y se vendia lo que ya estaba comprometido.",
+    "Legacy pasa el resultado por AlmacenProductoDTO, que lo recorta a 35 campos y agrega result/mensaje; el nuevo devuelve los renglones crudos del SP. Se comparan los 35 campos del contrato de Legacy.",
+    "StockMaximo: Legacy SIEMPRE devuelve 0 y el nuevo devuelve el valor real de la base. No es un bug del nuevo, es uno de Legacy: el SP nombra la columna 'stockMaximo' (minuscula inicial, lo fija la tabla temporal del SP, lineas 162 y 292) y Funciones.GetItem compara con 'pro.Name == column.ColumnName', que es CASE-SENSITIVE (Funciones.cs:123), asi que nunca asigna la propiedad StockMaximo del DTO y se queda en 0. Comprobado en la base: AlmacenProducto IDAlmacen=1 IDProducto 163/164/210 tienen [Stock Maximo]=5, que es lo que contesta el nuevo. 236 de 3543 renglones traen valor. Gana la base, no Legacy."
+  ],
+  "solo_campos": [
+    "IDGrupoCategoria",
+    "IDCategoria",
+    "IDMarca",
+    "IDProducto",
+    "IDTipoUsado",
+    "IDAlmacen",
+    "GrupoCategoria",
+    "Categoria",
+    "Marca",
+    "Clave",
+    "Descripcion",
+    "PrecioLista",
+    "PrecioLista2",
+    "PesoKg",
+    "StockMinimo",
+    "StockMaximo",
+    "Existencia",
+    "IDUnidadMedida",
+    "UnidadMedida",
+    "NumPiezas",
+    "ExistenciaCaja",
+    "ExistenciaFtm",
+    "UnidadMedidaFtm",
+    "Almacen",
+    "UsadoCostoCargo",
+    "UsadoCostoCredito",
+    "UsadoCostoCompraCargo",
+    "UsadoCostoCompraCredito",
+    "Concepto",
+    "TipoUsado",
+    "UnidadMedidaSat",
+    "ClaveSat",
+    "EsServicio"
+  ],
+  "ignorar": [
+    "StockMaximo"
+  ]
+}

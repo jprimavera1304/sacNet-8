@@ -1,0 +1,26 @@
+{
+  "nombre": "Catalogo de tipos de sueldo",
+  "_porque": [
+    "Caso de DataRow. Catalogo de dos renglones, util como control."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cattiposueldo/consultar",
+    "body": {
+      "IDStatus": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/tipos-sueldo"
+  },
+  "camino_legacy": "result.tablaLst.0.Table",
+  "camino_nuevo": "data",
+  "ordenar_por": "idTipoSueldo",
+  "solo_campos": [
+    "idTipoSueldo",
+    "idStatus",
+    "tipoSueldo",
+    "esComision"
+  ]
+}

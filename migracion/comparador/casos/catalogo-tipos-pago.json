@@ -1,0 +1,33 @@
+{
+  "nombre": "Catalogo de tipos de pago",
+  "_porque": [
+    "Caso de DataRow. @IDStatus y @EsPago tienen DEFAULT 1 en el SP y de eso",
+    "depende lo que la gente ve en cobranza, asi que los dos lados preguntan con 1."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cattipopago/consultar",
+    "body": {
+      "IDTipoPago": 0,
+      "IDStatus": 1,
+      "TipoPago": "",
+      "Identico": 0,
+      "EsPago": 1
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/tipos-pago"
+  },
+  "camino_legacy": "result.tablaLst.0.Table",
+  "camino_nuevo": "data",
+  "ordenar_por": "idTipoPago",
+  "solo_campos": [
+    "idTipoPago",
+    "idStatus",
+    "tipoPago",
+    "tipoPagoCorto",
+    "esDescuento",
+    "status"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "nombre": "Catalogo de estados",
+  "_porque": [
+    "Legacy manda @IDEstado como texto; se le pide '0' porque es lo que",
+    "fn_RegresaTablaEstados entiende por 'todos'. Con cadena vacia Legacy revienta,",
+    "y esa es una diferencia de la PREGUNTA, no del backend."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catestados/consultar",
+    "body": {
+      "IDEstado": "0",
+      "Estado": "",
+      "Identico": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/estados"
+  },
+  "camino_legacy": "result.estados",
+  "camino_nuevo": "data",
+  "ordenar_por": "idEstado",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo recorta el relleno de las columnas char(n): 'AGUASCALIENTES      ' sale como 'AGUASCALIENTES'. El comparador normaliza espacios, asi que no se ve aqui, pero el contrato nuevo promete texto recortado.",
+    "El nuevo no manda `result` ni `mensaje` por renglon: eran el hueco de error de los SP de escritura y en una consulta valen 0/null siempre."
+  ]
+}

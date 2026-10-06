@@ -1,0 +1,46 @@
+{
+  "nombre": "Consulta de pedidos autorizados (estatus 2, con linea de tiempo)",
+  "_porque": [
+    "Estatus 2 va aparte porque es el UNICO en el que el backend nuevo agrega algo",
+    "al procedimiento: EnrichPedidoTimelineAsync reescribe FechaImpresoFtm,",
+    "FechaProcesoFtm y FechaAutorizoFtm con una consulta propia contra Pedidos.",
+    "Si esa consulta no dijera lo mismo que el procedimiento, se veria aqui.",
+    "ESTE CASO DESTAPO UN BUG DEL BACKEND NUEVO (ver ola-0-lecturas.md): EnrichPedidoTimelineAsync empareja por IDVenta y se queda con el pedido mas reciente, asi que a los pedidos VIEJOS de una venta les pinta las fechas del pedido nuevo. Debe pasar en cuanto se empareje por IDPedido."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/consultaventaspedido/consultar",
+    "body": {
+      "IDEmpresa": 9,
+      "IDStatusPedido": 2
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/consulta/pedidos",
+    "body": {
+      "IDEmpresa": 9,
+      "IDStatusPedido": 2
+    }
+  },
+  "camino_legacy": "result.ventasPedidos",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDVenta",
+  "ignorar": [
+    "IDDomilicio",
+    "IDDomicilio",
+    "PedidosPendientesImprimir",
+    "EquipoAutorizo",
+    "EquipoCancelo",
+    "EquipoImpresion",
+    "EquipoProceso",
+    "EquipoRechazo",
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "IDDomicilio: el DTO de legacy lo escribe mal, 'IDDomilicio' (le falta la c). DataTableToList no empareja y legacy entrega 0 en los cinco renglones, PERDIENDO el dato. El nuevo entrega el IDDomicilio real del procedimiento (68092, 18735, 18735, 57556, 67940). El nuevo es mas fiel, no menos.",
+    "PedidosPendientesImprimir es un campo que solo existe en el DTO de legacy: el procedimiento no lo devuelve y sale siempre en 0.",
+    "El DTO de legacy TIRA cinco columnas que el procedimiento si devuelve (EquipoAutorizo, EquipoCancelo, EquipoImpresion, EquipoProceso, EquipoRechazo). El nuevo las pasa tal cual."
+  ]
+}

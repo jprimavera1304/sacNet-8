@@ -1,0 +1,33 @@
+{
+  "nombre": "Catalogo de municipios de un estado",
+  "_porque": [
+    "Mismo motivo que ciudades: se fija el estado 19 en los dos lados."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catmunicipios/consultar",
+    "body": {
+      "IDEstado": "19",
+      "IDMunicipio": "0",
+      "Municipio": "",
+      "Identico": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/municipios",
+    "query": {
+      "idEstado": "19"
+    }
+  },
+  "camino_legacy": "result.municipios",
+  "camino_nuevo": "data",
+  "ordenar_por": "idMunicipio",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Igual que ciudades: el nuevo traduce el estado ausente a '0' en vez de mandar '' y romper la funcion."
+  ]
+}

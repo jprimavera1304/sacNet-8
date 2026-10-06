@@ -1,0 +1,42 @@
+{
+  "nombre": "Catalogo de categorias del grupo ACUMULADORES",
+  "_porque": [
+    "Legacy: CategoriasController -> CategoriaService arma @IDsCategoria y",
+    "@IDsGrupoCategoria con string.Join('~', ...) y el repo manda",
+    "sp_n_ConsultaCategorias @IDsCategoria, @IDsGrupoCategoria, @IDStatus,",
+    "@Categoria, @Identico, @Formato.",
+    "El nuevo (ConsultarSubcategoriasAsync) manda @IDsCategoria='',",
+    "@IDsGrupoCategoria=idGrupoCategoria, @IDStatus=1, @Categoria='', 0, 0. Por eso",
+    "se le pasa idGrupoCategoria=1 al nuevo y IDGrupoCategoriaLst=[1] a Legacy: sin",
+    "fijar el grupo en los dos lados la diferencia seria de la pregunta."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/categorias/consultar",
+    "body": {
+      "IDCategoriaLst": [],
+      "IDsCategoria": "",
+      "IDGrupoCategoriaLst": [1],
+      "IDsGrupoCategoria": "1",
+      "IDStatus": 1,
+      "Categoria": "",
+      "Identico": 0,
+      "Formato": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/reportes/ventas/acumuladores-productos/catalogos",
+    "query": { "idGrupoCategoria": 1 }
+  },
+  "camino_legacy": "result.categorias",
+  "camino_nuevo": "subcategorias",
+  "ordenar_por": "idCategoria",
+  "solo_campos": ["IDGrupoCategoria", "GrupoCategoria", "IDCategoria", "Categoria"],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "El nuevo agrega idMarca=0 y marca='' porque reusa el mismo renglon que las marcas; esos dos campos quedan fuera de la comparacion.",
+    "Legacy manda ademas IDStatus, Status, result y mensaje.",
+    "El nuevo descarta renglones con idGrupoCategoria<=0, idCategoria<=0 o categoria vacia."
+  ]
+}

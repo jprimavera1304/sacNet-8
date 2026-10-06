@@ -1,0 +1,72 @@
+{
+  "nombre": "Rejilla de asistencias del periodo 9521",
+  "_porque": [
+    "Mismo SP en los dos lados (sp_n_ConsultaEmpleadosPeriodoAsistencia) y los",
+    "mismos tres parametros: @IDPeriodoTipoSueldo, @IDEmpleado=0, @IDStatus=1.",
+    "Legacy lo pide en el cuerpo; el nuevo por query string. Se le pide el mismo",
+    "periodo (9521, la semana 10 de 2026, que es donde llegan los datos locales).",
+    "Se comparan los campos que de verdad entregan los dos: identidad del",
+    "empleado, los siete dias y los totales del periodo."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/empleadosperiodoasistencias/consultar",
+    "body": {
+      "IDPeriodoTipoSueldo": 9521,
+      "IDEmpleado": 0,
+      "IDStatus": 1
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/asistencias",
+    "query": {
+      "idPeriodoTipoSueldo": 9521,
+      "idEmpleado": 0,
+      "idStatus": 1
+    }
+  },
+  "camino_legacy": "result.empleadosPeriodoAsistencia",
+  "camino_nuevo": "data",
+  "ordenar_por": "idEmpleado",
+  "solo_campos": [
+    "idEmpleado",
+    "nombre",
+    "minsRetardo",
+    "asistencias",
+    "inasistencias",
+    "diaEntrada1",
+    "diaSalida1",
+    "diaHorasLaboradas1",
+    "diaMinutosLaborados1",
+    "diaEntrada2",
+    "diaSalida2",
+    "diaHorasLaboradas2",
+    "diaMinutosLaborados2",
+    "diaEntrada3",
+    "diaSalida3",
+    "diaHorasLaboradas3",
+    "diaMinutosLaborados3",
+    "diaEntrada4",
+    "diaSalida4",
+    "diaHorasLaboradas4",
+    "diaMinutosLaborados4",
+    "diaEntrada5",
+    "diaSalida5",
+    "diaHorasLaboradas5",
+    "diaMinutosLaborados5",
+    "diaEntrada6",
+    "diaSalida6",
+    "diaHorasLaboradas6",
+    "diaMinutosLaborados6",
+    "diaEntrada7",
+    "diaSalida7",
+    "diaHorasLaboradas7",
+    "diaMinutosLaborados7"
+  ],
+  "diferencias_intencionales": [
+    "EL NUEVO ENTREGA MAS, NO MENOS. El SP devuelve tambien fechaDia1..fechaDia7 y vacaciones; el nuevo las pasa (manda el renglon crudo, ver Funciones.DataTableToRows) y Legacy las TIRA, porque EmpleadoPeriodoAsistenciaDTO no declara esas propiedades y DataTableToList empareja por nombre. Es un dato que Legacy pierde, no uno que el nuevo invente.",
+    "Legacy manda nueve campos que el SP NO devuelve y que por lo mismo salen siempre en null o 0: fecha, nombreEmpleado, horaEntrada, horaSalida, horaComidaInicio, horaComidaTermino, fechaHoraRegistro, result y status. Son restos del DTO de Legacy; el nuevo no los repite.",
+    "El nuevo agrega 'total' y 'milisegundos' al lado de 'data'. No son datos del renglon: la rejilla es un doble cursor dentro de legacy y tarda, y la pantalla tiene derecho a avisarlo en vez de girar un spinner mudo."
+  ]
+}

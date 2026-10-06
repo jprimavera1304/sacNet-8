@@ -1,0 +1,63 @@
+{
+  "nombre": "Ficha completa del cliente (captura de pedidos)",
+  "_porque": [
+    "Este es el equivalente de verdad de /api/clientes/consultar: devuelve la ficha",
+    "entera, no el catalogo de un selector.",
+    "El nuevo pone @Identico=1 cuando viene IDCliente (busqueda exacta) y",
+    "@IDStatus=0, @EsMostrador=0, @Referencia='', @Formato=0 y el resto en 0/''.",
+    "Por eso a legacy se le manda Identico:1 y esos mismos: con Identico:0 la",
+    "pregunta seria otra (busqueda parcial) y la diferencia seria culpa nuestra."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/clientes/consultar",
+    "body": {
+      "IDCliente": 20316,
+      "IDCondicionesCredito": 0,
+      "IDCondicionesCreditoAceites": 0,
+      "IDCondicionesCreditoCascos": 0,
+      "IDDescuento": 0,
+      "IDAgente": 0,
+      "IDStatus": 0,
+      "Numero": "",
+      "Nombre": "",
+      "ApellidoPaterno": "",
+      "ApellidoMaterno": "",
+      "Rfc": "",
+      "IDTipoCliente": 0,
+      "ConHuella": 0,
+      "IDEmpresaCS": 1,
+      "EsMostrador": 0,
+      "Referencia": "",
+      "Formato": 0,
+      "Identico": 1
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/pedidos/captura/clientes/buscar",
+    "body": {
+      "IDCliente": 20316,
+      "IDEmpresaCS": 1
+    }
+  },
+  "camino_legacy": "result.clientes",
+  "camino_nuevo": "data.clientes",
+  "ordenar_por": "IDCliente",
+  "ignorar": [
+    "Accion",
+    "IDAccion",
+    "IDClientesLog",
+    "IDUsuarioModificacion",
+    "UsuarioModificacion",
+    "FechaModificacion",
+    "FechaModificacionFtm",
+    "EquipoModificacion",
+    "result",
+    "mensaje",
+    "mensajeFacturama"
+  ],
+  "diferencias_intencionales": [
+    "Las 69 columnas que el procedimiento devuelve coinciden una por una, con el mismo valor. Lo unico que sobra en legacy son los 8 campos de la bitacora de cambios (IDClientesLog, IDAccion, Accion, IDUsuarioModificacion, UsuarioModificacion, FechaModificacion/Ftm, EquipoModificacion) y los 3 de su envoltorio (result, mensaje, mensajeFacturama): son el cascaron del DTO, el procedimiento no los trae y salen en 0/null. La bitacora se consulta aparte, con sp_n_ConsultarClientesLog."
+  ]
+}

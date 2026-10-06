@@ -1,0 +1,26 @@
+{
+  "nombre": "Catalogo de puestos",
+  "_porque": [
+    "El SP termina en SELECT * sobre [Catalogo Puestos], asi que las columnas",
+    "dependen de la base (EsAgente se agrego con un ALTER TABLE que el propio SP",
+    "lleva comentado arriba). Por eso el nuevo lee por nombre de columna."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catpuestos/consultar",
+    "body": {
+      "IDStatus": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/puestos"
+  },
+  "camino_legacy": "result.puestos",
+  "camino_nuevo": "data",
+  "ordenar_por": "idPuesto",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "nombre": "Catalogo de cajas (NO VERIFICABLE)",
+  "_porque": [
+    "NO SE PUEDE COMPARAR EN Produccion_svr: sp_n_ConsultaCajas es del modulo de",
+    "recaudaciones (base MacAviacion) y no esta instalado aqui. Legacy falla igual."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catcajas/consultar",
+    "body": {
+      "IDCaja": 0,
+      "IDStatus": 1,
+      "NumCaja": 0,
+      "NombreCaja": "",
+      "EquipoCaja": ""
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/cajas"
+  },
+  "camino_legacy": "result.cajas",
+  "camino_nuevo": "data",
+  "ordenar_por": "idCaja",
+  "solo_campos": [
+    "idCaja",
+    "idStatus",
+    "numCaja",
+    "nombreCaja",
+    "equipoCaja",
+    "maestraCaja",
+    "idColonia",
+    "direccion"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo no manda la auditoria ni los nombres de servidor/base (EquipoServidor, BaseServidor, EquipoLocal, BaseLocal). Son datos de infraestructura: publicar el nombre del servidor y de la base en una respuesta de catalogo es regalar la mitad de una cadena de conexion.",
+    "No verificable en Produccion_svr: el SP no esta instalado en esta base."
+  ]
+}

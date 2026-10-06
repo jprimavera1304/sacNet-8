@@ -1,0 +1,37 @@
+{
+  "nombre": "Pedidos faltantes del dia",
+  "_porque": [
+    "Legacy: POST /api/pedidos/faltante/consultar -> sp_n_ConsultaPedidoFaltante con",
+    "@Fecha='' y @IDEmpresaCS del cuerpo (PedidoRepository.spConsultarFaltante).",
+    "El nuevo: GET api/ventas/consulta/pedidos-faltantes corre el MISMO SP con",
+    "@Fecha='' y @IDEmpresaCS=0 fijos (VentasConsultaRepository.cs:134-140), igual",
+    "que Mac31, que lo llama con un PedidoInputDTO vacio. Por eso a Legacy se le",
+    "manda IDEmpresaCS=0: para preguntar LO MISMO.",
+    "ADVERTENCIA DE COBERTURA: el SP filtra por dentro con",
+    "CAST(Fecha as date) = CAST(GETDATE() as date) y la base local no tiene",
+    "pedidos de HOY, asi que los dos lados contestan lista vacia. El caso prueba",
+    "que la llamada, la autorizacion y el envoltorio funcionan en los dos; no",
+    "prueba el contenido de los renglones. Para probarlo de verdad hace falta un",
+    "pedido con faltante del dia, y aqui no se toca la base para fabricarlo."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/pedidos/faltante/consultar",
+    "body": { "IDEmpresaCS": 0 }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/ventas/consulta/pedidos-faltantes"
+  },
+  "camino_legacy": "result.pedidoFaltante",
+  "camino_nuevo": "data",
+  "ordenar_por": "Clave",
+  "diferencias_intencionales": [
+    "El nuevo no recibe parametros: no hay cuerpo ni query. En Mac31 tampoco se le pasa nada (ConsultarVentas.cs:3503 arma el DTO vacio) y el SP resuelve solo el dia y la empresa, asi que pedirlos seria inventar un filtro que alla no existe.",
+    "El nuevo entrega solo las diez columnas que pinta la rejilla (Numero, Nombre, FechaFtm, GrupoCategoria, Categoria, Marca, Clave, CantidadSolicitada, CantidadPedido, CantidadFaltante). Si el SP trajera mas, no viajan."
+  ],
+  "solo_campos": [
+    "Numero", "Nombre", "FechaFtm", "GrupoCategoria", "Categoria", "Marca",
+    "Clave", "CantidadSolicitada", "CantidadPedido", "CantidadFaltante"
+  ]
+}

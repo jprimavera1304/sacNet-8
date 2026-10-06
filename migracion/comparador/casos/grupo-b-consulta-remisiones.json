@@ -1,0 +1,71 @@
+{
+  "nombre": "Consulta de ventas/remisiones (emitidas)",
+  "_porque": [
+    "Para preguntar LO MISMO hay que saber dos cosas de legacy:",
+    "1) ConsultaVentasService.findAsync tiene 'else if (FolioInicial != \"\")' y el",
+    "   DTO nace con FolioInicial = \"0\". Si no se manda FolioInicial vacio, legacy",
+    "   entra a la rama de FOLIO, TIRA las fechas y barre la tabla entera (la",
+    "   respuesta pasa de 76 KB a 565 MB y no termina). Por eso va FolioInicial: \"\".",
+    "2) Las fechas se convierten con ConvertFtmDate(FormatoFechaDB) y FormatoFechaDB",
+    "   de esta base es MM-dd-yyyy: la funcion hace Substring(3,2)+Substring(0,2),",
+    "   o sea que ESPERA dd-MM-yyyy de entrada. Por eso a legacy se le manda",
+    "   16-09-2026 y al nuevo 2026-09-16: los dos acaban pidiendo el mismo dia.",
+    "El dia se eligio por tener datos reales: la base local llega a sep-2026."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/consultaventas/consultar",
+    "body": {
+      "IDEmpresa": 9,
+      "FolioInicial": "",
+      "FolioFinal": "",
+      "FechaEmisionInicial": "16-09-2026",
+      "FechaEmisionFinal": "16-09-2026"
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/consulta/remisiones",
+    "body": {
+      "IDEmpresa": 9,
+      "FechaEmisionInicial": "2026-09-16",
+      "FechaEmisionFinal": "2026-09-16"
+    }
+  },
+  "camino_legacy": "result.ventas",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDVenta",
+  "ignorar": [
+    "IDVentaDetalle",
+    "IDProducto",
+    "Codigo",
+    "Cantidad",
+    "IDUsuarioAcepto",
+    "UsuarioAcepto",
+    "FechaAcepto",
+    "FechaAceptoFtm",
+    "EquipoAcepto",
+    "Estatus",
+    "EquipoCancelo",
+    "SoloAceites",
+    "FechaPagoDinero",
+    "FechaPagoDineroFtm",
+    "FechaPagoCascos",
+    "FechaPagoCascosFtm",
+    "result",
+    "mensaje",
+    "IDAgente",
+    "IDagente",
+    "FechaFacturacion",
+    "FechaFacturacionCancelacion",
+    "FacturaParaPago"
+  ],
+  "diferencias_intencionales": [
+    "Legacy mapea el DataTable a ConsultaVentasDTO, asi que devuelve 11 campos que el procedimiento NO trae (IDVentaDetalle, IDProducto, Codigo, Cantidad, IDUsuarioAcepto, UsuarioAcepto, FechaAcepto, FechaAceptoFtm, EquipoAcepto, Estatus) siempre en 0/null: son el cascaron del DTO, no datos. El nuevo devuelve las columnas reales del procedimiento.",
+    "Al contrario, el DTO de legacy TIRA 6 columnas que el procedimiento si devuelve (EquipoCancelo, SoloAceites, FechaPagoDinero/Ftm, FechaPagoCascos/Ftm). El nuevo las pasa tal cual.",
+    "El procedimiento devuelve la columna como IDagente y legacy la renombra a IDAgente en el DTO. El comparador normaliza mayusculas, asi que no sale como diferencia.",
+    "IDagente: el procedimiento devuelve la columna en minuscula ('IDagente', asi esta declarada en su tabla temporal) y el DTO de legacy la declara 'IDAgente'. DataTableToList empareja con mayusculas y minusculas exactas, no empareja, y legacy entrega 0 PERDIENDO el dato. El nuevo entrega el valor real del procedimiento (se comprobo: coincide renglon por renglon con la columna Agente del mismo procedimiento). El nuevo es MAS fiel, no menos.",
+    "FechaFacturacion y FechaFacturacionCancelacion: el DTO de legacy las declara DateTime no anulable, asi que cuando el procedimiento devuelve NULL legacy entrega '0001-01-01T00:00:00'. El nuevo entrega null, que es lo que dice la base.",
+    "FacturaParaPago: el DTO de legacy la declara int no anulable, asi que un NULL del procedimiento sale como 0 (comprobado en el renglon de la venta 370730). El nuevo entrega null. Mismo caso que FechaFacturacion: legacy inventa un valor, el nuevo dice que no hay."
+  ]
+}

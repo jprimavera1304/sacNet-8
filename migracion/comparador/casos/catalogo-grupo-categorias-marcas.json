@@ -1,0 +1,38 @@
+{
+  "nombre": "Marcas frente a una categoria, con su grupo",
+  "_porque": [
+    "Igual que el anterior pero por el SP que arrastra el grupo de categoria.",
+    "Ese SP lee los catalogos de la base de Zaragoza cuando",
+    "Constantes.Funcionalidad = 'ZARA': por eso NO se reescribio su SELECT."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catgruposcategorias/marcas/relacionar/consultar",
+    "body": {
+      "IDCategoria": 1,
+      "IDMarca": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/grupos-categoria/marcas",
+    "query": {
+      "idCategoria": 1
+    }
+  },
+  "camino_legacy": "result.marcas",
+  "camino_nuevo": "data",
+  "ordenar_por": "idMarca",
+  "solo_campos": [
+    "idGrupoCategoria",
+    "idCategoria",
+    "idMarca",
+    "grupoCategoria",
+    "categoria",
+    "marca",
+    "marcado"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo entrega los siete campos que el SP de verdad devuelve. Legacy mete el renglon en su MarcaDTO completo, asi que agrega IDStatus, MarcaCorto, Status, ColumnaConcentrado, ColumnaTemplate, ColumnaInventario y OrdenListaPrecios en 0/null."
+  ]
+}

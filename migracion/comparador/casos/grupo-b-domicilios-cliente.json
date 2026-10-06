@@ -1,0 +1,39 @@
+{
+  "nombre": "Domicilios del cliente",
+  "_porque": [
+    "El nuevo no tiene endpoint propio de domicilios: los sirve dentro de la",
+    "busqueda de cliente de la captura de pedidos, con los MISMOS dos parametros",
+    "del procedimiento (@IDCliente y @IDEmpresaCS). Se le pasan los mismos a",
+    "legacy para que la pregunta sea identica."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/domicilios/consultar",
+    "body": {
+      "IDCliente": 20316,
+      "IDEmpresaCS": 1
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/pedidos/captura/clientes/buscar",
+    "body": {
+      "IDCliente": 20316,
+      "IDEmpresaCS": 1
+    }
+  },
+  "camino_legacy": "result.domicilios",
+  "camino_nuevo": "data.domicilios",
+  "ordenar_por": "IDDomicilio",
+  "ignorar": [
+    "Calle",
+    "NumeroExterior",
+    "NumeroInterior",
+    "CalleConNumero",
+    "CalleNumero"
+  ],
+  "diferencias_intencionales": [
+    "El procedimiento devuelve la columna CalleNumero y el DTO de legacy la declara CalleConNumero: no empareja y legacy entrega null, perdiendo la calle. El nuevo entrega CalleNumero con su valor ('CAMILO ARRIAGA MZ 61 LT16'). El nuevo es mas fiel.",
+    "Calle, NumeroExterior y NumeroInterior son campos que solo existen en el DTO de legacy: el procedimiento no los devuelve y salen en null."
+  ]
+}

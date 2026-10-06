@@ -1,0 +1,30 @@
+{
+  "nombre": "Siguiente numero de cuenta de un concepto (NO VERIFICABLE)",
+  "_porque": [
+    "NO SE PUEDE COMPARAR EN Produccion_svr: sp_n_ConsultaConceptoNextNumCuenta no",
+    "esta instalado aqui. Legacy falla igual."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catconceptos/consultar/nextnumcuenta",
+    "body": {
+      "IDConcepto": 1
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/conceptos/1/siguiente-numero-cuenta"
+  },
+  "camino_legacy": "result.conceptos",
+  "camino_nuevo": "data",
+  "solo_campos": [
+    "idConcepto",
+    "idStatus",
+    "numConcepto",
+    "nombreConcepto",
+    "estatus"
+  ],
+  "diferencias_intencionales": [
+    "No verificable en Produccion_svr: el SP no esta instalado en esta base."
+  ]
+}

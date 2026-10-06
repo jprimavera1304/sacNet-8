@@ -1,0 +1,27 @@
+{
+  "nombre": "Catalogo de unidades territoriales (NO VERIFICABLE)",
+  "_porque": [
+    "NO SE PUEDE COMPARAR EN Produccion_svr: sp_n_ConsultaCatUnidadesTerritoriales",
+    "no existe en esta base. Legacy contesta",
+    "\"Could not find stored procedure\" y el nuevo 500 con el mismo mensaje."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catunidadterritorial/consultar",
+    "body": {
+      "IDUnidadTerritorial": 0,
+      "IDStatus": 0,
+      "Clave": ""
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/unidades-territoriales"
+  },
+  "camino_legacy": "result.unidadesTerritoriales",
+  "camino_nuevo": "data",
+  "ordenar_por": "idUnidadTerritorial",
+  "diferencias_intencionales": [
+    "No verificable en Produccion_svr: el SP no esta instalado en esta base."
+  ]
+}

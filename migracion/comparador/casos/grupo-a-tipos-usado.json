@@ -1,0 +1,36 @@
+{
+  "nombre": "Catalogo de tipos de usado (cascos) activos",
+  "_porque": [
+    "Legacy: CatTipoUsadoController -> CatTipoUsadoRepository.spConsultaCatTipoUsado",
+    "manda sp_n_ConsultaTiposUsados @IDTipoUsado, @IDStatus, @TipoUsado, @Formato,",
+    "@Identico.",
+    "El nuevo (VentasPedidoCapturaRepository.ConsultarCascosCatalogoAsync) manda esos",
+    "cinco con 0 / 1 / '' / 0 / 0. No tiene ruta propia: el catalogo viaja dentro del",
+    "bootstrap de captura de pedidos, ya puesto como los renglones de cascos de un",
+    "pedido nuevo (cantidades en cero), que es como lo usa la pantalla."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cattipousado/consultar",
+    "body": { "IDTipoUsado": 0, "IDStatus": 1, "TipoUsado": "", "Formato": 0, "Identico": 0 }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/ventas/pedidos/captura/bootstrap"
+  },
+  "camino_legacy": "result.tablaLst.0.Table",
+  "camino_nuevo": "data.pedido.cascosCargo",
+  "ordenar_por": "Orden",
+  "mapa_campos": {
+    "TipoUsadoCorto": "TipoUsado",
+    "CostoCargoConIva": "CostoVentaCargoConIva"
+  },
+  "solo_campos": ["IDTipoUsado", "TipoUsado", "CostoVentaCargo", "CostoVentaCargoConIva", "Bonificacion", "Orden"],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "El 'TipoUsado' que publica el nuevo es el TipoUsadoCorto de Legacy ('MINI CHICO(1)'), no el largo con el codigo de barras ('11141608 MINI CHICO (1)'). Es el texto que Mac31 pinta en la rejilla de cascos.",
+    "En el renglon de CARGOS el nuevo no publica CostoVentaCredito, CostoCreditoConIva, CostoCompraCargo, CostoCompraCredito, CostoExcedentes, PesoKg, Existencia ni Status: los de credito van en cascosCredito y los de compra/excedentes son de compras, otra pantalla.",
+    "El nuevo agrega Tabla, IDPedidoUsadoCargo, IDPedido, Cantidad, Importe, ImporteVentaCargoConIva, ClienteBonificacion e ImporteClienteBonificacion: son las columnas que la pantalla llena al capturar, en cero para un pedido nuevo.",
+    "No hay endpoint nuevo dedicado al catalogo de tipos de usado: se sirve dentro del bootstrap de captura de pedidos."
+  ]
+}

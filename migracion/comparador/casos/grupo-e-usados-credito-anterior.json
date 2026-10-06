@@ -1,0 +1,47 @@
+{
+  "nombre": "Usados: creditos dados de baja antes (@Accion=1)",
+  "_porque": [
+    "La pantalla de Modificacion de Usados de Mac31 se arma con TRES llamadas a",
+    "Legacy; el backend nuevo las junta en POST api/ventas/usados/consultar y",
+    "devuelve cada bloque en su propia rama. Se compara bloque por bloque.",
+    "Los parametros al SP son identicos en los dos lados (ver cada caso).",
+    "IDVenta 369614 (folio 135317) se eligio porque es la remision mas reciente que",
+    "NO esta cancelada y tiene a la vez cargos, creditos y bajas anteriores: con una",
+    "sin bajas el bloque de anteriores saldria vacio en los dos y no probaria nada."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/ventasusadoscreditos/anterior/consultar",
+    "body": {
+      "IDVenta": 369614,
+      "IDUsuario": 1
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/usados/consultar",
+    "body": {
+      "idVenta": 369614
+    }
+  },
+  "camino_legacy": "result.ventasUsadosCreditos",
+  "camino_nuevo": "data.anteriores",
+  "mapa_campos": {
+    "FechaUsadoCredito": "fecha",
+    "TipoUsadoCredito": "tipo",
+    "CantidadUsadoCredito": "cantidad",
+    "NombreUsuario": "usuario"
+  },
+  "solo_campos": [
+    "fecha",
+    "tipo",
+    "cantidad",
+    "usuario"
+  ],
+  "diferencias_intencionales": [
+    "Los dos llaman a sp_n_VentasUsadosCredito con @Accion=1 y @IDVenta: en Legacy es enumUsadosCreditoStatus.UsadosCreditoAnterior (Enums.cs:101) y en el nuevo la constante CreditoAnterior (VentasUsadosRepository.cs:198). Misma pregunta.",
+    "Lo mismo del IDUsuario=1: lo exige el DTO de Legacy, no llega al SP.",
+    "El nuevo entrega solo las cuatro columnas del historico (fecha, tipo, cantidad, usuario), que son las de la rejilla de abajo en Mac31. El resto del DTO de Legacy viene en 0/null."
+  ],
+  "ordenar_por": "fecha"
+}

@@ -1,0 +1,48 @@
+{
+  "nombre": "Concentrado abierto que tiene un folio de venta",
+  "_porque": [
+    "El backend nuevo NO tiene pantalla de 'consultar concentrados'. Lo unico",
+    "que reusa de sp_n_ConsultarConcentrados es la pregunta estrecha que hace",
+    "Mac31 antes de cancelar: este folio de venta, ¿sigue dentro de un",
+    "concentrado abierto? Eso lo responde POST /api/ventas/cancelacion/verificar,",
+    "que es de SOLO LECTURA (consulta Constantes con un SELECT, las ventas con un",
+    "SELECT y el concentrado con sp_n_ConsultarConcentrados; no escribe nada).",
+    "",
+    "PARA PREGUNTAR LO MISMO: el nuevo llama al SP con @FolioInicialVenta =",
+    "@FolioFinalVenta = Folio de la venta y TODO lo demas en 0 / cadena vacia",
+    "(VentasCancelacionRepository.ConsultarConcentradoAbiertoAsync). A Legacy se",
+    "le manda exactamente ese mismo filtro: solo FolioInicialVenta/FolioFinalVenta.",
+    "Legacy les pega un '0' delante ('0135346'), pero el parametro del SP es",
+    "numerico, asi que llega el mismo 135346.",
+    "",
+    "El dato: IDVenta 369643 = Folio 135346, dentro del concentrado 133102 cuyo",
+    "Folio es 35957 y que no tiene Fecha Cancelacion (sigue abierto).",
+    "",
+    "Se comparan ESCALARES por 'camino' porque las dos respuestas tienen forma",
+    "distinta a proposito: Legacy devuelve el renglon completo del concentrado,",
+    "el nuevo devuelve candidatos a cancelar y de ese concentrado solo expone el",
+    "folio, que es lo unico que la pantalla necesita."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/concentrados/consultar",
+    "body": {
+      "FolioInicialVenta": "135346",
+      "FolioFinalVenta": "135346"
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/cancelacion/verificar",
+    "body": {
+      "idsVenta": [369643]
+    }
+  },
+  "camino_legacy": "result.concentrados.0.Folio",
+  "camino_nuevo": "data.candidatos.0.folioConcentrado",
+  "diferencias_intencionales": [
+    "Legacy expone la capacidad 'consultar concentrados' como pantalla propia y devuelve 29 campos del concentrado (repartidor, usuario, almacen, pesos, totales...). El nuevo NO tiene esa pantalla: reusa el SP solo para la pregunta de la cancelacion y devuelve del concentrado unicamente el folio, que es lo que se le ensena al usuario en el dialogo.",
+    "Legacy decide 'dentro o fuera' en el front; el nuevo lo decide en el servidor: si FechaCancelacionFtm trae texto, devuelve null (no hay concentrado abierto) y no pide contrasena.",
+    "La consulta general de concentrados con filtros (por folio de concentrado, repartidor, usuario, rango de fechas) NO existe en el backend nuevo. Queda como FALTA aparte."
+  ]
+}

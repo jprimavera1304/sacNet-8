@@ -1,0 +1,43 @@
+{
+  "nombre": "Catalogo FE: regimenes fiscales",
+  "_porque": [
+    "Legacy devuelve este catalogo como List<DataRow>, y al serializarlo sale",
+    "{RowError, RowState, Table:[...], ItemArray, HasErrors} por renglon, con la",
+    "tabla ENTERA repetida adentro de cada uno. Por eso el camino del lado Legacy",
+    "entra a result.tablaLst.0.Table, que son los renglones de verdad."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catFERegimenesFiscales/consultar",
+    "body": {
+      "IDFERegimenFiscal": 0,
+      "IDStatus": 0,
+      "FEClave": "",
+      "FERegimenFiscal": "",
+      "RFC": "",
+      "FEFisica": 0,
+      "FEMoral": 0,
+      "Identico": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/fe/regimenes-fiscales"
+  },
+  "camino_legacy": "result.tablaLst.0.Table",
+  "camino_nuevo": "data",
+  "ordenar_por": "idFeRegimenFiscal",
+  "solo_campos": [
+    "idFeRegimenFiscal",
+    "idStatus",
+    "feClave",
+    "feRegimenFiscal",
+    "feFisica",
+    "feMoral",
+    "status"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo no manda FEDescripcion ('601 - GENERAL DE LEY PERSONAS MORALES'): es clave + nombre concatenados en la base para los combos de WinForms. El front nuevo concatena en su capa.",
+    "El nuevo no reproduce la envoltura de DataRow (RowError/RowState/Table/ItemArray/HasErrors): era un accidente de serializacion de Legacy, no un dato."
+  ]
+}

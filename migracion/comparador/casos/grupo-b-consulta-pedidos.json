@@ -1,0 +1,48 @@
+{
+  "nombre": "Consulta de pedidos (por estatus)",
+  "_porque": [
+    "Se pide el mismo estatus (1) y la misma empresa (9) a los dos lados.",
+    "Aqui NO hay trampa de FolioInicial: ConsultaVentasPedidosService no tiene la",
+    "rama de folio y su DTO nace con FolioInicial = \"\".",
+    "Las fechas se dejan vacias a proposito: el procedimiento sobreescribe",
+    "@FechaInicial/@FechaFinal con '' en cada rama de @IDStatusPedido, asi que un",
+    "rango no cambia nada y mandarlo solo escondería la comparacion real.",
+    "Estatus 1 porque en esta base tiene 5 renglones; con 0 los dos dan vacio."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/consultaventaspedido/consultar",
+    "body": {
+      "IDEmpresa": 9,
+      "IDStatusPedido": 1
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/consulta/pedidos",
+    "body": {
+      "IDEmpresa": 9,
+      "IDStatusPedido": 1
+    }
+  },
+  "camino_legacy": "result.ventasPedidos",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDVenta",
+  "ignorar": [
+    "IDDomilicio",
+    "IDDomicilio",
+    "PedidosPendientesImprimir",
+    "EquipoAutorizo",
+    "EquipoCancelo",
+    "EquipoImpresion",
+    "EquipoProceso",
+    "EquipoRechazo",
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "IDDomicilio: el DTO de legacy lo escribe mal, 'IDDomilicio' (le falta la c). DataTableToList no empareja y legacy entrega 0 en los cinco renglones, PERDIENDO el dato. El nuevo entrega el IDDomicilio real del procedimiento (68092, 18735, 18735, 57556, 67940). El nuevo es mas fiel, no menos.",
+    "PedidosPendientesImprimir es un campo que solo existe en el DTO de legacy: el procedimiento no lo devuelve y sale siempre en 0.",
+    "El DTO de legacy TIRA cinco columnas que el procedimiento si devuelve (EquipoAutorizo, EquipoCancelo, EquipoImpresion, EquipoProceso, EquipoRechazo). El nuevo las pasa tal cual."
+  ]
+}

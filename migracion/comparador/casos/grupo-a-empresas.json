@@ -1,0 +1,30 @@
+{
+  "nombre": "Catalogo de empresas activas",
+  "_porque": [
+    "Legacy: CatEmpresasController -> CatEmpresaRepository.spConsultar manda a",
+    "sp_n_ConsultaEmpresas @IDEmpresa, @IDStatus, @RazonSocial, @Formato, @Identico.",
+    "El nuevo (ConsultarEmpresasAsync) manda esos cinco con 0 / 1 / '' / 0 / 0.",
+    "Legacy devuelve el DataTable crudo, de ahi el camino result.tablaLst.0.Table."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/empresas/consultar",
+    "body": { "IDEmpresa": 0, "IDStatus": 1, "RazonSocial": "", "Formato": 0, "Identico": 0 }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/reportes/ventas/acumuladores-productos/catalogos"
+  },
+  "camino_legacy": "result.tablaLst.0.Table",
+  "camino_nuevo": "empresas",
+  "ordenar_por": "id",
+  "mapa_campos": { "IDEmpresa": "id", "NombreCorto": "nombre" },
+  "solo_campos": ["id", "nombre"],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "El nombre que el nuevo publica es NombreCorto ('REFTAU'), no la RazonSocial. Es lo que Mac31 pinta en el desplegable.",
+    "El nuevo repite NombreCorto en 'clave' porque el SP no devuelve una columna Clave.",
+    "Legacy devuelve la ficha fiscal completa (domicilio, RFC, series, logos). El contrato nuevo del catalogo entrega solo id/nombre a proposito: la ficha es otra pantalla.",
+    "El nuevo descarta renglones con id<=0 o nombre vacio."
+  ]
+}

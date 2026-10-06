@@ -1,0 +1,29 @@
+{
+  "nombre": "Catalogo de tipos de nota de credito",
+  "_porque": [
+    "Caso de DataRow. El SP hace SELECT * y la tabla trae auditoria completa;",
+    "se comparan los tres campos que el catalogo de verdad necesita."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cattiponotascredito/consultar",
+    "body": {
+      "IDStatus": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/tipos-nota-credito"
+  },
+  "camino_legacy": "result.tablaLst.0.Table",
+  "camino_nuevo": "data",
+  "ordenar_por": "idTipoNotaCredito",
+  "solo_campos": [
+    "idTipoNotaCredito",
+    "idStatus",
+    "tipoNotaCredito"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo no manda la auditoria (IDUsuarioAlta, FechaAlta, EquipoAlta, IDUsuarioModifico, FechaModificacion, EquipoModifico). Un desplegable no necesita saber quien capturo el renglon."
+  ]
+}

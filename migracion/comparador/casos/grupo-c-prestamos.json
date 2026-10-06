@@ -1,0 +1,46 @@
+{
+  "nombre": "Prestamos a empleados (todos)",
+  "_porque": [
+    "Mismo SP: sp_n_ConsultaEmpleadoPrestamos. El nuevo le manda",
+    "@IDEmpleadoPrestamo=0, @IDEmpleado=idEmpleado, @Pagados=<estado> y",
+    "@Cancelados=0.",
+    "El nuevo traduce el estado a palabras: todos=0, pagados=1, pendientes=2,",
+    "cancelados=3. Con estado=todos el @Pagados va en 0, que es el mismo valor",
+    "que lleva el cuerpo de Legacy por defecto. Por eso a Legacy se le pasa",
+    "pagados=0 y cancelados=0: para preguntar LO MISMO."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/empleadosprestamo/consultar",
+    "body": {
+      "idEmpleadoPrestamo": 0,
+      "idEmpleado": 0,
+      "pagados": 0,
+      "cancelados": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/prestamos",
+    "query": {
+      "idEmpleado": 0,
+      "estado": "todos"
+    }
+  },
+  "camino_legacy": "result.empleadosPrestamo",
+  "camino_nuevo": "data",
+  "ordenar_por": "idEmpleadoPrestamo",
+  "diferencias_intencionales": [
+    "El nuevo agrega 'total' al lado de 'data'. No es un campo del renglon.",
+    "El nuevo habla de estados en palabras (todos/pagados/pendientes/cancelados) en vez de los 0/1/2/3 de legacy. El SP recibe el mismo numero; lo que cambia es el contrato de entrada.",
+    "El nuevo manda siempre @Cancelados=0: el SP ya no lo usa, lo recalcula solo. Aqui se le pasa 0 tambien a Legacy para que la pregunta sea identica.",
+    "LAS FECHAS VACIAS: 'Fecha Pago' y 'Fecha Cancelacion' estan en NULL en la base (927 de 1017 prestamos sin cancelar, 172 sin pagar). Legacy las declara DateTime no nulo en EmpleadoPrestamoDTO, asi que el NULL se convierte en '0001-01-01T00:00:00' y un prestamo vivo parece cancelado en el ano 1. El nuevo pasa el null tal cual. No es una diferencia accidental: es Legacy el que pierde la informacion, y por eso estos dos campos quedan fuera de la comparacion estricta.",
+    "Legacy repite 'result' y 'mensaje' DENTRO de cada prestamo; el SP no los devuelve (salen en 0 y null siempre). El nuevo no mete el estado de la llamada dentro de cada dato."
+  ],
+  "ignorar": [
+    "fechaPago",
+    "fechaCancelacion",
+    "result",
+    "mensaje"
+  ]
+}

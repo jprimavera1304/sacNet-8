@@ -1,0 +1,36 @@
+{
+  "nombre": "Credito disponible del cliente",
+  "_porque": [
+    "El procedimiento recibe un solo parametro, @IDCliente, asi que la pregunta es",
+    "la misma por construccion. El nuevo no lo expone solo: lo mezcla en el bloque",
+    "'saldos' de la busqueda de cliente de la captura de pedidos."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/creditodisponible/consultar",
+    "body": {
+      "IDCliente": 20316
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/pedidos/captura/clientes/buscar",
+    "body": {
+      "IDCliente": 20316,
+      "IDEmpresaCS": 1
+    }
+  },
+  "camino_legacy": "result.creditoDisponible",
+  "camino_nuevo": "data.saldos",
+  "solo_campos": [
+    "LimiteCredito",
+    "SumaPagosMeses",
+    "PromedioPagosMeses",
+    "FechaInicialPagos",
+    "FechaFinalPagos"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo no devuelve IDCliente en este bloque: ya lo pidio el llamador y el bloque es de UN cliente.",
+    "En el mismo bloque el nuevo agrega los saldos (saldoPendiente, saldoVencido, maxDiasVencidos*) y el 'disponible' ya restado. Mac31 hacia esa resta en la pantalla; aqui se hace en el servidor para que las dos pantallas no puedan discrepar."
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "nombre": "Periodos de nomina (tipo de sueldo 1)",
+  "_porque": [
+    "Mismo SP: sp_n_ConsultaPeriodosTipoSueldo. El nuevo le manda",
+    "@IDPeriodoTipoSueldo=0, @IDPeriodicidad=0, @IDTipoSueldo=idTipoSueldo,",
+    "@IDPeriodoStatus=0 y @Orden=1 (descendente).",
+    "Para preguntar LO MISMO a Legacy se le pasan esos cinco valores con",
+    "IDTipoSueldo=1 y Orden=1, y al nuevo idTipoSueldo=1.",
+    "IDTIPOSUELDO=1 Y NO 0: el nuevo entiende 'sin valor' como 1 (NOMINA) a",
+    "proposito, porque es el unico tipo de sueldo que tiene dias generados; se",
+    "le pide explicito para que la pregunta sea identica en los dos lados.",
+    "top=1000 para que el recorte en memoria del nuevo no entre en juego: con",
+    "el default de 52 la diferencia seria culpa de la pregunta."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/periodostiposueldo/consultar",
+    "body": {
+      "IDPeriodoTipoSueldo": 0,
+      "IDPeriodicidad": 0,
+      "IDTipoSueldo": 1,
+      "IDPeriodoStatus": 0,
+      "Orden": 1
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/asistencias/periodos",
+    "query": { "idTipoSueldo": 1, "top": 1000 }
+  },
+  "camino_legacy": "result.periodosTipoSueldo",
+  "camino_nuevo": "data",
+  "ordenar_por": "IDPeriodoTipoSueldo",
+  "mapa_campos": {
+    "PeriodoTipoSueldo": "Descripcion"
+  },
+  "solo_campos": [
+    "IDPeriodoTipoSueldo",
+    "IDTipoSueldo",
+    "Descripcion",
+    "FechaInicial",
+    "FechaFinal",
+    "NumeroSemana"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo entrega seis campos y Legacy trece. Los que no pasa (IDPeriodicidad, IDPeriodoStatus, IDPeriodoTipoSueldoDia, Periodicidad, TipoSueldo, Status, NumeroDias, FechaDia, FechaDiaFtm, FechaInicialFtm, FechaFinalFtm, result, mensaje) no los usa la pantalla del combo. Decidido en PeriodoNominaDto.",
+    "La descripcion ya formateada por legacy viaja como 'descripcion' en vez de 'PeriodoTipoSueldo', que era un nombre que no se entendia. Se traduce con mapa_campos.",
+    "El nuevo recorta a los 'top' mas nuevos (default 52, tope 520) porque son 540 periodos en Tauro y nadie captura asistencias de hace diez anios. Aqui se pide top=1000 justamente para que ese recorte no afecte la comparacion."
+  ]
+}

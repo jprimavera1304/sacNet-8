@@ -1,0 +1,27 @@
+{
+  "nombre": "Catalogo de tipos de recordatorio",
+  "_porque": [
+    "Catalogo chico con dos banderas (urgente / importante) que el nuevo conserva."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cattiporecordatorio/consultar",
+    "body": {
+      "IDTipoRecordatorio": 0,
+      "IDStatus": 0,
+      "TipoRecordatorio": "",
+      "Formato": 0,
+      "Identico": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/tipos-recordatorio"
+  },
+  "camino_legacy": "result.tipoRecordatorios",
+  "camino_nuevo": "data",
+  "ordenar_por": "idTipoRecordatorio",
+  "diferencias_intencionales": [
+    "El nuevo no acepta @Formato (el interruptor de Excel de Mac31)."
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "nombre": "Catalogo de clientes (buscar por IDCliente)",
+  "_porque": [
+    "El endpoint nuevo clava todos los parametros de sp_n_ConsultaClientes menos",
+    "@IDCliente y @Numero: @IDStatus=0, @IDEmpresaCS=1, @Formato=0, @Identico=0 y",
+    "el resto en 0/''. A legacy se le mandan EXACTAMENTE esos.",
+    "Ademas legacy, cuando IDCliente>0, fuerza IDTipoCliente=0 e IDStatus=0 por su",
+    "cuenta (ClienteService.cs:57), que es lo mismo que hace el nuevo.",
+    "Los strings van explicitos en '' porque ClienteService hace .Replace sobre",
+    "Nombre/ApellidoPaterno/ApellidoMaterno/Referencia y truena si llegan nulos."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/clientes/consultar",
+    "body": {
+      "IDCliente": 20316,
+      "IDCondicionesCredito": 0,
+      "IDCondicionesCreditoAceites": 0,
+      "IDCondicionesCreditoCascos": 0,
+      "IDDescuento": 0,
+      "IDAgente": 0,
+      "IDStatus": 0,
+      "Numero": "",
+      "Nombre": "",
+      "ApellidoPaterno": "",
+      "ApellidoMaterno": "",
+      "Rfc": "",
+      "IDTipoCliente": 0,
+      "ConHuella": 0,
+      "IDEmpresaCS": 1,
+      "EsMostrador": 0,
+      "Referencia": "",
+      "Formato": 0,
+      "Identico": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/reportes/ventas/acumuladores-productos/clientes",
+    "query": {
+      "idCliente": 20316
+    }
+  },
+  "camino_legacy": "result.clientes",
+  "ordenar_por": "idCliente",
+  "solo_campos": [
+    "IDCliente",
+    "Numero",
+    "NombreCliente",
+    "Nombre"
+  ],
+  "diferencias_intencionales": [
+    "El procedimiento devuelve el cliente completo (direccion, correos, credito, descuentos...) y este endpoint nuevo entrega solo los cuatro campos que la pantalla de reportes necesita para el autocompletado: idCliente, numero, nombreCliente y nombre. No es una perdida: es el catalogo de un selector, no la ficha del cliente.",
+    "El nuevo descarta renglones con IDCliente<=0 o Numero<=0; legacy los deja pasar."
+  ]
+}

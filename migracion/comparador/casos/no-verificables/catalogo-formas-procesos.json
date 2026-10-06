@@ -1,0 +1,29 @@
+{
+  "nombre": "Formas y procesos de Mac31 (NO VERIFICABLE)",
+  "_porque": [
+    "NO SE PUEDE COMPARAR: Legacy manda @IDForma, @IDProceso y @AplicaContrasena a",
+    "sp_n_ConsultaFormas, que solo declara dos parametros, y SQL Server contesta",
+    "\"Procedure or function sp_n_ConsultaFormas has too many arguments specified\".",
+    "La capacidad figura en el inventario pero nunca funciono."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catformasprocesos/consultar",
+    "body": {
+      "IDForma": 0,
+      "IDProceso": 0,
+      "AplicaContrasena": 1
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/formas-procesos"
+  },
+  "camino_legacy": "result.formasProcesos",
+  "camino_nuevo": "data",
+  "ordenar_por": "idForma",
+  "diferencias_intencionales": [
+    "El nuevo acepta idProceso y lo IGNORA, con la nota en el controlador: sp_n_ConsultaFormas no tiene ese parametro ni devuelve procesos (los procesos viven en n_Procesos / UsuarioFormaProceso, que es lo que lee PermissionService). Mandarlo solo serviria para fallar igual que Legacy.",
+    "No verificable contra Legacy: el lado de Legacy no responde nunca."
+  ]
+}

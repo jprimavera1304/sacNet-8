@@ -1,0 +1,33 @@
+{
+  "nombre": "Pedidos pendientes de imprimir (el contador)",
+  "_porque": [
+    "El procedimiento devuelve UN solo numero: COUNT(*) de los pedidos en estatus",
+    "1 procesados y sin imprimir. Su parametro @IDPedido esta declarado pero NO",
+    "se usa en ningun lado del cuerpo (comprobado con sp_helptext), asi que da lo",
+    "mismo lo que se le mande: a los dos lados se les pasa 0 para no fingir un",
+    "filtro que no existe."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/consultaventaspedido/pendientes/imprimir/consultar",
+    "body": {
+      "IDPedido": 0
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/consulta/pendientes-imprimir",
+    "body": {
+      "IDVenta": 0
+    }
+  },
+  "camino_legacy": "result.ventasPedidos",
+  "camino_nuevo": "data.rows",
+  "solo_campos": [
+    "PedidosPendientesImprimir"
+  ],
+  "diferencias_intencionales": [
+    "Legacy mete ese unico numero dentro de ConsultaVentasPedidosDTO, asi que su renglon trae 58 campos mas, todos en 0/null: son el cascaron del DTO. El nuevo devuelve la columna que el procedimiento si da y nada mas.",
+    "El backend nuevo no tiene campo IDPedido en VentasConsultaRequest y manda su IDVenta al parametro @IDPedido. No cambia nada porque el procedimiento nunca lee @IDPedido, pero queda anotado."
+  ]
+}

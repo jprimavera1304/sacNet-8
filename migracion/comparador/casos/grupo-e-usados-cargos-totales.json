@@ -1,0 +1,44 @@
+{
+  "nombre": "Usados: totales del bloque de cargos",
+  "_porque": [
+    "La pantalla de Modificacion de Usados de Mac31 se arma con TRES llamadas a",
+    "Legacy; el backend nuevo las junta en POST api/ventas/usados/consultar y",
+    "devuelve cada bloque en su propia rama. Se compara bloque por bloque.",
+    "Los parametros al SP son identicos en los dos lados (ver cada caso).",
+    "IDVenta 369614 (folio 135317) se eligio porque es la remision mas reciente que",
+    "NO esta cancelada y tiene a la vez cargos, creditos y bajas anteriores: con una",
+    "sin bajas el bloque de anteriores saldria vacio en los dos y no probaria nada."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/ventasusadoscargos/consultar",
+    "body": {
+      "IDVenta": 369614
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/usados/consultar",
+    "body": {
+      "idVenta": 369614
+    }
+  },
+  "camino_legacy": "result.ventasUsadosCargos.0",
+  "camino_nuevo": "data.cargos",
+  "mapa_campos": {
+    "TotalCantidadUsadoCargo": "totalCantidad",
+    "TotalImporteUsadoCargo": "totalImporte",
+    "TotalIVAUsadoCargo": "totalIva",
+    "TotalTotalUsadoCargo": "totalTotal"
+  },
+  "solo_campos": [
+    "totalCantidad",
+    "totalImporte",
+    "totalIva",
+    "totalTotal"
+  ],
+  "diferencias_intencionales": [
+    "El SP repite los totales en CADA renglon; los dos lados toman el primero (VentasUsadosRepository.cs:146-150). Por eso del lado de Legacy se mira el renglon 0.",
+    "Este caso existe porque los totales del bloque no son un renglon mas: si se compararan solo los renglones, un error al elegir de que fila sacar los totales pasaria sin verse."
+  ]
+}

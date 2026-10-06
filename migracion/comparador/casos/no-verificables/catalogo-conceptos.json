@@ -1,0 +1,35 @@
+{
+  "nombre": "Catalogo de conceptos de recaudacion (NO VERIFICABLE)",
+  "_porque": [
+    "NO SE PUEDE COMPARAR EN Produccion_svr: sp_n_ConsultaConceptos es del modulo",
+    "de recaudaciones y no esta instalado aqui. Legacy falla igual."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catconceptos/consultar",
+    "body": {
+      "IDConcepto": 0,
+      "IDStatus": 1,
+      "NumConcepto": "",
+      "NombreConcepto": ""
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/conceptos"
+  },
+  "camino_legacy": "result.conceptos",
+  "camino_nuevo": "data",
+  "ordenar_por": "idConcepto",
+  "solo_campos": [
+    "idConcepto",
+    "idStatus",
+    "numConcepto",
+    "nombreConcepto",
+    "estatus"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo no manda la auditoria de alta/confirmacion/cancelacion (catorce campos).",
+    "No verificable en Produccion_svr: el SP no esta instalado en esta base."
+  ]
+}

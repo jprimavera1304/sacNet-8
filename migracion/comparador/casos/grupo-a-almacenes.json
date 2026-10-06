@@ -1,0 +1,29 @@
+{
+  "nombre": "Catalogo de almacenes activos",
+  "_porque": [
+    "Legacy: CatAlmacenesController -> CatAlmacenRepository.spConsultar manda a",
+    "sp_n_ConsultaAlmacenes @IDAlmacen, @IDStatus, @Almacen, @Identico.",
+    "El nuevo: ReportesVentasRepository.Catalogos.cs ConsultarAlmacenesAsync manda",
+    "exactamente esos cuatro con 0 / 1 / '' / 0. Por eso a Legacy se le pide",
+    "IDStatus=1: el nuevo solo trae activos."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catalmacenes/consultar",
+    "body": { "IDAlmacen": 0, "IDStatus": 1, "Almacen": "", "Identico": 0 }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/reportes/ventas/acumuladores-productos/catalogos"
+  },
+  "camino_legacy": "result.catAlmacenes",
+  "camino_nuevo": "almacenes",
+  "ordenar_por": "id",
+  "mapa_campos": { "IDAlmacen": "id", "Almacen": "nombre" },
+  "solo_campos": ["id", "nombre"],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "El nuevo entrega {id,nombre,clave} y repite el nombre del almacen en 'clave' porque el SP no da una clave corta; Legacy manda ademas IDStatus, Status, result y mensaje. El texto se arma en el front.",
+    "El nuevo descarta renglones con id<=0 o nombre vacio."
+  ]
+}

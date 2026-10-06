@@ -1,0 +1,24 @@
+{
+  "nombre": "Catalogo de galleros",
+  "_porque": [
+    "En Produccion_svr [Catalogo Galleros] esta vacio, asi que este caso prueba",
+    "la forma y que los dos lados coincidan en 'no hay nada', no el contenido.",
+    "Queda escrito para que corra de verdad en la base que si tiene galleros."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catgalleros/consultar",
+    "body": {
+      "IDGallero": 0,
+      "IDStatus": 0,
+      "Gallero": ""
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/galleros"
+  },
+  "camino_legacy": "result.galleros",
+  "camino_nuevo": "data",
+  "ordenar_por": "idGallero"
+}

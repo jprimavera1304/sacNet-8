@@ -1,0 +1,38 @@
+{
+  "nombre": "Dias del periodo 9521",
+  "_porque": [
+    "Mismo SP: sp_n_ConsultaPeriodosTipoSueldoDias. El nuevo le manda",
+    "@IDPeriodoTipoSueldo=id, @IDPeriodicidad=0, @IDTipoSueldo=0 y",
+    "@IDPeriodoStatus=0. A Legacy se le pasan esos mismos cuatro valores."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/periodostiposueldodias/consultar",
+    "body": {
+      "IDPeriodoTipoSueldo": 9521,
+      "IDPeriodicidad": 0,
+      "IDTipoSueldo": 0,
+      "IDPeriodoStatus": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/asistencias/periodos/9521/dias"
+  },
+  "camino_legacy": "result.periodosTipoSueldo",
+  "camino_nuevo": "data",
+  "ordenar_por": "IDPeriodoTipoSueldoDia",
+  "mapa_campos": {
+    "FechaDia": "Fecha"
+  },
+  "solo_campos": [
+    "IDPeriodoTipoSueldoDia",
+    "Fecha"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo entrega solo {idPeriodoTipoSueldoDia, fecha}: es lo unico que hacen falta para los encabezados de la rejilla. Legacy repite en cada dia los datos del periodo (FechaInicial, FechaFinal, NumeroSemana, Periodicidad, TipoSueldo...), que ya vinieron en la consulta de periodos. Decidido en DiaPeriodoDto.",
+    "La columna se llama 'FechaDia' en Legacy y 'fecha' en el nuevo. Se traduce con mapa_campos.",
+    "El nuevo DESCARTA los dias fechados fuera del rango del propio periodo. La base de Zaragoza tiene renglones sueltos en PeriodosTipoSueldoDias (ids 999902 y 999903) colgados de una semana de julio pero fechados en agosto, y con ellos el endpoint devolvia nueve dias para una semana de siete; el SP de la rejilla solo tiene siete huecos. En el periodo 9521 de Tauro no hay ninguno, asi que aqui los dos lados entregan los mismos siete dias.",
+    "El nuevo contesta 404 si el periodo no tiene dias generados; Legacy devuelve lista vacia con 200."
+  ]
+}

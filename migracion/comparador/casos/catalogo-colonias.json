@@ -1,0 +1,42 @@
+{
+  "nombre": "Catalogo de colonias por codigo postal",
+  "_porque": [
+    "Se pregunta por un codigo postal concreto porque el catalogo completo son",
+    "68,101 renglones con cuatro INNER JOIN encima: comparar eso no demuestra",
+    "nada que no demuestre un codigo postal y tarda minutos."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catcolonias/consultar",
+    "body": {
+      "IDColonia": 0,
+      "IDEstado": "",
+      "IDCiudad": "",
+      "IDMunicipio": "",
+      "IDAsentamiento": "",
+      "Colonia": "",
+      "CodigoPostal": "64000",
+      "Estado": "",
+      "Ciudad": "",
+      "Municipio": "",
+      "Identico": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/colonias",
+    "query": {
+      "codigoPostal": "64000"
+    }
+  },
+  "camino_legacy": "result.colonias",
+  "camino_nuevo": "data",
+  "ordenar_por": "idColonia",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Pedir colonias SIN ningun filtro devuelve 400 en el nuevo ('Indica al menos un filtro'). Legacy entregaba los 68,101 renglones, ~14 MB, que ningun desplegable puede usar."
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "nombre": "Catalogo de proveedores activos",
+  "_porque": [
+    "Legacy: ProveedoresController -> ProveedorRepository.spConsultar manda",
+    "sp_n_ConsultaProveedores con once parametros: @IDProveedor,",
+    "@IDCondicionesCredito, @IDDescuento, @IDStatus, @Numero, @Nombre,",
+    "@ApellidoPaterno, @ApellidoMaterno, @RFC, @Formato, @Identico.",
+    "El nuevo (ConsultarProveedoresAsync) manda los MISMOS once con",
+    "0/0/0/1/''/''/''/''/''/0/0."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/proveedores/consultar",
+    "body": {
+      "IDProveedor": 0,
+      "IDCondicionesCredito": 0,
+      "IDDescuento": 0,
+      "IDStatus": 1,
+      "Numero": "",
+      "Nombre": "",
+      "ApellidoPaterno": "",
+      "ApellidoMaterno": "",
+      "Rfc": "",
+      "Formato": 0,
+      "Identico": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/reportes/ventas/remisiones/catalogos"
+  },
+  "camino_legacy": "result.proveedores",
+  "camino_nuevo": "proveedores",
+  "ordenar_por": "id",
+  "_porque_el_mapa_renombra_Nombre": [
+    "Legacy manda 'Nombre' y 'NombreProveedor', y las dos caen en 'nombre' al",
+    "normalizar. El nuevo publica NombreProveedor, asi que la otra se renombra a",
+    "algo que solo_campos descarta. Hoy traen el mismo texto en esta base, pero",
+    "dejarlo al azar del orden del JSON escondia la diferencia el dia que no."
+  ],
+  "mapa_campos": { "IDProveedor": "id", "NombreProveedor": "nombre", "Nombre": "nombrePilaLegacy", "Numero": "clave" },
+  "solo_campos": ["id", "nombre", "clave"],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "El nombre que el nuevo publica es NombreProveedor (el que arma el SP), no la concatenacion de Nombre + apellidos que Legacy manda por separado.",
+    "La 'clave' del nuevo es el Numero del proveedor: Legacy lo manda como entero y el nuevo como texto. El comparador lo normaliza, no es diferencia de contenido.",
+    "Legacy manda la ficha completa (domicilio, telefonos, condiciones de credito, fechas, Facturama). El catalogo nuevo entrega solo id/nombre/clave a proposito.",
+    "El nuevo descarta renglones con id<=0 o nombre vacio."
+  ]
+}

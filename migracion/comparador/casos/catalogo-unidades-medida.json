@@ -1,0 +1,31 @@
+{
+  "nombre": "Catalogo de unidades de medida",
+  "_porque": [
+    "sp_n_ConsultaUnidadesServicio con todos los filtros apagados: el ORDER BY es",
+    "por IDUnidadMedida, no por nombre, y conviene que se vea igual en los dos."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catunidadesmedida/consultar",
+    "body": {
+      "IDUnidadMedida": 0,
+      "IDStatus": 0,
+      "UnidadMedida": "",
+      "EsPieza": 0,
+      "EsCaja": 0,
+      "EsServicio": 0,
+      "Identico": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/unidades-medida"
+  },
+  "camino_legacy": "result.catUnidadesMedida",
+  "camino_nuevo": "data",
+  "ordenar_por": "idUnidadMedida",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ]
+}

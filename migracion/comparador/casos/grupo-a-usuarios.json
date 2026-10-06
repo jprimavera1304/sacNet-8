@@ -1,0 +1,36 @@
+{
+  "nombre": "Catalogo de usuarios activos",
+  "_porque": [
+    "Legacy: UsuariosController -> UsuarioRepository.spConsultar manda",
+    "sp_n_ConsultaUsuarios @IDUsuario, @IDPerfil, @IDStatus, @Usuario, @Identico,",
+    "@Formato.",
+    "El nuevo (ConsultarUsuariosAsync) manda esos seis con 0 / 0 / 1 / '' / 0 / 0."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/usuarios/consultar",
+    "body": { "IDUsuario": 0, "IDPerfil": 0, "IDStatus": 1, "Usuario": "", "Identico": 0, "Formato": 0 }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/reportes/ventas/remisiones/catalogos"
+  },
+  "camino_legacy": "result.usuarios",
+  "camino_nuevo": "usuarios",
+  "ordenar_por": "id",
+  "_porque_el_mapa_renombra_Nombre": [
+    "Legacy manda DOS columnas que al normalizar caen en 'nombre': 'Usuario'",
+    "(la cuenta: 'ALVARELYS') y 'Nombre' (el nombre completo: 'ALVARELYS DEL",
+    "CARMEN GIL SEIJAS'). Sin renombrar la segunda, la ultima gana y el caso",
+    "acusa una diferencia que no existe: el nuevo publica 'Usuario', igual que",
+    "el desplegable de Mac31. Se le pone un nombre que solo_campos descarta."
+  ],
+  "mapa_campos": { "IDUsuario": "id", "Usuario": "nombre", "Nombre": "nombreCompletoLegacy" },
+  "solo_campos": ["id", "nombre"],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "EL NUEVO NO DEVUELVE LA CONTRASENA. Legacy manda Contrasena, ContrasenaDesc y ContrasenaAutorizacion EN CLARO en la respuesta de este catalogo. Eso no se hereda: es la diferencia intencional mas importante de este caso.",
+    "Legacy manda ademas IDPerfil, Perfil, Nombre, Huellas, Status, Multicajas, NumUsuario y AplicaContrasenaAutorizacion. El catalogo nuevo entrega solo id/nombre.",
+    "El nuevo descarta renglones con id<=0 o nombre vacio."
+  ]
+}

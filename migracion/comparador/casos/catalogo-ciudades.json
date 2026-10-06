@@ -1,0 +1,34 @@
+{
+  "nombre": "Catalogo de ciudades de un estado",
+  "_porque": [
+    "Se pide Nuevo Leon (19) en los dos lados para no comparar 685 renglones",
+    "cuando lo que se quiere verificar es la forma y el filtro."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catciudades/consultar",
+    "body": {
+      "IDEstado": "19",
+      "IDCiudad": "",
+      "Ciudad": "",
+      "Identico": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/ciudades",
+    "query": {
+      "idEstado": "19"
+    }
+  },
+  "camino_legacy": "result.ciudades",
+  "camino_nuevo": "data",
+  "ordenar_por": "idCiudad",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "Sin estado, Legacy manda @IDEstado = '' y SQL Server contesta 'An insufficient number of arguments were supplied for fn_RegresaTablaEstados': el endpoint de Legacy esta roto cuando no se filtra. El nuevo traduce el ausente a '0' y si responde el catalogo completo."
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "nombre": "Catalogo de grupos de categorias activos",
+  "_porque": [
+    "Legacy: CatGruposCategoriasController -> CatGrupoCategoriaService arma",
+    "@IDsGrupoCategoria con string.Join('~', IDGrupoCategoriaLst) y el repo manda",
+    "sp_n_ConsultaGrupoCategorias @IDsGrupoCategoria, @IDStatus, @GrupoCategoria,",
+    "@Identico, @Formato. Se manda IDGrupoCategoriaLst vacio para que el join de ''",
+    "— que es exactamente lo que manda ConsultarGruposCategoriasAsync del nuevo.",
+    "Si se omite la lista, el servicio de Legacy truena con ArgumentNullException."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catgruposcategorias/consultar",
+    "body": {
+      "IDGrupoCategoriaLst": [],
+      "IDsGrupoCategoria": "",
+      "IDStatus": 1,
+      "GrupoCategoria": "",
+      "Identico": 0,
+      "Formato": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/reportes/ventas/acumuladores-productos/catalogos"
+  },
+  "camino_legacy": "result.catGruposCategorias",
+  "camino_nuevo": "categorias",
+  "ordenar_por": "id",
+  "mapa_campos": { "IDGrupoCategoria": "id", "GrupoCategoria": "nombre" },
+  "solo_campos": ["id", "nombre"],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "En el contrato nuevo este catalogo se llama 'categorias' (y los hijos 'subcategorias'), como los nombra la pantalla de reportes. Legacy los llama grupos de categorias y categorias.",
+    "El nuevo repite el nombre en 'clave' porque el SP no da clave corta.",
+    "El nuevo descarta renglones con id<=0 o nombre vacio."
+  ]
+}

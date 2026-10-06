@@ -1,0 +1,28 @@
+{
+  "nombre": "Catalogo de centros de servicio",
+  "_porque": [
+    "Catalogo chico y sin trampas: sirve de control de que el sobre nuevo y el",
+    "recorte de texto no alteran el dato."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catcentroservicio/consultar",
+    "body": {
+      "IDCentro": 0,
+      "IDStatus": 0,
+      "NombreCentro": "",
+      "Formato": 0,
+      "Identico": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/centros-servicio"
+  },
+  "camino_legacy": "result.centrosServicio",
+  "camino_nuevo": "data",
+  "ordenar_por": "idCentro",
+  "diferencias_intencionales": [
+    "El nuevo no acepta @Formato. Era el interruptor '0 todos los campos / 1 Excel' de Mac31, y el Excel lo arma el front nuevo con los mismos datos."
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "nombre": "Un empleado por id (4199)",
+  "_porque": [
+    "GET /api/empleados/{id} del nuevo llama al MISMO SP con @IDEmpleado=id,",
+    "@IDTipoSueldo=0 y @IDStatus=0 (a proposito 0: al pedir UNO se quiere ese,",
+    "este activo o dado de baja). A Legacy se le pasa exactamente eso.",
+    "Legacy devuelve lista de un renglon; el nuevo devuelve el renglon. Por eso",
+    "camino_legacy baja al indice 0."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/empleadostiposueldo/consultar",
+    "body": {
+      "IDEmpleado": 4199,
+      "IDTipoSueldo": 0,
+      "IDStatus": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/empleados/4199"
+  },
+  "camino_legacy": "result.empleadosTipoSueldo.0",
+  "camino_nuevo": "data",
+  "diferencias_intencionales": [
+    "El nuevo entrega el objeto y Legacy una lista de un elemento. Es la forma, no el dato.",
+    "El nuevo agrega 'puedeVerSueldo' fuera de 'data' (ver el caso de la lista)."
+  ]
+}

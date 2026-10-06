@@ -1,0 +1,31 @@
+{
+  "nombre": "Empleados con tipo de sueldo (activos)",
+  "_porque": [
+    "Mismo stored procedure en los dos lados: sp_n_ConsultaEmpleadosTipoSueldo.",
+    "Legacy lo expone en /api/empleadostiposueldo/consultar con @IDEmpleado,",
+    "@IDTipoSueldo y @IDStatus; el nuevo lo sirve en GET /api/empleados y manda",
+    "@IDEmpleado=0, @IDTipoSueldo=0 y @IDStatus=idStatus. Para preguntar LO",
+    "MISMO se le pasa a Legacy IDEmpleado=0, IDTipoSueldo=0, IDStatus=1 y al",
+    "nuevo idStatus=1."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/empleadostiposueldo/consultar",
+    "body": {
+      "IDEmpleado": 0,
+      "IDTipoSueldo": 0,
+      "IDStatus": 1
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/empleados",
+    "query": { "idStatus": 1 }
+  },
+  "camino_legacy": "result.empleadosTipoSueldo",
+  "camino_nuevo": "data",
+  "ordenar_por": "IDEmpleado",
+  "diferencias_intencionales": [
+    "El nuevo manda ademas 'puedeVerSueldo' al lado de 'data'. No es un campo del renglon: dice si el usuario tiene el permiso empleados.sueldo.ver. Sin ese permiso el backend pone en null SueldoSemanal, Comision, Asistencia, Puntualidad y SalidaTarde ANTES de contestar, en vez de mandarlos y confiar en que el front los esconda. BancoPruebas es SuperAdmin, por eso aqui vienen con valor y la comparacion es valida."
+  ]
+}

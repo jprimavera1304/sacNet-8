@@ -1,0 +1,32 @@
+{
+  "nombre": "Prestamos pendientes (traduccion del estado)",
+  "_porque": [
+    "El nuevo es el unico de este grupo que TRADUCE un parametro: estado en",
+    "palabras -> @Pagados numerico (todos=0, pagados=1, pendientes=2,",
+    "cancelados=3). Una traduccion mal puesta devolveria la lista equivocada",
+    "callando, asi que se verifica el caso que no es el default: pendientes = 2.",
+    "A Legacy se le pasa pagados=2."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/empleadosprestamo/consultar",
+    "body": {
+      "idEmpleadoPrestamo": 0,
+      "idEmpleado": 0,
+      "pagados": 2,
+      "cancelados": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/prestamos",
+    "query": { "idEmpleado": 0, "estado": "pendientes" }
+  },
+  "camino_legacy": "result.empleadosPrestamo",
+  "camino_nuevo": "data",
+  "ordenar_por": "idEmpleadoPrestamo",
+  "ignorar": ["fechaPago", "fechaCancelacion", "result", "mensaje"],
+  "diferencias_intencionales": [
+    "Mismas diferencias de representacion que el caso de la lista completa (fechas NULL y result/mensaje por renglon)."
+  ]
+}

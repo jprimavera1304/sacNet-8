@@ -1,0 +1,29 @@
+{
+  "nombre": "Catalogo de repartidores activos",
+  "_porque": [
+    "Legacy: CatRepartidoresController -> CatRepartidorRepository.spConsultar manda",
+    "sp_n_ConsultaRepartidores @IDRepartidor, @IDZona, @IDStatus, @Repartidor,",
+    "@Identico.",
+    "El nuevo (ConsultarRepartidoresAsync de los catalogos de remisiones) manda esos",
+    "cinco con 0 / 0 / 1 / '' / 0."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catrepartidores/consultar",
+    "body": { "IDRepartidor": 0, "IDZona": 0, "IDStatus": 1, "Repartidor": "", "Identico": 0 }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/reportes/ventas/remisiones/catalogos"
+  },
+  "camino_legacy": "result.catRepartidores",
+  "camino_nuevo": "repartidores",
+  "ordenar_por": "id",
+  "mapa_campos": { "IDRepartidor": "id", "Repartidor": "nombre" },
+  "solo_campos": ["id", "nombre"],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "Legacy manda ademas IDZona, Zona, IDStatus, Status, result y mensaje. El nuevo repite el nombre en 'clave' porque el SP no da clave corta.",
+    "El nuevo descarta renglones con id<=0 o nombre vacio."
+  ]
+}

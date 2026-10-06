@@ -1,0 +1,31 @@
+{
+  "nombre": "Catalogo de tipos de documento de venta",
+  "_porque": [
+    "Caso de DataRow con SELECT * sobre [Tipos de Documentos]. @MostrarPantalla",
+    "tiene default 1 en el SP y asi se pregunta en los dos lados."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catTiposDocumentos/consultar",
+    "body": {
+      "IDTipoDocumento": 0,
+      "MostrarPantalla": 1,
+      "SinDevCliente": 0,
+      "SinCambioVigencia": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/tipos-documento"
+  },
+  "camino_legacy": "result.tablaLst.0.Table",
+  "camino_nuevo": "data",
+  "ordenar_por": "idTipoDocumento",
+  "solo_campos": [
+    "idTipoDocumento",
+    "documento",
+    "nombreDocumento",
+    "nombreDocumentoCorto",
+    "mostrarPantalla"
+  ]
+}

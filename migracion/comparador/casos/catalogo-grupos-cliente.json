@@ -1,0 +1,34 @@
+{
+  "nombre": "Catalogo de grupos de cliente",
+  "_porque": [
+    "Caso de DataRow como los de facturacion electronica.",
+    "El SP declara @GrupoCliente pero no lo usa en ninguna rama; el nuevo tampoco",
+    "lo expone."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catGruposCliente/consultar",
+    "body": {
+      "IDGrupoCliente": 0,
+      "IDStatus": 0,
+      "GrupoCliente": "",
+      "Identico": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/grupos-cliente"
+  },
+  "camino_legacy": "result.tablaLst.0.Table",
+  "camino_nuevo": "data",
+  "ordenar_por": "idGrupoCliente",
+  "solo_campos": [
+    "idGrupoCliente",
+    "idStatus",
+    "grupoCliente",
+    "status"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo no acepta filtro por texto del grupo: sp_n_ConsultaCatGruposCliente recibe @GrupoCliente y no lo usa. Legacy lo mandaba (con un typo: catGrupoClienteInputDTO.@GrupoCliente) y no filtraba nada."
+  ]
+}

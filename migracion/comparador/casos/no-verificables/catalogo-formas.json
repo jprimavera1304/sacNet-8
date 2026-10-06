@@ -1,0 +1,29 @@
+{
+  "nombre": "Formas de Mac31 (NO VERIFICABLE)",
+  "_porque": [
+    "NO SE PUEDE COMPARAR: el endpoint de Legacy esta roto por su propio codigo.",
+    "CatFormaProcesoDTO declara FormaNombre y FormaDescripcion como int, y el SP",
+    "los devuelve como varchar, asi que DataTableToList truena con",
+    "\"El objeto de tipo 'System.String' no puede convertirse en el tipo 'System.Int32'\".",
+    "Legacy nunca ha devuelto este catalogo. El nuevo si: los declara string."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catformas/consultar",
+    "body": {
+      "IDForma": 0,
+      "AplicaContrasena": 1
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/formas"
+  },
+  "camino_legacy": "result.formasProcesos",
+  "camino_nuevo": "data",
+  "ordenar_por": "idForma",
+  "diferencias_intencionales": [
+    "El nuevo declara FormaNombre y FormaDescripcion como texto, que es lo que son. Legacy los tiene como int y por eso su endpoint devuelve 500: no es una diferencia de datos, es un defecto de Legacy que el nuevo no hereda.",
+    "No verificable contra Legacy: el lado de Legacy no responde nunca."
+  ]
+}

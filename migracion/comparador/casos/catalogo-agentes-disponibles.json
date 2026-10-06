@@ -1,0 +1,28 @@
+{
+  "nombre": "Numeros de agente disponibles",
+  "_porque": [
+    "sp_n_ConsultaAgentesDisponibles solo devuelve la columna NumeroAgente;",
+    "Legacy la mete en su CatAgenteDTO completo, asi que los otros campos salen",
+    "en 0/null. Por eso se comparan solo los campos que el dato de verdad tiene."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catagentes/disponible",
+    "body": {
+      "NumeroAgente": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/agentes-disponibles"
+  },
+  "camino_legacy": "result.agentes",
+  "camino_nuevo": "data",
+  "ordenar_por": "numeroAgente",
+  "solo_campos": [
+    "numeroAgente"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo entrega solo { numeroAgente }. Legacy rellena ademas IDAgente, IDStatus, NombreAgente, NumeroNombreAgente y Status con 0/null porque reusa el DTO del catalogo de agentes; mandar seis campos vacios no es informacion."
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "nombre": "Pedido guardado: encabezado y totales (tabla TOTALES)",
+  "_porque": [
+    "Legacy: POST /api/pedidos/consultar -> sp_n_ConsultaPedido con @IDPedido y los",
+    "cuatro Solo* en 0; devuelve CUATRO tablas y las reparte en pedidos (tabla 3),",
+    "pedidoDetalles (0), pedidoTipoUsadoCargos (1) y pedidoTipoUsadoCreditos (2).",
+    "El nuevo: GET api/ventas/pedidos/captura/{idPedido} corre el MISMO SP con los",
+    "MISMOS parametros (VentasPedidoCapturaRepository.cs:988-1001) y reparte las",
+    "mismas cuatro tablas en detalles / cascosCargo / cascosCredito / totales.",
+    "Pide primero sp_w_ConsultaPedido, pero ese procedimiento NO EXISTE en",
+    "Produccion_svr (comprobado en sys.procedures), asi que cae al fallback y los",
+    "dos lados corren literalmente el mismo sp_n_ConsultaPedido.",
+    "Se compara una tabla por caso porque son contratos distintos."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/pedidos/consultar",
+    "body": {
+      "IDPedido": 195033,
+      "SoloDetalles": 0,
+      "SoloCargos": 0,
+      "SoloCreditos": 0,
+      "SoloTotales": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/ventas/pedidos/captura/195033"
+  },
+  "camino_legacy": "result.pedidos.0",
+  "camino_nuevo": "data.totales",
+  "solo_campos": [
+    "IDPedido",
+    "Productos",
+    "Importe",
+    "Cargos",
+    "SubTotal",
+    "Iva",
+    "Creditos",
+    "TotalPagar",
+    "Descuento",
+    "ImporteUsadosCargo",
+    "IvaUsadosCargo",
+    "TotalUsadosCargo",
+    "TotalClienteBonificacion",
+    "ImporteUsadosCredito",
+    "IvaUsadosCredito",
+    "TotalUsadosCredito",
+    "SubTotalRedondeado",
+    "IvaRedondeado",
+    "TotalRedondeado",
+    "PesoKgTotal",
+    "Observaciones",
+    "Factura",
+    "Almacen",
+    "IDAlmacen",
+    "FechaEmision",
+    "FechaEmisionFtm",
+    "FechaVencimiento",
+    "FechaVencimientoFtm",
+    "ServicioNombre",
+    "ServicioDireccion1",
+    "ServicioDireccion2",
+    "ServicioReferencia",
+    "ServicioTelefono",
+    "SoloAceites",
+    "SoloServicios",
+    "SoloLogistica",
+    "IDAgenteAutoriza",
+    "IDEmpresaCS"
+  ],
+  "diferencias_intencionales": [
+    "Legacy mete la tabla en un DTO tipado y lo que el DTO declara pero el SP no devuelve sale en 0/null (es relleno del DTO, no dato). El nuevo entrega los renglones crudos del SP. Se comparan las columnas que el SP si trae. En TOTALES el SP no devuelve IDPedidoDetalle, IDVenta, IDEmpresa, IDCliente, IDUsuario, IDCompra, Existencia ni Pedido: Legacy las ensena en 0/null porque las declara PedidoDTO, no porque la base diga eso.",
+    "El nuevo agrega Tabla, TipoPrecio, Redondear, Ganancia, ImpuestosDetalle, ImporteConIva(Rnd), ImporteConUsadoConIva(Rnd) y TotalCostoUsadoCargoConIva, todas del mismo SP y tiradas por el DTO de Legacy."
+  ]
+}

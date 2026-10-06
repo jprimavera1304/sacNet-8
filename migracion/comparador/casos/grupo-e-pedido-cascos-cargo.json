@@ -1,0 +1,52 @@
+{
+  "nombre": "Pedido guardado: cascos a cargo (tabla CARGOS)",
+  "_porque": [
+    "Legacy: POST /api/pedidos/consultar -> sp_n_ConsultaPedido con @IDPedido y los",
+    "cuatro Solo* en 0; devuelve CUATRO tablas y las reparte en pedidos (tabla 3),",
+    "pedidoDetalles (0), pedidoTipoUsadoCargos (1) y pedidoTipoUsadoCreditos (2).",
+    "El nuevo: GET api/ventas/pedidos/captura/{idPedido} corre el MISMO SP con los",
+    "MISMOS parametros (VentasPedidoCapturaRepository.cs:988-1001) y reparte las",
+    "mismas cuatro tablas en detalles / cascosCargo / cascosCredito / totales.",
+    "Pide primero sp_w_ConsultaPedido, pero ese procedimiento NO EXISTE en",
+    "Produccion_svr (comprobado en sys.procedures), asi que cae al fallback y los",
+    "dos lados corren literalmente el mismo sp_n_ConsultaPedido.",
+    "Se compara una tabla por caso porque son contratos distintos."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/pedidos/consultar",
+    "body": {
+      "IDPedido": 195033,
+      "SoloDetalles": 0,
+      "SoloCargos": 0,
+      "SoloCreditos": 0,
+      "SoloTotales": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/ventas/pedidos/captura/195033"
+  },
+  "camino_legacy": "result.pedidoTipoUsadoCargos",
+  "camino_nuevo": "data.cascosCargo",
+  "solo_campos": [
+    "IDPedidoUsadoCargo",
+    "IDPedido",
+    "IDTipoUsado",
+    "TipoUsado",
+    "CostoVentaCargo",
+    "Cantidad",
+    "Importe",
+    "Orden",
+    "Bonificacion",
+    "CostoVentaCargoConIva",
+    "ImporteVentaCargoConIva",
+    "ClienteBonificacion",
+    "ImporteClienteBonificacion"
+  ],
+  "diferencias_intencionales": [
+    "Legacy mete la tabla en un DTO tipado y lo que el DTO declara pero el SP no devuelve sale en 0/null (es relleno del DTO, no dato). El nuevo entrega los renglones crudos del SP. Se comparan las columnas que el SP si trae. Aqui Legacy reusa CatTipoUsadoDTO para los DOS grids, asi que en CARGOS vienen en 0 las columnas de credito (CostoVentaCredito, CostoVentaCreditoConIva, ImporteVentaCreditoConIva, IDPedidoUsadoCredito) y tambien Actual, IDStatus y los CostoCompra*: el SP no las devuelve en esta tabla.",
+    "El nuevo agrega la columna Tabla ('CARGOS'), que es el discriminador que el propio SP pone."
+  ],
+  "ordenar_por": "IDTipoUsado"
+}

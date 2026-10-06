@@ -1,0 +1,52 @@
+{
+  "nombre": "Usados: cascos ENTREGADOS mas el catalogo completo (@Accion=2)",
+  "_porque": [
+    "La pantalla de Modificacion de Usados de Mac31 se arma con TRES llamadas a",
+    "Legacy; el backend nuevo las junta en POST api/ventas/usados/consultar y",
+    "devuelve cada bloque en su propia rama. Se compara bloque por bloque.",
+    "Los parametros al SP son identicos en los dos lados (ver cada caso).",
+    "IDVenta 369614 (folio 135317) se eligio porque es la remision mas reciente que",
+    "NO esta cancelada y tiene a la vez cargos, creditos y bajas anteriores: con una",
+    "sin bajas el bloque de anteriores saldria vacio en los dos y no probaria nada."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/ventasusadoscreditos/actual/catalogo/consultar",
+    "body": {
+      "IDVenta": 369614,
+      "IDUsuario": 1
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/usados/consultar",
+    "body": {
+      "idVenta": 369614
+    }
+  },
+  "camino_legacy": "result.ventasUsadosCreditos",
+  "camino_nuevo": "data.creditos.renglones",
+  "mapa_campos": {
+    "IDTipoUsado": "idTipoUsado",
+    "TipoUsadoCredito": "tipo",
+    "CostoUsadoCredito": "costo",
+    "CostoVentaCreditoConIva": "costoConIva",
+    "CantidadUsadoCredito": "cantidad",
+    "TotalUsadoCredito": "total"
+  },
+  "solo_campos": [
+    "idTipoUsado",
+    "tipo",
+    "costo",
+    "costoConIva",
+    "cantidad",
+    "total"
+  ],
+  "diferencias_intencionales": [
+    "Los dos lados llaman a sp_n_VentasUsadosCredito con @Accion=2 y @IDVenta. El 2 es enumUsadosCreditoStatus.UsadosCreditoActualCatalogo en Legacy (VentasUsadosCreditoService.findActualCatalogoAsync -> Enums.cs:104) y la constante CreditoActualConCatalogo en el nuevo (VentasUsadosRepository.cs:162). Misma pregunta. Con @Accion=2 el SP devuelve el CATALOGO entero de tipos de usado, con 0 en los que la venta no tiene: por eso salen 8 renglones y no 3.",
+    "A Legacy se le manda ademas IDUsuario=1 porque su DTO lo declara [Required] y sin el contesta 400 'Informacion incompleta'. NO llega al SP (VentasUsadosCreditoRepository.cs:58-59 solo pasa @Accion y @IDVenta), asi que no cambia la pregunta; es solo para pasar la validacion del modelo.",
+    "Legacy mapea las tres consultas al MISMO VentasUsadosCreditoDTO / VentasUsadosCargoDTO, asi que devuelve en 0/null un monton de columnas que el SP no trae en esa accion (relleno del DTO, no dato). El nuevo entrega solo lo que la pantalla usa. Se comparan los campos del contrato nuevo.",
+    "Los *Ftm no viajan en el nuevo. Son texto ya formateado para los grids de WinForms (incluso con &nbsp; dentro, como CantidadUsadoCargoFtm = '&nbsp;&nbsp;&nbsp;2'). El numero va crudo y el formato lo pone el navegador: mandar el mismo dato dos veces, y uno de ellos con HTML de relleno, era de Mac31."
+  ],
+  "ordenar_por": "idTipoUsado"
+}

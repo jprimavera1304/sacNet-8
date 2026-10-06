@@ -1,0 +1,56 @@
+{
+  "nombre": "Catalogo de empleados activos (sp distinto a proposito)",
+  "_porque": [
+    "Legacy /api/empleados/consultar usa sp_n_ConsultaEmpleados, que solo lee la",
+    "tabla Empleados. El backend nuevo NO lo usa: GET /api/empleados usa",
+    "sp_n_ConsultaEmpleadosTipoSueldo. Esta decidido y documentado en",
+    "Application/DTOs/Empleados/EmpleadosDtos.cs: sp_n_ConsultaEmpleados no trae",
+    "puesto ni sueldo (viven en EmpleadoTipoSueldo), asi que con el no se puede",
+    "llenar el formulario; y concatena @Nombre sin escapar dentro de un LIKE,",
+    "o sea inyeccion SQL si se le manda texto del usuario.",
+    "Se compara entonces solo la INTERSECCION de campos (la identidad del",
+    "empleado), que es lo que esta capacidad promete conservar.",
+    "A Legacy se le pasa IDStatus=1 porque al nuevo se le pide idStatus=1."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/empleados/consultar",
+    "body": {
+      "IDEmpleado": 0,
+      "IDStatus": 1,
+      "Nombre": "",
+      "Formato": 0,
+      "Identico": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/empleados",
+    "query": { "idStatus": 1 }
+  },
+  "camino_legacy": "result.empleados",
+  "camino_nuevo": "data",
+  "ordenar_por": "IDEmpleado",
+  "mapa_campos": {
+    "Status": "Estatus"
+  },
+  "solo_campos": [
+    "IDEmpleado",
+    "IDStatus",
+    "IDChecador",
+    "NumeroEmpleado",
+    "Nombre",
+    "FechaIngreso",
+    "FechaIngresoFtm",
+    "NumeroSeguro",
+    "Rfc",
+    "Curp",
+    "Estatus",
+    "Huellas"
+  ],
+  "diferencias_intencionales": [
+    "Los dos lados usan SP distintos a proposito (ver _porque). Solo se comparan los campos de identidad del empleado que ambos entregan.",
+    "Legacy llama a la columna 'Status' y el nuevo 'Estatus', porque el SP que usa el nuevo la devuelve con ese nombre. Se traduce con mapa_campos.",
+    "Legacy manda ademas result/mensaje por renglon; el nuevo no repite el estado de la llamada dentro de cada dato."
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "nombre": "Catalogo de marcas del grupo ACUMULADORES, categoria ACUMULADOR",
+  "_porque": [
+    "Legacy: MarcasController ruta catgruposcategorias/marcas/consultar ->",
+    "MarcaService arma @IDsMarca/@IDsCategoria/@IDsGrupoCategoria con",
+    "string.Join('~', ...) y el repo manda sp_n_ConsultaGrupoCategoriasMarcas",
+    "@IDsMarca, @IDsCategoria, @IDsGrupoCategoria, @IDStatus, @Marca, @Identico,",
+    "@Formato.",
+    "El nuevo (ConsultarMarcasPorCategoriasAsync) manda lo mismo y usa el MISMO",
+    "separador '~' (JoinIds). Si no se le fija idCategorias, el nuevo rellena con",
+    "TODAS las subcategorias del grupo; por eso aqui se fija la 1 en los dos lados."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catgruposcategorias/marcas/consultar",
+    "body": {
+      "IDMarcaLst": [],
+      "IDsMarca": "",
+      "IDCategoriaLst": [1],
+      "IDsCategoria": "1",
+      "IDGrupoCategoriaLst": [1],
+      "IDsGrupoCategoria": "1",
+      "IDStatus": 1,
+      "Marca": "",
+      "Identico": 0,
+      "Formato": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/reportes/ventas/acumuladores-productos/catalogos",
+    "query": { "idGrupoCategoria": 1, "idCategorias": 1 }
+  },
+  "camino_legacy": "result.marcas",
+  "camino_nuevo": "marcas",
+  "ordenar_por": "idMarca",
+  "solo_campos": ["IDGrupoCategoria", "GrupoCategoria", "IDCategoria", "Categoria", "IDMarca", "Marca"],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "Legacy manda ademas MarcaCorto, Status, ColumnaConcentrado, ColumnaTemplate, ColumnaInventario, Marcado y OrdenListaPrecios. Son columnas de la pantalla de catalogo y del armado de concentrados de Mac31, no del desplegable del reporte.",
+    "El nuevo descarta renglones con idGrupoCategoria<=0, idCategoria<=0, idMarca<=0 o marca vacia."
+  ]
+}

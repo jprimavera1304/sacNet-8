@@ -1,0 +1,36 @@
+{
+  "nombre": "Catalogo FE: relaciones de factura",
+  "_porque": [
+    "Mismo caso de DataRow que regimenes fiscales.",
+    "El SP tiene @IDStatus pero su WHERE esta clavado a IDStatus = 1: el nuevo",
+    "manda 1 para preguntar exactamente lo mismo y no finge un filtro que no existe."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catFERelacionFacturas/consultar",
+    "body": {
+      "IDFERelacionFactura": 0,
+      "IDStatus": 1,
+      "FEClave": "",
+      "Identico": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/fe/relaciones-factura"
+  },
+  "camino_legacy": "result.tablaLst.0.Table",
+  "camino_nuevo": "data",
+  "ordenar_por": "idFeRelacionFactura",
+  "solo_campos": [
+    "idFeRelacionFactura",
+    "idStatus",
+    "feClave",
+    "feRelacionFactura",
+    "status"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo no manda FEDescripcion, por lo mismo que en regimenes fiscales.",
+    "El nuevo no expone filtro por status: el SP lo ignora (WHERE FP.IDStatus = 1 fijo) y ofrecerlo seria mentir."
+  ]
+}

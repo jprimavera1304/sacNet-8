@@ -1,0 +1,53 @@
+{
+  "nombre": "Almacenes a los que el usuario tiene acceso",
+  "_porque": [
+    "Legacy: POST /api/usuarios/almacenes/consultar, que llama a",
+    "sp_n_ConsultaUsuariosAlmacenes con un solo parametro, @IDUsuario.",
+    "Nuevo: GET /api/ventas/pedidos/captura/bootstrap, cuyo arreglo 'almacenes'",
+    "sale del MISMO SP con el MISMO unico parametro",
+    "(VentasPedidoCapturaRepository.ConsultarUsuarioAlmacenesAsync).",
+    "",
+    "PARA PREGUNTAR LO MISMO: el nuevo NO acepta el IDUsuario por parametro, lo",
+    "saca del token (bien: si viajara en el body cualquiera pediria los",
+    "almacenes de otro). Por eso a Legacy se le manda el IDUsuario de un usuario",
+    "que SI tiene asignacion (1062 = ALVARELYS, el unico tipo de renglon que el",
+    "nuevo deja pasar: Acceso = true).",
+    "",
+    "LO QUE ESTA PRUEBA NO ALCANZA A DEMOSTRAR, y queda dicho:",
+    "BancoPruebas es un usuario solo-web, su IDUsuario legacy es 0, y con 0 el",
+    "nuevo se va por su respaldo documentado (sp_n_ConsultaAlmacenes, todos los",
+    "almacenes activos) en lugar de por sp_n_ConsultaUsuariosAlmacenes. En esta",
+    "base hay UN solo almacen activo (VILLA; los otros 6 estan en IDStatus 2),",
+    "asi que los dos caminos dan el mismo renglon y la prueba pasa sin distinguir",
+    "cual se ejecuto. Para separarlos hace falta un token cuyo IDUsuario legacy",
+    "sea > 0, y eso pide tocar la base, que aqui no se toca."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/usuarios/almacenes/consultar",
+    "body": {
+      "IDUsuario": 1062
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/ventas/pedidos/captura/bootstrap"
+  },
+  "camino_legacy": "result.tablaLst.0.Table",
+  "camino_nuevo": "data.almacenes",
+  "ordenar_por": "id",
+  "mapa_campos": {
+    "IDAlmacen": "id",
+    "Almacen": "nombre"
+  },
+  "solo_campos": [
+    "id",
+    "nombre"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo entrega {id,nombre,clave} y en este catalogo clave = nombre (el SP no trae clave de almacen). Legacy manda ademas IDUsuarioAlmacen, IDUsuario, IDStatus, Usuario y Acceso: datos de la pantalla de permisos, no del selector de almacen.",
+    "El nuevo filtra Acceso = true, id > 0 y nombre no vacio, y ordena por nombre. Legacy devuelve tambien los renglones con Acceso = false y Mac31 los pinta como casilla desmarcada, porque alla la misma consulta sirve para ASIGNAR almacenes. El nuevo solo la usa para elegir almacen, asi que un almacen sin acceso no tiene por que viajar.",
+    "El IDUsuario sale del token y no del cuerpo. Legacy lo acepta en el body, de modo que cualquiera con el token de app podia pedir los almacenes de otro usuario.",
+    "Cuando el token no trae IDUsuario legacy (usuario solo-web), el nuevo cae a sp_n_ConsultaAlmacenes y devuelve los almacenes activos. Es decision tomada: una pantalla de captura sin almacenes no sirve de nada."
+  ]
+}

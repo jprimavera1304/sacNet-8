@@ -1,0 +1,70 @@
+{
+  "nombre": "Pedido guardado: renglones de productos (tabla DETALLES)",
+  "_porque": [
+    "Legacy: POST /api/pedidos/consultar -> sp_n_ConsultaPedido con @IDPedido y los",
+    "cuatro Solo* en 0; devuelve CUATRO tablas y las reparte en pedidos (tabla 3),",
+    "pedidoDetalles (0), pedidoTipoUsadoCargos (1) y pedidoTipoUsadoCreditos (2).",
+    "El nuevo: GET api/ventas/pedidos/captura/{idPedido} corre el MISMO SP con los",
+    "MISMOS parametros (VentasPedidoCapturaRepository.cs:988-1001) y reparte las",
+    "mismas cuatro tablas en detalles / cascosCargo / cascosCredito / totales.",
+    "Pide primero sp_w_ConsultaPedido, pero ese procedimiento NO EXISTE en",
+    "Produccion_svr (comprobado en sys.procedures), asi que cae al fallback y los",
+    "dos lados corren literalmente el mismo sp_n_ConsultaPedido.",
+    "Se compara una tabla por caso porque son contratos distintos."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/pedidos/consultar",
+    "body": {
+      "IDPedido": 195033,
+      "SoloDetalles": 0,
+      "SoloCargos": 0,
+      "SoloCreditos": 0,
+      "SoloTotales": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/ventas/pedidos/captura/195033"
+  },
+  "camino_legacy": "result.pedidoDetalles",
+  "camino_nuevo": "data.detalles",
+  "solo_campos": [
+    "IDPedido",
+    "IDPedidoDetalle",
+    "IDAlmacen",
+    "IDProducto",
+    "IDTipoUsado",
+    "Porcentajes",
+    "Producto",
+    "PrecioLista",
+    "PrecioListaConIva",
+    "PrecioListaConIvaRnd",
+    "Cantidad",
+    "NumPiezas",
+    "CantidadCaja",
+    "CantidadFtm",
+    "PesoKg",
+    "TextoPorcentajes",
+    "Descuento",
+    "Importe",
+    "ImporteConIvaRnd",
+    "ObservacionesDetalle",
+    "Categoria",
+    "Marca",
+    "Clave",
+    "Descripcion",
+    "Concepto",
+    "TipoUsado",
+    "UnidadMedidaSat",
+    "ClaveSat",
+    "Almacen",
+    "EsServicio",
+    "FacturaPrecioListaConIva"
+  ],
+  "diferencias_intencionales": [
+    "Legacy mete la tabla en un DTO tipado y lo que el DTO declara pero el SP no devuelve sale en 0/null (es relleno del DTO, no dato). El nuevo entrega los renglones crudos del SP. Se comparan las columnas que el SP si trae.",
+    "El nuevo entrega 17 columnas mas que el DTO de Legacy (Tabla, TipoPrecio, Redondear, PrecioListaConUsadoConIva(Rnd), CostoUsadoCargoConIva, ImporteConIva, ImporteConUsadoConIva(Rnd), SubTotalConUsadoConIva, Impuestos*, Bonificacion, ClienteBonificacion, IDGarantia, EsCarga). Salen del MISMO SP: Legacy las tira al mapear a PedidoDetalleDTO. El web las necesita para pintar el precio con casco, que en Mac31 se recalculaba en la forma."
+  ],
+  "ordenar_por": "IDPedidoDetalle"
+}

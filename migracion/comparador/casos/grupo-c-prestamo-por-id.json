@@ -1,0 +1,31 @@
+{
+  "nombre": "Un prestamo por id (9005)",
+  "_porque": [
+    "GET /api/prestamos/{id} llama al mismo SP con @IDEmpleadoPrestamo=id,",
+    "@IDEmpleado=0, @Pagados=0 y @Cancelados=0 (0 a proposito: al pedir UNO se",
+    "quiere ese, este pagado, pendiente o cancelado). A Legacy se le pasa eso.",
+    "Legacy devuelve lista de un renglon; el nuevo el renglon."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/empleadosprestamo/consultar",
+    "body": {
+      "idEmpleadoPrestamo": 9005,
+      "idEmpleado": 0,
+      "pagados": 0,
+      "cancelados": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/prestamos/9005"
+  },
+  "camino_legacy": "result.empleadosPrestamo.0",
+  "camino_nuevo": "data",
+  "ignorar": ["fechaPago", "fechaCancelacion", "result", "mensaje"],
+  "diferencias_intencionales": [
+    "El nuevo entrega el objeto y Legacy una lista de un elemento. Es la forma, no el dato.",
+    "Mismas dos diferencias de representacion que en la lista: las fechas NULL que Legacy convierte en '0001-01-01' y el par result/mensaje que repite dentro del renglon.",
+    "El nuevo contesta 404 si el prestamo no existe; Legacy devuelve lista vacia con 200."
+  ]
+}

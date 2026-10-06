@@ -1,0 +1,39 @@
+{
+  "nombre": "Catalogo FE: usos de CFDI",
+  "_porque": [
+    "Mismo caso de DataRow que los otros dos de facturacion electronica."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catFEUsosCFDI/consultar",
+    "body": {
+      "IDFEUsoCFDI": 0,
+      "IDStatus": 0,
+      "FEClave": "",
+      "FEUsoCFDI": "",
+      "RFC": "",
+      "FEFisica": 0,
+      "FEMoral": 0,
+      "Identico": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/fe/usos-cfdi"
+  },
+  "camino_legacy": "result.tablaLst.0.Table",
+  "camino_nuevo": "data",
+  "ordenar_por": "idFeUsoCfdi",
+  "solo_campos": [
+    "idFeUsoCfdi",
+    "idStatus",
+    "feClave",
+    "feUsoCfdi",
+    "feFisica",
+    "feMoral",
+    "status"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo no manda FEDescripcion, por lo mismo que en regimenes fiscales."
+  ]
+}

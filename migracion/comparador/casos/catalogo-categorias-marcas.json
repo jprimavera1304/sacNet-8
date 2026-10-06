@@ -1,0 +1,23 @@
+{
+  "nombre": "Marcas frente a una categoria",
+  "_porque": [
+    "Se fija la categoria 1 porque el SP la exige (su default es 1) y porque la",
+    "columna Marcado solo tiene sentido contra una categoria concreta."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/categoriamarcas/consultar",
+    "body": {
+      "IDCategoria": 1,
+      "IDMarca": 0,
+      "Marcado": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/categorias/1/marcas"
+  },
+  "camino_legacy": "result.categoriaMarca",
+  "camino_nuevo": "data",
+  "ordenar_por": "idMarca"
+}

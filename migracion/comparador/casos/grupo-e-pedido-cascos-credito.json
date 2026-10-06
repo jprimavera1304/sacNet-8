@@ -1,0 +1,50 @@
+{
+  "nombre": "Pedido guardado: cascos a credito (tabla CREDITOS)",
+  "_porque": [
+    "Legacy: POST /api/pedidos/consultar -> sp_n_ConsultaPedido con @IDPedido y los",
+    "cuatro Solo* en 0; devuelve CUATRO tablas y las reparte en pedidos (tabla 3),",
+    "pedidoDetalles (0), pedidoTipoUsadoCargos (1) y pedidoTipoUsadoCreditos (2).",
+    "El nuevo: GET api/ventas/pedidos/captura/{idPedido} corre el MISMO SP con los",
+    "MISMOS parametros (VentasPedidoCapturaRepository.cs:988-1001) y reparte las",
+    "mismas cuatro tablas en detalles / cascosCargo / cascosCredito / totales.",
+    "Pide primero sp_w_ConsultaPedido, pero ese procedimiento NO EXISTE en",
+    "Produccion_svr (comprobado en sys.procedures), asi que cae al fallback y los",
+    "dos lados corren literalmente el mismo sp_n_ConsultaPedido.",
+    "Se compara una tabla por caso porque son contratos distintos."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/pedidos/consultar",
+    "body": {
+      "IDPedido": 195033,
+      "SoloDetalles": 0,
+      "SoloCargos": 0,
+      "SoloCreditos": 0,
+      "SoloTotales": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/ventas/pedidos/captura/195033"
+  },
+  "camino_legacy": "result.pedidoTipoUsadoCreditos",
+  "camino_nuevo": "data.cascosCredito",
+  "solo_campos": [
+    "IDPedidoUsadoCredito",
+    "IDPedido",
+    "IDTipoUsado",
+    "TipoUsado",
+    "CostoVentaCredito",
+    "Cantidad",
+    "Importe",
+    "Orden",
+    "Bonificacion",
+    "CostoVentaCreditoConIva",
+    "ImporteVentaCreditoConIva"
+  ],
+  "diferencias_intencionales": [
+    "Legacy mete la tabla en un DTO tipado y lo que el DTO declara pero el SP no devuelve sale en 0/null (es relleno del DTO, no dato). El nuevo entrega los renglones crudos del SP. Se comparan las columnas que el SP si trae. En CREDITOS el DTO compartido deja en 0 las columnas de cargo.",
+    "El nuevo agrega Tabla ('CREDITOS') y CostoCreditoConIva, las dos del mismo SP."
+  ],
+  "ordenar_por": "IDTipoUsado"
+}

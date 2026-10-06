@@ -1,0 +1,34 @@
+{
+  "nombre": "Catalogo de documentos (NO VERIFICABLE)",
+  "_porque": [
+    "NO SE PUEDE COMPARAR EN Produccion_svr: sp_n_ConsultaDocumentos existe pero",
+    "la tabla [Catalogo Documentos] no, asi que LEGACY devuelve",
+    "\"Invalid object name 'Catalogo Documentos'\". El backend nuevo contesta 500 con",
+    "el mismo mensaje de SQL Server, que es el comportamiento correcto.",
+    "El caso queda escrito para correrlo en una base que si tenga la tabla."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catdocumento/consultar",
+    "body": {
+      "IDDocumento": 0,
+      "IDStatus": 0,
+      "Documento": ""
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/documentos"
+  },
+  "camino_legacy": "result.documentos",
+  "camino_nuevo": "data",
+  "ordenar_por": "idDocumento",
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo no manda ObligatorioFtm ('SI'/'NO'): es el 0/1 de Obligatorio traducido a texto en la base para pintarlo en Mac31.",
+    "No verificable en Produccion_svr: le falta la tabla [Catalogo Documentos] a la base, no al codigo."
+  ]
+}

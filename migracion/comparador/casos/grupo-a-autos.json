@@ -1,0 +1,28 @@
+{
+  "nombre": "Catalogo de autos activos",
+  "_porque": [
+    "Legacy: CatAutosController -> CatAutoRepository.spConsultar manda a",
+    "sp_n_ConsultaAutos solo tres parametros: @IDAuto, @IDStatus, @Nombre.",
+    "El nuevo (ConsultarAutosAsync) manda los mismos tres con 0 / 1 / ''.",
+    "El catalogo nuevo vive en remisiones/catalogos, no en el de acumuladores."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catautos/consultar",
+    "body": { "IDAuto": 0, "IDStatus": 1, "Nombre": "" }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/reportes/ventas/remisiones/catalogos"
+  },
+  "camino_legacy": "result.autos",
+  "camino_nuevo": "autos",
+  "ordenar_por": "id",
+  "mapa_campos": { "IDAuto": "id", "Nombre": "nombre", "Placas": "clave" },
+  "solo_campos": ["id", "nombre", "clave"],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "Legacy manda ademas Modelo, Status, NombreAuto, Verifica, las dos fechas de verificacion, el seguro y la tenencia. El nuevo solo necesita id/nombre/placas para el desplegable del reporte; el resto es de la pantalla de catalogo de Mac31, que todavia no se migra.",
+    "El nuevo descarta renglones con id<=0 o nombre vacio."
+  ]
+}

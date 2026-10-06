@@ -1,0 +1,28 @@
+{
+  "nombre": "Catalogo de tipos de gasto activos",
+  "_porque": [
+    "Legacy: CatTiposGastoController -> CatTipoGastoRepository.spConsultaCatTipoGasto",
+    "manda sp_n_ConsultaTiposGastos @IDTipoGasto, @IDStatus, @TipoGasto, @Formato,",
+    "@Identico.",
+    "El nuevo (ConsultarTiposGastoAsync) manda esos cinco con 0 / 1 / '' / 0 / 0."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cattipogasto/consultar",
+    "body": { "IDTipoGasto": 0, "IDStatus": 1, "TipoGasto": "", "Formato": 0, "Identico": 0 }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/reportes/ventas/remisiones/catalogos"
+  },
+  "camino_legacy": "result.tipoGastos",
+  "camino_nuevo": "tiposGasto",
+  "ordenar_por": "id",
+  "mapa_campos": { "IDTipoGasto": "id", "TipoGasto": "nombre" },
+  "solo_campos": ["id", "nombre"],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "Legacy manda ademas IDStatus y Status. El nuevo repite el nombre en 'clave' porque el SP no da clave corta.",
+    "El nuevo descarta renglones con id<=0 o nombre vacio."
+  ]
+}

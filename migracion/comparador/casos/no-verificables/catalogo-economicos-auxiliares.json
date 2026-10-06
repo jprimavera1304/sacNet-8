@@ -1,0 +1,56 @@
+{
+  "nombre": "Auxiliares por economico (NO VERIFICABLE)",
+  "_porque": [
+    "NO SE PUEDE COMPARAR EN Produccion_svr: sp_n_ConsultaEconomicosAuxiliares es",
+    "del modulo de recaudaciones y no esta instalado aqui. Legacy falla igual."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cateconomicos/auxiliares/consultar",
+    "body": {
+      "IDRecaudacion": 0,
+      "IDEconomico": 0,
+      "NumEconomico": 0,
+      "IDPermisionario": 0,
+      "IDCuenta": 0,
+      "NumCuenta": "",
+      "IDCaja": 0,
+      "StatusPago": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/catalogos/economicos-auxiliares"
+  },
+  "camino_legacy": "result.economicosAuxiliares",
+  "camino_nuevo": "data",
+  "ordenar_por": "idEconomicoAuxiliar",
+  "solo_campos": [
+    "idEconomicoAuxiliar",
+    "idRecaudacion",
+    "idStatus",
+    "estatus",
+    "pagado",
+    "folio",
+    "idPermisionario",
+    "numPermisionario",
+    "nombrePermisionario",
+    "idEconomico",
+    "numEconomico",
+    "nombreEconomico",
+    "idCuenta",
+    "numCuenta",
+    "nombreCuenta",
+    "idConcepto",
+    "numConcepto",
+    "nombreConcepto",
+    "importeCuenta",
+    "debeHaber",
+    "idCaja",
+    "numCaja"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo deja fuera los campos del operador (nombre, apellidos, numero de nomina), los *Ftm (el mismo dato ya formateado para Mac31), los digitos verificadores del ticket y la auditoria de pago/recaudacion. Son 24 de los 46 campos y ninguno es del auxiliar: son de quien lo cobro.",
+    "No verificable en Produccion_svr: el SP no esta instalado en esta base."
+  ]
+}
