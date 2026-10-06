@@ -1,4 +1,4 @@
-﻿using ISL_Service.Application.DTOs.Reportes;
+using ISL_Service.Application.DTOs.Reportes;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Reportes;
 using ISL_Service.Infrastructure.Reports;
@@ -16,17 +16,20 @@ public class ReportesVentasController : PermisoControllerBase
     private readonly IReportesVentasService _service;
     private readonly ICurrentUserAccessor _currentUserAccessor;
     private readonly ICentrosServicioRepository _centros;
+    private readonly IConfiguration _configuration;
 
     public ReportesVentasController(
         IReportesVentasService service,
         ICurrentUserAccessor currentUserAccessor,
         ICentrosServicioRepository centros,
-        IPermissionService permissionService)
+        IPermissionService permissionService,
+        IConfiguration configuration)
         : base(currentUserAccessor, permissionService)
     {
         _service = service;
         _currentUserAccessor = currentUserAccessor;
         _centros = centros;
+        _configuration = configuration;
     }
 
     [HttpGet("acumuladores-productos/catalogos")]
@@ -295,10 +298,31 @@ public class ReportesVentasController : PermisoControllerBase
     public async Task<IActionResult> VerAcumuladoresProductosPantalla(
         [FromQuery] int psp,
         [FromQuery] int c,
+        [FromQuery] string? t,
         CancellationToken ct)
     {
         if (psp <= 0)
             return BadRequest("psp requerido.");
+
+        /*
+          SIN PASE NO HAY REPORTE.
+
+          Esta direccion es anonima porque el reporte se abre en una pestaña
+          nueva y una pestaña nueva no manda Authorization. Lo que autoriza es
+          el pase firmado que puso "generar".
+
+          Antes bastaba con `psp`, que es un entero CONSECUTIVO de una tabla
+          compartida: quien probara numeros veia los reportes de los demas.
+
+          Se comprueba ademas que el pase sea PARA ESTE psp y ESTE centro, no
+          solo que sea un pase valido: si no, cualquiera con un pase propio
+          podria cambiarle el numero en la barra del navegador y leer el de
+          otro, que es exactamente el agujero que se esta cerrando.
+        */
+        var llaveDelPase = _configuration["Jwt:Key"] ?? "";
+        var pase = ReporteTicket.Validar(llaveDelPase, t);
+        if (pase is null || pase.Psp != psp || pase.IdCentro != c)
+            return BadRequest("El enlace del reporte no es valido o ya vencio. Vuelve a generarlo desde el modulo de reportes.");
 
         try
         {
@@ -454,12 +478,32 @@ public class ReportesVentasController : PermisoControllerBase
       centro, asi que quien luego abra la direccion tiene que ir a buscarlos
       alla. Sin ese dato se buscarian en la matriz y saldria vacio.
     */
+    /*
+      LA DIRECCION DEL REPORTE VA FIRMADA.
+
+      Antes llevaba solo `psp`, que es un entero CONSECUTIVO de una tabla
+      compartida, y el GET que entrega el reporte era anonimo: quien probara
+      numeros veia los reportes de los demas. Ahora ademas viaja un pase que
+      dice que psp, de que centro, para que usuario y hasta cuando.
+
+      Los fronts no cambian: el web y la app abren la direccion que les devuelve
+      "generar", sin mirar lo que trae dentro.
+    */
     private string BuildReportesV3WUrl(string parametrosLegacy, int idCentro = 0)
     {
         var psp = Uri.EscapeDataString(parametrosLegacy);
         var pathBase = Request.PathBase.HasValue ? Request.PathBase.Value : "";
         var centro = idCentro > 0 ? $"&c={idCentro}" : "";
-        return $"{Request.Scheme}://{Request.Host}{pathBase}/api/reportes/ventas/ReportesV3W?psp={psp}{centro}";
+
+        var pase = "";
+        if (int.TryParse(parametrosLegacy, out var pspNumero) && pspNumero > 0)
+        {
+            var llave = _configuration["Jwt:Key"] ?? "";
+            pase = "&t=" + Uri.EscapeDataString(
+                ReporteTicket.Firmar(llave, pspNumero, idCentro, IdUsuarioLegacy()));
+        }
+
+        return $"{Request.Scheme}://{Request.Host}{pathBase}/api/reportes/ventas/ReportesV3W?psp={psp}{centro}{pase}";
     }
 
     /*
