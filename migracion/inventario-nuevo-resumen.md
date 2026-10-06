@@ -4,8 +4,9 @@ Resumen de lectura del código tal como está hoy (6-oct-2026). Todo lo que sigu
 leer los archivos; donde hay una afirmación, va la ruta y el número de línea.
 
 Tamaños reales: **44 archivos de controlador** (3 están comentados por completo), **242 acciones
-HTTP** + 2 endpoints minimal API en `Program.cs`, **37 servicios**, **63 repositorios**
-(`ReportesVentasRepository` son 7 archivos `partial`), **74 interfaces**, **2 entidades de dominio**.
+HTTP** + 2 endpoints minimal API en `Program.cs`, **37 servicios**, **45 archivos de repositorio**
+(`ReportesVentasRepository` son 7 de ellos, `partial`), **75 interfaces**, **38 carpetas de DTO**,
+**2 entidades de dominio**, **199 stored procedures distintos** invocados por nombre.
 El detalle acción por acción está en `inventario-nuevo.tsv` (248 filas).
 
 ---
@@ -22,8 +23,8 @@ ISL_Service/
   Program.cs                     arranque + TODO el registro de DI (443 líneas)
   Controllers/                   44 controladores
   Application/
-    DTOs/<Modulo>/               un folder por módulo (41 folders)
-    Interfaces/                  I<X>Service e I<X>Repository (74 archivos)
+    DTOs/<Modulo>/               un folder por módulo (38 folders)
+    Interfaces/                  I<X>Service e I<X>Repository (75 archivos)
     Services/                    37 servicios
     Security/                    CurrentUser, PermissionRequirement, PermisosDeCentros,
                                  RemisionTicket, ReporteUsadosTicket, PasswordGenerator
@@ -32,7 +33,7 @@ ISL_Service/
     Reportes/                    ReportesCatalogo (catálogo de 53 reportes y su permiso)
   Infrastructure/
     Data/                        AppDbContext, BaseDelCentro, Mac3SqlServerConnector
-    Repositories/                63 archivos
+    Repositories/                45 archivos
     Security/                    JwtTokenGenerator, PermissionService (3139 líneas),
                                  PermissionPolicyProvider, PermissionAuthorizationHandler,
                                  CurrentUserAccessor
@@ -99,7 +100,7 @@ legacy y trae dos trucos vivos: si la cadena contiene `Aviacion` la desencripta 
 `Utils/Encryptacion`, y si contiene `@Info` lo sustituye por `User Id=sa; Password=Hope5y2k`
 (línea 46 — credencial en claro en el repositorio).
 
-Hay **158 nombres de stored procedure distintos** referenciados, en tres familias:
+Hay **199 nombres de stored procedure distintos** referenciados, en tres familias:
 
 | prefijo | quién lo escribió | se puede tocar |
 |---|---|---|
@@ -408,7 +409,8 @@ blancas son `VentasWebPermissionSeeds` (`:101-110`), `EmpleadosWebPermissionSeed
   `app_movil.empleados.ver`, `app_movil.pedidos`, `app_movil.cascos_cambio.crear`. La razón
   está escrita: *"el teléfono se presta y la computadora de la oficina no"*.
 * Reportes: **`reportes.{grupo}.{clave}.ver`**, donde grupo ∈ {ventas, compras, inventario,
-  administracion} (`Application/Reportes/ReportesCatalogo.cs:29-32`), con excepciones
+  administracion} (`Application/Reportes/ReportesCatalogo.cs:7` y el helper `Grupo(...)` de
+  `:160-161`, que es quien aplica la regla), con excepciones
   documentadas una por una porque la fila de `WPermiso` es más vieja que el texto del nodo en
   legacy.
 * Centros de servicio: `reportes.centros.cambiar` (el interruptor del selector) y
