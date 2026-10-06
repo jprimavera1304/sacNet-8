@@ -1,0 +1,52 @@
+{
+  "nombre": "Catalogo de agentes activos",
+  "_porque": [
+    "Primer caso del banco: de solo lectura y existe en los dos lados.",
+    "Legacy expone el catalogo completo de agentes con parametros; el backend",
+    "nuevo lo sirve dentro de los catalogos de Consultar ventas, ya filtrado a",
+    "activos. Por eso a Legacy se le pide IDStatus=1: para preguntar LO MISMO.",
+    "Si se le pidiera sin filtro, la diferencia seria culpa de la pregunta, no",
+    "del backend."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catagentes/consultar",
+    "body": {
+      "IDAgente": 0,
+      "IDStatus": 1,
+      "NumeroAgente": 0,
+      "NombreAgente": "",
+      "Formato": 0,
+      "Identico": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/ventas/consulta/catalogos",
+    "camino": "data.agentes"
+  },
+  "camino_legacy": "result.agentes",
+  "camino_nuevo": "data.agentes",
+  "ordenar_por": "id",
+  "ignorar": [
+    "IDStatus",
+    "Status",
+    "NumeroNombreAgente",
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "El nuevo entrega {id,nombre,clave} y Legacy manda ademas IDStatus, Status y NumeroNombreAgente. El nuevo arma ese texto en el front; mandar el mismo dato dos veces era de Mac31.",
+    "El nuevo descarta renglones con id<=0 o nombre vacio. Legacy los deja pasar y Mac31 los esconde al pintar."
+  ],
+  "mapa_campos": {
+    "IDAgente": "id",
+    "NombreAgente": "nombre",
+    "NumeroAgente": "clave"
+  },
+  "solo_campos": [
+    "id",
+    "nombre",
+    "clave"
+  ]
+}
