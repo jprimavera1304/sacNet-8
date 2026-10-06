@@ -24,6 +24,15 @@ public class AsistenciasController : PermisoControllerBase
     private static readonly string[] PermisosVer = { "asistencias.ver", "app_movil.asistencias.ver" };
     private static readonly string[] PermisosEditar = { "asistencias.editar", "app_movil.asistencias.editar" };
 
+    // Para destapar los nombres de la asistencia del dia. Se reusa
+    // `empleados.sueldo.ver` y no se inventa `asistencias.nombres.ver` porque esa
+    // clave ya significa exactamente esto —"puede ver datos personales de la
+    // nomina"— y, sobre todo, porque esta en la lista blanca del web
+    // (EmpleadosWebPermissionSeeds): lo que se le de desde la pantalla de permisos
+    // se respeta. Un permiso nuevo de la familia `empleados.*` que no estuviera en
+    // esa lista se borraria del snapshot en el siguiente recalculo.
+    private static readonly string[] PermisosNombres = { "empleados.sueldo.ver" };
+
     private readonly IAsistenciasService _service;
 
     public AsistenciasController(
@@ -69,6 +78,40 @@ public class AsistenciasController : PermisoControllerBase
 
         var data = await _service.ConsultarDiasAsync(id, ct);
         return Ok(new { ok = true, message = "Dias consultados.", data });
+    }
+
+    /// <summary>
+    /// Quien checo HOY, con su hora de entrada y de salida.
+    /// </summary>
+    /// <remarks>
+    /// SIEMPRE ES HOY y no acepta fecha. El procedimiento de legacy declara un
+    /// @Fecha que no usa en ninguna linea (y que ademas es varchar(1), un solo
+    /// caracter): su filtro esta clavado a GETDATE(). Para otro dia estan
+    /// GET /api/asistencias (por periodo) y GET /api/checador/asistencia?fecha=.
+    ///
+    /// EL NOMBRE PUEDE SALIR CON ASTERISCOS, Y QUIEN LO DECIDE ES EL PERMISO.
+    /// En Tauro (Constantes.Funcionalidad = 'TAU') el procedimiento tapa el
+    /// nombre con dieciocho asteriscos cuando se le pide en 0, y lo ensena cuando
+    /// se le pide en 1. Legacy dejaba ese interruptor en el BODY: cualquiera que
+    /// supiera mandar MostrarAsistenciasNombres = 1 destapaba la lista completa de
+    /// quien llego y a que hora. Aqui NO viene del cliente: se decide con el mismo
+    /// permiso que ya gobierna ver un sueldo (`empleados.sueldo.ver`), que es la
+    /// llave de "puede ver datos personales de la nomina". Quien no lo tiene ve la
+    /// rejilla de horarios sin nombres, que sigue sirviendo para contar cuanta
+    /// gente entro.
+    /// </remarks>
+    [HttpGet("diaria")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> Diaria(CancellationToken ct)
+    {
+        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        if (sinPermiso != null) return sinPermiso;
+
+        var puedeVerNombres = await TienePermisoAsync(PermisosNombres, ct);
+
+        var data = await _service.ConsultarAsistenciaDiariaAsync(puedeVerNombres, ct);
+        return Ok(new { ok = true, message = "Asistencia del dia consultada.", data, puedeVerNombres });
     }
 
     /// <summary>

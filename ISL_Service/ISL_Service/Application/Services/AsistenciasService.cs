@@ -156,4 +156,14 @@ public class AsistenciasService : IAsistenciasService
         // Se recorta a HH:mm, que es como la guarda y la muestra Mac31.
         return limpia.Length >= 5 ? limpia.Substring(0, 5) : limpia;
     }
+
+    /// <summary>
+    /// Quien checo hoy.
+    /// </summary>
+    /// <param name="mostrarNombres">
+    /// Lo decide el controlador a partir del permiso, nunca el cliente: en Tauro
+    /// el procedimiento tapa el nombre con asteriscos si llega en 0.
+    /// </param>
+    public Task<List<AsistenciaDiariaDto>> ConsultarAsistenciaDiariaAsync(bool mostrarNombres, CancellationToken ct = default)
+        => _repository.ConsultarAsistenciaDiariaAsync(mostrarNombres, ct);
 }
