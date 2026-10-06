@@ -218,6 +218,54 @@ builder.Services.AddScoped<ICascosCambioService, CascosCambioService>();
 // Version minima/recomendada de la app movil (endpoint anonimo api/app/version).
 builder.Services.AddScoped<IAppVersionRepository, AppVersionRepository>();
 
+// -------------------- OBRA (las tablas MC_* de Mac31) --------------------
+// Contratos de obra publica, sus grupos, conceptos y estimaciones, y los
+// catalogos que los alimentan. SOLO LECTURA: los sp_n_Insertar_MC* y
+// sp_n_Actualizar_MC* existen en la base y a proposito no se exponen.
+builder.Services.AddScoped<IObraRepository, ObraRepository>();
+builder.Services.AddScoped<IObraService, ObraService>();
+
+// -------------------- CATALOGOS COMPLEMENTARIOS --------------------
+// Los catalogos de lectura que no entraron en la primera ola (tipos de
+// domicilio, condiciones de credito, series de empresa, los tres del SAT y
+// marcas). Comparten el prefijo api/catalogos y los permisos catalogos.*.
+builder.Services.AddScoped<ICatalogosComplementosRepository, CatalogosComplementosRepository>();
+builder.Services.AddScoped<ICatalogosComplementosService, CatalogosComplementosService>();
+
+// -------------------- ANEXOS DE CLIENTE Y DE PROVEEDOR --------------------
+// Las pestanas de la ficha: bonificaciones por tipo de usado, centros de
+// servicio permitidos, datos de facturacion y bitacora de cambios del cliente;
+// apoderados, domicilios y documentos del proveedor. Todo lectura.
+builder.Services.AddScoped<IClientesAnexosRepository, ClientesAnexosRepository>();
+builder.Services.AddScoped<IClientesAnexosService, ClientesAnexosService>();
+builder.Services.AddScoped<IProveedoresAnexosRepository, ProveedoresAnexosRepository>();
+builder.Services.AddScoped<IProveedoresAnexosService, ProveedoresAnexosService>();
+
+// -------------------- PRODUCTOS (catalogo con precios y existencias) --------------------
+// No es un desplegable: trae precio de lista, stock y la lista de descuentos
+// Roshfrans. Por eso tiene su propio permiso y no cae en catalogos.*.
+builder.Services.AddScoped<IProductosRepository, ProductosRepository>();
+builder.Services.AddScoped<IProductosService, ProductosService>();
+
+// -------------------- HUELLAS Y ANEXOS DE USUARIO --------------------
+// Huellas registradas (usuario / empleado / cliente) y las tres lecturas
+// sueltas de la pantalla de usuarios de Mac31.
+builder.Services.AddScoped<IHuellasRepository, HuellasRepository>();
+builder.Services.AddScoped<IHuellasService, HuellasService>();
+builder.Services.AddScoped<IUsuariosAnexosRepository, UsuariosAnexosRepository>();
+builder.Services.AddScoped<IUsuariosAnexosService, UsuariosAnexosService>();
+
+// -------------------- CORTES DE CAJA --------------------
+// Las cuatro lecturas de corte que NO pasan por sp_n_ConsultaConstantes y por
+// tanto son lecturas de verdad (ver CortesRepository).
+builder.Services.AddScoped<ICortesRepository, CortesRepository>();
+builder.Services.AddScoped<ICortesService, CortesService>();
+
+// Manifiesto de actualizacion de las aplicaciones de escritorio (no es la
+// version de la app movil: eso es IAppVersionRepository, mas arriba).
+builder.Services.AddScoped<IActualizacionesAplicacionRepository, ActualizacionesAplicacionRepository>();
+builder.Services.AddScoped<IActualizacionesAplicacionService, ActualizacionesAplicacionService>();
+
 // -------------------- JWT Authentication --------------------
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtKey = jwtSection["Key"];

@@ -389,7 +389,65 @@ public sealed class PermissionService : IPermissionService
         new("cheques.ver", "Cheques - Ver", "cheques"),
         new("cheques.crear", "Cheques - Crear", "cheques"),
         new("cheques.editar", "Cheques - Editar", "cheques"),
-        new("cheques.activar", "Cheques - Cambiar estatus", "cheques")
+        new("cheques.activar", "Cheques - Cambiar estatus", "cheques"),
+
+        /*
+          OLA 3 — LAS LECTURAS QUE NO ERAN CATALOGOS NI VENTAS.
+
+          Todas estas familias son del WEB: ninguna empieza con `ventas.`,
+          `reportes.`, `empleados.` ni `prestamos.`, que son las cuatro que
+          gobierna Mac31 y donde lo que se guarda desde la pantalla de permisos se
+          borra en el siguiente recalculo (ver la seccion del puente, mas arriba).
+          O sea: lo que se de aqui desde el web SI se respeta.
+
+          Dos endpoints de esta ola NO traen clave nueva a proposito:
+          * GET api/huellas usa `empleados.huellas`, que ya existe y la deriva el
+            puente del boton btnHuellas de Mac31. Inventar `huellas.ver` habria
+            creado una llave que se borra sola al dia siguiente.
+          * GET api/asistencias/diaria destapa los nombres con
+            `empleados.sueldo.ver`, que ya esta en la lista blanca del web.
+
+          Y los tres `catalogos.*` que usa CatalogosComplementosController
+          (`catalogos.ver`, `catalogos.fe.ver`, `catalogos.marcas.ver`) tampoco se
+          declaran aqui: los siembra la entrega de catalogos. Dos filas con la
+          misma clave serian dos duenos de la misma llave.
+        */
+
+        // Obra publica (las tablas MC_* de Mac31). Modulo que la mayoria de las
+        // empresas no tiene prendido (Constantes.EsAlcaldiaMC).
+        new("obra.ver_modulo", "Obra - Ver módulo", "obra"),
+        new("obra.contratos.ver", "Obra - Ver contratos, conceptos y estimaciones", "obra"),
+        new("obra.catalogos.ver", "Obra - Ver catálogos", "obra"),
+        // Separado de los catalogos porque el renglon trae RFC, CURP, teléfono y
+        // correo: es un dato personal, no un desplegable.
+        new("obra.proveedores.ver", "Obra - Ver proveedores", "obra"),
+
+        // Ficha del cliente. NO se reusa `ventas.cliente.ver`: esa clave
+        // significa "ver a quién le estoy vendiendo mientras capturo un pedido",
+        // y aquí se publican datos fiscales y una bitácora de quién cambió qué.
+        new("clientes.ver_modulo", "Clientes - Ver módulo", "clientes"),
+        new("clientes.ver", "Clientes - Ver bonificaciones y centros de servicio", "clientes"),
+        // Aparte porque es dinero: dice qué bonificación y qué RFC se le factura.
+        new("clientes.facturacion.ver", "Clientes - Ver datos de facturación", "clientes"),
+        // Aparte porque es auditoría: quién cambió el límite de crédito y cuándo.
+        // Quien atiende al cliente no necesita verlo; quien revisa, sí.
+        new("clientes.log.ver", "Clientes - Ver bitácora de cambios", "clientes"),
+
+        // Catálogo de productos CON precios y existencias. No cae en
+        // `catalogos.*` porque el renglón trae precio de lista, precio anterior y
+        // la diferencia entre los dos: es el margen de la empresa.
+        new("productos.ver_modulo", "Productos - Ver módulo", "productos"),
+        new("productos.ver", "Productos - Ver catálogo con precios", "productos"),
+
+        // Cortes de caja. `.cs` aparte: los de centro de servicio cruzan a las
+        // bases de los centros y los ve otra gente (la matriz, no el centro).
+        new("cortes.ver_modulo", "Cortes - Ver módulo", "cortes"),
+        new("cortes.ver", "Cortes - Ver corte y su detalle", "cortes"),
+        new("cortes.cs.ver", "Cortes - Ver cortes de centros de servicio", "cortes"),
+
+        // Manifiesto de actualización de las aplicaciones de escritorio. Publica
+        // rutas del servidor, así que es de quien administra la instalación.
+        new("aplicaciones.actualizaciones.ver", "Aplicaciones - Ver actualizaciones", "aplicaciones")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)
