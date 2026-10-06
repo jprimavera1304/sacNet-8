@@ -15,6 +15,11 @@ on:
 env:
   SOLUTION_PATH: ./ISL_Service/ISL_Service.sln
   PROJECT_PATH: ./ISL_Service/ISL_Service/ISL_Service.csproj
+  # Las pruebas van por su ruta y NO por el .sln a proposito: el .sln solo
+  # tiene el proyecto web, y meterle el de pruebas volveria a alargar la
+  # compilacion que ya costo bajar a segundos. Asi se corren igual sin pagar
+  # eso.
+  TESTS_PATH: ./ISL_Service/ISL_Service/ISL_Service.Tests/ISL_Service.Tests.csproj
   PUBLISH_PATH: ./publish
   NUGET_XMLDOC_MODE: skip
 
@@ -45,6 +50,17 @@ jobs:
 
       - name: Build with dotnet
         run: dotnet build ${{ env.PROJECT_PATH }} --configuration Release --no-restore -m /p:ContinuousIntegrationBuild=true
+
+      # NADIE HABIA CORRIDO LAS PRUEBAS EN CI.
+      #
+      # El paso no existia, y ademas `dotnet test` sobre el .sln no habria
+      # servido: el .sln no incluye el proyecto de pruebas, asi que no encuentra
+      # ninguna y termina en verde sin haber probado nada. Habia 109 pruebas
+      # escritas que no protegian de nada porque nadie las ejecutaba.
+      #
+      # Va ANTES de publicar: si una prueba falla, no se despliega.
+      - name: Test with dotnet
+        run: dotnet test ${{ env.TESTS_PATH }} --configuration Release --verbosity normal
 
       - name: Dotnet publish (project path)
         run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -o ${{ env.PUBLISH_PATH }} --no-build
