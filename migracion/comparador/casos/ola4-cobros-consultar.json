@@ -1,0 +1,27 @@
+{
+  "nombre": "ola4-cobros-consultar",
+  "_porque": [
+    "sp_n_ConsultarCobros, 12 parametros. Cobros esta vacia en Tauro."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cobros/consultar",
+    "body": {
+      "IDCobro": 1,
+      "IDUsuarioActual": 0
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/cobranza/cobros/consultar",
+    "body": {
+      "idCobro": 1
+    }
+  },
+  "camino_legacy": "result.cobros",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": null,
+  "solo_campos": [],
+  "ignorar": [],
+  "diferencias_intencionales": []
+}

@@ -207,6 +207,47 @@ public sealed class PermissionService : IPermissionService
     private static readonly LegacyModuleBinding VentasPagosBinding = new(
         VentasModuleKey, "Ventas", VentasPagosLegacyForm, VentasPagosLegacyPermissionMap, new List<PermissionSeed>());
 
+    /*
+      EL BOTON GUARDAR DE USADOS VIVE EN UNA TERCERA FORMA DE MAC31.
+
+      "ventas.usados" (btnUsados, en CONSULTA DE VENTAS) es el que deja ABRIR la
+      pantalla de usados, y ya estaba arriba. Pero Mac31 tiene un permiso APARTE
+      para el boton GUARDAR de esa pantalla, y vive en su propia forma. Hasta
+      ahora el backend no lo usaba: quien podia abrir la pantalla podia guardar.
+
+      VentasUsadosController lo tenia anotado como pendiente, con el motivo de
+      que "el puente de permisos heredados esta amarrado a UNA forma por modulo
+      y agregar una segunda obligaria a tocar el mecanismo entero". Ya no es
+      cierto: el puente se parametrizo cuando se hizo el de pagos
+      (LegacyModuleBinding), y esta es la tercera forma del mismo modulo, exacta-
+      mente como la segunda. No hay mecanismo que tocar.
+
+      Verificado en las DOS empresas y son identicas hasta el numero: IDForma
+      4024, Forma "VentasUsados", Descripcion "CONSULTA DE VENTAS USADOS", con un
+      solo proceso, btnGuardar (5085), el mismo IDProceso en Produccion_svr
+      (Tauro) y en MacZ (Zaragoza).
+
+      NO HAY CHOQUE DE IDProceso con las otras dos formas de ventas: la de
+      consulta usa 1..18, 1031, 3063, 5096, 5151-5154, 5196 y 53xx; la de pagos
+      1032 y 1033; esta, 5085. Importa porque el catalogo se indexa por
+      IDProceso.
+
+      NO LLEVA WebSeeds NI SU PROPIO ver_modulo, por lo mismo que pagos: el
+      modulo es el MISMO ("ventas") y su ".ver_modulo" ya lo siembra
+      VentasWebPermissionSeeds.
+    */
+    private const string VentasUsadosLegacyForm = "CONSULTA DE VENTAS USADOS";
+
+    public const string UsadosGuardarPermission = "ventas.usados.guardar";
+
+    private static readonly Dictionary<string, (string Key, string Name)> VentasUsadosLegacyPermissionMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["btnGuardar"] = (UsadosGuardarPermission, "Ventas - Guardar usados")
+    };
+
+    private static readonly LegacyModuleBinding VentasUsadosBinding = new(
+        VentasModuleKey, "Ventas", VentasUsadosLegacyForm, VentasUsadosLegacyPermissionMap, new List<PermissionSeed>());
+
     private const string PrestamosModuleKey = "prestamos";
     private const string PrestamosViewPermission = "prestamos.ver_modulo";
 
@@ -306,7 +347,36 @@ public sealed class PermissionService : IPermissionService
         ["cheques.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
         ["cheques.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
         ["cheques.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
-        ["cheques.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" }
+        ["cheques.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+
+        /*
+          El reparto por rol para las claves nuevas de cascos, temporadas y
+          torneos. Esto SOLO manda en instalaciones sin el modelo de capacidades
+          (PermissionsEnabled = false): donde si lo hay, decide la base.
+
+          Se copia el reparto de los modulos hermanos —ver con "User", escribir
+          solo "Admin"— porque es la regla que ya rige en todo el catalogo y
+          porque es la decision conservadora: antes de este cambio cualquier
+          token escribia; ahora, en una base sin capacidades, al menos hace
+          falta ser Admin.
+        */
+        ["almacen_cascos.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["almacen_cascos.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["almacen_cascos.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["almacen_cascos.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["almacen_cascos.cancelar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+
+        ["temporadas.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["temporadas.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["temporadas.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["temporadas.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["temporadas.cancelar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+
+        ["torneos.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["torneos.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["torneos.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["torneos.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["torneos.cancelar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" }
     };
 
     private readonly AppDbContext _db;
@@ -508,7 +578,54 @@ public sealed class PermissionService : IPermissionService
 
         // Manifiesto de actualización de las aplicaciones de escritorio. Publica
         // rutas del servidor, así que es de quien administra la instalación.
-        new("aplicaciones.actualizaciones.ver", "Aplicaciones - Ver actualizaciones", "aplicaciones")
+        new("aplicaciones.actualizaciones.ver", "Aplicaciones - Ver actualizaciones", "aplicaciones"),
+
+        /*
+          ALMACEN DE CASCOS, TEMPORADAS Y TORNEOS.
+
+          Las once escrituras de estos tres modulos estaban SOLO con [Authorize]
+          de clase: cualquier usuario con token, de cualquier rol, podia crear,
+          modificar y cancelar movimientos de casco, y abrir, cerrar y cancelar
+          torneos y temporadas.
+
+          LAS CLAVES NO SE INVENTAN AQUI: YA LAS PIDE EL FRONT.
+          ----------------------------------------------------
+          Estan escritas desde hace tiempo en
+          Web/QR_Web/docs/shared/js/core/module-action-flags.js, que es con lo
+          que el web decide si enciende o apaga cada boton:
+
+            almacen_cascos: ver_modulo, ver, crear, editar, cancelar
+            temporadas:     ver_modulo, ver, crear, editar, cancelar
+            torneos:        ver_modulo, ver, crear, editar, cancelar
+
+          O sea: el web ya apagaba los botones por estos permisos y el backend
+          no los conocia. Las dos mitades opinaban distinto sobre la misma
+          persona — justo lo que el proyecto ya evito en PermisoControllerBase.
+          Se declaran TAL CUAL, con guion bajo en "almacen_cascos" incluido,
+          porque cambiarles una letra las volveria otras claves.
+
+          Ojo con el nombre: es "cancelar", no "activar" como en los modulos
+          deportivos hermanos. Es lo que dice el front, y ademas describe mejor
+          lo que hacen estas pantallas: un movimiento de casco no se activa ni
+          se desactiva, se cancela.
+        */
+        new("almacen_cascos.ver_modulo", "Almacén de Cascos - Ver módulo", "almacen_cascos"),
+        new("almacen_cascos.ver", "Almacén de Cascos - Ver", "almacen_cascos"),
+        new("almacen_cascos.crear", "Almacén de Cascos - Crear movimiento", "almacen_cascos"),
+        new("almacen_cascos.editar", "Almacén de Cascos - Modificar movimiento", "almacen_cascos"),
+        new("almacen_cascos.cancelar", "Almacén de Cascos - Cancelar movimiento", "almacen_cascos"),
+
+        new("temporadas.ver_modulo", "Temporadas - Ver módulo", "temporadas"),
+        new("temporadas.ver", "Temporadas - Ver", "temporadas"),
+        new("temporadas.crear", "Temporadas - Crear", "temporadas"),
+        new("temporadas.editar", "Temporadas - Editar", "temporadas"),
+        new("temporadas.cancelar", "Temporadas - Cancelar/Reactivar", "temporadas"),
+
+        new("torneos.ver_modulo", "Torneos - Ver módulo", "torneos"),
+        new("torneos.ver", "Torneos - Ver", "torneos"),
+        new("torneos.crear", "Torneos - Crear", "torneos"),
+        new("torneos.editar", "Torneos - Editar", "torneos"),
+        new("torneos.cancelar", "Torneos - Cancelar/Activar/Cerrar/Reactivar", "torneos")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)
@@ -2539,7 +2656,10 @@ WHERE EmpresaId = @EmpresaId
     {
         var catalogo = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasBinding, ct);
         var pagos = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasPagosBinding, ct);
+        var usados = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasUsadosBinding, ct);
         foreach (var par in pagos)
+            catalogo[par.Key] = par.Value;
+        foreach (var par in usados)
             catalogo[par.Key] = par.Value;
         return catalogo;
     }
@@ -2557,9 +2677,12 @@ WHERE EmpresaId = @EmpresaId
     {
         var consulta = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, userId, VentasBinding, catalogo, ct);
         var pagos = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, userId, VentasPagosBinding, catalogo, ct);
+        var usados = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, userId, VentasUsadosBinding, catalogo, ct);
 
         consulta.Allow.UnionWith(pagos.Allow);
+        consulta.Allow.UnionWith(usados.Allow);
         consulta.Deny.UnionWith(pagos.Deny);
+        consulta.Deny.UnionWith(usados.Deny);
         return consulta;
     }
 

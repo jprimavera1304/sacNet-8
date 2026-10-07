@@ -1,0 +1,26 @@
+{
+  "nombre": "ola4-usados-cobros-consultar",
+  "_porque": [
+    "sp_n_ConsultarVentasCobrosUsados. VentasCobrosUsados esta vacia en Tauro."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/ventascobrosusados/consultar",
+    "body": {
+      "IDVentaCobroUsado": 1
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/usados/cobros/consultar",
+    "body": {
+      "idVentaCobroUsado": 1
+    }
+  },
+  "camino_legacy": "result.ventasCobrosUsados",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": null,
+  "solo_campos": [],
+  "ignorar": [],
+  "diferencias_intencionales": []
+}

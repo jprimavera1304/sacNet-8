@@ -13,6 +13,29 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
 {
     private const int CommandTimeoutSeconds = 500;
 
+    private readonly ILogger<VentasPedidoCapturaRepository> _logger;
+
+    /*
+      QUE EL FILTRO POR AGENTE NO SE CAIGA EN SILENCIO.
+
+      Las dos recaidas de abajo (sp_w_ConsultaAgenteUsuario y
+      sp_w_ConsultaExistenciaComprometida) son deliberadas: si el script de base
+      todavia no esta desplegado, la pantalla sigue funcionando como funcionaba
+      antes en vez de romperse. Eso se queda: nada de la base se toca aqui, y un
+      script pendiente no debe dejar a un repartidor sin poder capturar.
+
+      Lo que NO se queda es que no se note. La de agente apaga un filtro de
+      DATOS —sin el, un usuario que deberia ver solo sus pedidos los ve todos—,
+      asi que falla ABIERTO. Una recaida que relaja un filtro y no deja rastro es
+      indistinguible de no tener filtro: nadie se entera nunca.
+
+      Ahora cada recaida deja una advertencia, UNA sola vez por proceso (el
+      script no se despliega a medias: o esta o no esta, y una linea por peticion
+      ahogaria el registro sin decir nada nuevo).
+    */
+    private static int _avisadoAgenteFiltro;
+    private static int _avisadoComprometido;
+
     // sp_n_ConsultaAlmacenProducto tarda ~700 ms y devuelve el almacen completo.
     // Su resultado solo depende de (IDAlmacen, IDEmpresaCS), asi que se cachea por
     // esa llave. TTL corto: la existencia cambia con cada venta y no queremos
@@ -89,10 +112,14 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
     private readonly IConfiguration _configuration;
     private readonly IMemoryCache _cache;
 
-    public VentasPedidoCapturaRepository(IConfiguration configuration, IMemoryCache cache)
+    public VentasPedidoCapturaRepository(
+        IConfiguration configuration,
+        IMemoryCache cache,
+        ILogger<VentasPedidoCapturaRepository> logger)
     {
         _configuration = configuration;
         _cache = cache;
+        _logger = logger;
     }
 
     public async Task<PedidoBootstrapResponse> BootstrapAsync(int idUsuario, CancellationToken ct)
@@ -298,6 +325,16 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         {
             // SP no desplegado: 0 = sin filtro = como se comportaba antes. Un
             // script pendiente no debe dejar a nadie sin poder capturar.
+            //
+            // Pero esto APAGA un filtro de datos, asi que queda escrito: ver el
+            // comentario de _avisadoAgenteFiltro arriba.
+            if (Interlocked.Exchange(ref _avisadoAgenteFiltro, 1) == 0)
+            {
+                _logger.LogWarning(ex,
+                    "sp_w_ConsultaAgenteUsuario no esta desplegado en esta base: el FILTRO POR AGENTE queda APAGADO (todos ven todos los pedidos) hasta que se despliegue el script. Primer usuario afectado: {IDUsuario}.",
+                    idUsuario);
+            }
+
             return 0;
         }
     }
@@ -505,6 +542,11 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
             // El SP todavia no esta desplegado en esta base: se devuelve vacio, con
             // lo que disponible == existencia y la app se comporta como antes.
             // Preferible a tumbar el catalogo completo por un script pendiente.
+            if (Interlocked.Exchange(ref _avisadoComprometido, 1) == 0)
+            {
+                _logger.LogWarning(ex,
+                    "sp_w_ConsultaExistenciaComprometida no esta desplegado en esta base: lo apartado en pedidos sin procesar NO se descuenta, asi que el disponible que se muestra es la existencia completa.");
+            }
         }
 
         return mapa;

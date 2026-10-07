@@ -1,0 +1,53 @@
+{
+  "nombre": "ola4-inventario-pedidos-consultar",
+  "_porque": [
+    "sp_n_ConsultarInventarioPedidos, 4 parametros."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/inventariopedidos/consultar",
+    "body": {
+      "IDInventarioPedido": 1071
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/inventario/pedidos/consultar",
+    "body": {
+      "idInventarioPedido": 1071
+    }
+  },
+  "camino_legacy": "result.inventarioPedidos",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDProducto",
+  "solo_campos": [
+    "Cancelada",
+    "Equipo",
+    "EquipoCancelacion",
+    "EquipoModificacion",
+    "Fecha",
+    "FechaCancelacion",
+    "FechaCancelacionFtm",
+    "FechaFtm",
+    "FechaModificacion",
+    "FechaModificacionFtm",
+    "IDInventarioPedido",
+    "IDStatus",
+    "IDUsuario",
+    "IDUsuarioCancelacion",
+    "IDUsuarioModificacion",
+    "Modificada",
+    "Observaciones",
+    "Usuario",
+    "UsuarioCancelacion",
+    "UsuarioModificacion"
+  ],
+  "ignorar": [
+    "TotalPedido"
+  ],
+  "diferencias_intencionales": [
+    "Legacy rellena con 0 / 0001-01-01 los campos que su DTO declara y el procedimiento no devuelve, y TIRA los que el procedimiento devuelve y su DTO no declara. El nuevo baja el renglon del procedimiento tal cual: donde dice NULL, dice null. Se comparan los campos que los dos lados entregan.",
+    "TotalPedido lo devuelve el procedimiento como NULL en la cabecera del detalle; legacy lo entrega en 0 y el nuevo en null.",
+    "TotalPedido: El procedimiento devuelve NULL en esa columna; el DTO no anulable de legacy la entrega como 0 o 0001-01-01 y el nuevo como null. Mac31 pinta esas celdas EN BLANCO (su rejilla esta ligada al DataTable), asi que null es el valor fiel: un 0 se lee como 'vale cero', que no es lo mismo que 'no tiene valor'."
+  ]
+}

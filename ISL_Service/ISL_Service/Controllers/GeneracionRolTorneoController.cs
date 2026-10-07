@@ -240,6 +240,28 @@ public class GeneracionRolTorneoController : ControllerBase
         return Ok(response);
     }
 
+    /// <summary>
+    /// Genera los partidos y los devuelve SIN confirmar la generacion.
+    /// </summary>
+    /// <remarks>
+    /// "PREVISUALIZAR" NO ES MIRAR: ESCRIBE.
+    /// ------------------------------------
+    /// Llama al MISMO procedimiento que generar-partidos
+    /// (GenerarPartidosAsync), solo con confirmarEstado = false. O sea: los
+    /// partidos se escriben de verdad, lo unico que no cambia es el estado de la
+    /// generacion. El nombre invita a pensar que es una vista previa en memoria
+    /// y no lo es.
+    ///
+    /// Se queda asi, y por dos razones:
+    ///   1. Es un POST, no un GET. El verbo ya avisa de que la peticion no es
+    ///      segura: no hay reintento del navegador ni prefetch que la dispare
+    ///      sola, que es el peligro real de esconder una escritura.
+    ///   2. Ya lleva permiso propio y distinto del de confirmar
+    ///      (generacionroltorneo.editar frente a .activar): quien puede
+    ///      previsualizar no necesariamente puede dejar la generacion cerrada.
+    ///
+    /// Lo que faltaba era decirlo. Queda dicho.
+    /// </remarks>
     [HttpPost("{id:guid}/previsualizar-partidos")]
     [Authorize(Policy = "perm:generacionroltorneo.editar")]
     [ProducesResponseType(typeof(GenerarPartidosGeneracionRolTorneoResponse), StatusCodes.Status200OK)]

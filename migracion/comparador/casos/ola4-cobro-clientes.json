@@ -1,0 +1,25 @@
+{
+  "nombre": "ola4-cobro-clientes",
+  "_porque": [
+    "sp_n_ConsultarCobroClientes con un solo parametro. Cobros esta vacia en",
+    "Tauro, asi que los dos lados coinciden en el vacio."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cobrosclientes/consultar",
+    "body": {
+      "IDCobro": 1
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/ventas/cobranza/cobros/1/clientes",
+    "body": null
+  },
+  "camino_legacy": "result.cobros",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": null,
+  "solo_campos": [],
+  "ignorar": [],
+  "diferencias_intencionales": []
+}

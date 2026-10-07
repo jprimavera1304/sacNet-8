@@ -1,0 +1,27 @@
+{
+  "nombre": "ola4-usados-cobros-dinero-consultar",
+  "_porque": [
+    "sp_n_ConsultarCobrosDineroUsados, 9 parametros. CobrosDineroUsado esta vacia",
+    "en Tauro."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/ventascobrosdinerousados/consultar",
+    "body": {
+      "IDCobroDineroUsado": 1
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/usados/cobros-dinero/consultar",
+    "body": {
+      "idCobroDineroUsado": 1
+    }
+  },
+  "camino_legacy": "result.cobrosDineroUsados",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": null,
+  "solo_campos": [],
+  "ignorar": [],
+  "diferencias_intencionales": []
+}

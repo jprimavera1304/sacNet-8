@@ -1,0 +1,30 @@
+{
+  "nombre": "ola4-ventas-pendientes-consultar",
+  "_porque": [
+    "NO VERIFICABLE, y los dos lados fallan IGUAL: sp_n_ConsultaVentasPendiente referencia la tabla 'Ventas Pendiente', que NO EXISTE en Produccion_svr.",
+    "Legacy contesta {status:500, result:\"[No se pudo procesar sp_n_ConsultaVentasPendiente] - Invalid object name 'Ventas Pendiente'.\"} y el nuevo contesta HTTP 500 con ese mismo mensaje de SQL Server.",
+    "O sea: coinciden en el fallo. Hay que volver a correrlo contra una base que si tenga esa tabla (Zaragoza / MacZ)."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/consultaventaspendiente/consultar",
+    "body": {
+      "idVentaPendiente": 0,
+      "idCliente": 0,
+      "filtrar": 1
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/consultas/pendientes",
+    "body": {
+      "filtrar": 1
+    }
+  },
+  "camino_legacy": "result.ventasPendiente",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDVenta",
+  "solo_campos": [],
+  "ignorar": [],
+  "diferencias_intencionales": []
+}

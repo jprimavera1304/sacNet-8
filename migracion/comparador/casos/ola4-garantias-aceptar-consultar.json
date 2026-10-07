@@ -1,0 +1,46 @@
+{
+  "nombre": "ola4-garantias-aceptar-consultar",
+  "_porque": [
+    "sp_n_ConsultarGarantiasAceptar: los mismos 15 mas @IDStatusGarantiaAceptada."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/garantias/aceptar/consultar",
+    "body": {
+      "IDGarantia": 3997,
+      "IDStatusGarantiaAceptada": 2,
+      "IDUsuarioActual": 0,
+      "FechaInicial": "01-01-2026",
+      "FechaFinal": "31-12-2026"
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/garantias/aceptar/consultar",
+    "body": {
+      "idGarantia": 3997,
+      "idStatusGarantiaAceptada": 2,
+      "fechaInicial": "2026-01-01",
+      "fechaFinal": "2026-12-31"
+    }
+  },
+  "camino_legacy": "result.garantias",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDGarantia",
+  "solo_campos": [
+    "IDGarantia",
+    "IDCliente",
+    "IDProducto",
+    "IDStatusGarantia",
+    "Ticket",
+    "Vigencia",
+    "Garantia",
+    "Monto",
+    "Porcentaje"
+  ],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "Legacy rellena con 0 / 0001-01-01 los campos que su DTO declara y el procedimiento no devuelve, y TIRA los que el procedimiento devuelve y su DTO no declara. El nuevo baja el renglon del procedimiento tal cual: donde dice NULL, dice null. Se comparan los campos que los dos lados entregan.",
+    "Legacy REVIENTA en este endpoint si no se le mandan las fechas: con IDStatusGarantiaAceptada = 2 las formatea sin comprobar que vengan y lanza ArgumentOutOfRangeException en Substring, contestando 400 con el stack. Por eso el caso se las manda. El nuevo funciona con o sin ellas."
+  ]
+}

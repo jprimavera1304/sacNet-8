@@ -1,0 +1,26 @@
+{
+  "nombre": "ola4-usados-cheques-consultar",
+  "_porque": [
+    "sp_n_ConsultarCobrosDineroUsadosCheques, 5 parametros."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/ventascobrosdinerousados/cheques/consultar",
+    "body": {
+      "IDCobroDineroUsado": 1
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/usados/cobros-dinero/cheques/consultar",
+    "body": {
+      "idCobroDineroUsado": 1
+    }
+  },
+  "camino_legacy": "result.cobrosDineroUsados",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": null,
+  "solo_campos": [],
+  "ignorar": [],
+  "diferencias_intencionales": []
+}

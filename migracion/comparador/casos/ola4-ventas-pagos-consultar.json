@@ -1,0 +1,36 @@
+{
+  "nombre": "ola4-ventas-pagos-consultar",
+  "_porque": [
+    "sp_n_ConsultaVentasPagos, 5 parametros, los mismos de los dos lados."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/consultaventaspagos/consultar",
+    "body": {
+      "IDVenta": 370852,
+      "NuevoEsquemaPagos": 0
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/consultas/pagos",
+    "body": {
+      "idVenta": 370852
+    }
+  },
+  "camino_legacy": "result.ventasPagos",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": null,
+  "solo_campos": [
+    "IDPagoVenta",
+    "IDVenta",
+    "IDTipoPago",
+    "Abono",
+    "MontoTotal",
+    "Saldo"
+  ],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "Legacy rellena con 0 / 0001-01-01 los campos que su DTO declara y el procedimiento no devuelve, y TIRA los que el procedimiento devuelve y su DTO no declara. El nuevo baja el renglon del procedimiento tal cual: donde dice NULL, dice null. Se comparan los campos que los dos lados entregan."
+  ]
+}

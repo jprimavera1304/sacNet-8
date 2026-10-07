@@ -263,6 +263,9 @@ public class TemporadasService : ITemporadasService
     public Task<int> CerrarTorneosVencidosAsync(Guid usuarioSistemaId, DateTime? fechaCorte, CancellationToken ct = default)
         => _repository.CerrarTorneosVencidosAsync(usuarioSistemaId, fechaCorte, ct);
 
+    public Task<int> CerrarTemporadasVencidasAsync(Guid usuarioSistemaId, CancellationToken ct = default)
+        => _repository.CerrarTemporadasVencidasAsync(usuarioSistemaId, ct);
+
     private static string? NormalizeText(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))

@@ -1,0 +1,36 @@
+{
+  "nombre": "ola4-ventas-transito-consultar",
+  "_porque": [
+    "sp_n_ConsultaVentasTransito, 5 parametros. El nuevo manda la fecha en ISO y",
+    "no lee Constantes."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/consultaventas/consultar/transito",
+    "body": {
+      "StatusInventario": 0,
+      "IDCliente": 0,
+      "FechaEmisionInicial": "01-03-2026",
+      "FechaEmisionFinal": "31-03-2026",
+      "Agrupado": 0
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/consultas/transito",
+    "body": {
+      "statusInventario": 0,
+      "fechaEmisionInicial": "2026-03-01",
+      "fechaEmisionFinal": "2026-03-31",
+      "agrupado": 0
+    }
+  },
+  "camino_legacy": "result.ventas",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": null,
+  "solo_campos": [],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "Legacy convierte la fecha con ConvertFtmDate leyendo formatoFechaDB de Constantes (sp_n_ConsultaConstantes, el del cierre del dia); el nuevo la manda en ISO."
+  ]
+}

@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.Temporadas;
+﻿using ISL_Service.Application.DTOs.Temporadas;
 
 namespace ISL_Service.Application.Interfaces;
 
@@ -6,6 +6,9 @@ public interface ITemporadasService
 {
     Task<List<TemporadaDto>> ConsultarTemporadasAsync(byte? estado, string? texto, CancellationToken ct = default);
     Task<List<TemporadaDto>> ConsultarTemporadasListadoAsync(byte? estado, string? texto, Guid usuarioSistemaId, CancellationToken ct = default);
+
+    /// <summary>Cierra las temporadas vencidas. La puerta explicita del efecto que el listado hacia a escondidas.</summary>
+    Task<int> CerrarTemporadasVencidasAsync(Guid usuarioSistemaId, CancellationToken ct = default);
     Task<TemporadaDto?> GetTemporadaByIdAsync(Guid id, CancellationToken ct = default);
     Task<TemporadaDto> CrearTemporadaAsync(CreateTemporadaRequest request, Guid usuarioId, CancellationToken ct = default);
     Task<TemporadaDto> ActualizarTemporadaAsync(Guid id, UpdateTemporadaRequest request, Guid usuarioId, CancellationToken ct = default);

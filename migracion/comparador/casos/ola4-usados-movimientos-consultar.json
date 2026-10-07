@@ -1,0 +1,73 @@
+{
+  "nombre": "ola4-usados-movimientos-consultar",
+  "_porque": [
+    "sp_n_ConsultarUsadosMovimientos, 8 parametros. Con el id puesto, legacy tira",
+    "el resto de los filtros; el nuevo hace lo mismo pero escrito."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/usadosmovimientos/consultar",
+    "body": {
+      "IDUsadoMovimiento": 2
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/usados/movimientos/consultar",
+    "body": {
+      "idUsadoMovimiento": 2
+    }
+  },
+  "camino_legacy": "result.usadosMovimientos",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDTipoUsado",
+  "solo_campos": [
+    "AlmacenUsado",
+    "Cancelada",
+    "Equipo",
+    "EquipoCancelacion",
+    "Fecha",
+    "FechaCancelacion",
+    "FechaCancelacionFtm",
+    "FechaCobroFtm",
+    "FechaFtm",
+    "FechaVentaFtm",
+    "Folio",
+    "FolioCobro",
+    "FolioCobroFtm",
+    "FolioFtm",
+    "FolioVentaFtm",
+    "Gallero",
+    "IDAlmacenUsado",
+    "IDCobro",
+    "IDGallero",
+    "IDRepartidor",
+    "IDUsadoMovimiento",
+    "IDUsuario",
+    "IDUsuarioCancelacion",
+    "Motivo",
+    "Movimiento",
+    "Nombre",
+    "NumCascos",
+    "NumCascosEntrada",
+    "NumCascosSalida",
+    "NumeroGallero",
+    "Repartidor",
+    "TotalCambio",
+    "TotalEntrada",
+    "TotalPagar",
+    "TotalSalida",
+    "Usuario",
+    "UsuarioCancelacion"
+  ],
+  "ignorar": [
+    "IDVenta",
+    "FechaVenta",
+    "FechaCobro"
+  ],
+  "diferencias_intencionales": [
+    "Legacy rellena con 0 / 0001-01-01 los campos que su DTO declara y el procedimiento no devuelve, y TIRA los que el procedimiento devuelve y su DTO no declara. El nuevo baja el renglon del procedimiento tal cual: donde dice NULL, dice null. Se comparan los campos que los dos lados entregan.",
+    "IDVenta, FechaVenta y FechaCobro vienen NULL cuando el movimiento no cuelga de una remision ni de un cobro: legacy los entrega en 0 y 0001-01-01.",
+    "IDVenta, FechaVenta y FechaCobro vienen NULL cuando el movimiento no cuelga de una remision ni de un cobro. El procedimiento devuelve NULL en esa columna; el DTO no anulable de legacy la entrega como 0 o 0001-01-01 y el nuevo como null. Mac31 pinta esas celdas EN BLANCO (su rejilla esta ligada al DataTable), asi que null es el valor fiel: un 0 se lee como 'vale cero', que no es lo mismo que 'no tiene valor'."
+  ]
+}

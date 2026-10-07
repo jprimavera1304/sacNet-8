@@ -1,0 +1,28 @@
+{
+  "nombre": "ola4-usados-cortes-cs-consultar",
+  "_porque": [
+    "sp_n_ConsultarCobrosDineroUsadosCortesCS. El nuevo manda ademas @IDsCobro,",
+    "que el procedimiento declara y legacy no mandaba; vacio da el mismo",
+    "resultado."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/ventascobrosdinerousados/cortescs/consultar",
+    "body": {
+      "IDCobroDineroUsado": 1
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/usados/cobros-dinero/cortes-cs/consultar",
+    "body": {
+      "idCobroDineroUsado": 1
+    }
+  },
+  "camino_legacy": "result.cobrosDineroUsados",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": null,
+  "solo_campos": [],
+  "ignorar": [],
+  "diferencias_intencionales": []
+}

@@ -1,0 +1,27 @@
+{
+  "nombre": "ola4-garantias-registro-consultar",
+  "_porque": [
+    "sp_n_ConsultarGarantiasRegistro, 9 parametros. GarantiasRegistro esta vacia",
+    "en Tauro: coinciden en el vacio."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/garantias/registrar/consultar",
+    "body": {
+      "IDGarantiaRegistro": 1
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/garantias/registros/consultar",
+    "body": {
+      "idGarantiaRegistro": 1
+    }
+  },
+  "camino_legacy": "result.garantias",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": null,
+  "solo_campos": [],
+  "ignorar": [],
+  "diferencias_intencionales": []
+}

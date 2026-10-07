@@ -1,0 +1,40 @@
+{
+  "nombre": "ola4-ventas-detalles-consultar",
+  "_porque": [
+    "Una sola remision: los dos lados usan sp_n_VentasDetalle con @IDVenta y",
+    "@IDDescuento. El nuevo lee EsLuro de dbo.Constantes con un SELECT en vez de",
+    "sp_n_ConsultaConstantes, que es quien hace el cierre del dia."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/ventasdetalles/consultar",
+    "body": {
+      "IDVenta": 370852,
+      "IDDescuento": 0
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/detalles/consultar",
+    "body": {
+      "idVenta": 370852,
+      "idDescuento": 0
+    }
+  },
+  "camino_legacy": "result.ventasDetalles",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDProducto",
+  "solo_campos": [
+    "IDVenta",
+    "IDProducto",
+    "Codigo",
+    "Cantidad",
+    "PrecioLista",
+    "Importe",
+    "Descuento"
+  ],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "Legacy rellena con 0 / 0001-01-01 los campos que su DTO declara y el procedimiento no devuelve, y TIRA los que el procedimiento devuelve y su DTO no declara. El nuevo baja el renglon del procedimiento tal cual: donde dice NULL, dice null. Se comparan los campos que los dos lados entregan."
+  ]
+}

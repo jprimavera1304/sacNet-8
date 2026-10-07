@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using ISL_Service.Application.DTOs.Temporadas;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Data;
@@ -63,6 +63,24 @@ public class TemporadasRepository : ITemporadasRepository
         return Funciones.DataTableToList<TemporadaDto>(dt);
     }
 
+    /// <summary>
+    /// CUIDADO: ESTO ESCRIBE. Cierra las temporadas vencidas y DESPUES lista.
+    ///
+    /// El nombre dice "Consultar" y no es solo una consulta: ejecuta
+    /// sp_w_CerrarTemporadasVencidas en la misma transaccion, asi que una
+    /// temporada puede cambiar de estado por el simple hecho de que alguien
+    /// abrio la pantalla. Es la unica cosa en todo el sistema que cierra
+    /// temporadas vencidas — el front no llama a ningun endpoint de cierre—, asi
+    /// que no se quita: quitarlo dejaria temporadas vencidas en "activa" para
+    /// siempre.
+    ///
+    /// Lo que si se hizo: que el efecto no lo dispare cualquiera. El controlador
+    /// solo llama a este metodo si el usuario tiene el permiso de cerrar
+    /// (temporadas.cancelar); quien solo puede leer pasa por
+    /// <see cref="ConsultarTemporadasAsync"/>, que no escribe nada. Y el cierre
+    /// tiene ya su propia puerta explicita:
+    /// <see cref="CerrarTemporadasVencidasAsync"/>.
+    /// </summary>
     public async Task<List<TemporadaDto>> ConsultarTemporadasListadoAsync(byte? estado, string? texto, Guid usuarioSistemaId, CancellationToken ct = default)
     {
         await using var conn = GetConnection();
@@ -181,6 +199,17 @@ public class TemporadasRepository : ITemporadasRepository
         return Funciones.DataTableToList<TorneoDto>(dt);
     }
 
+    /// <summary>
+    /// CUIDADO: ESTO ESCRIBE. Cierra los torneos vencidos y DESPUES lista.
+    ///
+    /// Mismo caso que <see cref="ConsultarTemporadasListadoAsync"/>: ejecuta
+    /// sp_w_CerrarTorneosVencidos en la misma transaccion antes de leer. Aqui el
+    /// cierre YA tenia puerta propia (<see cref="CerrarTorneosVencidosAsync"/>,
+    /// expuesta en POST api/torneos/cerrar-vencidos), pero nadie la llama: el
+    /// front solo lista. Por eso el efecto se queda, y por eso el controlador
+    /// solo entra aqui cuando el usuario tiene torneos.cancelar; el que solo lee
+    /// pasa por <see cref="ConsultarTorneosAsync"/>.
+    /// </summary>
     public async Task<List<TorneoDto>> ConsultarTorneosListadoAsync(Guid? temporadaId, byte? estado, string? texto, DateTime? fechaInicio, DateTime? fechaFin, Guid usuarioSistemaId, CancellationToken ct = default)
     {
         await using var conn = GetConnection();
@@ -325,6 +354,43 @@ public class TemporadasRepository : ITemporadasRepository
 
         var ordinal = reader.GetOrdinal("TorneosCerrados");
         return reader.IsDBNull(ordinal) ? 0 : reader.GetInt32(ordinal);
+    }
+
+    /// <summary>
+    /// Cierra las temporadas vencidas y devuelve cuantas cerro.
+    ///
+    /// Existe para que el cierre tenga PUERTA PROPIA. Hasta ahora lo unico que
+    /// cerraba temporadas vencidas era el GET del listado
+    /// (<see cref="ConsultarTemporadasListadoAsync"/>), que ejecuta este mismo
+    /// procedimiento antes de leer. Es el gemelo de
+    /// <see cref="CerrarTorneosVencidosAsync"/>, que ya existia.
+    /// </summary>
+    public async Task<int> CerrarTemporadasVencidasAsync(Guid usuarioSistemaId, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(SpCerrarTemporadasVencidas, conn);
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.Parameters.AddWithValue("@UsuarioSistemaId", ResolveUsuarioSistemaId(usuarioSistemaId));
+
+        /*
+          sp_w_CerrarTemporadasVencidas no promete devolver nada —el listado lo
+          llama con ExecuteNonQuery—, asi que aqui se lee lo que haya sin
+          exigirlo: si trae una cuenta se devuelve, y si no, 0. No se cambia el
+          procedimiento: nada de la base se toca en esta entrega.
+        */
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct))
+            return 0;
+
+        for (var i = 0; i < reader.FieldCount; i++)
+        {
+            if (reader.GetName(i).Contains("Cerrad", StringComparison.OrdinalIgnoreCase))
+                return reader.IsDBNull(i) ? 0 : Convert.ToInt32(reader.GetValue(i));
+        }
+
+        return 0;
     }
 
     private static async Task<T?> ExecuteSingleAsync<T>(SqlCommand cmd, CancellationToken ct = default) where T : class

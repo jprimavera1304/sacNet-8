@@ -1,0 +1,26 @@
+{
+  "nombre": "ola4-usados-excedentes-consultar",
+  "_porque": [
+    "sp_n_ConsultarVentasUsadosExcendentes, 7 parametros."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/ventasusadosexcedentes/consultar",
+    "body": {
+      "IDVentaUsadoExcendente": 4250
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/usados/excedentes/consultar",
+    "body": {
+      "idVentaUsadoExcedente": 4250
+    }
+  },
+  "camino_legacy": "result.ventasUsadosExcedentes",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDTipoUsado",
+  "solo_campos": [],
+  "ignorar": [],
+  "diferencias_intencionales": []
+}

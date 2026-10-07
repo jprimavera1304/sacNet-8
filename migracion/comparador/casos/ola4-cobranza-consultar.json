@@ -1,0 +1,43 @@
+{
+  "nombre": "ola4-cobranza-consultar",
+  "_porque": [
+    "Legacy: ConsultaVentasCobranzasController -> sp_n_ConsultarCobranzas con 11",
+    "parametros. El nuevo manda los mismos; el IDUsuarioActual sale del token",
+    "(0 para el usuario del banco, igual que lo que se le manda a legacy)."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cobranzas/consultar",
+    "body": {
+      "IDCobranza": 208623,
+      "IDUsuarioActual": 0
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/cobranza/cobranzas/consultar",
+    "body": {
+      "idCobranza": 208623
+    }
+  },
+  "camino_legacy": "result.cobranzas",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDCobranza",
+  "solo_campos": [
+    "IDCobranza",
+    "Folio",
+    "IDRepartidor",
+    "IDAlmacen",
+    "NumFolios",
+    "NumProductos",
+    "TotalPagar",
+    "Abonos",
+    "Descuentos",
+    "Saldo"
+  ],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "Legacy rellena con 0 / 0001-01-01 los campos que su DTO declara y el procedimiento no devuelve, y TIRA los que el procedimiento devuelve y su DTO no declara. El nuevo baja el renglon del procedimiento tal cual: donde dice NULL, dice null. Se comparan los campos que los dos lados entregan.",
+    "Legacy entrega ademas FacturaParaPago y EsFacturaParaPago en 0/null: su DTO las declara y sp_n_ConsultarCobranzas no las devuelve."
+  ]
+}

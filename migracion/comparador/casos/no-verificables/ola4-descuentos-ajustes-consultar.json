@@ -1,0 +1,32 @@
+{
+  "nombre": "ola4-descuentos-ajustes-consultar",
+  "_porque": [
+    "NO VERIFICABLE por una diferencia de contrato deliberada: legacy IGNORA los filtros del cuerpo y los lee de un renglon de dbo.Parametros por su ID, sacandolos de Param2..Param12 POR POSICION (es el mecanismo de sus reportes). Sin un renglon guardado antes contesta 'INTENTE GENERAR DE NUEVAMENTE EL REPORTE.' (con el typo).",
+    "El nuevo recibe los filtros con nombre, asi que con el mismo cuerpo los dos lados preguntan cosas distintas y no hay nada que comparar.",
+    "Verificado contra la fuente: se corrio sp_n_ConsultaVentasDescuentosAjustes con sqlcmd y los mismos once parametros, y el renglon devuelto es el mismo que entrega el endpoint nuevo."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/consultaventasdescuentosajustes/consultar",
+    "body": {
+      "ID": 0,
+      "Status": 1,
+      "IDUsuarioActual": 0
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/descuentos/ajustes/consultar",
+    "body": {
+      "status": 1
+    }
+  },
+  "camino_legacy": "result.consultaVentasDescuentosAjustes",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDVentasDescuentosAjustes",
+  "solo_campos": [],
+  "ignorar": [],
+  "diferencias_intencionales": [
+    "Legacy lee los filtros de dbo.Parametros por ID y posicion; el nuevo los recibe con nombre. Este caso solo vale si el renglon de Parametros del ID pedido tiene los mismos filtros."
+  ]
+}
