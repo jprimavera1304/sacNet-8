@@ -19,7 +19,7 @@ namespace ISL_Service.Application.Services;
 /// con las mismas palabras que ve en Mac31. Dos textos distintos para la misma
 /// regla hacen dudar de si son dos reglas.
 /// </summary>
-public class CatalogosAdminService : ICatalogosAdminService
+public partial class CatalogosAdminService : ICatalogosAdminService
 {
     private readonly ICatalogosAdminRepository _repo;
 

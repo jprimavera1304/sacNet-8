@@ -118,4 +118,28 @@ public interface ICatalogosAdminService
     Task<CatalogoEscrituraResponse> CrearEmpresaSerieAsync(CrearEmpresaSerieRequest r, int idUsuario, string equipo, CancellationToken ct);
     Task<CatalogoEscrituraResponse> ActualizarEmpresaSerieAsync(int id, ActualizarEmpresaSerieRequest r, int idUsuario, string equipo, CancellationToken ct);
     Task<CatalogoEscrituraResponse?> CambiarStatusEmpresaSerieAsync(int id, int idStatus, int idUsuario, string equipo, CancellationToken ct);
+
+    /*
+      --- LECTURAS DE LOS SIETE CATALOGOS EDITABLES
+
+      Devuelven el renglon crudo (Dictionary) por la misma razon que
+      ConsultarDiasFestivosAsync, que ya estaba aqui: sus sp_n_ terminan en
+      EXEC (@Sql) y la lista de columnas cambia con @Formato, asi que un DTO
+      cerrado por catalogo seria once clases que solo copian nombres y que
+      tiran en silencio la columna que el SP agregue manana.
+    */
+    Task<List<Dictionary<string, object?>>> ConsultarAlmacenesAsync(AlmacenesFiltro f, CancellationToken ct);
+    Task<List<Dictionary<string, object?>>> ConsultarAgentesAsync(AgentesFiltro f, CancellationToken ct);
+    Task<List<Dictionary<string, object?>>> ConsultarTiposGastoAsync(TiposGastoFiltro f, CancellationToken ct);
+    Task<List<Dictionary<string, object?>>> ConsultarAutosAsync(AutosFiltro f, CancellationToken ct);
+    Task<List<Dictionary<string, object?>>> ConsultarGruposCategoriaAsync(GruposCategoriaFiltro f, CancellationToken ct);
+    Task<List<Dictionary<string, object?>>> ConsultarCategoriasMacAsync(CategoriasMacFiltro f, CancellationToken ct);
+    Task<List<Dictionary<string, object?>>> ConsultarTiposUsadoAsync(TiposUsadoFiltro f, CancellationToken ct);
+
+    /// <summary>
+    /// Las constantes de operacion de la empresa, LEIDAS CON UN SELECT.
+    /// Ver el comentario del repositorio: sp_n_ConsultaConstantes no es una
+    /// consulta, es el cierre del dia.
+    /// </summary>
+    Task<Dictionary<string, object?>?> ConsultarConstantesOperacionAsync(CancellationToken ct);
 }
