@@ -269,6 +269,23 @@ public class ReportesVentasController : PermisoControllerBase
             return BadRequest(new { message = "El estado de cuenta es de un cliente: manda tipoReporte \"cliente\" y el cliente en idClientes." });
         }
 
+        /*
+          LOS FILTROS QUE EL SP NO SABE DAR VACIOS (106 y 1245).
+
+          El porque, con la linea de cada SP y el mensaje de Mac31, esta en
+          FiltrosObligatoriosDeReporte. Resumen: sin ellos el backend contestaba
+          500 "Error de base de datos" y le echaba la culpa a la base de un dato
+          que faltaba en la peticion.
+        */
+        if (FiltrosObligatoriosDeReporte.QueFalta(
+                request.ReporteKey,
+                request.IDGrupoCategoria,
+                request.IDDiasSemana.Count,
+                request.IDSubcategorias.Count) is { } filtroQueFalta)
+        {
+            return BadRequest(new { message = filtroQueFalta });
+        }
+
         HydrateLegacyContext(request);
         var result = await _service.GenerarLegacyVentasAsync(request, ct);
         result.Url = BuildReportesV3WUrl(result.ParametrosLegacy, request.IdCentro);
