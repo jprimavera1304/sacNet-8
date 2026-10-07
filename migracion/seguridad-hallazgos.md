@@ -72,3 +72,55 @@ función que hoy se usa. Queda anotado para cuando se ataque el tema de fondo.
 Esto no se arregla con un commit: hay que **rotar las credenciales** y sacarlas
 del repo a configuración del servidor. Mientras estén en el historial de git,
 siguen expuestas aunque se borren del archivo.
+
+---
+
+## El web sube la contrasena a MAYUSCULAS, y eso parte el padron de usuarios
+
+Medido el 07-oct-2026.
+
+`docs2/src/nucleo/api.ts:62` sube la contrasena a mayusculas antes de mandarla
+al login, y `docs2/src/nucleo/usuarios.ts` hace lo mismo al **crear** un usuario
+(:229), al **modificarlo** (:247) y al **fijarle** la contrasena (:274). El
+comentario de :207 lo explica y es coherente: si el login compara en mayusculas,
+hay que guardar en mayusculas.
+
+El backend compara con `BCrypt.Verify`
+(`Application/Services/UserService.cs:63`), que **distingue mayusculas**.
+
+Asi que hay dos poblaciones de usuarios web y no son compatibles:
+
+| Como se fijo la contrasena | Hash guardado | Entra por el web? |
+|---|---|---|
+| Desde la pantalla del web | el de la version en MAYUSCULAS | **si** |
+| Desde el movil, por SQL o llamando al API | el de lo que se teclep | **no** |
+
+El sintoma que lo destapo: `BancoPruebas` / `Banco2026` —el usuario de pruebas
+de la migracion, creado fuera del web— **no puede entrar por la pantalla de
+login del web nuevo** y devuelve 401, aunque el mismo endpoint lo acepte con su
+capitalizacion original.
+
+Lo contrario tambien es verdad, y es lo que hace que esto NO sea un
+arreglo de un renglon: **si se quita la conversion solo del login, se queda
+fuera todo usuario creado desde el web**, que son los que hoy si entran.
+
+En las bases locales: 12 usuarios web en `MacZ` (8 activos) y 7 en
+`Produccion_svr`, los 19 con hash de BCrypt y ninguno marcado para cambiar
+contrasena. Son pocos, pero la cuenta de produccion no es esta.
+
+### Las dos salidas, y por que no elegi
+
+1. **Que el backend pruebe las dos formas** (tal cual y en mayusculas) como
+   rampa de migracion. Solo puede dejar entrar a quien ya entraba, y para una
+   contrasena sin minusculas las dos formas son la misma. Lo intente y **el
+   guardia de la sesion lo rechazo por debilitar la autenticacion**, con razon:
+   son dos intentos donde habia uno.
+2. **Quitar la conversion de las cuatro llamadas y reiniciarle la contrasena** a
+   quien la haya fijado desde el web. Es el estado final correcto —`Banco2026`
+   debe poder ser `Banco2026`— pero hay que avisar y acompanarlo.
+
+Las dos cambian quien puede entrar a produccion, asi que la decision no es
+tecnica. Queda escrito con los numeros para que se tome.
+
+**Mientras no se decida:** cualquier usuario creado fuera del web no puede
+entrar por el web, y el usuario de pruebas de la migracion es uno de ellos.
