@@ -98,6 +98,19 @@ public class CrearClienteRequest
     public string? IdFacturama { get; set; }
 
     public bool Redondear { get; set; }
+
+    /// <summary>
+    /// Limite de credito.
+    ///
+    /// EN TAURO EL PROCEDIMIENTO LO IGNORA. sp_n_InsertarCliente hace
+    /// "IF @Funcionalidad = 'TAU' SELECT @LimiteCredito = LimiteCreditoNuevos"
+    /// (de Constantes), asi que el valor que se manda se descarta y todos los
+    /// clientes nuevos nacen con el limite de la empresa — comprobado en
+    /// Produccion_svr: se mando 900 y quedo 10000. En Zaragoza solo lo sustituye
+    /// si llega en cero. El campo se conserva porque en otras empresas si cuenta,
+    /// pero la pantalla no deberia prometer que se puede fijar: para cambiarlo
+    /// despues esta la modificacion, que si lo escribe.
+    /// </summary>
     public decimal LimiteCredito { get; set; }
 
     /// <summary>El numero visible del cliente cuando la empresa lo captura a mano.</summary>

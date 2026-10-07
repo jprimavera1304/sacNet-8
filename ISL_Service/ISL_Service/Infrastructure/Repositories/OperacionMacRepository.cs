@@ -1,6 +1,5 @@
 using System.Data;
 using System.Globalization;
-using System.Text;
 using ISL_Service.Application.DTOs.Empleados;
 using ISL_Service.Application.DTOs.OperacionMac;
 using ISL_Service.Application.Interfaces;
@@ -38,15 +37,6 @@ public partial class OperacionMacRepository : IOperacionMacRepository
     /// EmpleadosRepository y PrestamosRepository.
     /// </summary>
     private const string FormatoFechaLegacy = "MM-dd-yyyy";
-
-    /// <summary>
-    /// Los dos delimitadores del CorteInfo, leidos del cuerpo de
-    /// sp_n_InsertarCorte: '@@@@' entre campos y '||||' entre Tarjetas y
-    /// TarjetasTiendas. El comentario de legacy dice '@@@@@' (cinco arrobas) y es
-    /// un error del comentario: el codigo y el procedimiento usan cuatro.
-    /// </summary>
-    private const string DelimitadorCorte = "@@@@";
-    private const string DelimitadorTarjetas = "||||";
 
     private readonly IConfiguration _configuration;
 
@@ -143,46 +133,12 @@ public partial class OperacionMacRepository : IOperacionMacRepository
     private static string Unir(IEnumerable<string> valores) => string.Join("~", valores);
 
     /// <summary>
-    /// Arma el CorteInfo con el formato exacto que parte sp_n_InsertarCorte: 20
-    /// campos pegados con '@@@@', y dentro del campo 13 las dos tarjetas pegadas
-    /// con '||||'. El orden es el del procedimiento.
+    /// Arma el CorteInfo. La construccion vive en <see cref="CorteInfoLegacy"/>,
+    /// que es publica para poder probar el formato sin base de datos: es la pieza
+    /// mas fragil del modulo (veinte importes en una cadena que el procedimiento
+    /// vuelve a partir con CHARINDEX) y la unica que se puede probar sola.
     /// </summary>
-    private static string ArmarCorteInfo(DesgloseCorte d)
-    {
-        var sb = new StringBuilder();
-
-        void Campo(decimal v) => sb.Append(Numero(v)).Append(DelimitadorCorte);
-
-        Campo(d.SaeEsquina);
-        Campo(d.SaeEsquinaDomingo);
-        Campo(d.SaeLocalTauro);
-        Campo(d.TotalSae);
-        Campo(d.MacCamioneta);
-        Campo(d.MacAgentes);
-        Campo(d.TotalMac);
-        Campo(d.Transferencias);
-        Campo(d.TransferenciasTiendaEsquina);
-        Campo(d.TransferenciasLocalTauro);
-        Campo(d.DepositoCheque);
-        Campo(d.DepositoEfectivo);
-
-        // Las dos tarjetas comparten campo, separadas por '||||'.
-        sb.Append(Numero(d.Tarjetas)).Append(DelimitadorTarjetas)
-          .Append(Numero(d.TarjetasTiendas)).Append(DelimitadorCorte);
-
-        Campo(d.Cheque);
-        Campo(d.Efectivo);
-        Campo(d.Morraya);
-        Campo(d.TotalGastos);
-        Campo(d.TotalDesglose);
-        Campo(d.GranTotal);
-
-        // El ultimo va SIN delimitador: el procedimiento se lleva el resto de la
-        // cadena como NoAplicadoDesglose.
-        sb.Append(Numero(d.NoAplicadoDesglose));
-
-        return sb.ToString();
-    }
+    private static string ArmarCorteInfo(DesgloseCorte d) => CorteInfoLegacy.Armar(d);
 
     private static SqlCommand Sp(string sp, SqlConnection conn)
         => new(sp, conn) { CommandType = CommandType.StoredProcedure };

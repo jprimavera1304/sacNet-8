@@ -1,6 +1,7 @@
 using ISL_Service.Application.DTOs.CatalogosAdmin;
 using ISL_Service.Application.DTOs.Empleados;
 using ISL_Service.Utils;
+using Microsoft.Data.SqlClient;
 
 namespace ISL_Service.Infrastructure.Repositories;
 
@@ -177,27 +178,75 @@ public partial class CatalogosAdminRepository
     /// <summary>
     /// Alta de tipo de domicilio.
     ///
-    /// CUIDADO CON EL CONTRATO DE ESTE SP: sp_n_Insertar_TipoDomicilio no
-    /// devuelve 1 en la columna 'result', devuelve el id nuevo
-    /// (SELECT @IDTipoDomicilio AS result). Funciona como exito solo porque
-    /// result > 0, y el id sale de donde nadie lo buscaria. Aqui se lee como lo
-    /// que es: el id. Comprobado en el cuerpo del procedimiento en
-    /// Produccion_svr.
+    /// DOS RAREZAS DE ESTE PROCEDIMIENTO, LAS DOS COMPROBADAS EN Produccion_svr.
+    ///
+    /// 1. NO DEVUELVE 1 EN LA COLUMNA 'result': devuelve el id nuevo
+    ///    (SELECT @IDTipoDomicilio AS result). Funciona como exito solo porque
+    ///    result > 0, y el id sale de donde nadie lo buscaria. Aqui se lee como
+    ///    lo que es.
+    ///
+    /// 2. EL PROCEDIMIENTO ESTA ROTO EN ESTA BASE, Y DE LA PEOR FORMA. Inserta
+    ///    bien en [Catalogo Tipos Domicilio] y despues, para leer el id, hace
+    ///    "SELECT MAX(IDTipoDomicilio) FROM MC_TiposDomicilio" — una tabla que no
+    ///    existe aqui. O sea que la fila SE GUARDA y la llamada revienta despues:
+    ///    el usuario ve un error, vuelve a intentarlo y crea un duplicado. Lo
+    ///    comprobe llamando el endpoint: la fila quedo con IDTipoDomicilio 3 y la
+    ///    respuesta fue 500 "Invalid object name 'MC_TiposDomicilio'".
+    ///
+    ///    Legacy falla igual, y no se puede arreglar en el procedimiento porque
+    ///    los sp_n_ no se tocan. Lo que si se puede es no mentirle al usuario: si
+    ///    el error es EXACTAMENTE ese nombre de tabla, se comprueba si la fila
+    ///    quedo y, si quedo, se contesta exito con su id. Cualquier otro error se
+    ///    propaga tal cual. El filtro es estrecho a proposito: tragarse errores de
+    ///    SQL en general taparia problemas de verdad.
     /// </summary>
     public async Task<(ResultadoLegacy, int)> InsertarTipoDomicilioAsync(string nombre, int idUsuario, string equipo, CancellationToken ct)
     {
-        var resultado = await EjecutarAsync("dbo.sp_n_Insertar_TipoDomicilio", cmd =>
+        const string TablaQueFalta = "MC_TiposDomicilio";
+        var limpio = Texto(nombre);
+
+        try
         {
-            cmd.Parameters.AddWithValue("@TipoDomicilio", Texto(nombre));
-            cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
-            cmd.Parameters.AddWithValue("@Equipo", equipo);
-        }, ct);
+            var resultado = await EjecutarAsync("dbo.sp_n_Insertar_TipoDomicilio", cmd =>
+            {
+                cmd.Parameters.AddWithValue("@TipoDomicilio", limpio);
+                cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
+                cmd.Parameters.AddWithValue("@Equipo", equipo);
+            }, ct);
 
-        if (resultado.Result <= 0)
-            return (resultado, 0);
+            if (resultado.Result <= 0)
+                return (resultado, 0);
 
-        var id = resultado.Result;
-        return (new ResultadoLegacy { Result = 1, Mensaje = resultado.Mensaje }, id);
+            return (new ResultadoLegacy { Result = 1, Mensaje = resultado.Mensaje }, resultado.Result);
+        }
+        catch (SqlException ex) when (ex.Message.Contains(TablaQueFalta, StringComparison.OrdinalIgnoreCase))
+        {
+            // El INSERT del procedimiento ya corrio; lo que reventó fue el SELECT
+            // del id. Si la fila esta, la operacion salio: se contesta con su id.
+            var id = await IdDeTipoDomicilioAsync(limpio, ct);
+            if (id > 0)
+                return (new ResultadoLegacy { Result = 1, Mensaje = string.Empty }, id);
+
+            // No quedo la fila: entonces si fue un fallo de verdad y se dice.
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// El id del tipo de domicilio por su nombre. Solo lo usa el alta, para
+    /// recuperar el id que el procedimiento no pudo leer (ver arriba).
+    /// </summary>
+    private async Task<int> IdDeTipoDomicilioAsync(string nombre, CancellationToken ct)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new Microsoft.Data.SqlClient.SqlCommand(
+            "SELECT ISNULL(MAX(IDTipoDomicilio), 0) FROM dbo.[Catalogo Tipos Domicilio] WHERE TipoDomicilio = @Nombre", conn);
+        cmd.Parameters.AddWithValue("@Nombre", nombre);
+
+        var valor = await cmd.ExecuteScalarAsync(ct);
+        return valor is null or DBNull ? 0 : Convert.ToInt32(valor, System.Globalization.CultureInfo.InvariantCulture);
     }
 
     public Task<ResultadoLegacy> ActualizarTipoDomicilioAsync(int id, string nombre, int idStatus, int idUsuario, string equipo, CancellationToken ct)
