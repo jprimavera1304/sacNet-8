@@ -128,8 +128,29 @@ public class VentasDescuentosController : PermisoControllerBase
 
     /* ------------------------------- Detalle ------------------------------- */
 
-    /// <summary>Agrega un renglon al detalle de un esquema.</summary>
-    [HttpPost("detalle")]
+    /// <summary>
+    /// Agrega un renglon al detalle de un esquema.
+    ///
+    /// POR QUE `detalle/alta` Y NO `detalle` A SECAS
+    /// --------------------------------------------
+    /// Porque `POST api/ventas/descuentos/detalle` YA EXISTE y es la CONSULTA:
+    /// `VentasDescuentosConsultaController.Detalle`, migrada en la ola 2 y
+    /// comparada contra Legacy (129 renglones). Las dos acciones son POST sobre la
+    /// misma plantilla, asi que ASP.NET no puede elegir y contesta
+    /// AmbiguousMatchException: un 500 con cuerpo vacio, sin mensaje y sin rastro
+    /// en la respuesta.
+    ///
+    /// Y no rompia una, rompia LAS DOS: la consulta tambien dejaba de responder.
+    /// Los dos casos del banco que la cubren (ola2-descuentos-detalle y
+    /// ola2-descuentos-detalle-marcas) pasaron de OK a 500 sin que nadie tocara su
+    /// codigo. Las dos olas se escribieron en ramas separadas y la colision solo
+    /// aparece al juntarlas, que es justo donde nadie la estaba mirando.
+    ///
+    /// Se movio ESTA y no la consulta porque la consulta es anterior, esta
+    /// comparada y es la que el web ya llama. El sufijo va a juego con los
+    /// hermanos de este mismo controlador: `detalle/eliminar`, `ajustes/status`.
+    /// </summary>
+    [HttpPost("detalle/alta")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]

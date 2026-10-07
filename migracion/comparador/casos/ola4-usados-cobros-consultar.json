@@ -1,7 +1,14 @@
 {
   "nombre": "ola4-usados-cobros-consultar",
   "_porque": [
-    "sp_n_ConsultarVentasCobrosUsados. VentasCobrosUsados esta vacia en Tauro."
+    "ESTE CASO COMPARA LISTA VACIA CONTRA LISTA VACIA: el OK no prueba nada.",
+    "Contado hoy: dbo.VentasCobrosUsados = 0 renglones en LAS DOS bases",
+    "(Produccion_svr y MacZ), y su detalle VentasCobrosUsadosDetalle tambien.",
+    "Nadie ha usado esa pantalla en ninguna de las dos empresas que hay en esta",
+    "maquina: no verificable aqui.",
+    "",
+    "Lo que ya decia el caso:",
+    "  sp_n_ConsultarVentasCobrosUsados. VentasCobrosUsados esta vacia en Tauro."
   ],
   "legacy": {
     "method": "POST",
@@ -22,5 +29,6 @@
   "ordenar_por": null,
   "solo_campos": [],
   "ignorar": [],
-  "diferencias_intencionales": []
+  "diferencias_intencionales": [],
+  "_no_verificable_aqui": true
 }

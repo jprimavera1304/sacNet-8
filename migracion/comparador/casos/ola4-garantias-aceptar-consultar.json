@@ -1,16 +1,30 @@
 {
   "nombre": "ola4-garantias-aceptar-consultar",
   "_porque": [
-    "sp_n_ConsultarGarantiasAceptar: los mismos 15 mas @IDStatusGarantiaAceptada."
+    "sp_n_ConsultarGarantiasAceptar: los mismos 15 parametros mas",
+    "@IDStatusGarantiaAceptada (1 Pendientes, 2 Aceptadas, 3 Todas).",
+    "",
+    "ANTES ESTE CASO COMPARABA LISTA VACIA CONTRA LISTA VACIA. Pedia",
+    "IDGarantia = 3997 con el rango 01-01-2026 / 31-12-2026 y esa combinacion no",
+    "devuelve nada, aunque dbo.Garantias tiene 2.037 renglones en Produccion_svr.",
+    "El estorbo era el RANGO, no el id: probado con la rama 2 (Aceptadas) y el",
+    "rango 2024-2026 devuelve 924 renglones; solo 2026 devuelve 0. Y el IDGarantia",
+    "ademas reducia la consulta a un renglon.",
+    "",
+    "Ahora pide la rama 2 (Aceptadas) con el rango 2024-2026: 924 renglones.",
+    "La rama 1 (Pendientes) va en su propio caso, ola4-garantias-aceptar-pendientes,",
+    "porque es OTRO camino del procedimiento: cuando",
+    "@IDStatusGarantiaAceptada = 1 el SP BORRA el rango de fechas",
+    "(`SELECT @FechaInicial = '', @FechaFinal = ''`) y no lo usa. Con el caso vacio",
+    "eso no se veia."
   ],
   "legacy": {
     "method": "POST",
     "path": "/api/garantias/aceptar/consultar",
     "body": {
-      "IDGarantia": 3997,
       "IDStatusGarantiaAceptada": 2,
       "IDUsuarioActual": 0,
-      "FechaInicial": "01-01-2026",
+      "FechaInicial": "01-01-2024",
       "FechaFinal": "31-12-2026"
     }
   },
@@ -18,9 +32,8 @@
     "method": "POST",
     "path": "/api/ventas/garantias/aceptar/consultar",
     "body": {
-      "idGarantia": 3997,
       "idStatusGarantiaAceptada": 2,
-      "fechaInicial": "2026-01-01",
+      "fechaInicial": "2024-01-01",
       "fechaFinal": "2026-12-31"
     }
   },
@@ -41,6 +54,7 @@
   "ignorar": [],
   "diferencias_intencionales": [
     "Legacy rellena con 0 / 0001-01-01 los campos que su DTO declara y el procedimiento no devuelve, y TIRA los que el procedimiento devuelve y su DTO no declara. El nuevo baja el renglon del procedimiento tal cual: donde dice NULL, dice null. Se comparan los campos que los dos lados entregan.",
-    "Legacy REVIENTA en este endpoint si no se le mandan las fechas: con IDStatusGarantiaAceptada = 2 las formatea sin comprobar que vengan y lanza ArgumentOutOfRangeException en Substring, contestando 400 con el stack. Por eso el caso se las manda. El nuevo funciona con o sin ellas."
+    "Legacy REVIENTA en este endpoint si no se le mandan las fechas: con IDStatusGarantiaAceptada = 2 las formatea sin comprobar que vengan y lanza ArgumentOutOfRangeException en Substring, contestando 400 con el stack. Por eso el caso se las manda. El nuevo funciona con o sin ellas.",
+    "A Legacy el rango va en dd-MM-yyyy porque Funciones.ConvertFtmDate le voltea el dia y el mes; al nuevo en ISO. Los dos terminan pidiendo el mismo rango."
   ]
 }

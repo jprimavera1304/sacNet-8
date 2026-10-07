@@ -1,17 +1,34 @@
 {
   "nombre": "ola4-ventas-transito-consultar",
   "_porque": [
-    "sp_n_ConsultaVentasTransito, 5 parametros. El nuevo manda la fecha en ISO y",
-    "no lee Constantes."
+    "sp_n_ConsultaVentasTransito, 5 parametros.",
+    "",
+    "ANTES ESTE CASO COMPARABA LISTA VACIA CONTRA LISTA VACIA, y el culpable era un",
+    "filtro escondido: con @IDCliente = 0 el procedimiento agrega",
+    "`AND Ven.IDCliente IN ( SELECT IDCliente FROM CentrosServicio )`. En",
+    "Produccion_svr hay 10 centros de servicio y CERO ventas a sus clientes, asi que",
+    "con el cliente en 0 este endpoint devuelve vacio pase lo que pase con las",
+    "fechas. El rango de marzo de 2026 no tenia nada que ver.",
+    "",
+    "Ahora pide el cliente 2.844, que es el que mas renglones aceptados tiene, con",
+    "@StatusInventario = 2 (Aceptado) y el rango de junio de 2024: 306 renglones.",
+    "",
+    "Por que la rama 2 y no la 1: la rama 1 (En Transito) filtra por",
+    "`VD.FechaAcepto IS NULL` y ademas, si no se le manda fecha inicial, cambia el",
+    "BETWEEN por un `< FechaEmisionFinal` — es otro camino y merece su propio caso",
+    "cuando haya inventario en transito en esta base.",
+    "",
+    "La base local llega a marzo de 2026 pero los renglones aceptados paran en junio",
+    "de 2024: por eso el rango es ese y no uno mas nuevo."
   ],
   "legacy": {
     "method": "POST",
     "path": "/api/consultaventas/consultar/transito",
     "body": {
-      "StatusInventario": 0,
-      "IDCliente": 0,
-      "FechaEmisionInicial": "01-03-2026",
-      "FechaEmisionFinal": "31-03-2026",
+      "StatusInventario": 2,
+      "IDCliente": 2844,
+      "FechaEmisionInicial": "01-06-2024",
+      "FechaEmisionFinal": "29-06-2024",
       "Agrupado": 0
     }
   },
@@ -19,9 +36,10 @@
     "method": "POST",
     "path": "/api/ventas/consultas/transito",
     "body": {
-      "statusInventario": 0,
-      "fechaEmisionInicial": "2026-03-01",
-      "fechaEmisionFinal": "2026-03-31",
+      "statusInventario": 2,
+      "idCliente": 2844,
+      "fechaEmisionInicial": "2024-06-01",
+      "fechaEmisionFinal": "2024-06-29",
       "agrupado": 0
     }
   },

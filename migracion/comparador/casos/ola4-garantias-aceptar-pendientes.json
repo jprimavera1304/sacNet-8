@@ -1,0 +1,54 @@
+{
+  "nombre": "ola4-garantias-aceptar-pendientes (la rama que borra el rango)",
+  "_porque": [
+    "LA RAMA 1 DE sp_n_ConsultarGarantiasAceptar, que nunca se habia probado.",
+    "",
+    "Cuando @IDStatusGarantiaAceptada = 1 (Pendientes) el procedimiento hace lo",
+    "contrario de lo que uno esperaria: BORRA el rango de fechas que se le mando",
+    "(`SELECT @FechaInicial = '', @FechaFinal = ''`) y consulta sin el. O sea que un",
+    "filtro de fechas en esa pantalla no filtra nada. El caso hermano",
+    "(ola4-garantias-aceptar-consultar) solo cubre la rama 2, y mientras comparaba",
+    "lista vacia contra lista vacia esta diferencia de comportamiento no se veia por",
+    "ningun lado.",
+    "",
+    "Se manda el rango a proposito, aunque el procedimiento lo tire: asi la",
+    "comparacion comprueba que los DOS backends lo tiran igual. 340 renglones."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/garantias/aceptar/consultar",
+    "body": {
+      "IDStatusGarantiaAceptada": 1,
+      "IDUsuarioActual": 0,
+      "FechaInicial": "01-01-2026",
+      "FechaFinal": "31-12-2026"
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/ventas/garantias/aceptar/consultar",
+    "body": {
+      "idStatusGarantiaAceptada": 1,
+      "fechaInicial": "2026-01-01",
+      "fechaFinal": "2026-12-31"
+    }
+  },
+  "camino_legacy": "result.garantias",
+  "camino_nuevo": "data.rows",
+  "ordenar_por": "IDGarantia",
+  "solo_campos": [
+    "IDGarantia",
+    "IDCliente",
+    "IDProducto",
+    "IDStatusGarantia",
+    "Ticket",
+    "Vigencia",
+    "Garantia",
+    "Monto",
+    "Porcentaje"
+  ],
+  "diferencias_intencionales": [
+    "Legacy rellena con 0 / 0001-01-01 los campos que su DTO declara y el procedimiento no devuelve. El nuevo baja el renglon tal cual: donde dice NULL, dice null.",
+    "A Legacy el rango va en dd-MM-yyyy; al nuevo en ISO. Da igual lo que valgan: esta rama los borra."
+  ]
+}
