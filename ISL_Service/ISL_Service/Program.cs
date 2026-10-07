@@ -145,6 +145,14 @@ builder.Services.AddScoped<IMaestrosService, MaestrosService>();
 builder.Services.AddScoped<IOperacionMacRepository, OperacionMacRepository>();
 builder.Services.AddScoped<IOperacionMacService, OperacionMacService>();
 
+// -------------------- USUARIOS DE MAC31, HUELLAS, CONSTANTES Y PARAMETROS --------------------
+builder.Services.AddScoped<ISeguridadMacRepository, SeguridadMacRepository>();
+builder.Services.AddScoped<ISeguridadMacService, SeguridadMacService>();
+
+// -------------------- BATCHES DE NOMINA (calcular recibos, generar periodos, descontar prestamos) --------------------
+builder.Services.AddScoped<INominaBatchRepository, NominaBatchRepository>();
+builder.Services.AddScoped<INominaBatchService, NominaBatchService>();
+
 builder.Services.AddScoped<ICategoriasRepository, CategoriasRepository>();
 builder.Services.AddScoped<ICategoriasService, CategoriasService>();
 builder.Services.AddScoped<IProfesoresRepository, ProfesoresRepository>();

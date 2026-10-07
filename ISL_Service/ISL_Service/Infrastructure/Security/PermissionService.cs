@@ -507,7 +507,40 @@ public sealed class PermissionService : IPermissionService
         new("cambiosvigencia.ver", "Cambios de vigencia - Consultar", "cambiosvigencia"),
         new("cambiosvigencia.crear", "Cambios de vigencia - Registrar", "cambiosvigencia"),
         new("cambiosvigencia.editar", "Cambios de vigencia - Modificar / regresar", "cambiosvigencia"),
-        new("cambiosvigencia.cancelar", "Cambios de vigencia - Cancelar", "cambiosvigencia")
+        new("cambiosvigencia.cancelar", "Cambios de vigencia - Cancelar", "cambiosvigencia"),
+
+        /*
+          CONFIGURACION, HUELLAS Y NOMINA (ola 6).
+
+          POR QUE LA NOMINA NO USA `empleados.*` NI `prestamos.*`
+          -----------------------------------------------------
+          Porque esas dos familias las gobierna Mac31: el puente de permisos las
+          recalcula desde los botones de sus formas y BORRA lo que haya guardado el
+          web. Un `prestamos.descontar` dado desde la pantalla de permisos
+          desapareceria en el siguiente calculo, sin error y sin rastro, y el boton
+          quedaria apagado sin que nadie supiera por que. La familia `nomina.*` es
+          del web y si se respeta.
+
+          Los tres de nomina van separados porque son tres autoridades distintas:
+          calcular los recibos de un periodo, crear los periodos, y DESCONTAR los
+          prestamos de la nomina — este ultimo mueve dinero de la gente.
+
+          El usuario de Mac31 reusa las claves `usuarios.*` que ya existian: es el
+          mismo concepto visto desde la otra aplicacion, no uno nuevo.
+        */
+        new("constantes.editar", "Constantes - Editar parámetros de operación", "constantes"),
+        new("constantes.fechapagos.editar", "Constantes - Mover la fecha de operación de pagos", "constantes"),
+
+        new("huellas.editar", "Huellas - Registrar y cancelar", "huellas"),
+        new("seguridad.bitacora.registrar", "Seguridad - Registrar intentos de contraseña", "seguridad"),
+
+        new("reportes.parametros.ver", "Reportes - Leer parámetros guardados", "reportes"),
+        new("reportes.parametros.editar", "Reportes - Guardar parámetros", "reportes"),
+
+        new("nomina.ver_modulo", "Nómina - Ver módulo", "nomina"),
+        new("nomina.recibos.calcular", "Nómina - Calcular recibos del periodo", "nomina"),
+        new("nomina.periodos.generar", "Nómina - Generar periodos", "nomina"),
+        new("nomina.prestamos.descontar", "Nómina - Descontar préstamos de la nómina", "nomina")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)
