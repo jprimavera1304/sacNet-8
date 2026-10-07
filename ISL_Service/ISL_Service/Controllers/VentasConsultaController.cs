@@ -9,8 +9,18 @@ namespace ISL_Service.Controllers;
 [ApiController]
 [Route("api/ventas/consulta")]
 [Authorize]
-public class VentasConsultaController : ControllerBase
+public class VentasConsultaController : PermisoControllerBase
 {
+    /// <summary>
+    /// El permiso que separa "puedo consultar lo de cualquiera" de "solo lo
+    /// mio": es btnBuscar de Consultar ventas en Mac31. Ver
+    /// VentasConsultaService.AcotarFiltroDeUsuario.
+    /// </summary>
+    private static readonly string[] PermisoConsultarDeOtros =
+    {
+        "ventas.consultar", "ventas.ver_modulo"
+    };
+
     private readonly IVentasConsultaService _service;
     private readonly IRemisionImpresionService _remisiones;
     private readonly ICurrentUserAccessor _currentUserAccessor;
@@ -20,12 +30,51 @@ public class VentasConsultaController : ControllerBase
         IVentasConsultaService service,
         IRemisionImpresionService remisiones,
         ICurrentUserAccessor currentUserAccessor,
+        IPermissionService permissionService,
         IConfiguration configuration)
+        : base(currentUserAccessor, permissionService)
     {
         _service = service;
         _remisiones = remisiones;
         _currentUserAccessor = currentUserAccessor;
         _configuration = configuration;
+    }
+
+    /*
+      QUIEN PREGUNTA SALE DEL TOKEN; "DE QUIEN QUIERO VER" ES OTRA COSA.
+
+      @IDUsuarioActual (el candado de almacen de los procedimientos) ya no se
+      lee del cuerpo: lo pone el servicio con el id del token, siempre.
+
+      @IDUsuario si es un filtro de pantalla legitimo, pero apuntar al de OTRO
+      necesita permiso. Esto resuelve los dos casos:
+
+        - sin permiso y pidiendo explicitamente otro usuario -> 403, para que se
+          vea que se nego y no parezca que ese usuario no tiene ventas;
+        - sin permiso y sin pedir a nadie -> el servicio lo acota a los suyos.
+          Antes, un cliente movil que omitia `SoloMisPedidos` veia los pedidos
+          de todos.
+    */
+    private async Task<(bool PuedeVerDeOtros, IActionResult? Negado)> ResolverAlcanceAsync(
+        VentasConsultaRequest request, int idUsuarioToken, CancellationToken ct)
+    {
+        var permisos = await LeerPermisosAsync(ct);
+        if (!permisos.TokenValido)
+            return (false, Unauthorized(new { ok = false, message = "Token invalido." }));
+
+        if (permisos.Tiene(PermisoConsultarDeOtros))
+            return (true, null);
+
+        if (request.IDUsuario > 0 && request.IDUsuario != idUsuarioToken)
+        {
+            return (false, StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                ok = false,
+                message = "No tienes permiso para consultar las ventas de otro usuario."
+            }));
+        }
+
+        return (false, null);
     }
 
     [HttpGet("catalogos")]
@@ -38,16 +87,24 @@ public class VentasConsultaController : ControllerBase
     [HttpPost("remisiones")]
     public async Task<IActionResult> Remisiones([FromBody] VentasConsultaRequest? request, CancellationToken ct)
     {
+        var req = request ?? new VentasConsultaRequest();
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
-        var data = await _service.ConsultarRemisionesAsync(request ?? new VentasConsultaRequest(), idUsuario, ct);
+        var (puedeVerDeOtros, negado) = await ResolverAlcanceAsync(req, idUsuario, ct);
+        if (negado is not null) return negado;
+
+        var data = await _service.ConsultarRemisionesAsync(req, idUsuario, puedeVerDeOtros, ct);
         return Ok(new { ok = true, message = "Remisiones consultadas.", data });
     }
 
     [HttpPost("pedidos")]
     public async Task<IActionResult> Pedidos([FromBody] VentasConsultaRequest? request, CancellationToken ct)
     {
+        var req = request ?? new VentasConsultaRequest();
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
-        var data = await _service.ConsultarPedidosAsync(request ?? new VentasConsultaRequest(), idUsuario, ct);
+        var (puedeVerDeOtros, negado) = await ResolverAlcanceAsync(req, idUsuario, ct);
+        if (negado is not null) return negado;
+
+        var data = await _service.ConsultarPedidosAsync(req, idUsuario, puedeVerDeOtros, ct);
         return Ok(new { ok = true, message = "Pedidos consultados.", data });
     }
 
@@ -62,8 +119,12 @@ public class VentasConsultaController : ControllerBase
     [HttpPost("pagos")]
     public async Task<IActionResult> Pagos([FromBody] VentasConsultaRequest? request, CancellationToken ct)
     {
+        var req = request ?? new VentasConsultaRequest();
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
-        var data = await _service.ConsultarPagosAsync(request ?? new VentasConsultaRequest(), idUsuario, ct);
+        var (puedeVerDeOtros, negado) = await ResolverAlcanceAsync(req, idUsuario, ct);
+        if (negado is not null) return negado;
+
+        var data = await _service.ConsultarPagosAsync(req, idUsuario, puedeVerDeOtros, ct);
         return Ok(new { ok = true, message = "Pagos consultados.", data });
     }
 

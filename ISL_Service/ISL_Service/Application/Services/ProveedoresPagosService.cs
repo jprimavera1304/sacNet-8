@@ -1,9 +1,30 @@
 using ISL_Service.Application.DTOs.ProveedoresPagos;
 using ISL_Service.Infrastructure.Repositories;
-using Microsoft.Data.SqlClient;
 
 namespace ISL_Service.Application.Services
 {
+    /*
+      SE QUITARON LOS OCHO `catch (SqlException ex) { throw new Exception(ex.Message); }`
+
+      No atrapaban nada: volvian a lanzar el mismo texto, pero PERDIENDO el tipo.
+      Y el tipo era lo unico que importaba, porque el
+      ExceptionHandlingMiddleware mira `SqlException` para dos cosas:
+
+        1. distinguir un RAISERROR de negocio (numeros 50000-99999, que debe
+           llegar al usuario con su texto y un 400) de un error del motor (que
+           debe salir como 500 generico);
+        2. decidir si el `detail` tecnico se ensena o se guarda.
+
+      Convertido a `Exception` generico, todo caia al catch de abajo: los
+      mensajes de negocio de los SP se perdian y los nombres de procedimiento del
+      motor se devolvian al cliente. Sin el catch, la SqlException sube con su
+      tipo y el middleware hace su trabajo.
+
+      LAS VALIDACIONES DE AUTORIA TAMBIEN SE FUERON. Exigian IDUsuario y Equipo
+      del cuerpo; ahora los pone el controlador desde el token, asi que pedirlos
+      al cliente no tenia sentido y ademas documentaba la falla como si fuera un
+      contrato.
+    */
     public class ProveedoresPagosService
     {
         private readonly ProveedoresPagosRepository proveedoresPagosRepository;
@@ -15,83 +36,29 @@ namespace ISL_Service.Application.Services
 
         public List<ProveedorPagoDTO> Consultar(ProveedorPagoInputDTO input)
         {
-            try
-            {
-                return proveedoresPagosRepository.Consultar(input);
-            }
-            catch (SqlException ex)
-            {
-                throw new Exception(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
-            }
+            return proveedoresPagosRepository.Consultar(input);
         }
-
 
         public int Insertar(ProveedorPagoInputDTO input)
         {
-            try
-            {
-                if (input.IDPersona <= 0) throw new Exception("IDPersona es requerido.");
-                //if (input.IDProveedor <= 0) throw new Exception("IDProveedor es requerido.");
+            if (input.IDPersona <= 0) throw new ArgumentException("IDPersona es requerido.");
+            if (string.IsNullOrWhiteSpace(input.FechaPago)) throw new ArgumentException("FechaPago es requerido.");
 
-                if (input.IDUsuario <= 0) throw new Exception("IDUsuario es requerido.");
-                if (string.IsNullOrWhiteSpace(input.Equipo)) throw new Exception("Equipo es requerido.");
-                if (string.IsNullOrWhiteSpace(input.FechaPago)) throw new Exception("FechaPago es requerido.");
-
-                return proveedoresPagosRepository.Insertar(input);
-            }
-            catch (SqlException ex)
-            {
-                throw new Exception(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
-            }
+            return proveedoresPagosRepository.Insertar(input);
         }
-
 
         public void Cancelar(ProveedorPagoInputDTO input)
         {
-            try
-            {
-                if (input.IDProveedorPago <= 0) throw new Exception("IDProveedorPago es requerido.");
-                if (input.IDUsuarioCancelacion <= 0) throw new Exception("IDUsuarioCancelacion es requerido.");
-                if (string.IsNullOrWhiteSpace(input.EquipoCancelacion)) throw new Exception("EquipoCancelacion es requerido.");
+            if (input.IDProveedorPago <= 0) throw new ArgumentException("IDProveedorPago es requerido.");
 
-                proveedoresPagosRepository.Cancelar(input);
-            }
-            catch (SqlException ex)
-            {
-                throw new Exception(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
-            }
+            proveedoresPagosRepository.Cancelar(input);
         }
 
         public void Actualizar(ProveedorPagoInputDTO input)
         {
-            try
-            {
-                if (input.IDProveedorPago <= 0) throw new Exception("IDProveedorPago es requerido.");
-                if (input.IDUsuarioModificacion <= 0) throw new Exception("IDUsuarioModificacion es requerido.");
-                if (string.IsNullOrWhiteSpace(input.EquipoModificacion)) throw new Exception("EquipoModificacion es requerido.");
+            if (input.IDProveedorPago <= 0) throw new ArgumentException("IDProveedorPago es requerido.");
 
-                proveedoresPagosRepository.Actualizar(input);
-            }
-            catch (SqlException ex)
-            {
-                throw new Exception(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
-            }
+            proveedoresPagosRepository.Actualizar(input);
         }
     }
 }

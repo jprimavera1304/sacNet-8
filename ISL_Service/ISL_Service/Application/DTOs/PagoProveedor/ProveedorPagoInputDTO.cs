@@ -30,6 +30,19 @@ namespace ISL_Service.Application.DTOs.ProveedoresPagos
         // ===== Cancelar =====
         public string MotivoCancelacion { get; set; }
 
+        /*
+          LOS SEIS CAMPOS DE AUDITORIA LOS PISA EL CONTROLADOR CON EL TOKEN.
+
+          Siguen aqui porque son los parametros que el repositorio le pasa a los
+          sp_n_, pero lo que mande el cliente se DESCARTA: ProveedoresPagosController
+          los sobreescribe con IdUsuarioLegacy() y Equipo() antes de llamar al
+          servicio.
+
+          Antes se EXIGIAN del cuerpo ("IDUsuario es requerido."), asi que la
+          firma de un pago a proveedor -quien lo dio de alta, quien lo modifico,
+          quien lo cancelo- la elegia quien llamaba. Un pago a proveedor es
+          dinero que sale; que su autoria sea falsificable no es un detalle.
+        */
         // Auditoria (alta)
         public int IDUsuario { get; set; }
         public string Equipo { get; set; }

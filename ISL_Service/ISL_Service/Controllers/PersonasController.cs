@@ -1,6 +1,7 @@
 ﻿using System.Threading.Tasks;
 using ISL_Service.Application.DTOs.Persona;
 using ISL_Service.Application.Interfaces;
+using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,13 +10,40 @@ namespace ISL_Service.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
+    /*
+        LA FIRMA DE QUIEN DA DE ALTA UNA PERSONA VENIA EN EL CUERPO.
+
+        PersonaInputDTO trae IDUsuario y Equipo, y el servicio los EXIGIA del
+        cliente ("IDUsuario es requerido."). Esos dos campos son lo que queda
+        escrito en Personas.IDUsuario/Equipo y en IDUsuarioModificacion/
+        EquipoModificacion: la autoria del alta, de la modificacion, de la
+        cancelacion y de la reactivacion. Viajando en el cuerpo, cualquiera con
+        el permiso podia dar de alta un proveedor a nombre de otra persona.
+
+        La regla del proyecto -repetida literalmente en una docena de
+        controladores- es que la identidad NUNCA viene del cuerpo. Aqui se habia
+        colado. Ahora SellarAutoria() la pisa con el token en las cuatro
+        escrituras y lo que manda el cliente se descarta.
+    */
     public class PersonasController : ControllerBase
     {
         private readonly IPersonasService _service;
+        private readonly ICurrentUserAccessor _currentUser;
 
-        public PersonasController(IPersonasService service)
+        public PersonasController(IPersonasService service, ICurrentUserAccessor currentUser)
         {
             _service = service;
+            _currentUser = currentUser;
+        }
+
+        /// <summary>
+        /// Quien y desde donde, del token.
+        /// </summary>
+        private PersonaInputDTO SellarAutoria(PersonaInputDTO input)
+        {
+            input.IDUsuario = _currentUser.GetLegacyUserId(User);
+            input.Equipo = _currentUser.GetUsername(User, Environment.MachineName);
+            return input;
         }
 
         /// <summary>
@@ -43,7 +71,7 @@ namespace ISL_Service.Controllers
         public async Task<IActionResult> Insertar(
             [FromBody] PersonaInputDTO input)
         {
-            var result = await _service.InsertarAsync(input);
+            var result = await _service.InsertarAsync(SellarAutoria(input));
             return Ok(result);
         }
 
@@ -56,7 +84,7 @@ namespace ISL_Service.Controllers
         public async Task<IActionResult> Actualizar(
             [FromBody] PersonaInputDTO input)
         {
-            var result = await _service.ActualizarAsync(input);
+            var result = await _service.ActualizarAsync(SellarAutoria(input));
             return Ok(result);
         }
 
@@ -75,7 +103,7 @@ namespace ISL_Service.Controllers
                 return BadRequest("IDPersona es requerido para cancelar.");
             }
 
-            var result = await _service.CancelarAsync(input.IDPersona.Value, input);
+            var result = await _service.CancelarAsync(input.IDPersona.Value, SellarAutoria(input));
             return Ok(result);
         }
 
@@ -93,7 +121,7 @@ namespace ISL_Service.Controllers
                 return BadRequest("IDPersona es requerido para reactivar.");
             }
 
-            var result = await _service.ReactivarAsync(input.IDPersona.Value, input);
+            var result = await _service.ReactivarAsync(input.IDPersona.Value, SellarAutoria(input));
             return Ok(result);
         }
     }

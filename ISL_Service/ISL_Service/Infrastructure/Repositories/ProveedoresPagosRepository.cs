@@ -105,7 +105,13 @@ namespace ISL_Service.Infrastructure.Repositories
 
         #region Insertar
 
-        public int Insertar(ProveedorPagoInputDTO input)
+        /// <summary>
+        /// `virtual` para que la prueba de autoria (Ola12IdentidadDelTokenTests)
+        /// pueda ver con que valores llega el DTO sin escribir en la base. Este
+        /// modulo no tiene interfaz -es uno de los tres viejos- y un pago a
+        /// proveedor es dinero que sale: la prueba vale la palabra clave.
+        /// </summary>
+        public virtual int Insertar(ProveedorPagoInputDTO input)
         {
             using SqlConnection Conn = GetConnection();
 
