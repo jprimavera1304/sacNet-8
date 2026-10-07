@@ -552,6 +552,17 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // Auth
 app.UseAuthentication();
+
+/*
+  EL TOKEN TIENE QUE SER DE ESTA EMPRESA.
+
+  Va entre UseAuthentication y UseAuthorization a proposito: necesita el
+  ClaimsPrincipal ya armado (asi que despues de autenticar) y tiene que cortar
+  ANTES de que cualquier politica de permisos lea el rol del token, porque el rol
+  viaja dentro de el. Lo demas lo explica CompanyKeyMiddleware.
+*/
+app.UseMiddleware<CompanyKeyMiddleware>();
+
 app.UseAuthorization();
 
 /*
