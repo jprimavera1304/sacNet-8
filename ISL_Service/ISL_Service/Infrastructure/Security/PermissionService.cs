@@ -462,7 +462,6 @@ public sealed class PermissionService : IPermissionService
         new("cheques.activar", "Cheques - Cambiar estatus", "cheques"),
 
         /*
-<<<<<<< HEAD
           PERMISOS DE LOS CATALOGOS DE SOLO LECTURA (ola 1 de la migracion de MacServicios2).
 
           Son cinco y no uno porque el contenido no es igual de inocente:
