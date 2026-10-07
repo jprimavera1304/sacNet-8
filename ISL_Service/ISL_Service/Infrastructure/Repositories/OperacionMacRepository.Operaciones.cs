@@ -324,9 +324,14 @@ public partial class OperacionMacRepository
             cmd.Parameters.AddWithValue("@Fecha", AFechaLegacy(m.Fecha));
             cmd.Parameters.AddWithValue("@Descripcion", Texto(m.Descripcion));
             cmd.Parameters.AddWithValue("@Suc", m.Suc);
-            cmd.Parameters.AddWithValue("@RefNumerica", Texto(m.RefNumerica));
+            // Estos dos los CONVIERTE A decimal(22,0) el procedimiento, para
+            // comparar y para insertar. Vacio se manda como "0": la cadena vacia
+            // tumba la carga entera con "Error converting data type varchar to
+            // numeric", y la columna destino es numerica, asi que 0 es lo que
+            // significa "no hay".
+            cmd.Parameters.AddWithValue("@RefNumerica", Numerico(m.RefNumerica));
             cmd.Parameters.AddWithValue("@RefAlfanumerica", Texto(m.RefAlfanumerica));
-            cmd.Parameters.AddWithValue("@Autorizacion", Texto(m.Autorizacion));
+            cmd.Parameters.AddWithValue("@Autorizacion", Numerico(m.Autorizacion));
             cmd.Parameters.AddWithValue("@Ordenante", Texto(m.Ordenante));
             cmd.Parameters.AddWithValue("@BancoEmisor", Texto(m.BancoEmisor));
             cmd.Parameters.AddWithValue("@Deposito", m.Deposito);

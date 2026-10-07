@@ -130,6 +130,25 @@ public partial class OperacionMacRepository : IOperacionMacRepository
 
     private static string Entero(int valor) => valor.ToString(CultureInfo.InvariantCulture);
 
+    /// <summary>
+    /// Un valor que el procedimiento va a convertir a numero.
+    ///
+    /// sp_n_InsertarBancoTransferencia hace CAST( @RefNumerica as decimal(22,0) )
+    /// y lo mismo con @Autorizacion. Con la cadena vacia eso falla con "Error
+    /// converting data type varchar to numeric" y tumba la carga del estado de
+    /// cuenta completo — comprobado. Vacio se traduce a "0", que es lo que la
+    /// columna numerica puede guardar y lo que significa "no hay".
+    ///
+    /// Que el valor sea de verdad numerico lo valida el controlador: aqui no se
+    /// adivina, porque convertir una autorizacion con letras en 0 seria perder el
+    /// dato en silencio.
+    /// </summary>
+    private static string Numerico(string? valor)
+    {
+        var limpio = Texto(valor);
+        return limpio.Length == 0 ? "0" : limpio;
+    }
+
     private static string Unir(IEnumerable<string> valores) => string.Join("~", valores);
 
     /// <summary>

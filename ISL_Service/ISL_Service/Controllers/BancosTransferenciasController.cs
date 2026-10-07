@@ -121,6 +121,28 @@ public class BancosTransferenciasController : PermisoControllerBase
         if (request.Movimientos.Any(x => x.Fecha == default))
             return BadRequest(new { ok = false, message = "Hay un movimiento sin fecha." });
 
+        // LA REFERENCIA Y LA AUTORIZACION TIENEN QUE SER NUMEROS. El procedimiento
+        // hace CAST( @RefNumerica as decimal(22,0) ) y lo mismo con @Autorizacion,
+        // asi que un texto con letras tumba la carga ENTERA con "Error converting
+        // data type varchar to numeric" — y el usuario no sabria que renglon fue.
+        // Se dice antes de abrir la transaccion y se dice cual.
+        foreach (var m in request.Movimientos)
+        {
+            // LOS TOPES DE TEXTO SE DICEN AQUI, no se dejan al servidor. Cuando el
+            // valor es mas largo que el varchar del parametro, SQL Server lo
+            // RECORTA en silencio al asignarlo: el movimiento entra con la
+            // descripcion mutilada y el estado de cuenta se concilia contra un
+            // texto que no es el del banco. Comprobado con una descripcion de 5000
+            // caracteres: entro recortada y la carga contesto exito.
+            var largo = Topes(m);
+            if (largo != null) return BadRequest(largo);
+
+            if (!EsNumeroOVacio(m.RefNumerica))
+                return BadRequest(new { ok = false, message = $"El movimiento {m.Num} trae una referencia numerica que no es un numero: la base la convierte a numero y tumbaria la carga completa." });
+            if (!EsNumeroOVacio(m.Autorizacion))
+                return BadRequest(new { ok = false, message = $"El movimiento {m.Num} trae una autorizacion que no es un numero: la base la convierte a numero y tumbaria la carga completa." });
+        }
+
         var sinPermiso = await ExigirPermisoAsync(PermisosCargar, ct);
         if (sinPermiso != null) return sinPermiso;
 
@@ -242,6 +264,35 @@ public class BancosTransferenciasController : PermisoControllerBase
                 : (string.IsNullOrWhiteSpace(r.Mensaje) ? "La base rechazo la operacion." : r.Mensaje),
             data = r
         });
+
+    /// <summary>
+    /// Los topes de los textos del movimiento, que son los de los varchar del
+    /// procedimiento: descripcion 400, referencia alfanumerica 100, ordenante
+    /// 4000, banco emisor 1000.
+    /// </summary>
+    private static object? Topes(MovimientoTransferencia m)
+    {
+        if ((m.Descripcion ?? string.Empty).Trim().Length > 400)
+            return new { ok = false, message = $"El movimiento {m.Num} trae una descripcion de mas de 400 caracteres: la base la recortaria sin avisar." };
+        if ((m.RefAlfanumerica ?? string.Empty).Trim().Length > 100)
+            return new { ok = false, message = $"El movimiento {m.Num} trae una referencia alfanumerica de mas de 100 caracteres." };
+        if ((m.Ordenante ?? string.Empty).Trim().Length > 4000)
+            return new { ok = false, message = $"El movimiento {m.Num} trae un ordenante de mas de 4000 caracteres." };
+        if ((m.BancoEmisor ?? string.Empty).Trim().Length > 1000)
+            return new { ok = false, message = $"El movimiento {m.Num} trae un banco emisor de mas de 1000 caracteres." };
+        return null;
+    }
+
+    /// <summary>
+    /// Vacio o solo digitos. Son los dos campos que el procedimiento convierte a
+    /// decimal(22,0); 18 digitos es lo que cabe sin desbordar.
+    /// </summary>
+    private static bool EsNumeroOVacio(string? valor)
+    {
+        var limpio = (valor ?? string.Empty).Trim();
+        if (limpio.Length == 0) return true;
+        return limpio.Length <= 18 && limpio.All(char.IsAsciiDigit);
+    }
 
     private static object? ValidaRango(DateTime? desde, DateTime? hasta)
     {

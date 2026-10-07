@@ -230,9 +230,27 @@ public class MovimientoTransferencia
     public DateTime Fecha { get; set; }
     public string? Descripcion { get; set; }
     public int Suc { get; set; }
+
+    /// <summary>
+    /// La referencia numerica del banco.
+    ///
+    /// TIENE QUE SER UN NUMERO, Y ESO NO ES UN CAPRICHO DEL BACKEND: el
+    /// procedimiento hace CAST( @RefNumerica as decimal(22,0) ) para comparar y
+    /// para insertar, asi que un texto con letras —o la cadena vacia— tumba la
+    /// carga entera con "Error converting data type varchar to numeric".
+    /// Comprobado: un movimiento sin autorizacion ni referencia revienta el lote.
+    /// Vacio se manda como 0, que es lo que la columna puede guardar.
+    /// </summary>
     public string? RefNumerica { get; set; }
+
     public string? RefAlfanumerica { get; set; }
+
+    /// <summary>
+    /// Numero de autorizacion. Mismo caso que RefNumerica: el procedimiento lo
+    /// convierte a decimal(22,0).
+    /// </summary>
     public string? Autorizacion { get; set; }
+
     public string? Ordenante { get; set; }
     public string? BancoEmisor { get; set; }
     public decimal Deposito { get; set; }
