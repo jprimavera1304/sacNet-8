@@ -207,6 +207,7 @@ public sealed class PermissionService : IPermissionService
     private static readonly LegacyModuleBinding VentasPagosBinding = new(
         VentasModuleKey, "Ventas", VentasPagosLegacyForm, VentasPagosLegacyPermissionMap, new List<PermissionSeed>());
 
+
     private const string PrestamosModuleKey = "prestamos";
     private const string PrestamosViewPermission = "prestamos.ver_modulo";
 
@@ -306,7 +307,36 @@ public sealed class PermissionService : IPermissionService
         ["cheques.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
         ["cheques.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
         ["cheques.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
-        ["cheques.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" }
+        ["cheques.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+
+        /*
+          El reparto por rol para las claves nuevas de cascos, temporadas y
+          torneos. Esto SOLO manda en instalaciones sin el modelo de capacidades
+          (PermissionsEnabled = false): donde si lo hay, decide la base.
+
+          Se copia el reparto de los modulos hermanos —ver con "User", escribir
+          solo "Admin"— porque es la regla que ya rige en todo el catalogo y
+          porque es la decision conservadora: antes de este cambio cualquier
+          token escribia; ahora, en una base sin capacidades, al menos hace
+          falta ser Admin.
+        */
+        ["almacen_cascos.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["almacen_cascos.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["almacen_cascos.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["almacen_cascos.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["almacen_cascos.cancelar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+
+        ["temporadas.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["temporadas.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["temporadas.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["temporadas.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["temporadas.cancelar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+
+        ["torneos.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["torneos.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
+        ["torneos.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["torneos.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["torneos.cancelar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" }
     };
 
     private readonly AppDbContext _db;
@@ -389,7 +419,54 @@ public sealed class PermissionService : IPermissionService
         new("cheques.ver", "Cheques - Ver", "cheques"),
         new("cheques.crear", "Cheques - Crear", "cheques"),
         new("cheques.editar", "Cheques - Editar", "cheques"),
-        new("cheques.activar", "Cheques - Cambiar estatus", "cheques")
+        new("cheques.activar", "Cheques - Cambiar estatus", "cheques"),
+
+        /*
+          ALMACEN DE CASCOS, TEMPORADAS Y TORNEOS.
+
+          Las once escrituras de estos tres modulos estaban SOLO con [Authorize]
+          de clase: cualquier usuario con token, de cualquier rol, podia crear,
+          modificar y cancelar movimientos de casco, y abrir, cerrar y cancelar
+          torneos y temporadas.
+
+          LAS CLAVES NO SE INVENTAN AQUI: YA LAS PIDE EL FRONT.
+          ----------------------------------------------------
+          Estan escritas desde hace tiempo en
+          Web/QR_Web/docs/shared/js/core/module-action-flags.js, que es con lo
+          que el web decide si enciende o apaga cada boton:
+
+            almacen_cascos: ver_modulo, ver, crear, editar, cancelar
+            temporadas:     ver_modulo, ver, crear, editar, cancelar
+            torneos:        ver_modulo, ver, crear, editar, cancelar
+
+          O sea: el web ya apagaba los botones por estos permisos y el backend
+          no los conocia. Las dos mitades opinaban distinto sobre la misma
+          persona — justo lo que el proyecto ya evito en PermisoControllerBase.
+          Se declaran TAL CUAL, con guion bajo en "almacen_cascos" incluido,
+          porque cambiarles una letra las volveria otras claves.
+
+          Ojo con el nombre: es "cancelar", no "activar" como en los modulos
+          deportivos hermanos. Es lo que dice el front, y ademas describe mejor
+          lo que hacen estas pantallas: un movimiento de casco no se activa ni
+          se desactiva, se cancela.
+        */
+        new("almacen_cascos.ver_modulo", "Almacén de Cascos - Ver módulo", "almacen_cascos"),
+        new("almacen_cascos.ver", "Almacén de Cascos - Ver", "almacen_cascos"),
+        new("almacen_cascos.crear", "Almacén de Cascos - Crear movimiento", "almacen_cascos"),
+        new("almacen_cascos.editar", "Almacén de Cascos - Modificar movimiento", "almacen_cascos"),
+        new("almacen_cascos.cancelar", "Almacén de Cascos - Cancelar movimiento", "almacen_cascos"),
+
+        new("temporadas.ver_modulo", "Temporadas - Ver módulo", "temporadas"),
+        new("temporadas.ver", "Temporadas - Ver", "temporadas"),
+        new("temporadas.crear", "Temporadas - Crear", "temporadas"),
+        new("temporadas.editar", "Temporadas - Editar", "temporadas"),
+        new("temporadas.cancelar", "Temporadas - Cancelar/Reactivar", "temporadas"),
+
+        new("torneos.ver_modulo", "Torneos - Ver módulo", "torneos"),
+        new("torneos.ver", "Torneos - Ver", "torneos"),
+        new("torneos.crear", "Torneos - Crear", "torneos"),
+        new("torneos.editar", "Torneos - Editar", "torneos"),
+        new("torneos.cancelar", "Torneos - Cancelar/Activar/Cerrar/Reactivar", "torneos")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)

@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using ISL_Service.Application.DTOs.Temporadas;
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -7,16 +7,40 @@ using ISL_Service.Application.Security;
 
 namespace ISL_Service.Controllers;
 
+/// <summary>
+/// Torneos.
+///
+/// PERMISOS
+/// --------
+/// Las siete escrituras llevan ahora permiso propio: antes solo comprobaban que
+/// el token trajera un userId, asi que cualquier usuario autenticado podia
+/// crear, modificar, cancelar, activar, cerrar y reactivar torneos — y lanzar el
+/// cierre MASIVO de vencidos.
+///
+///   crear    -> POST api/torneos
+///   editar   -> PUT  api/torneos/{id}
+///   cancelar -> POST .../cancelar, .../activar, .../cerrar, .../reactivar,
+///               POST api/torneos/cerrar-vencidos
+///
+/// Las claves (torneos.*) son las que ya pide el front en
+/// shared/js/core/module-action-flags.js.
+/// </summary>
 [ApiController]
 [Route("api/torneos")]
 [Authorize]
-public class TorneosController : ControllerBase
+public class TorneosController : PermisoControllerBase
 {
-    
+    /// <summary>Permiso para cerrar/cancelar/activar/reactivar torneos.</summary>
+    private static readonly string[] PermisoCerrar = { "torneos.cancelar" };
+
     private readonly ITemporadasService _service;
     private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public TorneosController(ITemporadasService service, ICurrentUserAccessor currentUserAccessor)
+    public TorneosController(
+        ITemporadasService service,
+        ICurrentUserAccessor currentUserAccessor,
+        IPermissionService permissionService)
+        : base(currentUserAccessor, permissionService)
     {
         _service = service;
         _currentUserAccessor = currentUserAccessor;
@@ -32,6 +56,27 @@ public class TorneosController : ControllerBase
         if (!TryGetUserId(out var userId))
             return Unauthorized(new { message = "Token inválido." });
 
+        /*
+          ESTE GET PUEDE CERRAR TORNEOS VENCIDOS.
+
+          El listado ejecutaba sp_w_CerrarTorneosVencidos antes de leer, SIEMPRE
+          y sin decirlo: abrir la pantalla cambiaba datos, y lo disparaba
+          tambien quien solo tenia permiso de mirar.
+
+          No se quita porque es lo unico que los cierra: el endpoint explicito
+          (POST api/torneos/cerrar-vencidos) existe pero el front no lo llama
+          nunca —comprobado: "cerrar-vencidos" no aparece en Web/QR_Web—, asi que
+          quitarlo dejaria los vencidos en "activo" para siempre.
+
+          Lo que se hizo: el efecto solo corre si el usuario PUEDE cerrar
+          (torneos.cancelar); quien solo lee pasa por ConsultarTorneosAsync, que
+          no escribe. Y cuando ocurre, la respuesta lo dice en la cabecera
+          X-Efecto-Lateral.
+        */
+        if (!await TienePermisoAsync(PermisoCerrar, ct))
+            return Ok(await _service.ConsultarTorneosAsync(temporadaId, estado, texto, fechaInicio, fechaFin, ct));
+
+        Response.Headers["X-Efecto-Lateral"] = "cerrar-torneos-vencidos";
         var list = await _service.ConsultarTorneosListadoAsync(temporadaId, estado, texto, fechaInicio, fechaFin, userId, ct);
         return Ok(list);
     }
@@ -48,6 +93,7 @@ public class TorneosController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = "perm:torneos.crear")]
     [ProducesResponseType(typeof(TorneoDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -77,6 +123,7 @@ public class TorneosController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "perm:torneos.editar")]
     [ProducesResponseType(typeof(TorneoDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -108,6 +155,7 @@ public class TorneosController : ControllerBase
     }
 
     [HttpPost("{id:guid}/cancelar")]
+    [Authorize(Policy = "perm:torneos.cancelar")]
     [ProducesResponseType(typeof(TorneoDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -126,6 +174,7 @@ public class TorneosController : ControllerBase
     }
 
     [HttpPost("{id:guid}/activar")]
+    [Authorize(Policy = "perm:torneos.cancelar")]
     [ProducesResponseType(typeof(TorneoDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -140,6 +189,7 @@ public class TorneosController : ControllerBase
     }
 
     [HttpPost("{id:guid}/cerrar")]
+    [Authorize(Policy = "perm:torneos.cancelar")]
     [ProducesResponseType(typeof(TorneoDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -154,6 +204,7 @@ public class TorneosController : ControllerBase
     }
 
     [HttpPost("{id:guid}/reactivar")]
+    [Authorize(Policy = "perm:torneos.cancelar")]
     [ProducesResponseType(typeof(TorneoDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -168,6 +219,7 @@ public class TorneosController : ControllerBase
     }
 
     [HttpPost("cerrar-vencidos")]
+    [Authorize(Policy = "perm:torneos.cancelar")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> CerrarVencidos([FromQuery] DateTime? fechaCorte, CancellationToken ct)

@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.AlmacenCascos;
+﻿using ISL_Service.Application.DTOs.AlmacenCascos;
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,6 +8,20 @@ namespace ISL_Service.Controllers;
 
 /// <summary>
 /// API Almacén de Cascos: movimientos (salidas/entradas), detalle y cancelación. Usa SP sp_w_* y tablas WMovimientoCasco / WMovimientoCascoDetalle.
+///
+/// PERMISOS
+/// --------
+/// Las lecturas piden solo token, como antes. Las SEIS escrituras llevan ahora
+/// permiso propio: antes bastaba con tener un token de cualquier rol para crear,
+/// modificar o CANCELAR un movimiento de casco.
+///
+///   crear    -> POST salidas, POST entradas
+///   editar   -> POST .../kilos, PUT salidas/{id}, PUT entradas/{id}
+///   cancelar -> POST movimientos/{id}/cancelar
+///
+/// Las claves son las que ya pide el front en
+/// shared/js/core/module-action-flags.js (almacen_cascos.*); se declaran en
+/// PermissionService.PermissionCatalogSeeds.
 /// </summary>
 [ApiController]
 [Route("api/almacen-cascos")]
@@ -106,6 +120,7 @@ public class AlmacenCascosController : ControllerBase
     /// <response code="201">Salida creada (devuelve idMovimiento)</response>
     /// <response code="400">Validación fallida o repartidor/tarimas no activos</response>
     [HttpPost("salidas")]
+    [Authorize(Policy = "perm:almacen_cascos.crear")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CrearSalida([FromBody] CreateSalidaRequest request, CancellationToken ct)
@@ -125,6 +140,7 @@ public class AlmacenCascosController : ControllerBase
     /// <response code="400">Validación o salida sin detalle / no registrada</response>
     /// <response code="409">Ya existe entrada para esta salida (índice único)</response>
     [HttpPost("entradas")]
+    [Authorize(Policy = "perm:almacen_cascos.crear")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -142,6 +158,7 @@ public class AlmacenCascosController : ControllerBase
     /// Guarda kilos por tarima para una ENTRADA (inserta o actualiza).
     /// </summary>
     [HttpPost("movimientos/{idMovimiento:int}/tarimas/{numeroTarima:int}/kilos")]
+    [Authorize(Policy = "perm:almacen_cascos.editar")]
     [ProducesResponseType(typeof(MovimientoCascoTarimaKilosResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GuardarKilosTarima(int idMovimiento, int numeroTarima, [FromBody] GuardarKilosTarimaRequest request, CancellationToken ct)
@@ -158,6 +175,7 @@ public class AlmacenCascosController : ControllerBase
     /// Actualiza una SALIDA (repartidor, tarima, cantidad de tarimas, piezas, observaciones).
     /// </summary>
     [HttpPut("salidas/{idMovimiento:int}")]
+    [Authorize(Policy = "perm:almacen_cascos.editar")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ActualizarSalida(int idMovimiento, [FromBody] UpdateSalidaRequest request, CancellationToken ct)
@@ -174,6 +192,7 @@ public class AlmacenCascosController : ControllerBase
     /// Actualiza una ENTRADA (repartidor recibe, observaciones).
     /// </summary>
     [HttpPut("entradas/{idMovimiento:int}")]
+    [Authorize(Policy = "perm:almacen_cascos.editar")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ActualizarEntrada(int idMovimiento, [FromBody] UpdateEntradaRequest request, CancellationToken ct)
@@ -193,6 +212,7 @@ public class AlmacenCascosController : ControllerBase
     /// <response code="400">Motivo vacío o regla de negocio</response>
     /// <response code="409">Ya cancelado o no se puede cancelar</response>
     [HttpPost("movimientos/{idMovimiento:int}/cancelar")]
+    [Authorize(Policy = "perm:almacen_cascos.cancelar")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]

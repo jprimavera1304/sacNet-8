@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using ISL_Service.Application.DTOs.Temporadas;
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -7,21 +7,68 @@ using ISL_Service.Application.Security;
 
 namespace ISL_Service.Controllers;
 
+/// <summary>
+/// Temporadas.
+///
+/// PERMISOS
+/// --------
+/// Las cuatro escrituras llevan ahora permiso propio: antes bastaba con que el
+/// token trajera un userId, o sea cualquier usuario de cualquier rol podia
+/// crear, modificar, cancelar y reactivar temporadas.
+///
+///   crear    -> POST api/temporadas
+///   editar   -> PUT  api/temporadas/{id}
+///   cancelar -> POST api/temporadas/{id}/cancelar, .../reactivar,
+///               POST api/temporadas/cerrar-vencidas
+///
+/// Las claves (temporadas.*) son las que ya pide el front en
+/// shared/js/core/module-action-flags.js.
+/// </summary>
 [ApiController]
 [Route("api/temporadas")]
 [Authorize]
-public class TemporadasController : ControllerBase
+public class TemporadasController : PermisoControllerBase
 {
-    
+    /// <summary>Permiso para cerrar/cancelar/reactivar temporadas.</summary>
+    private static readonly string[] PermisoCerrar = { "temporadas.cancelar" };
+
     private readonly ITemporadasService _service;
     private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public TemporadasController(ITemporadasService service, ICurrentUserAccessor currentUserAccessor)
+    public TemporadasController(
+        ITemporadasService service,
+        ICurrentUserAccessor currentUserAccessor,
+        IPermissionService permissionService)
+        : base(currentUserAccessor, permissionService)
     {
         _service = service;
         _currentUserAccessor = currentUserAccessor;
     }
 
+    /// <summary>
+    /// Lista temporadas.
+    /// </summary>
+    /// <remarks>
+    /// ESTE GET PUEDE CERRAR TEMPORADAS VENCIDAS, Y HAY QUE SABERLO.
+    /// -----------------------------------------------------------
+    /// Antes lo hacia SIEMPRE y sin decirlo: el listado ejecutaba
+    /// sp_w_CerrarTemporadasVencidas antes de leer, asi que abrir la pantalla
+    /// cambiaba datos. En un GET eso sorprende a cualquiera —un reintento, un
+    /// prefetch del navegador o un monitor de salud se volvian escrituras— y
+    /// ademas lo disparaba quien solo tenia permiso de mirar.
+    ///
+    /// No se puede simplemente quitar: es LO UNICO que cierra temporadas
+    /// vencidas (el front no llama a ningun endpoint de cierre), asi que
+    /// quitarlo dejaria las vencidas en "activa" para siempre.
+    ///
+    /// Lo que se hizo:
+    ///   1. El efecto solo corre si el usuario puede cerrar
+    ///      (temporadas.cancelar). Quien solo lee recibe una lectura limpia.
+    ///   2. El cierre tiene ya puerta propia y explicita:
+    ///      POST api/temporadas/cerrar-vencidas.
+    ///   3. La respuesta lo declara en la cabecera X-Efecto-Lateral cuando
+    ///      ocurre, para que no haya que leer el codigo para enterarse.
+    /// </remarks>
     [HttpGet]
     [ProducesResponseType(typeof(List<TemporadaDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List([FromQuery] byte? estado, [FromQuery] string? texto, CancellationToken ct)
@@ -29,8 +76,29 @@ public class TemporadasController : ControllerBase
         if (!TryGetUserId(out var userId))
             return Unauthorized(new { message = "Token inválido." });
 
+        if (!await TienePermisoAsync(PermisoCerrar, ct))
+            return Ok(await _service.ConsultarTemporadasAsync(estado, texto, ct));
+
+        Response.Headers["X-Efecto-Lateral"] = "cerrar-temporadas-vencidas";
         var list = await _service.ConsultarTemporadasListadoAsync(estado, texto, userId, ct);
         return Ok(list);
+    }
+
+    /// <summary>
+    /// Cierra las temporadas vencidas. La puerta explicita del efecto que el
+    /// listado hacia por su cuenta.
+    /// </summary>
+    [HttpPost("cerrar-vencidas")]
+    [Authorize(Policy = "perm:temporadas.cancelar")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> CerrarVencidas(CancellationToken ct)
+    {
+        if (!TryGetUserId(out var userId))
+            return Unauthorized(new { message = "Token inválido." });
+
+        var cerradas = await _service.CerrarTemporadasVencidasAsync(userId, ct);
+        return Ok(new { temporadasCerradas = cerradas });
     }
 
     [HttpGet("{id:guid}")]
@@ -45,6 +113,7 @@ public class TemporadasController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = "perm:temporadas.crear")]
     [ProducesResponseType(typeof(TemporadaDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -72,6 +141,7 @@ public class TemporadasController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "perm:temporadas.editar")]
     [ProducesResponseType(typeof(TemporadaDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -101,6 +171,7 @@ public class TemporadasController : ControllerBase
     }
 
     [HttpPost("{id:guid}/cancelar")]
+    [Authorize(Policy = "perm:temporadas.cancelar")]
     [ProducesResponseType(typeof(TemporadaDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -119,6 +190,7 @@ public class TemporadasController : ControllerBase
     }
 
     [HttpPost("{id:guid}/reactivar")]
+    [Authorize(Policy = "perm:temporadas.cancelar")]
     [ProducesResponseType(typeof(TemporadaDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
