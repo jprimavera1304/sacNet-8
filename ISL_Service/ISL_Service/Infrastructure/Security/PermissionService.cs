@@ -401,6 +401,10 @@ public sealed class PermissionService : IPermissionService
         new("usuarios.editar", "Usuarios - Editar", "usuarios"),
         new("usuarios.estado.editar", "Usuarios - Activar/Inactivar", "usuarios"),
         new("usuarios.password.reset", "Usuarios - Reset Password", "usuarios"),
+        // La exige UsuariosController para enseñar la contraseña de Mac31 en
+        // claro. Estaba en el codigo y NO en esta lista, asi que nunca llegaba a
+        // WPermiso: nadie salvo el SuperAdmin podia tenerla.
+        new("usuarios.password.ver", "Usuarios - Ver contraseña de Mac31", "usuarios"),
         new("usuarios.empresa.editar", "Usuarios - Cambiar Empresa", "usuarios"),
 
         new("empresas.ver", "Empresas - Ver", "empresas"),
@@ -1912,6 +1916,39 @@ WHERE t.name = 'WUsuarioPermiso';";
         var allowToken = definition.Contains("'allow'") ? "allow" : "permit";
         var denyToken = definition.Contains("'block'") && !definition.Contains("'deny'") ? "block" : "deny";
         return new OverrideTypeTokens(allowToken, denyToken);
+    }
+
+    /*
+      SIEMBRA COMPLETA, LA QUE CORRE AL ARRANCAR.
+
+      `SyncPermissionCatalogAsync` siembra la lista ESTATICA del codigo. Pero hay
+      familias que no se pueden escribir a mano porque salen de la base: una
+      clave por cada centro de servicio y una por cada reporte del catalogo de
+      Mac31. Esas las arman `EnsureCentros…` y `EnsureLegacyReport…`, y hasta
+      ahora solo se llamaban al abrir la pantalla de permisos.
+
+      El resultado era el mismo agujero que se creyo cerrado, pero mas estrecho:
+      `reportes.centros.*` tenia CERO filas en WPermiso con 10 centros activos, y
+      el selector de centros estaba muerto para todos menos el SuperAdmin.
+
+      Lo encontro la auditoria final. El arreglo anterior cubrio la lista
+      estatica y dio por hecho que lo demas venia con ella.
+    */
+    public async Task SembrarCatalogoCompletoAsync(int empresaId, CancellationToken ct)
+    {
+        await SyncPermissionCatalogAsync(empresaId, null, ct);
+
+        await using var conn = new SqlConnection(_db.Database.GetConnectionString());
+        await conn.OpenAsync(ct);
+
+        if (!await AreCapabilityTablesAvailableAsync(conn, ct))
+            return;
+
+        await EnsureCentrosPermissionsSyncedAsync(conn, empresaId, ct);
+        await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
+        await EnsureVentasPermissionsSyncedAsync(conn, empresaId, ct);
+        await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
+        await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
     }
 
     public async Task<PermisosWebSyncCatalogResponse> SyncPermissionCatalogAsync(int empresaId, IReadOnlyCollection<string>? modules, CancellationToken ct)

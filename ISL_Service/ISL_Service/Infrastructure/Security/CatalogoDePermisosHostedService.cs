@@ -73,12 +73,8 @@ public sealed class CatalogoDePermisosHostedService : IHostedService
 
                 // La empresa del tenant. Este backend corre una instalacion por
                 // empresa (ver el despliegue), asi que es siempre la 1.
-                var resultado = await permisos.SyncPermissionCatalogAsync(1, null, ct);
-
-                _log.LogInformation(
-                    "Catalogo de permisos sembrado: {Creados} nuevos, {Existentes} ya estaban.",
-                    resultado.InsertedCount,
-                    resultado.SkippedPermissions.Count);
+                await permisos.SembrarCatalogoCompletoAsync(1, ct);
+                _log.LogInformation("Catalogo de permisos sembrado.");
             }
             catch (OperationCanceledException)
             {

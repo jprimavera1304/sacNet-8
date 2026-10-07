@@ -16,6 +16,9 @@ public interface IPermissionService
     Task<PermisosWebRoleItem> CreateRoleAsync(int empresaId, string roleCode, string name, CancellationToken ct);
     Task UpsertRolePermissionsAsync(int empresaId, string roleCode, IReadOnlyCollection<string> permissions, CancellationToken ct);
     Task UpsertUserOverridesAsync(int empresaId, Guid userId, IReadOnlyCollection<string> allow, IReadOnlyCollection<string> deny, CancellationToken ct);
+    /// <summary>Siembra la lista estatica Y las familias que salen de la base (centros, reportes).</summary>
+    Task SembrarCatalogoCompletoAsync(int empresaId, CancellationToken ct);
+
     Task<PermisosWebSyncCatalogResponse> SyncPermissionCatalogAsync(int empresaId, IReadOnlyCollection<string>? modules, CancellationToken ct);
     Task<bool> CreatePermissionAsync(int empresaId, string key, string name, string? description, CancellationToken ct);
 }
