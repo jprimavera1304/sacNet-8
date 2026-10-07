@@ -6,15 +6,45 @@ using Microsoft.Data.SqlClient;
 
 namespace ISL_Service.Infrastructure.Middleware;
 
+/*
+  EL `detail` CRUDO DEL MOTOR NO SALE EN PRODUCTION.
+
+  Sintoma que se vio: con el backend corriendo en entorno Production, pedir el
+  dashboard de ventas (cuyo sp_w_ no esta desplegado en Tauro) contestaba
+
+      {"message":"Error de base de datos.",
+       "detail":"Could not find stored procedure 'dbo.sp_w_ConsultarDashboardVentasKpis'."}
+
+  Es decir: el nombre del procedimiento. Con otros errores salen nombres de
+  columna y, en fallos de red, el nombre del servidor y de la base. Eso es un
+  mapa del esquema regalado a cualquiera que sepa provocar un 500.
+
+  Que se hace: el `detail` tecnico solo se escribe cuando el entorno es
+  Development. En Production el cliente recibe un mensaje generico mas un
+  `traceId` (el TraceIdentifier de la peticion), y el mensaje completo del motor
+  se registra del lado del servidor con ese mismo traceId para poder cruzarlo.
+
+  Que NO se toca:
+  - `AppException.Detail` si sale siempre: lo redacta el propio backend para el
+    usuario (p. ej. "falta el script sp_w_ConsultaAgenteUsuario"), no viene del
+    motor.
+  - Los `RAISERROR` de negocio (numeros 50000-99999) siguen llegando al usuario
+    como 400 con su texto: son mensajes escritos a proposito en los SP.
+*/
 public class ExceptionHandlingMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<ExceptionHandlingMiddleware> _logger;
+    private readonly IHostEnvironment _env;
 
-    public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
+    public ExceptionHandlingMiddleware(
+        RequestDelegate next,
+        ILogger<ExceptionHandlingMiddleware> logger,
+        IHostEnvironment env)
     {
         _next = next;
         _logger = logger;
+        _env = env;
     }
 
     public async Task Invoke(HttpContext context)
@@ -77,20 +107,43 @@ public class ExceptionHandlingMiddleware
         }
         catch (SqlException ex)
         {
-            _logger.LogError(ex, "SqlException: {Message}", ex.Message);
+            var traceId = context.TraceIdentifier;
+            _logger.LogError(ex, "SqlException (traceId {TraceId}): {Message}", traceId, ex.Message);
             // RAISERROR con severity 16 suele usar error number 50001-99999
             var isUserError = ex.Number >= 50000 && ex.Number <= 99999;
             context.Response.StatusCode = isUserError ? (int)HttpStatusCode.BadRequest : (int)HttpStatusCode.InternalServerError;
             context.Response.ContentType = "application/json";
-            await context.Response.WriteAsync(JsonSerializer.Serialize(new { message = isUserError ? ex.Message : "Error de base de datos.", detail = ex.Message }));
+            await context.Response.WriteAsync(JsonSerializer.Serialize(new
+            {
+                message = isUserError ? ex.Message : "Error de base de datos.",
+                detail = DetalleTecnico(ex, isUserError),
+                traceId
+            }));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled exception: {Message}", ex.Message);
+            var traceId = context.TraceIdentifier;
+            _logger.LogError(ex, "Unhandled exception (traceId {TraceId}): {Message}", traceId, ex.Message);
             context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
             context.Response.ContentType = "application/json";
-            await context.Response.WriteAsync(JsonSerializer.Serialize(new { message = "Error interno.", detail = ex.Message }));
+            await context.Response.WriteAsync(JsonSerializer.Serialize(new
+            {
+                message = "Error interno.",
+                detail = DetalleTecnico(ex, false),
+                traceId
+            }));
         }
+    }
+
+    /// <summary>
+    /// El mensaje del motor solo viaja al cliente en Development. En cualquier
+    /// otro entorno devuelve null (y `detail` sale null en el JSON), salvo que el
+    /// propio mensaje ya se este entregando como texto de negocio (RAISERROR).
+    /// </summary>
+    private string? DetalleTecnico(Exception ex, bool yaEsMensajeDeNegocio)
+    {
+        if (yaEsMensajeDeNegocio) return ex.Message;
+        return _env.IsDevelopment() ? ex.Message : null;
     }
 
     private static bool IsConnectionStringError(Exception ex)

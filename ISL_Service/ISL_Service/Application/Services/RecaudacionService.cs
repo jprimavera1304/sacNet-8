@@ -62,10 +62,16 @@ namespace ISL_Service.Application.Services
         /// La lista de renglones del ticket, o una lista vacia si no existe o si
         /// el digito verificador no cuadra. El controlador lo traduce a 404.
         /// </returns>
+        /*
+          SE QUITO EL `catch (SqlException ex) { throw new Exception(ex.Message); }`
+
+          Relanzaba el mismo texto perdiendo el tipo, y el tipo es lo que el
+          ExceptionHandlingMiddleware necesita para distinguir un RAISERROR de
+          negocio de un error del motor y para decidir si el detalle tecnico se
+          ensena o solo se registra. Sin el catch, la SqlException sube entera.
+        */
         public List<RecaudacionDTO> GetById(RecaudacionInputDTO recaudacionInputDTO)
         {
-
-            try
             {
                 // Busqueda por un IDRecaudacion y su IDCaja. Los demas campos del
                 // DTO no se tocan: el constructor los deja en 0 / "" y asi viajan
@@ -83,15 +89,6 @@ namespace ISL_Service.Application.Services
 
                 return FiltrarPorDigitoVerificador(renglones, recaudacionInputDTO.Dv1);
             }
-            catch (SqlException ex) // Manejo de errores de conexión y SP
-            {
-                throw new Exception(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(ex.Message);
-            }
-
         }
 
         /// <summary>
