@@ -198,7 +198,7 @@ public class DashboardVentasDetalleReporteTests
         public Task<List<DashboardTopProductoDto>> ConsultarTopProductosAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
             => Task.FromResult(new List<DashboardTopProductoDto>());
 
-        public Task<DashboardVentasFiltrosResponse> ConsultarFiltrosAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
+        public Task<DashboardVentasFiltrosResponse> ConsultarFiltrosAsync(CancellationToken ct = default)
             => throw new NotImplementedException();
 
         public Task<List<DashboardVentasSerieSemanalDto>> ConsultarSerieSemanalAsync(DashboardVentasSerieSemanalRequest request, CancellationToken ct = default)

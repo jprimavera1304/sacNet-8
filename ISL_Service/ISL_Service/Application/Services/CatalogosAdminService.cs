@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.CatalogosAdmin;
+﻿using ISL_Service.Application.DTOs.CatalogosAdmin;
 using ISL_Service.Application.DTOs.Empleados;
 using ISL_Service.Application.Interfaces;
 
@@ -244,8 +244,8 @@ public class CatalogosAdminService : ICatalogosAdminService
     public async Task<CatalogoEscrituraResponse> CrearUnidadTerritorialAsync(UnidadTerritorialRequest r, int idUsuario, string equipo, CancellationToken ct)
         => Traducir(await _repo.InsertarUnidadTerritorialAsync(r, idUsuario, equipo, ct));
 
-    public async Task<CatalogoEscrituraResponse> ActualizarUnidadTerritorialAsync(int id, UnidadTerritorialRequest r, int idUsuario, string equipo, CancellationToken ct)
-        => Traducir(await _repo.ActualizarUnidadTerritorialAsync(id, r, idUsuario, equipo, ct), id);
+    public async Task<CatalogoEscrituraResponse> ActualizarUnidadTerritorialAsync(int id, CancellationToken ct)
+        => Traducir(await _repo.ActualizarUnidadTerritorialAsync(id, ct), id);
 
     public async Task<CatalogoEscrituraResponse> CrearCentroServicioAsync(CentroServicioRequest r, int idUsuario, string equipo, CancellationToken ct)
         => Traducir(await _repo.InsertarCentroServicioAsync(r, idUsuario, equipo, ct));

@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.CatalogosAdmin;
+﻿using ISL_Service.Application.DTOs.CatalogosAdmin;
 
 namespace ISL_Service.Application.Interfaces;
 
@@ -92,7 +92,8 @@ public interface ICatalogosAdminService
     Task<CatalogoEscrituraResponse> CrearColoniaAsync(CrearColoniaRequest r, CancellationToken ct);
     Task<CatalogoEscrituraResponse> ActualizarColoniaAsync(int idColonia, ActualizarColoniaRequest r, CancellationToken ct);
     Task<CatalogoEscrituraResponse> CrearUnidadTerritorialAsync(UnidadTerritorialRequest r, int idUsuario, string equipo, CancellationToken ct);
-    Task<CatalogoEscrituraResponse> ActualizarUnidadTerritorialAsync(int id, UnidadTerritorialRequest r, int idUsuario, string equipo, CancellationToken ct);
+    // Solo el id: el SP de legacy no recibe nada mas (ver la implementacion del repositorio).
+    Task<CatalogoEscrituraResponse> ActualizarUnidadTerritorialAsync(int id, CancellationToken ct);
     Task<CatalogoEscrituraResponse> CrearCentroServicioAsync(CentroServicioRequest r, int idUsuario, string equipo, CancellationToken ct);
     Task<CatalogoEscrituraResponse> ActualizarCentroServicioAsync(int id, CentroServicioRequest r, int idUsuario, string equipo, CancellationToken ct);
 

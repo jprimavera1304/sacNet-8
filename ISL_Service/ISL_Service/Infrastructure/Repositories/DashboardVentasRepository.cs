@@ -40,7 +40,28 @@ public class DashboardVentasRepository : IDashboardVentasRepository
         return connector.GetConnection;
     }
 
-    public async Task<DashboardVentasFiltrosResponse> ConsultarFiltrosAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
+    /*
+      ESTE ENDPOINT ACEPTABA 11 FILTROS Y LOS TIRABA.
+
+      La firma pedia un DashboardVentasFiltroRequest completo —fechaInicial,
+      fechaFinal, idEmpresa, idAlmacen, idAgente, idCliente, idProducto,
+      idCategoria, idMarca, idTipoDocumento, top— y el cuerpo del metodo NO
+      referenciaba `request` en ninguna linea: el SqlCommand se armaba con cero
+      parametros. Devolvia 200 con los catalogos completos y el que llamaba se
+      quedaba creyendo que su rango de fechas se habia aplicado.
+
+      No se "implementaron los filtros" porque no hay donde:
+      sp_w_ConsultarDashboardVentasFiltros no declara NI UN parametro
+      (Querrys/Dashboard Ventas Zara/02_sp_w_ConsultarDashboardVentasFiltros.sql)
+      y por diseno devuelve los ocho catalogos enteros — son los desplegables de
+      la pantalla, no un resultado filtrado. Filtrarlos exigiria cambiar el
+      procedimiento, y la base no se toca para esto.
+
+      Asi que se quitaron del contrato. El cuerpo que siga mandando un front
+      viejo se ignora sin romperse (ASP.NET no lo enlaza a nada), pero Swagger ya
+      no promete un filtrado que nunca existio.
+    */
+    public async Task<DashboardVentasFiltrosResponse> ConsultarFiltrosAsync(CancellationToken ct = default)
     {
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);

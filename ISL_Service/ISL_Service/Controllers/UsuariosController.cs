@@ -227,8 +227,18 @@ public class UsuariosController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Confirma la empresa de un usuario. Una base = una empresa, asi que
+    /// mandar la que ya tiene es un 200 sin cambios y mandar otra es un 409
+    /// (ver <c>UserAdminService.UpdateEmpresaAsync</c>). Antes contestaba 500
+    /// a todo.
+    /// </summary>
     [HttpPatch("{id:guid}/empresa")]
     [Authorize(Policy = "perm:usuarios.empresa.editar")]
+    [ProducesResponseType(typeof(ISL_Service.Application.DTOs.Responses.UserResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateEmpresa(Guid id, [FromBody] UpdateUserEmpresaRequest req, CancellationToken ct)
     {
         var result = await _service.UpdateEmpresaAsync(id, req, User, ct);
