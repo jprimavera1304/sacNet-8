@@ -299,10 +299,60 @@ public class UserAdminService : IUserAdminService
         return value;
     }
 
-    public Task<UserResponse> UpdateEmpresaAsync(Guid userId, UpdateUserEmpresaRequest req, ClaimsPrincipal actor, CancellationToken ct)
+    /*
+      CAMBIAR LA EMPRESA DE UN USUARIO: POR QUE CONTESTABA 500 Y QUE CONTESTA
+      AHORA.
+
+      Esto decia:
+
+          return Task.FromException<UserResponse>(
+              new InvalidOperationException("En este modelo por base de datos, cada base maneja una sola empresa."));
+
+      `InvalidOperationException` no esta en la lista de
+      ExceptionHandlingMiddleware, asi que caia en el catch general y salia como
+      **500 "Error interno."** — SIEMPRE, con cualquier cuerpo. Una capacidad
+      retirada a proposito disfrazada de averia del servidor: el que llama no
+      puede distinguir "esto no se hace aqui" de "el backend esta roto", y
+      reintentar no sirve de nada. En Swagger el endpoint solo declaraba 200.
+
+      LA REGLA DEL MODELO: una base = una empresa (ver README_EMPRESAS_DB.md y
+      la seccion 4 del inventario). El `EmpresaId` del usuario no es una
+      eleccion suya: es la empresa de la base en la que vive. Mover a alguien a
+      otra empresa seria moverlo a OTRA BASE, que es un alta alla y una baja
+      aqui, no un PATCH.
+
+      Asi que ahora el endpoint contesta de verdad:
+
+        * Piden la empresa que ya tiene -> 200 con el usuario, sin tocar nada.
+          Es idempotente y es lo que un cliente que reenvia su formulario
+          completo necesita: no se le revienta la pantalla por mandar el valor
+          que ya estaba.
+        * Piden otra empresa -> 409 CONFLICTO, con el motivo escrito. No es un
+          error del servidor: es una peticion que este modelo no puede cumplir.
+        * Piden una empresa <= 0 -> 400, que es lo que es.
+
+      No se borro la ruta ni el permiso `usuarios.empresa.editar`: la pantalla
+      de usuarios existe, el campo se ensena, y dejarla sin ruta cambiaria el
+      404 por otro mensaje igual de mudo. Lo que se arregla es que diga la
+      verdad con el codigo correcto.
+    */
+    public async Task<UserResponse> UpdateEmpresaAsync(Guid userId, UpdateUserEmpresaRequest req, ClaimsPrincipal actor, CancellationToken ct)
     {
-        return Task.FromException<UserResponse>(
-            new InvalidOperationException("En este modelo por base de datos, cada base maneja una sola empresa."));
+        if (req is null || req.EmpresaId <= 0)
+            throw new ArgumentException("EmpresaId es obligatorio y debe ser mayor que cero.");
+
+        var user = await _repo.GetByIdAsync(userId, ct) ?? throw new NotFoundException("Usuario no encontrado.");
+
+        EnsureActorCanManageTarget(actor, user);
+
+        if (user.EmpresaId == req.EmpresaId)
+            return Map(user);
+
+        throw new ConflictException(
+            "No se puede cambiar la empresa de un usuario: en este modelo cada base de datos maneja una sola empresa, "
+            + $"y este usuario pertenece a la empresa {user.EmpresaId} porque es la de esta base. "
+            + "Para que exista en otra empresa hay que darlo de alta en la base de esa empresa.",
+            $"EmpresaId actual: {user.EmpresaId}. EmpresaId solicitado: {req.EmpresaId}.");
     }
 
     public async Task ChangeMyPasswordAsync(ChangePasswordRequest req, ClaimsPrincipal actor, CancellationToken ct)
