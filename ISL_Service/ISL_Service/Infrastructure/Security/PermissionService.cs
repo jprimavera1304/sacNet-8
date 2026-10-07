@@ -883,7 +883,8 @@ public sealed class PermissionService : IPermissionService
           mismo concepto visto desde la otra aplicacion, no uno nuevo.
         */
         new("constantes.editar", "Constantes - Editar parámetros de operación", "constantes"),
-        new("constantes.fechapagos.editar", "Constantes - Mover la fecha de operación de pagos", "constantes"),
+        new("constantes.fechapagos.editar", "Constantes - Mover la fecha de operación de pagos", "constantes"),
+        new("constantes.fechaventas.editar", "Constantes - Avanzar la fecha de operación de ventas", "constantes"),
 
         new("huellas.editar", "Huellas - Registrar y cancelar", "huellas"),
         new("seguridad.bitacora.registrar", "Seguridad - Registrar intentos de contraseña", "seguridad"),

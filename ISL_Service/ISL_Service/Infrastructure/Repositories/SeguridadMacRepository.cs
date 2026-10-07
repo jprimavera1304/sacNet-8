@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Globalization;
 using ISL_Service.Application.DTOs.Empleados;
 using ISL_Service.Application.DTOs.SeguridadMac;
@@ -311,19 +311,56 @@ public class SeguridadMacRepository : ISeguridadMacRepository
             cmd.Parameters.AddWithValue("@NumDiasPedidosRechazados", r.NumDiasPedidosRechazados);
         }, ct);
 
-    /// <summary>
-    /// Mueve la fecha de operacion de pagos. Sin fecha se manda cadena vacia, que
-    /// es lo que legacy entiende por "no la cambies".
-    /// </summary>
+    /*
+      LAS DOS FECHAS SALEN DEL MISMO PROCEDIMIENTO, Y LA CADENA VACIA NO ES NEUTRA.
+
+      sp_n_ActualizarFechaOperacion decide la rama por @FechaOperacionPagos:
+          IF @FechaOperacionPagos = ''   -> AVANZA LA FECHA DE VENTAS un dia,
+                                            rehace el freeze de AlmacenProductoHist
+                                            y apunta FechaOperacionLog tipo 'V'
+          IF @FechaOperacionPagos <> ''  -> mueve la fecha de PAGOS
+      Aqui decia que la cadena vacia era "no la cambies". No lo es: es la rutina de
+      cierre del dia. Por eso el controlador ahora EXIGE la fecha de pagos, y el
+      avance de la de ventas tiene su propio metodo con su propio permiso, en vez de
+      salir por descuido de un cuerpo incompleto.
+
+      Y la rama de pagos ramifica por empresa dentro del procedimiento:
+          @Funcionalidad = 'TAU'  -> UPDATE Constantes.FechaOperacionPagos  (global)
+          @Funcionalidad = 'ZARA' -> UPDATE [Usuarios Fechas]               (por usuario)
+      De ahi la capacidad fechaDePagosEsPorUsuario que publica
+      GET /api/empresa/capacidades.
+    */
     public Task<List<Dictionary<string, object?>>> ActualizarFechaOperacionPagosAsync(
         ActualizarFechaOperacionPagosRequest r, int idUsuario, string equipo, CancellationToken ct)
-        => ConsultarAsync("dbo.sp_n_ActualizarFechaOperacion", cmd =>
+    {
+        if (!r.FechaOperacionPagos.HasValue)
+            throw new ArgumentException(
+                "La fecha de operacion de pagos es obligatoria: sin ella el procedimiento avanza la fecha de ventas.");
+
+        return ConsultarAsync("dbo.sp_n_ActualizarFechaOperacion", cmd =>
         {
             cmd.Parameters.AddWithValue("@FechaOperacionPagos",
-                r.FechaOperacionPagos.HasValue
-                    ? $"{r.FechaOperacionPagos.Value.ToString(FormatoFechaLegacy, CultureInfo.InvariantCulture)} 00:00:00"
-                    : string.Empty);
+                $"{r.FechaOperacionPagos.Value.ToString(FormatoFechaLegacy, CultureInfo.InvariantCulture)} 00:00:00");
             cmd.Parameters.AddWithValue("@Valido", r.Valido ? 1 : 0);
+            cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
+            cmd.Parameters.AddWithValue("@Equipo", equipo);
+        }, ct);
+    }
+
+    /// <summary>
+    /// Avanza un dia la fecha de operacion de VENTAS: la cadena vacia en
+    /// @FechaOperacionPagos es como legacy pide esta rama (Mac31 manda un
+    /// ConstanteInputDTO sin fecha, FechaOperacionVentas.cs:49-52).
+    ///
+    /// @Valido va en 0 siempre: esa bandera solo afecta al tope inferior de la fecha
+    /// de PAGOS y la rama de ventas no la mira.
+    /// </summary>
+    public Task<List<Dictionary<string, object?>>> AvanzarFechaOperacionVentasAsync(
+        int idUsuario, string equipo, CancellationToken ct)
+        => ConsultarAsync("dbo.sp_n_ActualizarFechaOperacion", cmd =>
+        {
+            cmd.Parameters.AddWithValue("@FechaOperacionPagos", string.Empty);
+            cmd.Parameters.AddWithValue("@Valido", 0);
             cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
             cmd.Parameters.AddWithValue("@Equipo", equipo);
         }, ct);

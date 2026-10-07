@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.Empleados;
+﻿using ISL_Service.Application.DTOs.Empleados;
 using ISL_Service.Application.DTOs.SeguridadMac;
 
 namespace ISL_Service.Application.Interfaces;
@@ -31,6 +31,13 @@ public interface ISeguridadMacRepository
     // --- Constantes
     Task<List<Dictionary<string, object?>>> ActualizarConstantesAsync(ActualizarConstantesRequest r, CancellationToken ct);
     Task<List<Dictionary<string, object?>>> ActualizarFechaOperacionPagosAsync(ActualizarFechaOperacionPagosRequest r, int idUsuario, string equipo, CancellationToken ct);
+
+    /// <summary>
+    /// Avanza un dia la fecha de operacion de VENTAS. Es el mismo procedimiento que
+    /// la de pagos, llamado con @FechaOperacionPagos = '', que es como legacy pide
+    /// esta rama.
+    /// </summary>
+    Task<List<Dictionary<string, object?>>> AvanzarFechaOperacionVentasAsync(int idUsuario, string equipo, CancellationToken ct);
     Task<List<Dictionary<string, object?>>> RegistrarActividadAsync(int idUsuario, string equipo, CancellationToken ct);
 
     // --- Parametros de reporte

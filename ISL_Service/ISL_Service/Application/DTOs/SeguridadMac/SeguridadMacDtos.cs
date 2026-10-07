@@ -1,4 +1,4 @@
-namespace ISL_Service.Application.DTOs.SeguridadMac;
+﻿namespace ISL_Service.Application.DTOs.SeguridadMac;
 
 /*
   USUARIOS DE MAC31, HUELLAS, CONSTANTES Y PARAMETROS.
@@ -249,10 +249,49 @@ public class ActualizarConstantesRequest
 /// </summary>
 public class ActualizarFechaOperacionPagosRequest
 {
+    /// <summary>
+    /// OBLIGATORIA. Si llega vacia el procedimiento NO entiende "no la cambies":
+    /// entiende "avanza la fecha de VENTAS", porque su rama de ventas es
+    /// justamente IF @FechaOperacionPagos = ''. El controlador la exige antes de
+    /// llamar; para mover la de ventas esta su propio endpoint.
+    /// </summary>
     public DateTime? FechaOperacionPagos { get; set; }
 
-    /// <summary>El interruptor que el procedimiento usa para validar o no el cambio.</summary>
+    /// <summary>
+    /// El interruptor que el procedimiento usa para validar o no el cambio. Con
+    /// Valido = 1 se salta SOLO el tope inferior (FechaOperacion - NoDiasAtrasados);
+    /// el tope superior no se puede saltar. Mac31 lo pone en 1 despues de pedir una
+    /// contrasena de autorizacion (FechaOperacionVentas.cs:112-121).
+    /// </summary>
     public bool Valido { get; set; }
+}
+
+/// <summary>
+/// AVANZA LA FECHA DE OPERACION DE VENTAS UN DIA.
+///
+/// No lleva fecha, y no es un recorte: el procedimiento no acepta una.
+/// sp_n_ActualizarFechaOperacion, con @FechaOperacionPagos = '', hace
+/// SET FechaOperacion = DATEADD(dd, 1, FechaOperacion) y antes rechaza el cambio si
+/// eso dejaria la fecha mas de un dia adelante de hoy. Mac31 hace lo mismo: su
+/// boton "guardar fecha de ventas" manda un DTO sin fecha
+/// (FechaOperacionVentas.cs:49-52).
+///
+/// LO QUE ESTA OPERACION ARRASTRA, Y HAY QUE DECIRLE AL USUARIO ANTES:
+///   - borra AlmacenProductoHist del dia que se cierra y lo vuelve a escribir con
+///     las existencias actuales (el "freeze" del inventario);
+///   - apunta el cambio en FechaOperacionLog con tipo 'V';
+///   - a partir de ahi, toda la operacion del dia entra con la fecha nueva.
+/// No es reversible desde la aplicacion.
+/// </summary>
+public class AvanzarFechaOperacionVentasRequest
+{
+    /// <summary>
+    /// La fecha a la que el cliente CREE que va a quedar. Opcional y solo sirve de
+    /// seguro: si no coincide con FechaOperacion + 1 dia, el backend contesta 409 y
+    /// no escribe. Evita el caso real de dos pestanas abiertas -o el cierre
+    /// automatico de sp_n_ConsultaConstantes- avanzando el dia dos veces.
+    /// </summary>
+    public DateOnly? FechaEsperada { get; set; }
 }
 
 // ===========================================================================

@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.Empleados;
+﻿using ISL_Service.Application.DTOs.Empleados;
 using ISL_Service.Application.DTOs.SeguridadMac;
 using ISL_Service.Application.Interfaces;
 
@@ -107,6 +107,10 @@ public class SeguridadMacService : ISeguridadMacService
     public Task<List<Dictionary<string, object?>>> ActualizarFechaOperacionPagosAsync(
         ActualizarFechaOperacionPagosRequest r, int idUsuario, string equipo, CancellationToken ct)
         => _repo.ActualizarFechaOperacionPagosAsync(r, idUsuario, equipo, ct);
+
+    public Task<List<Dictionary<string, object?>>> AvanzarFechaOperacionVentasAsync(
+        int idUsuario, string equipo, CancellationToken ct)
+        => _repo.AvanzarFechaOperacionVentasAsync(idUsuario, equipo, ct);
 
     public Task<List<Dictionary<string, object?>>> RegistrarActividadAsync(int idUsuario, string equipo, CancellationToken ct)
         => _repo.RegistrarActividadAsync(idUsuario, equipo, ct);
