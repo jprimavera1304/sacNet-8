@@ -132,6 +132,11 @@ builder.Services.AddScoped<IEmpresaService, EmpresaService>();
 builder.Services.AddScoped<ITarimaRepository, TarimaRepository>();
 builder.Services.AddScoped<ITarimaService, TarimaService>();
 builder.Services.AddScoped<ICatalogosRepository, CatalogosRepository>();
+
+// -------------------- ESCRITURAS DE CATALOGOS DE MAC31 (ola 6) --------------------
+builder.Services.AddScoped<ICatalogosAdminRepository, CatalogosAdminRepository>();
+builder.Services.AddScoped<ICatalogosAdminService, CatalogosAdminService>();
+
 builder.Services.AddScoped<ICategoriasRepository, CategoriasRepository>();
 builder.Services.AddScoped<ICategoriasService, CategoriasService>();
 builder.Services.AddScoped<IProfesoresRepository, ProfesoresRepository>();

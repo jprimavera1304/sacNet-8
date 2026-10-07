@@ -389,7 +389,57 @@ public sealed class PermissionService : IPermissionService
         new("cheques.ver", "Cheques - Ver", "cheques"),
         new("cheques.crear", "Cheques - Crear", "cheques"),
         new("cheques.editar", "Cheques - Editar", "cheques"),
-        new("cheques.activar", "Cheques - Cambiar estatus", "cheques")
+        new("cheques.activar", "Cheques - Cambiar estatus", "cheques"),
+
+        /*
+          ESCRITURAS DE LOS CATALOGOS DE MAC31 (ola 6).
+
+          La familia `catalogos.*` es del WEB, no de Mac31: no esta entre las
+          cuatro que manda legacy (reportes, ventas, empleados, prestamos), asi
+          que lo que se da desde la pantalla de permisos SE RESPETA y no lo borra
+          el siguiente recalculo. Las lecturas (`catalogos.ver`,
+          `catalogos.marcas.ver`, `catalogos.galleros.ver`...) ya las sembro la
+          ola 1; aqui van las de escritura.
+
+          POR QUE NO UN SOLO `catalogos.editar` PARA TODO
+          ----------------------------------------------
+          Porque no todos los catalogos pesan lo mismo:
+           - galleros trae SALDO: es dinero;
+           - empresas trae RFC, regimen fiscal, CLABE y el folio con el que se
+             factura: es la identidad fiscal de la empresa;
+           - marcas y categorias deciden las columnas del concentrado: cambiar
+             una marca de columna cambia los reportes de toda la empresa;
+           - territorial le mueve el domicilio a clientes y proveedores que ya
+             estaban capturados;
+           - autos trae poliza y monto asegurado.
+          Quien captura un tipo de gasto no tiene por que poder cambiar el RFC
+          con el que se factura.
+
+          Territorial no tiene `.baja` a proposito: ciudades, municipios y
+          colonias no tienen IDStatus en la base, asi que no hay baja que dar.
+        */
+        new("catalogos.crear", "Catálogos - Dar de alta", "catalogos"),
+        new("catalogos.editar", "Catálogos - Modificar", "catalogos"),
+        new("catalogos.baja", "Catálogos - Dar de baja / reactivar", "catalogos"),
+
+        new("catalogos.marcas.crear", "Catálogos - Alta de marcas y categorías", "catalogos"),
+        new("catalogos.marcas.editar", "Catálogos - Modificar marcas y categorías", "catalogos"),
+        new("catalogos.marcas.baja", "Catálogos - Baja de marcas y categorías", "catalogos"),
+
+        new("catalogos.galleros.crear", "Catálogos - Alta de galleros", "catalogos"),
+        new("catalogos.galleros.editar", "Catálogos - Modificar galleros", "catalogos"),
+        new("catalogos.galleros.baja", "Catálogos - Baja de galleros", "catalogos"),
+
+        new("catalogos.empresas.crear", "Catálogos - Alta de empresas y series", "catalogos"),
+        new("catalogos.empresas.editar", "Catálogos - Modificar empresas y series", "catalogos"),
+        new("catalogos.empresas.baja", "Catálogos - Baja de empresas y series", "catalogos"),
+
+        new("catalogos.territorial.crear", "Catálogos - Alta territorial", "catalogos"),
+        new("catalogos.territorial.editar", "Catálogos - Modificar territorial", "catalogos"),
+
+        new("catalogos.autos.crear", "Catálogos - Alta de autos", "catalogos"),
+        new("catalogos.autos.editar", "Catálogos - Modificar autos", "catalogos"),
+        new("catalogos.autos.baja", "Catálogos - Baja de autos", "catalogos")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)
