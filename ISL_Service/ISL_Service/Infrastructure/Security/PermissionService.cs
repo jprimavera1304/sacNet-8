@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Models;
@@ -600,6 +600,18 @@ public sealed class PermissionService : IPermissionService
           La familia `catalogos.*` es del WEB, no esta en la lista de las cuatro familias que
           gobierna Mac31, asi que lo que se de desde la pantalla de permisos si se respeta.
         */
+        /*
+          LA LLAVE DEL MODULO DE CATALOGOS.
+
+          Faltaba, y sin ella el modulo de Catalogos del web no puede existir:
+          `<modulo>.ver_modulo` es la clave con la que el inicio decide si pinta
+          la tarjeta y con la que la pantalla decide si abre. Las otras doce
+          claves de la familia dicen que se puede HACER adentro; ninguna dice si
+          se puede ENTRAR, y usar `catalogos.ver` para las dos cosas obliga a dar
+          el desplegable de estados a quien solo deberia poder abrir la pantalla
+          (o al contrario, a cerrarle la pantalla a quien si captura).
+        */
+        new("catalogos.ver_modulo", "Catálogos - Ver módulo", "catalogos"),
         new("catalogos.ver", "Catálogos - Consultar", "catalogos"),
         new("catalogos.fe.ver", "Catálogos - Facturación electrónica", "catalogos"),
         new("catalogos.galleros.ver", "Catálogos - Galleros y su saldo", "catalogos"),
@@ -841,6 +853,11 @@ public sealed class PermissionService : IPermissionService
         new("compras.editar", "Compras - Marcar como factura", "compras"),
         new("compras.cancelar", "Compras - Cancelar", "compras"),
 
+        // La lectura de lo mismo. Va aparte del procesar porque son dos
+        // decisiones distintas: VER lo que viene en camino no mueve nada, y
+        // ACEPTARLO mueve existencias. Quien planea la ruta necesita la primera;
+        // solo quien recibe la mercancia necesita la segunda.
+        new("inventario.transito.ver", "Inventario - Consultar tránsito", "inventario"),
         new("inventario.transito.procesar", "Inventario - Procesar tránsito", "inventario"),
 
         new("cortes.ver_modulo", "Cortes - Ver módulo", "cortes"),
@@ -882,8 +899,20 @@ public sealed class PermissionService : IPermissionService
           El usuario de Mac31 reusa las claves `usuarios.*` que ya existian: es el
           mismo concepto visto desde la otra aplicacion, no uno nuevo.
         */
+        /*
+          LEER LAS CONSTANTES NO ES EDITARLAS.
+
+          La pantalla de fecha de operacion ENSEÑA la fecha de ventas, la de
+          pagos, quien las movio y desde que equipo, y los dos contadores de
+          dias. Eso lo mira mucha mas gente que la que puede moverlos, y hasta
+          ahora la unica llave de la familia era `constantes.editar`: pedirla
+          para leer significa darle a cualquiera que quiera VER la fecha el
+          permiso de CAMBIARLA.
+        */
+        new("constantes.ver", "Constantes - Consultar parámetros de operación", "constantes"),
         new("constantes.editar", "Constantes - Editar parámetros de operación", "constantes"),
-        new("constantes.fechapagos.editar", "Constantes - Mover la fecha de operación de pagos", "constantes"),
+        new("constantes.fechapagos.editar", "Constantes - Mover la fecha de operación de pagos", "constantes"),
+
         new("constantes.fechaventas.editar", "Constantes - Avanzar la fecha de operación de ventas", "constantes"),
 
         new("huellas.editar", "Huellas - Registrar y cancelar", "huellas"),

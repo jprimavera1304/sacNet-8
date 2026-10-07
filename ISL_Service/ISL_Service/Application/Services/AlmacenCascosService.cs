@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.AlmacenCascos;
+﻿using ISL_Service.Application.DTOs.AlmacenCascos;
 using ISL_Service.Application.Exceptions;
 using ISL_Service.Application.Interfaces;
 using Microsoft.Data.SqlClient;
@@ -158,7 +158,7 @@ public class AlmacenCascosService : IAlmacenCascosService
         if (request.Tarimas == null || request.Tarimas.Count == 0)
             throw new ArgumentException("tarimas es requerido y debe tener al menos un item.");
 
-        var repartidores = await _catalogos.ListRepartidoresAsync(1, ct);
+        var repartidores = await _catalogos.ListRepartidoresAsync(1, null, ct);
         if (repartidores.All(r => r.IdRepartidor != request.IdRepartidorEntrega))
             throw new ArgumentException("idRepartidorEntrega no es un repartidor activo.");
 
@@ -197,7 +197,7 @@ public class AlmacenCascosService : IAlmacenCascosService
         if (request.IdRepartidorRecibe <= 0)
             throw new ArgumentException("idRepartidorRecibe es requerido y debe ser mayor a 0.");
 
-        var repartidores = await _catalogos.ListRepartidoresAsync(1, ct);
+        var repartidores = await _catalogos.ListRepartidoresAsync(1, null, ct);
         if (repartidores.All(r => r.IdRepartidor != request.IdRepartidorRecibe))
             throw new ArgumentException("idRepartidorRecibe no es un repartidor activo.");
 
@@ -250,7 +250,7 @@ public class AlmacenCascosService : IAlmacenCascosService
         if (request.Tarimas == null || request.Tarimas.Count == 0)
             throw new ArgumentException("tarimas es requerido y debe tener al menos un item.");
 
-        var repartidores = await _catalogos.ListRepartidoresAsync(1, ct);
+        var repartidores = await _catalogos.ListRepartidoresAsync(1, null, ct);
         if (repartidores.All(r => r.IdRepartidor != request.IdRepartidorEntrega))
             throw new ArgumentException("idRepartidorEntrega no es un repartidor activo.");
 
@@ -287,7 +287,7 @@ public class AlmacenCascosService : IAlmacenCascosService
         if (request.IdRepartidorRecibe <= 0)
             throw new ArgumentException("idRepartidorRecibe es requerido y debe ser mayor a 0.");
 
-        var repartidores = await _catalogos.ListRepartidoresAsync(1, ct);
+        var repartidores = await _catalogos.ListRepartidoresAsync(1, null, ct);
         if (repartidores.All(r => r.IdRepartidor != request.IdRepartidorRecibe))
             throw new ArgumentException("idRepartidorRecibe no es un repartidor activo.");
     }
