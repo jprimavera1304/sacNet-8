@@ -43,6 +43,7 @@ de la nómina, que se llama `/validar`.
 | `COMO-HABLARLE-A-LEGACY.md` | levantar Legacy y autenticarse (cuesta encontrarlo) |
 | `inventario-nuevo-resumen.md` | la arquitectura y el estilo del backend nuevo |
 | `seguridad-hallazgos.md` | los agujeros encontrados y cuáles quedan |
+| `zaragoza-estado.md` | **la referencia es Zaragoza, no Tauro**: cómo se levanta la segunda instancia de Legacy, qué falta en `MacZ` y qué se ve solo midiendo allá |
 
 ## Cómo se levanta todo
 
@@ -70,11 +71,27 @@ código.
 
 ```bash
 cd migracion/comparador
+
+# Tauro (Produccion_svr). Es lo de siempre: MAC_EMPRESA vale `tauro` por omision.
 MAC_SCRATCH=<carpeta con legacy.token y nuevo.token> python comparar.py casos/
+
+# Zaragoza (MacZ). Hace falta una SEGUNDA instancia de Legacy apuntada a MacZ;
+# como se levanta sin tocar Legacy/ esta en zaragoza-estado.md.
+MAC_EMPRESA=zaragoza MAC_SQL_BASE=MacZ \
+  LEGACY_BASE=http://localhost:63480 NUEVO_BASE=http://127.0.0.1:5062 \
+  MAC_SCRATCH=<carpeta> python comparar.py casos/
 ```
+
+**Se corre contra LAS DOS empresas antes de entregar.** Los ids no son portables
+—el IDVenta 369614 existe en Tauro y en MacZ el más alto es 140964— así que cada
+caso que lo necesita declara su juego de parámetros en `por_empresa`.
 
 El comparador vigila que la fecha de operación no se mueva a media corrida. Si
 se movió, los resultados **no valen**.
+
+Y al final dice **cuántos casos coincidieron SIN VER UN RENGLÓN**. Eso no es
+ruido: un caso que compara vacío contra vacío sale `OK` y no prueba nada. Hoy son
+25 en Tauro y 38 en Zaragoza, y cambian de sitio al cambiar de empresa.
 
 ## Lo que ya está cerrado
 
