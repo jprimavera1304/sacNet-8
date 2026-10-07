@@ -160,6 +160,10 @@ builder.Services.AddScoped<IDashboardVentasReportService, DashboardVentasReportS
 builder.Services.AddScoped<IDashboardVentasReportRenderer, DashboardVentasPdfReportRenderer>();
 builder.Services.AddScoped<IDashboardVentasReportRenderer, DashboardVentasXlsxReportRenderer>();
 builder.Services.AddHostedService<ReportEngineWarmupHostedService>();
+// Siembra en WPermiso las claves que declara el codigo. Sin esto, un modulo
+// migrado contesta 403 a todos menos al SuperAdmin. Ver el comentario del
+// servicio: la causa no se ve de frente.
+builder.Services.AddHostedService<ISL_Service.Infrastructure.Security.CatalogoDePermisosHostedService>();
 
 builder.Services.AddScoped<IReportesVentasRepository, ReportesVentasRepository>();
 /* El catalogo de centros de servicio: de el sale a que base apunta un reporte. */

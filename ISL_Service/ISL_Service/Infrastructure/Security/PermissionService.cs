@@ -1543,6 +1543,7 @@ WHERE t.name = 'WUsuarioPermiso';";
             return BuildLegacyFallback(userId, empresaId, rolLegacy, feature.Version);
 
         var schema = await GetSchemaAsync(conn, ct);
+        await EnsureCatalogoSembradoAsync(conn, empresaId, ct);
         var permissions = await LoadEffectivePermissionsAsync(conn, schema, userId, empresaId, rolLegacy, ct);
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
         var ventasCatalog = await EnsureVentasPermissionsSyncedAsync(conn, empresaId, ct);
@@ -2214,6 +2215,37 @@ VALUES ({string.Join(", ", insertValues)});";
       Si la tabla no existe —empresa sin centros— no se crea nada y todo sigue
       igual.
     */
+    /*
+      LAS CLAVES NUEVAS TIENEN QUE LLEGAR A LA BASE SOLAS.
+
+      PermissionCatalogSeeds es la lista de permisos que declara el codigo. Hasta
+      ahora solo se escribia en WPermiso cuando alguien entraba a la pantalla de
+      permisos y pulsaba sincronizar: BuildSnapshotAsync no la llamaba nunca.
+
+      La consecuencia no se veia de frente. Un permiso que no esta en WPermiso no
+      puede tener fila de concesion, asi que el endpoint que lo exige contesta 403
+      a TODO EL MUNDO menos al SuperAdmin -que pasa antes de mirar nada-. O sea
+      que el modulo quedaba escrito, probado y comprobado contra Legacy... y
+      muerto para los usuarios de verdad. En esta base habia 0 filas para
+      catalogos.*, obra.*, cobranza.* y productos.*, y 68 capacidades ya migradas
+      caian ahi.
+
+      Las demas familias ya se sembraban solas (reportes, ventas, empleados,
+      prestamos, centros). Esto hace lo mismo con las del catalogo, que es lo que
+      todo el mundo daba por hecho que pasaba.
+
+      Sembrar NO es conceder: crea la clave para que se pueda repartir desde la
+      pantalla de permisos. Quien no la tenga concedida sigue sin poder.
+    */
+    private static async Task EnsureCatalogoSembradoAsync(
+        SqlConnection conn,
+        int empresaId,
+        CancellationToken ct)
+    {
+        await SincronizarCatalogoDePermisosAsync(
+            conn, empresaId, PermissionCatalogSeeds, seed => seed.Module, ct);
+    }
+
     private static async Task EnsureCentrosPermissionsSyncedAsync(
         SqlConnection conn,
         int empresaId,
