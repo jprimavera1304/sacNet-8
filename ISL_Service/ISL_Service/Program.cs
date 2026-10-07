@@ -141,6 +141,10 @@ builder.Services.AddScoped<ICatalogosAdminService, CatalogosAdminService>();
 builder.Services.AddScoped<IMaestrosRepository, MaestrosRepository>();
 builder.Services.AddScoped<IMaestrosService, MaestrosService>();
 
+// -------------------- OPERACION DIARIA: COMPRAS, CORTES, TRANSFERENCIAS, VIGENCIAS --------------------
+builder.Services.AddScoped<IOperacionMacRepository, OperacionMacRepository>();
+builder.Services.AddScoped<IOperacionMacService, OperacionMacService>();
+
 builder.Services.AddScoped<ICategoriasRepository, CategoriasRepository>();
 builder.Services.AddScoped<ICategoriasService, CategoriasService>();
 builder.Services.AddScoped<IProfesoresRepository, ProfesoresRepository>();

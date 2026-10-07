@@ -466,7 +466,48 @@ public sealed class PermissionService : IPermissionService
 
         new("productos.crear", "Productos - Dar de alta", "productos"),
         new("productos.editar", "Productos - Modificar", "productos"),
-        new("productos.estado.editar", "Productos - Dar de baja / reactivar", "productos")
+        new("productos.estado.editar", "Productos - Dar de baja / reactivar", "productos"),
+
+        /*
+          OPERACION DIARIA (ola 6): compras, inventario en transito, cortes de
+          caja, transferencias bancarias y cambios de vigencia.
+
+          Las de transferencias estan separadas en cuatro porque son cuatro pasos
+          con consecuencias muy distintas: CARGAR el estado de cuenta no mueve
+          dinero, IDENTIFICAR solo dice de quien es un deposito, y APLICAR y
+          CANCELAR si mueven dinero — tocan Ventas, [Ventas Pagos],
+          [Ventas Pagos Usados] y el saldo del cliente. Quien sube el archivo del
+          banco no tiene por que poder aplicar pagos.
+
+          `inventario.transito.procesar` va aparte de compras porque mueve
+          existencias y se usa desde otra pantalla.
+        */
+        new("compras.ver_modulo", "Compras - Ver módulo", "compras"),
+        new("compras.ver", "Compras - Consultar", "compras"),
+        new("compras.editar", "Compras - Marcar como factura", "compras"),
+        new("compras.cancelar", "Compras - Cancelar", "compras"),
+
+        new("inventario.transito.procesar", "Inventario - Procesar tránsito", "inventario"),
+
+        new("cortes.ver_modulo", "Cortes - Ver módulo", "cortes"),
+        new("cortes.ver", "Cortes - Consultar", "cortes"),
+        new("cortes.crear", "Cortes - Guardar corte de caja", "cortes"),
+        new("cortes.cancelar", "Cortes - Cancelar", "cortes"),
+        new("cortes.cs.ver", "Cortes - Consultar centros de servicio", "cortes"),
+        new("cortes.cs.crear", "Cortes - Guardar retiro de centro de servicio", "cortes"),
+
+        new("transferencias.ver_modulo", "Transferencias - Ver módulo", "transferencias"),
+        new("transferencias.ver", "Transferencias - Consultar", "transferencias"),
+        new("transferencias.cargar", "Transferencias - Cargar estado de cuenta", "transferencias"),
+        new("transferencias.identificar", "Transferencias - Identificar cliente", "transferencias"),
+        new("transferencias.aplicar", "Transferencias - Aplicar pagos", "transferencias"),
+        new("transferencias.cancelar", "Transferencias - Cancelar movimiento", "transferencias"),
+
+        new("cambiosvigencia.ver_modulo", "Cambios de vigencia - Ver módulo", "cambiosvigencia"),
+        new("cambiosvigencia.ver", "Cambios de vigencia - Consultar", "cambiosvigencia"),
+        new("cambiosvigencia.crear", "Cambios de vigencia - Registrar", "cambiosvigencia"),
+        new("cambiosvigencia.editar", "Cambios de vigencia - Modificar / regresar", "cambiosvigencia"),
+        new("cambiosvigencia.cancelar", "Cambios de vigencia - Cancelar", "cambiosvigencia")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)
