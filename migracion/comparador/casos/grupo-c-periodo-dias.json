@@ -34,5 +34,19 @@
     "La columna se llama 'FechaDia' en Legacy y 'fecha' en el nuevo. Se traduce con mapa_campos.",
     "El nuevo DESCARTA los dias fechados fuera del rango del propio periodo. La base de Zaragoza tiene renglones sueltos en PeriodosTipoSueldoDias (ids 999902 y 999903) colgados de una semana de julio pero fechados en agosto, y con ellos el endpoint devolvia nueve dias para una semana de siete; el SP de la rejilla solo tiene siete huecos. En el periodo 9521 de Tauro no hay ninguno, asi que aqui los dos lados entregan los mismos siete dias.",
     "El nuevo contesta 404 si el periodo no tiene dias generados; Legacy devuelve lista vacia con 200."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El periodo 9521 es de Tauro. En MacZ el 12549 tiene siete dias, del 6 al 12 de julio de 2026, todos dentro del rango del periodo. (El 12551 es el que tiene los nueve dias con dos fechados fuera, que es el caso que la nota intencional describe.)",
+      "legacy": {
+        "body": {
+          "IDPeriodoTipoSueldo": 12549
+        }
+      },
+      "nuevo": {
+        "path": "/api/asistencias/periodos/12549/dias"
+      },
+      "nombre": "Dias del periodo 12549 (Zaragoza)"
+    }
+  }
 }

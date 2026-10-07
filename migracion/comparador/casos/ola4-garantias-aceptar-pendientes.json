@@ -50,5 +50,13 @@
   "diferencias_intencionales": [
     "Legacy rellena con 0 / 0001-01-01 los campos que su DTO declara y el procedimiento no devuelve. El nuevo baja el renglon tal cual: donde dice NULL, dice null.",
     "A Legacy el rango va en dd-MM-yyyy; al nuevo en ISO. Da igual lo que valgan: esta rama los borra."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "diferencias_intencionales": [
+        "HEREDADO, FALLA IGUAL EN EL LEGACY DE ZARAGOZA. sp_n_ConsultarGarantiasAceptar recorre dbo.CentrosServicio y cruza a [MacZCS1..MacZCS11].dbo.Garantias; esas bases no estan en este servidor. El nuevo contesta 500 'Error de base de datos' y Legacy, con el mismo filtro, contesta status 500 \"[No se pudo procesar sp_n_ConsultarGarantiasAceptar] - Invalid object name 'MacZCS1.dbo.Garantias'.\" Es infraestructura: restaurar esas bases. No se pierde nada al apagar Legacy."
+      ],
+      "estado_nuevo_esperado": 500
+    }
+  }
 }

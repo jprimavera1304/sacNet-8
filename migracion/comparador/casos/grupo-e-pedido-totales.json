@@ -72,5 +72,18 @@
   "diferencias_intencionales": [
     "Legacy mete la tabla en un DTO tipado y lo que el DTO declara pero el SP no devuelve sale en 0/null (es relleno del DTO, no dato). El nuevo entrega los renglones crudos del SP. Se comparan las columnas que el SP si trae. En TOTALES el SP no devuelve IDPedidoDetalle, IDVenta, IDEmpresa, IDCliente, IDUsuario, IDCompra, Existencia ni Pedido: Legacy las ensena en 0/null porque las declara PedidoDTO, no porque la base diga eso.",
     "El nuevo agrega Tabla, TipoPrecio, Redondear, Ganancia, ImpuestosDetalle, ImporteConIva(Rnd), ImporteConUsadoConIva(Rnd) y TotalCostoUsadoCargoConIva, todas del mismo SP y tiradas por el DTO de Legacy."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDPedido 195033 es de Tauro. En MacZ el 198678 tiene renglones en las tres tablas (detalle, cargo y credito), que es lo que este caso necesita.",
+      "legacy": {
+        "body": {
+          "IDPedido": 198678
+        }
+      },
+      "nuevo": {
+        "path": "/api/ventas/pedidos/captura/198678"
+      }
+    }
+  }
 }

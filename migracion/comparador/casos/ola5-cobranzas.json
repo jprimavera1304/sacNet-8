@@ -35,18 +35,46 @@
       "FolioFinalVenta": ""
     }
   },
-  "nuevo": { "method": "GET", "path": "/api/cobranzas", "query": { "idRepartidor": 7145 } },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/cobranzas",
+    "query": {
+      "idRepartidor": 7145
+    }
+  },
   "camino_legacy": "result.cobranzas",
   "camino_nuevo": "data",
   "ordenar_por": "idCobranza",
   "solo_campos": [
-    "idCobranza", "idRepartidor", "folio", "repartidor", "fecha", "equipo",
-    "idUsuario", "usuario", "idAlmacen", "almacen", "fechaModificacion",
-    "equipoModifico", "idUsuarioModifico", "usuarioModifico",
-    "fechaModificacionMostrar", "fechaCancelacion", "equipoCancelo",
-    "idUsuarioCancelo", "usuarioCancelo", "fechaCancelacionMostrar",
-    "cancelada", "numFolios", "numProductos", "pesoKg", "totalPagar",
-    "abonos", "descuentos", "saldo", "observaciones"
+    "idCobranza",
+    "idRepartidor",
+    "folio",
+    "repartidor",
+    "fecha",
+    "equipo",
+    "idUsuario",
+    "usuario",
+    "idAlmacen",
+    "almacen",
+    "fechaModificacion",
+    "equipoModifico",
+    "idUsuarioModifico",
+    "usuarioModifico",
+    "fechaModificacionMostrar",
+    "fechaCancelacion",
+    "equipoCancelo",
+    "idUsuarioCancelo",
+    "usuarioCancelo",
+    "fechaCancelacionMostrar",
+    "cancelada",
+    "numFolios",
+    "numProductos",
+    "pesoKg",
+    "totalPagar",
+    "abonos",
+    "descuentos",
+    "saldo",
+    "observaciones"
   ],
   "diferencias_intencionales": [
     "Fuera FechaFtm, FechaModificacionFtm y FechaCancelacionFtm: la misma fecha otra vez, ya formateada por la base para las rejillas de WinForms.",
@@ -54,5 +82,20 @@
     "El filtro por folio de cobranza YA NO tira los demas filtros, y el filtro por folio de VENTA ya funciona: en Legacy su rama estaba escrita con la condicion del folio de cobranza repetida (copiar y pegar), asi que era codigo muerto y nunca se ejecutaba.",
     "IDUsuarioActual —que es con lo que el SP decide que cobranzas se ven— sale del token, no del cuerpo. En Legacy, mandando el id de otro se veian las cobranzas de otro.",
     "Las fechas del filtro van tipadas y en ISO: el nuevo no llama a sp_n_ConsultaConstantes, que es la rutina que cierra el dia del negocio."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDRepartidor 7145 es de Tauro. En MacZ la cobranza 49334 es del repartidor 1031.",
+      "legacy": {
+        "body": {
+          "IDRepartidor": 1031
+        }
+      },
+      "nuevo": {
+        "query": {
+          "idRepartidor": 1031
+        }
+      }
+    }
+  }
 }

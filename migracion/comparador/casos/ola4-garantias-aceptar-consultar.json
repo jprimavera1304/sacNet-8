@@ -56,5 +56,13 @@
     "Legacy rellena con 0 / 0001-01-01 los campos que su DTO declara y el procedimiento no devuelve, y TIRA los que el procedimiento devuelve y su DTO no declara. El nuevo baja el renglon del procedimiento tal cual: donde dice NULL, dice null. Se comparan los campos que los dos lados entregan.",
     "Legacy REVIENTA en este endpoint si no se le mandan las fechas: con IDStatusGarantiaAceptada = 2 las formatea sin comprobar que vengan y lanza ArgumentOutOfRangeException en Substring, contestando 400 con el stack. Por eso el caso se las manda. El nuevo funciona con o sin ellas.",
     "A Legacy el rango va en dd-MM-yyyy porque Funciones.ConvertFtmDate le voltea el dia y el mes; al nuevo en ISO. Los dos terminan pidiendo el mismo rango."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "diferencias_intencionales": [
+        "HEREDADO, FALLA IGUAL EN EL LEGACY DE ZARAGOZA. sp_n_ConsultarGarantiasAceptar recorre dbo.CentrosServicio y cruza a [MacZCS1..MacZCS11].dbo.Garantias; esas bases no estan en este servidor. El nuevo contesta 500 'Error de base de datos' y Legacy, con el mismo filtro, contesta status 500 \"[No se pudo procesar sp_n_ConsultarGarantiasAceptar] - Invalid object name 'MacZCS1.dbo.Garantias'.\" Es infraestructura: restaurar esas bases. No se pierde nada al apagar Legacy."
+      ],
+      "estado_nuevo_esperado": 500
+    }
+  }
 }

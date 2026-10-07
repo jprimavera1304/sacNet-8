@@ -105,5 +105,25 @@
   "diferencias_intencionales": [
     "Legacy declara 1 campos que el procedimiento NO devuelve y salen en 0/null: Cargos. Es relleno del DTO (DataTableToList empareja por nombre exacto y lo que no encuentra lo deja en su valor por omision), no un dato, asi que no se compara.",
     "El procedimiento devuelve 7 columnas que el DTO de Legacy NO declara y Legacy TIRA al mapear: InicialCascos, InicialCreditosZ, InicialImporteZ, InicialSaldoCascos, InicialSaldoFavor, InicialSaldoFavorCascos, InicialSaldoImporte. El nuevo las pasa tal cual: es mas fiel al procedimiento, no menos, y la pantalla las necesita."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "La IDCobranza 208623 es de Tauro; en MacZ se usa la 49334.",
+      "legacy": {
+        "body": {
+          "IDCobranza": 49334
+        }
+      },
+      "nuevo": {
+        "path": "/api/ventas/cobranzas/49334/detalle"
+      },
+      "diferencias_intencionales": [
+        "SALDOFAVORCASCOS: Legacy entrega 0 y el nuevo 25. No es nuestro. sp_n_ConsultarCobranzaDetalle devuelve las columnas 'SaldoFavor' y 'SaldoFavorCascos' (F mayuscula, como se llaman en dbo.Ventas) y el DTO de Legacy las declara 'Saldofavor' y 'SaldofavorCascos' (f minuscula): el mapeo por nombre exacto no empareja y Legacy las entrega en 0 SIEMPRE. En Tauro no se nota porque la cobranza de prueba no tenia saldo a favor de cascos. El nuevo entrega lo que dice la base. ES UN NUMERO QUE MAC31 NO ENSENA Y EL WEB SI VA A ENSENAR."
+      ],
+      "ignorar": [
+        "SaldoFavorCascos",
+        "SaldoFavor"
+      ]
+    }
+  }
 }

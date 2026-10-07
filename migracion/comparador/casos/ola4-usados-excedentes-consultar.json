@@ -41,5 +41,66 @@
   "solo_campos": [],
   "ignorar": [],
   "diferencias_intencionales": [],
-  "_base_con_datos": "MacZ"
+  "_base_con_datos": "MacZ",
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDVentaUsadoExcendente 4250 es de Tauro. En MacZ el mas reciente es el 40177.",
+      "legacy": {
+        "body": {
+          "IDVentaUsadoExcendente": 40177
+        }
+      },
+      "nuevo": {
+        "body": {
+          "idVentaUsadoExcedente": 40177
+        }
+      },
+      "solo_campos": [
+        "canceladaexc",
+        "concepto",
+        "equipocancelacionexc",
+        "equipocob",
+        "equipoexc",
+        "equipomodificacionexc",
+        "fechacancelacionexc",
+        "fechacancelacionexcftm",
+        "fechacob",
+        "fechacobftm",
+        "fechaexc",
+        "fechaexcftm",
+        "fechamodificacionexc",
+        "fechamodificacionexcftm",
+        "fechasistema",
+        "fechasistemaftm",
+        "foliocob",
+        "idcliente",
+        "idcobro",
+        "idrepartidor",
+        "idusuariocancelacionexc",
+        "idusuariocob",
+        "idusuarioexc",
+        "idusuariomodificacionexc",
+        "idventausadoexcendente",
+        "modificadaexc",
+        "nombrecliente",
+        "numcascos",
+        "numerocliente",
+        "observaciones",
+        "repartidorcob",
+        "repartidorexc",
+        "saldofavor",
+        "saldofavorcascos",
+        "totalcascos",
+        "usuariocancelacionexc",
+        "usuariocob",
+        "usuarioexc",
+        "vale"
+      ],
+      "diferencias_intencionales": [
+        "Este caso se escribio a ciegas contra Tauro, donde la tabla esta vacia: comparaba lista vacia contra lista vacia y el OK no probaba nada. Con los datos de Zaragoza se comparan de verdad 39 campos, y los 39 coinciden uno por uno.",
+        "Legacy manda ademas 9 campos que sp_n_ConsultarVentasUsadosExcedentes NO devuelve: son el cascaron de su DTO (DataTableToList deja el valor por omision, 0 o null, en lo que el procedimiento no trae). No son dato. Son: cantidadusado, idtipousado, importeusadoconiva, orden, tipousado, tipousadocorto, totalgruposusadocredito, totalimportegruposusadocredito, usuariomodificacionexc.",
+        "Y sp_n_ConsultarVentasUsadosExcedentes SI devuelve 2 columnas que el DTO de Legacy no declara, asi que alla se pierden sin aviso: esdinero, usuariomodificacion. El contrato nuevo las publica."
+      ]
+    }
+  }
 }

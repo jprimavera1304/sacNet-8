@@ -36,5 +36,20 @@
   "solo_campos": [],
   "ignorar": [],
   "diferencias_intencionales": [],
-  "_base_con_datos": "MacZ"
+  "_base_con_datos": "MacZ",
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDCobroDineroUsado 1 no trae renglones en MacZ; el 34388 es el mas reciente.",
+      "legacy": {
+        "body": {
+          "IDCobroDineroUsado": 34388
+        }
+      },
+      "nuevo": {
+        "body": {
+          "idCobroDineroUsado": 34388
+        }
+      }
+    }
+  }
 }

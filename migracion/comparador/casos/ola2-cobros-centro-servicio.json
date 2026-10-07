@@ -30,5 +30,35 @@
   },
   "camino_legacy": "result.cobros",
   "camino_nuevo": "data.rows",
-  "_base_con_datos": "MacZ"
+  "_base_con_datos": "MacZ",
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El FolioCobro 1 no trae renglones en MacZ. El cobro mas reciente es el 68918, folio 29716.",
+      "legacy": {
+        "body": {
+          "FolioCobro": 29716
+        }
+      },
+      "nuevo": {
+        "query": {
+          "folioCobro": 29716
+        }
+      },
+      "solo_campos": [
+        "cancelada",
+        "equipocancelo",
+        "fecha",
+        "fechacancelacion",
+        "fechacancelacionftm",
+        "fechaftm",
+        "idcobro",
+        "idusuariocancelo"
+      ],
+      "diferencias_intencionales": [
+        "Este caso se escribio a ciegas contra Tauro, donde la tabla esta vacia: comparaba lista vacia contra lista vacia y el OK no probaba nada. Con los datos de Zaragoza se comparan de verdad 8 campos, y los 8 coinciden uno por uno.",
+        "Legacy manda ademas 89 campos que sp_n_ConsultarCobrosCentroServicio NO devuelve: son el cascaron de su DTO (DataTableToList deja el valor por omision, 0 o null, en lo que el procedimiento no trae). No son dato. Son: abonoscascos, abonosdinero, almacen, cantidadg1, cantidadg2, cantidadg3, cantidadg4, cantidadg5, cantidadg6, cantidadg7, cantidadmoto, cargo, cascos, cheque, clientemanual, conpagoscascos, conpagosdinero, conpagosdinerocascos, depositoefectivo, descuento, dinero, dinerocascosingresado, efectivo, equipo, equipocierre, equipocierremodificacion, equipomodifico, excedenteusados, fechaaplicacion, fechaaplicacionftm, fechacancelacionmostrar, fechacierre, fechacierreftm, fechacierremodificacion, fechacierremodificacionftm, fechacierremostrar, fechacierremostrarmodificacion, fechamodificacion, fechamodificacionftm, fechamodificacionmostrar, folio, folioventacascos, folioventacascosftm, folioventadinero, folioventadineroftm, id, idalmacen, idcliente, idcobranza, idcobrodinerousado, idconcentrado, idrepartidor, idusuario, idusuarioaplicacion, idusuariocierre, idusuariocierremodificacion, idusuariomodifico, idusuariotrabajo, idventa, idventaaplicosaldofavor, idventacascos, idventacobrodinero, idventacobrousado, idventadinero, ingresodinero, ingresousados, nombrecliente, numerocliente, numfolios, observaciones, repartidor, saldocascos, saldodinero, saldofavor, tarjeta, tipodocumentocascos, tipodocumentodinero, total, totalcascos, totalencero, totalimporte, totalsaldocascos, totalsaldoimporte, transferencia, usuario, usuariocancelo, usuariocierre, usuariocierremodificacion, usuariomodifico.",
+        "Y sp_n_ConsultarCobrosCentroServicio SI devuelve 1 columnas que el DTO de Legacy no declara, asi que alla se pierden sin aviso: foliocobro. El contrato nuevo las publica."
+      ]
+    }
+  }
 }

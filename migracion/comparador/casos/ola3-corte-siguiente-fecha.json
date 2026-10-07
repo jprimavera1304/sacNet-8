@@ -32,5 +32,14 @@
     "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla.",
     "Fuera el parametro IDCorte, que el procedimiento ignora. Aceptarlo haria creer que el resultado depende de el.",
     "Legacy devolvia el CorteDTO completo con todo en ceros salvo tres campos. El nuevo publica un objeto de dos campos."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "diferencias_intencionales": [
+        "EN ZARAGOZA dbo.Cortes TIENE 0 RENGLONES, asi que no hay corte del que partir. El nuevo contesta 404 'No hay cortes registrados.', que es la respuesta que su propio contrato declara (CortesController.cs: ProducesResponseType 404). Legacy entrega su CorteDTO en ceros, con FechaCorte = '0001-01-01T00:00:00': un ano 1 no es una fecha de corte siguiente, es el valor por omision de su DTO. No verificable en Zaragoza por falta de datos, no por el backend."
+      ],
+      "estado_nuevo_esperado": 404,
+      "no_comparable": "en Zaragoza dbo.Cortes tiene 0 renglones. El nuevo contesta el 404 que declara su contrato y Legacy su DTO en ceros con FechaCorte '0001-01-01'. No hay dato con el que comparar. Se verifica en Tauro."
+    }
+  }
 }

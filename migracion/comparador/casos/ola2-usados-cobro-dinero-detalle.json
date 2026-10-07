@@ -29,5 +29,82 @@
   },
   "camino_legacy": "result.cobrosDineroUsados",
   "camino_nuevo": "data.rows",
-  "_base_con_datos": "MacZ"
+  "_base_con_datos": "MacZ",
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDCobroDineroUsado 1 no trae renglones en MacZ; el 34388 es el mas reciente.",
+      "legacy": {
+        "body": {
+          "IDCobroDineroUsado": 34388
+        }
+      },
+      "nuevo": {
+        "query": {
+          "idCobroDineroUsado": 34388
+        }
+      },
+      "solo_campos": [
+        "cancelada",
+        "cantidad",
+        "cantidadcascos",
+        "cheque",
+        "chequesaldo",
+        "chequeutilizado",
+        "depositoefectivo",
+        "depositoefectivosaldo",
+        "depositoefectivoutilizado",
+        "efectivo",
+        "efectivosaldo",
+        "efectivoutilizado",
+        "equipo",
+        "equipocancelacion",
+        "equipomodificacion",
+        "fecha",
+        "fechacancelacion",
+        "fechacancelacionftm",
+        "fechacobro",
+        "fechacobroftm",
+        "fechaftm",
+        "fechamodificacion",
+        "fechamodificacionftm",
+        "foliocobro",
+        "idcobro",
+        "idcobrodinerousado",
+        "idrepartidor",
+        "idtipousado",
+        "idusuario",
+        "idusuariocancelacion",
+        "idusuariomodificacion",
+        "importecascos",
+        "modificado",
+        "numcascos",
+        "observaciones",
+        "observacionesaplicacion",
+        "preciounitario",
+        "repartidor",
+        "tarjeta",
+        "tarjetasaldo",
+        "tarjetautilizado",
+        "tipousado",
+        "tipousadocorto",
+        "totalcascos",
+        "totalcascossaldo",
+        "totalcascosutilizado",
+        "totalcobrado",
+        "totalcobradosaldo",
+        "totalcobradoutilizado",
+        "transferencia",
+        "transferenciasaldo",
+        "transferenciautilizado",
+        "usuario",
+        "usuariocancelacion",
+        "usuariomodificacion"
+      ],
+      "diferencias_intencionales": [
+        "Este caso se escribio a ciegas contra Tauro, donde la tabla esta vacia: comparaba lista vacia contra lista vacia y el OK no probaba nada. Con los datos de Zaragoza se comparan de verdad 55 campos, y los 55 coinciden uno por uno.",
+        "Legacy manda ademas 75 campos que sp_n_ConsultarCobroDineroUsadosDetalle NO devuelve: son el cascaron de su DTO (DataTableToList deja el valor por omision, 0 o null, en lo que el procedimiento no trae). No son dato. Son: aplicado, bancocheque, cantidadcascossaldo, cantidadcascosutilizada, cantidadg1, cantidadg2, cantidadg3, cantidadg4, cantidadg5, cantidadg6, cantidadg7, cantidadmoto, cantidadsaldog1, cantidadsaldog2, cantidadsaldog3, cantidadsaldog4, cantidadsaldog5, cantidadsaldog6, cantidadsaldog7, cantidadsaldomoto, cantidadutilizadog1, cantidadutilizadog2, cantidadutilizadog3, cantidadutilizadog4, cantidadutilizadog5, cantidadutilizadog6, cantidadutilizadog7, cantidadutilizadomoto, equipoaplicacion, equipotrabajo, fechaaplicacion, fechaaplicacionftm, fechacancelacionmostrar, fechacheque, fechachequeftm, fechacierremostrar, fechafinal, fechafinalftm, fechainicial, fechainicialftm, fechamodificacionmostrar, fechatrabajo, fechatrabajoftm, foliocorte, foliocorteftm, idbancocheque, idcentro, idcobranza, idcobrodinerousadocheque, idcobrodinerousadocortecs, idcobrodinerousadodetalle, idconcentrado, idcorte, idstatuscheque, idtiporetiro, idusuarioaplicacion, idusuariotrabajo, importecheque, ingresado, nombrecentro, numcortescs, numerocheque, numpagos, observacionescobro, pagosefectivo, pagossalidaefectivo, retiroefectivo, retiroefectivocortescs, saldoactualefectivo, saldoanteriorefectivo, statuscheque, totalretiroefectivocortescs, trabajado, usuarioaplicacion, usuariotrabajo.",
+        "Y sp_n_ConsultarCobroDineroUsadosDetalle SI devuelve 6 columnas que el DTO de Legacy no declara, asi que alla se pierden sin aviso: idcobrodinerousado1, modificotarjetacomision, orden, tarjetacomision, tarjetacomisionsaldo, tarjetacomisionutilizado. El contrato nuevo las publica."
+      ]
+    }
+  }
 }

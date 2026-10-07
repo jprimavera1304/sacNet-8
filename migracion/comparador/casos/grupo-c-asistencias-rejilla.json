@@ -68,5 +68,42 @@
     "EL NUEVO ENTREGA MAS, NO MENOS. El SP devuelve tambien fechaDia1..fechaDia7 y vacaciones; el nuevo las pasa (manda el renglon crudo, ver Funciones.DataTableToRows) y Legacy las TIRA, porque EmpleadoPeriodoAsistenciaDTO no declara esas propiedades y DataTableToList empareja por nombre. Es un dato que Legacy pierde, no uno que el nuevo invente.",
     "Legacy manda nueve campos que el SP NO devuelve y que por lo mismo salen siempre en null o 0: fecha, nombreEmpleado, horaEntrada, horaSalida, horaComidaInicio, horaComidaTermino, fechaHoraRegistro, result y status. Son restos del DTO de Legacy; el nuevo no los repite.",
     "El nuevo agrega 'total' y 'milisegundos' al lado de 'data'. No son datos del renglon: la rejilla es un doble cursor dentro de legacy y tarda, y la pantalla tiene derecho a avisarlo en vez de girar un spinner mudo."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El periodo 9521 es de Tauro. En MacZ el 12549 tiene sus siete dias y 246 asistencias.",
+      "legacy": {
+        "body": {
+          "IDPeriodoTipoSueldo": 12549
+        }
+      },
+      "nuevo": {
+        "query": {
+          "idPeriodoTipoSueldo": 12549
+        }
+      },
+      "nombre": "Rejilla de asistencias del periodo 12549 (Zaragoza)",
+      "ignorar": [
+        "Asistencias",
+        "Inasistencias",
+        "DiaHorasLaboradas1",
+        "DiaHorasLaboradas2",
+        "DiaHorasLaboradas3",
+        "DiaHorasLaboradas4",
+        "DiaHorasLaboradas5",
+        "DiaHorasLaboradas6",
+        "DiaHorasLaboradas7",
+        "DiaMinutosLaborados1",
+        "DiaMinutosLaborados2",
+        "DiaMinutosLaborados3",
+        "DiaMinutosLaborados4",
+        "DiaMinutosLaborados5",
+        "DiaMinutosLaborados6",
+        "DiaMinutosLaborados7"
+      ],
+      "diferencias_intencionales": [
+        "NULL contra el valor por omision del DTO, la misma diferencia intencional ya documentada en el resto del banco. En los dias que el empleado no tiene capturados, el procedimiento devuelve NULL; Legacy los declara NO anulables y entrega 0, el nuevo entrega null. Un 0 en 'DiaHorasLaboradas3' se lee como 'trabajo cero horas ese dia', que no es lo mismo que 'ese dia no tiene captura'. En el periodo 9521 de Tauro no habia ningun NULL y la diferencia no salia; en el 12549 de Zaragoza hay 246 asistencias con huecos y si sale."
+      ]
+    }
+  }
 }

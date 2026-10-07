@@ -35,5 +35,20 @@
   "diferencias_intencionales": [
     "El procedimiento devuelve la columna CalleNumero y el DTO de legacy la declara CalleConNumero: no empareja y legacy entrega null, perdiendo la calle. El nuevo entrega CalleNumero con su valor ('CAMILO ARRIAGA MZ 61 LT16'). El nuevo es mas fiel.",
     "Calle, NumeroExterior y NumeroInterior son campos que solo existen en el DTO de legacy: el procedimiento no los devuelve y salen en null."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDCliente 20316 es de Tauro; en MacZ se usa el 33320.",
+      "legacy": {
+        "body": {
+          "IDCliente": 33320
+        }
+      },
+      "nuevo": {
+        "body": {
+          "IDCliente": 33320
+        }
+      }
+    }
+  }
 }

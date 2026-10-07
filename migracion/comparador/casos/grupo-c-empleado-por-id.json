@@ -25,5 +25,19 @@
   "diferencias_intencionales": [
     "El nuevo entrega el objeto y Legacy una lista de un elemento. Es la forma, no el dato.",
     "El nuevo agrega 'puedeVerSueldo' fuera de 'data' (ver el caso de la lista)."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDEmpleado 4199 es de Tauro. En MacZ el mas alto es el 123.",
+      "legacy": {
+        "body": {
+          "IDEmpleado": 123
+        }
+      },
+      "nuevo": {
+        "path": "/api/empleados/123"
+      },
+      "nombre": "Un empleado por id (123, Zaragoza)"
+    }
+  }
 }

@@ -51,5 +51,28 @@
   ],
   "diferencias_intencionales": [
     "Legacy declara 13 campos que el procedimiento NO devuelve y salen en 0/null: Accion, Equipo, EsBaja, Fecha, FechaFtm, IDDescuentoDetalleLog, IDUsuario, Incrementar, mensaje, PorcentajeAnterior, PorcentajeNuevo, result, Usuario. Es relleno del DTO (DataTableToList empareja por nombre exacto y lo que no encuentra lo deja en su valor por omision), no un dato, asi que no se compara."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDDescuento 53518 y las marcas 94/87 son de Tauro. En MacZ el descuento 15178 tiene 20 renglones y entre sus marcas estan la 146 y la 132.",
+      "legacy": {
+        "body": {
+          "IDDescuento": 15178,
+          "IDMarcaLst": [
+            146,
+            132
+          ]
+        }
+      },
+      "nuevo": {
+        "body": {
+          "IDDescuento": 15178,
+          "IDsMarca": [
+            146,
+            132
+          ]
+        }
+      }
+    }
+  }
 }

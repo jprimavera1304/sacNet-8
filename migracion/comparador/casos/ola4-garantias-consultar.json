@@ -38,5 +38,20 @@
   "ignorar": [],
   "diferencias_intencionales": [
     "Legacy rellena con 0 / 0001-01-01 los campos que su DTO declara y el procedimiento no devuelve, y TIRA los que el procedimiento devuelve y su DTO no declara. El nuevo baja el renglon del procedimiento tal cual: donde dice NULL, dice null. Se comparan los campos que los dos lados entregan."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "La IDGarantia 3997 es de Tauro. En MacZ hay 24.854 garantias y la mas reciente es la 53047.",
+      "legacy": {
+        "body": {
+          "IDGarantia": 53047
+        }
+      },
+      "nuevo": {
+        "body": {
+          "idGarantia": 53047
+        }
+      }
+    }
+  }
 }

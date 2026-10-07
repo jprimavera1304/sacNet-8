@@ -48,5 +48,18 @@
     "El procedimiento devuelve ~30 columnas y el contrato nuevo se queda con nueve: las que Mac31 pinta en el panel de saldos. Las otras (IDVenta, Empresa, Folio, las cuatro FechaVencimiento*, los cuatro Estatus* por concepto, PromedioVencimiento, NumFolios*) salen SIEMPRE en 0/null para esta llamada porque @Formato=0 no las llena.",
     "DiasVencimientoMostrar llega de la base como texto ('222') y el contrato nuevo lo entrega como numero (222) con el nombre diasVencimiento. Es el mismo dato.",
     "El nuevo agrega totalSaldo y maximoVencimiento, que Mac31 calcula en la pantalla sumando los renglones. No son datos nuevos, es la misma suma hecha en el servidor."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDCliente 20316 es de Tauro; en MacZ se usa el 33320.",
+      "legacy": {
+        "body": {
+          "IDCliente": 33320
+        }
+      },
+      "nuevo": {
+        "path": "/api/ventas/saldos/cliente/33320"
+      }
+    }
+  }
 }

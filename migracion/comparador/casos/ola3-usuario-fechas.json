@@ -35,5 +35,20 @@
   "diferencias_intencionales": [
     "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla. Con el caso apuntado a datos reales esta diferencia SI aparece (antes no, porque la lista venia vacia), asi que `FechaFtm` esta en `ignorar`.",
     "Fuera `result` y `mensaje` de cada renglon."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDUsuario 40 es de Tauro. En MacZ el 1 es ADMIN.",
+      "legacy": {
+        "body": {
+          "IDUsuario": 1
+        }
+      },
+      "nuevo": {
+        "query": {
+          "idUsuario": 1
+        }
+      }
+    }
+  }
 }
