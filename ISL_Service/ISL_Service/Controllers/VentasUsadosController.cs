@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.VentasUsados;
+﻿using ISL_Service.Application.DTOs.VentasUsados;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -21,15 +21,28 @@ public class VentasUsadosController : PermisoControllerBase
       y en PermissionService ya esta mapeado a "ventas.usados". No se inventa
       ninguno nuevo.
 
-      Mac31 tiene ademas un permiso aparte para el boton GUARDAR de esta pantalla
-      (n_Procesos 5085, forma VentasUsados, proceso btnGuardar) con los mismos
-      identificadores en las dos empresas. No se usa aqui porque el puente de
-      permisos heredados esta amarrado a UNA forma por modulo —la de Consultar
-      ventas— y agregar una segunda forma obligaria a tocar el mecanismo entero.
-      Queda anotado como pendiente: hoy quien puede abrir la pantalla puede
-      guardar, igual que en la practica pasa en Mac31.
+      ABRIR LA PANTALLA Y GUARDAR SON DOS PERMISOS, YA NO UNO
+      ------------------------------------------------------
+      Aqui estaba anotado como pendiente que el GUARDAR usaba el permiso de
+      LECTURA, porque "el puente de permisos heredados esta amarrado a UNA forma
+      por modulo". Ya no: el puente se parametrizo cuando se hizo el de la forma
+      de pagos, y en PermissionService hay ahora una tercera forma de ventas,
+      VentasUsadosBinding, que trae el boton GUARDAR de Mac31 (IDForma 4024,
+      "CONSULTA DE VENTAS USADOS", btnGuardar = IDProceso 5085, los mismos
+      numeros en las dos empresas).
+
+      Asi que el GUARDAR exige "ventas.usados.guardar", que es EL MISMO permiso
+      que Mac31 ya pide para ese boton: a quien lo tiene encendido en Mac31 le
+      llega solo, sin capturarlo dos veces, y a quien no, el web deja de dejarle
+      guardar — igual que legacy.
     */
     private static readonly string[] PermisosUsados = { "ventas.usados" };
+
+    /// <summary>
+    /// El boton GUARDAR de Mac31 (btnGuardar de la forma VentasUsados), heredado
+    /// por VentasUsadosBinding. Ver el comentario de arriba.
+    /// </summary>
+    private static readonly string[] PermisosGuardarUsados = { Infrastructure.Security.PermissionService.UsadosGuardarPermission };
 
     private readonly IVentasUsadosService _service;
 
@@ -82,7 +95,7 @@ public class VentasUsadosController : PermisoControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Guardar([FromBody] VentasUsadosGuardarRequest? body, CancellationToken ct)
     {
-        var sinPermiso = await ExigirPermisoAsync(PermisosUsados, ct);
+        var sinPermiso = await ExigirPermisoAsync(PermisosGuardarUsados, ct);
         if (sinPermiso is not null) return sinPermiso;
 
         if (body is null)

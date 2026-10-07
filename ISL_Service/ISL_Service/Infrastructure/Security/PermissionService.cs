@@ -207,6 +207,46 @@ public sealed class PermissionService : IPermissionService
     private static readonly LegacyModuleBinding VentasPagosBinding = new(
         VentasModuleKey, "Ventas", VentasPagosLegacyForm, VentasPagosLegacyPermissionMap, new List<PermissionSeed>());
 
+    /*
+      EL BOTON GUARDAR DE USADOS VIVE EN UNA TERCERA FORMA DE MAC31.
+
+      "ventas.usados" (btnUsados, en CONSULTA DE VENTAS) es el que deja ABRIR la
+      pantalla de usados, y ya estaba arriba. Pero Mac31 tiene un permiso APARTE
+      para el boton GUARDAR de esa pantalla, y vive en su propia forma. Hasta
+      ahora el backend no lo usaba: quien podia abrir la pantalla podia guardar.
+
+      VentasUsadosController lo tenia anotado como pendiente, con el motivo de
+      que "el puente de permisos heredados esta amarrado a UNA forma por modulo
+      y agregar una segunda obligaria a tocar el mecanismo entero". Ya no es
+      cierto: el puente se parametrizo cuando se hizo el de pagos
+      (LegacyModuleBinding), y esta es la tercera forma del mismo modulo, exacta-
+      mente como la segunda. No hay mecanismo que tocar.
+
+      Verificado en las DOS empresas y son identicas hasta el numero: IDForma
+      4024, Forma "VentasUsados", Descripcion "CONSULTA DE VENTAS USADOS", con un
+      solo proceso, btnGuardar (5085), el mismo IDProceso en Produccion_svr
+      (Tauro) y en MacZ (Zaragoza).
+
+      NO HAY CHOQUE DE IDProceso con las otras dos formas de ventas: la de
+      consulta usa 1..18, 1031, 3063, 5096, 5151-5154, 5196 y 53xx; la de pagos
+      1032 y 1033; esta, 5085. Importa porque el catalogo se indexa por
+      IDProceso.
+
+      NO LLEVA WebSeeds NI SU PROPIO ver_modulo, por lo mismo que pagos: el
+      modulo es el MISMO ("ventas") y su ".ver_modulo" ya lo siembra
+      VentasWebPermissionSeeds.
+    */
+    private const string VentasUsadosLegacyForm = "CONSULTA DE VENTAS USADOS";
+
+    public const string UsadosGuardarPermission = "ventas.usados.guardar";
+
+    private static readonly Dictionary<string, (string Key, string Name)> VentasUsadosLegacyPermissionMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["btnGuardar"] = (UsadosGuardarPermission, "Ventas - Guardar usados")
+    };
+
+    private static readonly LegacyModuleBinding VentasUsadosBinding = new(
+        VentasModuleKey, "Ventas", VentasUsadosLegacyForm, VentasUsadosLegacyPermissionMap, new List<PermissionSeed>());
 
     private const string PrestamosModuleKey = "prestamos";
     private const string PrestamosViewPermission = "prestamos.ver_modulo";
@@ -2465,7 +2505,10 @@ WHERE EmpresaId = @EmpresaId
     {
         var catalogo = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasBinding, ct);
         var pagos = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasPagosBinding, ct);
+        var usados = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, VentasUsadosBinding, ct);
         foreach (var par in pagos)
+            catalogo[par.Key] = par.Value;
+        foreach (var par in usados)
             catalogo[par.Key] = par.Value;
         return catalogo;
     }
@@ -2483,9 +2526,12 @@ WHERE EmpresaId = @EmpresaId
     {
         var consulta = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, userId, VentasBinding, catalogo, ct);
         var pagos = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, userId, VentasPagosBinding, catalogo, ct);
+        var usados = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, userId, VentasUsadosBinding, catalogo, ct);
 
         consulta.Allow.UnionWith(pagos.Allow);
+        consulta.Allow.UnionWith(usados.Allow);
         consulta.Deny.UnionWith(pagos.Deny);
+        consulta.Deny.UnionWith(usados.Deny);
         return consulta;
     }
 
