@@ -400,6 +400,37 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 
+/*
+  LOS DOS ENDPOINTS DE DIAGNOSTICO VAN CON CANDADO.
+
+  QUE PASABA
+  ----------
+  /whoami y /dbcheck estaban anonimos, y no decian poca cosa:
+
+    GET /dbcheck -> {"connected":true,"connection":"Main",
+                     "server":"LAP-JUAND","database":"Produccion_svr"}
+    GET /whoami  -> {"companyId":"local","environment":"Production", ...}
+
+  Nombre del servidor SQL y nombre de la base, de regalo, a quien pase por la
+  URL. En produccion eso es reconocimiento de infraestructura: el primer paso
+  de cualquiera que luego pruebe a conectarse.
+
+  QUE SE DECIDIO Y POR QUE
+  ------------------------
+  NO se dejan "solo en Development". Para lo que sirven —comprobar que una Web
+  App de Azure quedo apuntando a la empresa y a la base correctas despues de un
+  despliegue— hay que poder llamarlos EN produccion; si solo existen en local no
+  comprueban nada de lo que se despliega. Asi que siguen existiendo en los dos
+  entornos, pero PIDEN TOKEN: sin cabecera Authorization contestan 401.
+
+  Basta con estar autenticado, sin permiso fino: no revelan datos de nadie, y
+  quien tiene que comprobar un despliegue no siempre es administrador del
+  sistema de permisos.
+
+  El candado es RequireAuthorization() sobre el endpoint, que corre dentro del
+  mismo UseAuthorization() ya registrado arriba.
+*/
+
 // AGREGADO: endpoint simple para validar config por empresa
 app.MapGet("/whoami", (IConfiguration config, IWebHostEnvironment env) =>
 {
@@ -413,7 +444,7 @@ app.MapGet("/whoami", (IConfiguration config, IWebHostEnvironment env) =>
         corsAllowedOrigins = config["AllowedOrigins"] ?? "",
         db = effectiveCsName
     });
-});
+}).RequireAuthorization();
 
 app.MapGet("/dbcheck", async () =>
 {
@@ -434,7 +465,7 @@ app.MapGet("/dbcheck", async () =>
     {
         return Results.Problem(ex.Message);
     }
-});
+}).RequireAuthorization();
 
 
 app.MapControllers();
