@@ -394,8 +394,28 @@ def correr_caso(caso, cred, verbose=False):
         "estado_nuevo": est_nue,
         "diferencias": diffs,
         "intencionales": caso.get("diferencias_intencionales", []),
+        "renglones": cuantos(datos_leg),
         "ok": not diffs and est_leg == 200 and est_nue in (200, 204),
     }
+
+
+def cuantos(datos):
+    """Cuantos renglones se compararon de verdad.
+
+    UN CASO QUE COMPARA VACIO CONTRA VACIO SALE `OK` Y NO PRUEBA NADA: un
+    endpoint que devolviera siempre una lista vacia pasaria igual. Pasa cuando
+    la tabla no tiene datos en esta base, o cuando el parametro del caso esta
+    mal elegido -que fue lo mas comun: de seis casos rescatados, en los seis el
+    endpoint estaba bien y lo que estaba mal era la prueba-.
+
+    De 135 casos habia 25 asi, y la unica forma de saberlo era leer el
+    `_porque` de cada uno. Ahora se ve en cada corrida.
+    """
+    if isinstance(datos, list):
+        return len(datos)
+    if isinstance(datos, dict):
+        return 1 if datos else 0
+    return 0 if datos is None else 1
 
 
 # ---------------------------------------------------------------- principal
@@ -456,7 +476,7 @@ def main(argv):
 
     fecha_antes = fecha_de_operacion()
     rutas = casos_de(objetivo)
-    bien, mal = [], []
+    bien, mal, vacios = [], [], []
 
     for ruta in rutas:
         with open(ruta, "r", encoding="utf-8") as fh:
@@ -476,6 +496,8 @@ def main(argv):
             mal.append(res["nombre"])
         else:
             bien.append(res["nombre"])
+            if res["renglones"] == 0:
+                vacios.append(res["nombre"])
 
     print("\n{} coinciden, {} con diferencias, {} casos".format(
         len(bien), len(mal), len(rutas)))
