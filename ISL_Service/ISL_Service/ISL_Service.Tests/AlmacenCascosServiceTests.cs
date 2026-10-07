@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.AlmacenCascos;
+﻿using ISL_Service.Application.DTOs.AlmacenCascos;
 using ISL_Service.Application.DTOs.Catalogos;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Services;
@@ -152,16 +152,16 @@ public class AlmacenCascosServiceTests
         public Task<List<TipoCascoItemDto>> ListTiposCascoAsync(int? idStatus, CancellationToken ct = default)
             => Task.FromResult(new List<TipoCascoItemDto>());
 
-        public Task<List<RepartidorItemDto>> ListRepartidoresAsync(int? idStatus, CancellationToken ct = default)
+        public Task<List<RepartidorItemDto>> ListRepartidoresAsync(int? idStatus, string? texto, CancellationToken ct = default)
             => Task.FromResult(new List<RepartidorItemDto>());
 
         public Task<List<TarimaCatalogItemDto>> ListTarimasAsync(int? idStatus, CancellationToken ct = default)
             => Task.FromResult(new List<TarimaCatalogItemDto>());
 
-        public Task<List<ClienteCatalogItemDto>> ListClientesAsync(int? idStatus, CancellationToken ct = default)
+        public Task<List<ClienteCatalogItemDto>> ListClientesAsync(int? idStatus, int idUsuario, CancellationToken ct = default)
             => Task.FromResult(new List<ClienteCatalogItemDto>());
 
-        public Task<List<BancoCatalogItemDto>> ListBancosAsync(int? idStatus, CancellationToken ct = default)
+        public Task<List<BancoCatalogItemDto>> ListBancosAsync(int? idStatus, string? texto, CancellationToken ct = default)
             => Task.FromResult(new List<BancoCatalogItemDto>());
     }
 }
