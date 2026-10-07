@@ -130,8 +130,22 @@ namespace ISL_Service.Utils
 
             // "IDEmpleado" -> "idEmpleado": si arrancan dos mayusculas, se bajan
             // las dos, que es como lo escribe el resto de la API.
+            //
+            // OJO AL ARREGLO (ola 5, obra/aviacion). Esto estaba escrito como
+            //
+            //     return char.ToLowerInvariant(nombre[0]) + char.ToLowerInvariant(nombre[1]) + nombre.Substring(2);
+            //
+            // y en C# `char + char` NO concatena: SUMA los codigos. 'i' + 'd' da
+            // 205, y el `int + string` que viene despues convertia "IDContrato" en
+            // "205Contrato". Cualquier columna que empiece por dos mayusculas
+            // —IDContrato, IDCliente, IDPoliza, RFC...— salia al cliente con un
+            // numero pegado delante. No se habia notado porque los SP que usaban
+            // DataTableToRows hasta hoy devuelven sus columnas ya en camelCase y
+            // la funcion sale antes por el `if (!char.IsUpper(nombre[0]))`; los SP
+            // de obra y aviacion si las devuelven en Pascal, y ahi se destapo.
+            // Con interpolacion se concatena de verdad.
             if (nombre.Length > 1 && char.IsUpper(nombre[1]))
-                return char.ToLowerInvariant(nombre[0]) + char.ToLowerInvariant(nombre[1]) + nombre.Substring(2);
+                return $"{char.ToLowerInvariant(nombre[0])}{char.ToLowerInvariant(nombre[1])}{nombre.Substring(2)}";
 
             return char.ToLowerInvariant(nombre[0]) + nombre.Substring(1);
         }
