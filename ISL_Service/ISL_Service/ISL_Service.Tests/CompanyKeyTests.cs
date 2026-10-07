@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
@@ -268,6 +268,9 @@ public class CompanyKeyTests
             => Task.CompletedTask;
         public Task UpsertUserOverridesAsync(int empresaId, Guid userId, IReadOnlyCollection<string> allow, IReadOnlyCollection<string> deny, CancellationToken ct)
             => Task.CompletedTask;
+        // La siembra del arranque: en las pruebas no hace nada.
+        public Task SembrarCatalogoCompletoAsync(int empresaId, CancellationToken ct) => Task.CompletedTask;
+
         public Task<PermisosWebSyncCatalogResponse> SyncPermissionCatalogAsync(int empresaId, IReadOnlyCollection<string>? modules, CancellationToken ct)
             => Task.FromResult(new PermisosWebSyncCatalogResponse());
         public Task<bool> CreatePermissionAsync(int empresaId, string key, string name, string? description, CancellationToken ct)
