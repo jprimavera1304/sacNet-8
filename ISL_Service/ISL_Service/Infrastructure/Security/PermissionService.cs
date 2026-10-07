@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Models;
@@ -454,6 +454,57 @@ public sealed class PermissionService : IPermissionService
         new("generacionroltorneo.crear", "Generación Rol Torneo - Crear", "generacionroltorneo"),
         new("generacionroltorneo.editar", "Generación Rol Torneo - Editar", "generacionroltorneo"),
         new("generacionroltorneo.activar", "Generación Rol Torneo - Activar/Inactivar", "generacionroltorneo"),
+
+        /*
+          CONFIGURACION DE ROL DE TORNEO: la gemela de generacionroltorneo, y la
+          unica de las dos que no estaba sembrada. Sus claves se exigen en
+          ConfiguracionRolTorneoController:26-123 y no existian en WPermiso de
+          NINGUNA de las dos bases, asi que la pantalla contestaba 403 a todo el
+          mundo menos al SuperAdmin. Lo encontro la prueba
+          ClavesDePermisoSembradasTests, no una revision a mano.
+        */
+        new("configuracionroltorneo.ver_modulo", "Configuración Rol Torneo - Ver módulo", "configuracionroltorneo"),
+        new("configuracionroltorneo.ver", "Configuración Rol Torneo - Ver", "configuracionroltorneo"),
+        new("configuracionroltorneo.crear", "Configuración Rol Torneo - Crear", "configuracionroltorneo"),
+        new("configuracionroltorneo.editar", "Configuración Rol Torneo - Editar", "configuracionroltorneo"),
+        new("configuracionroltorneo.activar", "Configuración Rol Torneo - Activar/Inactivar", "configuracionroltorneo"),
+
+        /*
+          EL TABLERO DE VENTAS COMPLETO COLGABA DE UNA CLAVE QUE NO EXISTIA.
+          Los 12 endpoints de DashboardVentasController exigen `dashboardventas.ver`
+          y esa fila no estaba en WPermiso ni en Tauro ni en Zaragoza: el tablero
+          era visible solo para el SuperAdmin, en las dos empresas.
+        */
+        new("dashboardventas.ver_modulo", "Tablero de Ventas - Ver módulo", "dashboardventas"),
+        new("dashboardventas.ver", "Tablero de Ventas - Consultar", "dashboardventas"),
+
+        /*
+          TARIMAS: cinco claves exigidas en TarimasController y cero filas en las
+          dos bases.
+        */
+        new("tarimas.ver_modulo", "Tarimas - Ver módulo", "tarimas"),
+        new("tarimas.ver", "Tarimas - Ver", "tarimas"),
+        new("tarimas.crear", "Tarimas - Crear", "tarimas"),
+        new("tarimas.editar", "Tarimas - Editar", "tarimas"),
+        new("tarimas.estado.editar", "Tarimas - Activar/Inactivar", "tarimas"),
+
+        /*
+          LAS PANTALLAS DE PERMISOS DEL WEB. Estas si estaban en WPermiso de Tauro
+          —script a mano— y no en la lista, asi que en una empresa nueva la
+          pantalla que reparte permisos es la primera que no se puede abrir.
+          `permisos_usuarios.*` se incluye por lo mismo aunque hoy nadie la exija
+          en un [Authorize]: es la tercera hermana y WModulo ya la contempla.
+        */
+        new("permisos_roles.ver_modulo", "Permisos - Roles: Ver módulo", "permisos_roles"),
+        new("permisos_roles.crear", "Permisos - Roles: Crear", "permisos_roles"),
+        new("permisos_roles.editar", "Permisos - Roles: Editar", "permisos_roles"),
+        new("permisos_modulos.ver_modulo", "Permisos - Módulos: Ver módulo", "permisos_modulos"),
+        new("permisos_modulos.ver", "Permisos - Módulos: Ver", "permisos_modulos"),
+        new("permisos_modulos.crear", "Permisos - Módulos: Crear", "permisos_modulos"),
+        new("permisos_modulos.editar", "Permisos - Módulos: Editar", "permisos_modulos"),
+        new("permisos_modulos.activar", "Permisos - Módulos: Prender/Apagar", "permisos_modulos"),
+        new("permisos_usuarios.ver_modulo", "Permisos - Usuarios: Ver módulo", "permisos_usuarios"),
+        new("permisos_usuarios.editar", "Permisos - Usuarios: Editar", "permisos_usuarios"),
 
         new("pagosproveedores.ver", "Pagos Proveedores - Ver", "pagosproveedores"),
         new("pagosproveedores.crear", "Pagos Proveedores - Crear", "pagosproveedores"),
@@ -992,7 +1043,79 @@ public sealed class PermissionService : IPermissionService
         new("cobros.pagos.incobrable", "Cobros - Declarar una remision incobrable", "cobros"),
         new("cobros.pagos.kilos", "Cobros - Pagos por kilo", "cobros"),
         new("cobros.transferencias.cancelar", "Cobros - Cancelar transferencias bancarias", "cobros"),
-        new("cobros.reasignar", "Cobros - Reasignar remisiones de cliente o agente", "cobros")
+        new("cobros.reasignar", "Cobros - Reasignar remisiones de cliente o agente", "cobros"),
+
+        /*
+          LAS FAMILIAS QUE EXISTIAN EN LA BASE Y NO EN ESTA LISTA.
+
+          QUE PASABA
+          Cambio de Cascos, el Checador, Asistencias y TODO el canal movil exigen
+          sus claves en el controlador âCascosCambioController:34-36,
+          ChecadorController:23-25, AsistenciasController:24-25,
+          EmpleadosController:23-29, PrestamosController:30-33,
+          VentasPedidoCapturaController (app_movil.pedidos),
+          VentasPedidosController:27-29 y VentasUsadosConsultaController:49â y
+          ninguna estaba aqui. Llegaron a `WPermiso` de Tauro porque alguien
+          corrio un script a mano cuando se desplegaron, no porque el backend las
+          sembrara. En una base de empresa NUEVA no entran: comprobado en MacZ
+          (Zaragoza), CERO filas `cascos_cambio.*` y cero `app_movil.ventas.usados`.
+
+          Y una clave que no esta en WPermiso NO PUEDE TENER FILA DE CONCESION,
+          asi que su endpoint contesta 403 a todo el mundo menos al SuperAdmin
+          (PermissionAuthorizationHandler, primer if). O sea: desplegar este
+          backend contra una empresa nueva dejaba Cambio de Cascos, el Checador y
+          la app movil completa en 403 hasta que un humano abriera la pantalla de
+          permisos y pulsara sincronizar. Es el mismo agujero que el arranque vino
+          a cerrar, entrando por las familias que nadie anoto.
+
+          POR QUE VAN AQUI Y NO EN UNA LISTA BLANCA DEL PUENTE DE LEGACY
+          Ninguna empieza por `ventas.`, `reportes.`, `empleados.` ni
+          `prestamos.`, que son las cuatro familias donde manda Mac31 y donde lo
+          que se guarda desde el web se borra en el siguiente calculo. El prefijo
+          `app_movil.` es justo lo que las salva: `app_movil.empleados.ver` NO
+          empieza por "empleados.", asi que el RemoveAll por prefijo no se la
+          lleva y lo que se de desde la pantalla de permisos se respeta. Esa es la
+          razon por la que el canal movil lleva prefijo propio y no sufijo.
+
+          LAS TRES CLAVES `ventas.*` QUE LA AUDITORIA CONTO EN ESTE HUECO NO VAN
+          EN ESTA LISTA. `ventas.ver_modulo`, `ventas.usados` y
+          `ventas.usados.guardar` las siembra EnsureVentasPermissionsSyncedAsync
+          desde los botones de las tres formas de Mac31, y eso ya corre al
+          arrancar (SembrarCatalogoCompletoAsync). Declararlas aqui crearia dos
+          duenos de la misma llave y la de Mac31 ganaria en el siguiente calculo.
+
+          SEMBRAR NO ES CONCEDER: esto solo crea la clave para poder repartirla.
+          Quien no la tenga concedida sigue sin entrar.
+        */
+        new("cascos_cambio.ver_modulo", "Cambio de Cascos - Ver mÃ³dulo", "cascos_cambio"),
+        new("cascos_cambio.ver", "Cambio de Cascos - Ver", "cascos_cambio"),
+        new("cascos_cambio.crear", "Cambio de Cascos - Registrar cambio", "cascos_cambio"),
+        new("cascos_cambio.cancelar", "Cambio de Cascos - Cancelar cambio", "cascos_cambio"),
+
+        new("asistencias.ver", "Asistencias - Ver", "asistencias"),
+        new("asistencias.editar", "Asistencias - Editar", "asistencias"),
+
+        new("checador.ver", "Checador - Checar entrada/salida", "checador"),
+        new("checador.huellas", "Checador - Administrar huellas", "checador"),
+        new("checador.reportes", "Checador - Reportes del checador", "checador"),
+
+        new("app_movil.pedidos", "App mÃ³vil - Capturar pedidos", "app_movil"),
+        new("app_movil.ventas.ver", "App mÃ³vil - Ver pendientes de autorizar", "app_movil"),
+        new("app_movil.ventas.autorizar", "App mÃ³vil - Autorizar pendientes", "app_movil"),
+        new("app_movil.ventas.usados", "App mÃ³vil - Consultar usados", "app_movil"),
+        new("app_movil.cascos_cambio.ver", "App mÃ³vil - Cambio de cascos: Ver", "app_movil"),
+        new("app_movil.cascos_cambio.crear", "App mÃ³vil - Cambio de cascos: Registrar", "app_movil"),
+        new("app_movil.cascos_cambio.cancelar", "App mÃ³vil - Cambio de cascos: Cancelar", "app_movil"),
+        new("app_movil.asistencias.ver", "App mÃ³vil - Asistencias: Ver", "app_movil"),
+        new("app_movil.asistencias.editar", "App mÃ³vil - Asistencias: Editar", "app_movil"),
+        new("app_movil.empleados.ver", "App mÃ³vil - Empleados: Ver", "app_movil"),
+        new("app_movil.empleados.crear", "App mÃ³vil - Empleados: Dar de alta", "app_movil"),
+        new("app_movil.empleados.editar", "App mÃ³vil - Empleados: Modificar", "app_movil"),
+        new("app_movil.empleados.sueldo.ver", "App mÃ³vil - Empleados: Ver sueldo y bonos", "app_movil"),
+        new("app_movil.prestamos.ver", "App mÃ³vil - PrÃ©stamos: Ver", "app_movil"),
+        new("app_movil.prestamos.crear", "App mÃ³vil - PrÃ©stamos: Crear", "app_movil"),
+        new("app_movil.prestamos.editar", "App mÃ³vil - PrÃ©stamos: Editar", "app_movil"),
+        new("app_movil.prestamos.cancelar", "App mÃ³vil - PrÃ©stamos: Cancelar", "app_movil")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)

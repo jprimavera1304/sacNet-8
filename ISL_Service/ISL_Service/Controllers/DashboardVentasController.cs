@@ -19,16 +19,21 @@ public class DashboardVentasController : ControllerBase
         _reportService = reportService;
     }
 
+    /// <summary>
+    /// Los catalogos que llenan los desplegables del tablero.
+    /// </summary>
+    /// <remarks>
+    /// NO LLEVA CUERPO, Y ANTES SI. Declaraba los 11 filtros del tablero y
+    /// ninguno llegaba a la base (ver el comentario de
+    /// <c>DashboardVentasRepository.ConsultarFiltrosAsync</c>). Se queda en POST
+    /// para no romper al front que ya lo llama asi; si manda cuerpo, se ignora.
+    /// </remarks>
     [HttpPost("filtros/consultar")]
     [Authorize(Policy = "perm:dashboardventas.ver")]
     [ProducesResponseType(typeof(DashboardVentasFiltrosResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ConsultarFiltros([FromBody] DashboardVentasFiltroRequest request, CancellationToken ct)
+    public async Task<IActionResult> ConsultarFiltros(CancellationToken ct)
     {
-        if (request is null)
-            return BadRequest(new { message = "Body requerido." });
-
-        var result = await _service.ConsultarFiltrosAsync(request, ct);
+        var result = await _service.ConsultarFiltrosAsync(ct);
         return Ok(result);
     }
 

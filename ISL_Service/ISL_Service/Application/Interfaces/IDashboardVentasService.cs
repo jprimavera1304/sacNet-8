@@ -4,7 +4,8 @@ namespace ISL_Service.Application.Interfaces;
 
 public interface IDashboardVentasService
 {
-    Task<DashboardVentasFiltrosResponse> ConsultarFiltrosAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default);
+    /// <summary>Los catalogos de los desplegables. No recibe filtros; ver la interfaz del repositorio.</summary>
+    Task<DashboardVentasFiltrosResponse> ConsultarFiltrosAsync(CancellationToken ct = default);
     Task<DashboardVentasKpisDto?> ConsultarKpisAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default);
     Task<List<DashboardVentasSerieMensualDto>> ConsultarSerieMensualAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default);
 

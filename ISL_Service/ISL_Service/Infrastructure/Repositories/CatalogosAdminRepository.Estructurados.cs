@@ -89,19 +89,28 @@ public partial class CatalogosAdminRepository
         }, ct);
 
     /// <summary>
-    /// Modificacion de unidad territorial.
-    ///
-    /// SE MANDA SOLO EL ID, A PROPOSITO. Legacy manda unicamente
-    /// @IDUnidadTerritorial, aunque su propia cadena de depuracion de al lado
-    /// arma cinco valores (id, status, clave, usuario, equipo): el que escribio
-    /// el repositorio copio la cadena de debug y se le olvidaron cuatro
-    /// AddWithValue. El SP no esta en esta base, asi que no hay forma de saber
-    /// cuantos parametros acepta de verdad; inventar los otros cuatro seria
-    /// apostar a que la firma es la del comentario y romper la llamada en la
-    /// instalacion donde hoy funciona. Se manda lo mismo que Legacy y queda
-    /// anotado: cuando aparezca el SP, se completa.
+    /// Modificacion de unidad territorial. <b>SOLO LLEVA EL ID</b>, y ahora la
+    /// firma lo dice.
     /// </summary>
-    public Task<ResultadoLegacy> ActualizarUnidadTerritorialAsync(int id, UnidadTerritorialRequest r, int idUsuario, string equipo, CancellationToken ct)
+    /// <remarks>
+    /// SE MANDA SOLO EL ID, A PROPOSITO. Legacy manda unicamente
+    /// @IDUnidadTerritorial (CatUnidadTerritorialRepository.cs:174), aunque su
+    /// propia cadena de depuracion de al lado arma cinco valores (id, status,
+    /// clave, usuario, equipo): el que escribio el repositorio copio la cadena
+    /// de debug y se le olvidaron cuatro AddWithValue. El SP no esta en ninguna
+    /// de las dos bases, asi que no hay forma de saber cuantos parametros acepta
+    /// de verdad; inventar los otros cuatro seria apostar a que la firma es la
+    /// del comentario y romper la llamada en la instalacion donde hoy funciona.
+    ///
+    /// LO QUE SE ARREGLO: antes esta firma RECIBIA un
+    /// <c>UnidadTerritorialRequest</c> entero y lo descartaba, y el controlador
+    /// lo publicaba como cuerpo obligatorio del PUT. Mandar una clave nueva era
+    /// un no-op silencioso: quien llamaba creia haber renombrado la unidad.
+    /// Ahora el cuerpo no esta en el contrato, asi que nadie puede mandar un
+    /// dato que no va a ningun sitio. Cuando aparezca el SP y se sepa su firma,
+    /// se vuelve a agregar el cuerpo con los campos que de verdad viajen.
+    /// </remarks>
+    public Task<ResultadoLegacy> ActualizarUnidadTerritorialAsync(int id, CancellationToken ct)
         => EjecutarAsync("dbo.sp_n_ActualizarCatUnidadTerritorial",
             cmd => cmd.Parameters.AddWithValue("@IDUnidadTerritorial", id), ct);
 

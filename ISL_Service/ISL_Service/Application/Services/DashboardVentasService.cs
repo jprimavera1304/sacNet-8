@@ -18,11 +18,8 @@ public class DashboardVentasService : IDashboardVentasService
         _cache = cache;
     }
 
-    public Task<DashboardVentasFiltrosResponse> ConsultarFiltrosAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
-    {
-        ValidateRequest(request);
-        return _repository.ConsultarFiltrosAsync(request, ct);
-    }
+    public Task<DashboardVentasFiltrosResponse> ConsultarFiltrosAsync(CancellationToken ct = default)
+        => _repository.ConsultarFiltrosAsync(ct);
 
     public Task<DashboardVentasKpisDto?> ConsultarKpisAsync(DashboardVentasFiltroRequest request, CancellationToken ct = default)
     {

@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Text;
 using ISL_Service.Application.DTOs.VentasPedidoCaptura;
+using ISL_Service.Application.Exceptions;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Data;
 using Microsoft.Data.SqlClient;
@@ -16,24 +17,26 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
     private readonly ILogger<VentasPedidoCapturaRepository> _logger;
 
     /*
-      QUE EL FILTRO POR AGENTE NO SE CAIGA EN SILENCIO.
+      DOS RECAIDAS POR SP NO DESPLEGADO, Y NO SE TRATAN IGUAL.
 
-      Las dos recaidas de abajo (sp_w_ConsultaAgenteUsuario y
-      sp_w_ConsultaExistenciaComprometida) son deliberadas: si el script de base
-      todavia no esta desplegado, la pantalla sigue funcionando como funcionaba
-      antes en vez de romperse. Eso se queda: nada de la base se toca aqui, y un
-      script pendiente no debe dejar a un repartidor sin poder capturar.
+      La diferencia es QUE pierde cada una:
 
-      Lo que NO se queda es que no se note. La de agente apaga un filtro de
-      DATOS —sin el, un usuario que deberia ver solo sus pedidos los ve todos—,
-      asi que falla ABIERTO. Una recaida que relaja un filtro y no deja rastro es
-      indistinguible de no tener filtro: nadie se entera nunca.
+      * sp_w_ConsultaExistenciaComprometida (existencia apartada en pedidos
+        vivos) es un dato DE MAS. Sin el, "disponible" vuelve a ser "existencia",
+        que es como se comporto la pantalla siempre. Se degrada y se anota UNA
+        vez por proceso: el script no se despliega a medias, y una linea por
+        peticion ahogaria el registro sin decir nada nuevo.
 
-      Ahora cada recaida deja una advertencia, UNA sola vez por proceso (el
-      script no se despliega a medias: o esta o no esta, y una linea por peticion
-      ahogaria el registro sin decir nada nuevo).
+      * sp_w_ConsultaAgenteUsuario es un filtro de SEGURIDAD. Su recaida
+        devolvia 0, y 0 no significa "no se sabe": significa "este usuario ve a
+        TODOS los clientes". Asi que fallaba ABIERTO —el repartidor amarrado a
+        un agente veia el padron completo— y la unica senal era una linea en el
+        registro. Ahora falla CERRADO: 409 y se nota en la pantalla. El detalle
+        esta en el catch.
+
+      Regla que queda escrita para la proxima: una recaida puede quitar
+      informacion, nunca puede quitar un filtro.
     */
-    private static int _avisadoAgenteFiltro;
     private static int _avisadoComprometido;
 
     // sp_n_ConsultaAlmacenProducto tarda ~700 ms y devuelve el almacen completo.
@@ -323,19 +326,34 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         }
         catch (SqlException ex) when (IsMissingStoredProcedure(ex, "sp_w_ConsultaAgenteUsuario"))
         {
-            // SP no desplegado: 0 = sin filtro = como se comportaba antes. Un
-            // script pendiente no debe dejar a nadie sin poder capturar.
+            // AQUI SE FALLA CERRADO, Y ES UN CAMBIO DE CONDUCTA A PROPOSITO.
             //
-            // Pero esto APAGA un filtro de datos, asi que queda escrito: ver el
-            // comentario de _avisadoAgenteFiltro arriba.
-            if (Interlocked.Exchange(ref _avisadoAgenteFiltro, 1) == 0)
-            {
-                _logger.LogWarning(ex,
-                    "sp_w_ConsultaAgenteUsuario no esta desplegado en esta base: el FILTRO POR AGENTE queda APAGADO (todos ven todos los pedidos) hasta que se despliegue el script. Primer usuario afectado: {IDUsuario}.",
-                    idUsuario);
-            }
+            // Antes se devolvia 0 —"sin filtro"— para que un script pendiente no
+            // dejara a nadie sin capturar. El problema es cual es el 0: 0
+            // significa "este usuario ve TODOS los clientes". O sea que la
+            // recaida no degradaba el servicio: APAGABA el filtro. Un repartidor
+            // amarrado a su agente veia el padron completo de la empresa, y la
+            // unica senal era una linea de advertencia en el registro del
+            // servidor que nadie mira. En Tauro (Produccion_svr) el SP NO esta
+            // desplegado, asi que esto no era hipotetico: era el comportamiento
+            // de todos los dias.
+            //
+            // Un filtro de seguridad que falla abierto es peor que no tener
+            // filtro, porque el de arriba cree que esta puesto. Asi que si no se
+            // puede saber a que agente pertenece el usuario, no se contesta: 409
+            // con el nombre del script que falta. Se nota en la pantalla, no en
+            // un log.
+            //
+            // Lo que NO cambia: que el SP devuelva 0 filas sigue siendo
+            // "este usuario no esta amarrado a ningun agente" y sigue viendo
+            // todos. Eso es un dato, no una falla.
+            _logger.LogError(ex,
+                "sp_w_ConsultaAgenteUsuario no esta desplegado en esta base: NO se puede resolver el filtro por agente del usuario {IDUsuario}, asi que la busqueda de clientes se RECHAZA en vez de devolver el padron completo.",
+                idUsuario);
 
-            return 0;
+            throw new ConflictException(
+                "No se puede resolver el filtro por agente de este usuario, asi que no se devuelve el padron de clientes. Falta desplegar sp_w_ConsultaAgenteUsuario en esta base.",
+                ex.Message);
         }
     }
 
@@ -388,8 +406,33 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         var funcionalidad = await ConsultarFuncionalidadConCacheAsync(ct);
         if (funcionalidad.ToUpperInvariant().Contains("TAU"))
         {
-            var credito = await ConsultarCreditoDisponibleAsync(conn, idCliente, ct);
-            if (credito != null)
+            DataRow? credito;
+            try
+            {
+                credito = await ConsultarCreditoDisponibleAsync(conn, idCliente, ct);
+            }
+            catch (SqlException ex)
+            {
+                _logger.LogError(ex,
+                    "sp_n_ConsultaCreditoDisponible fallo para el cliente {IDCliente}: NO se cae al limite estatico, que en Tauro es el MAS ALTO. La peticion se rechaza.",
+                    idCliente);
+
+                throw new ConflictException(
+                    "No se pudo calcular el limite de credito de este cliente, asi que no se devuelve un disponible. Intente de nuevo; si sigue, avise a soporte.",
+                    ex.Message);
+            }
+
+            if (credito == null)
+            {
+                // El SP corrio y no devolvio renglon: no hay promedio de pagos
+                // que aplicar. Se queda el estatico, que es lo unico que hay, y
+                // queda escrito para que el numero de la pantalla se pueda
+                // explicar despues.
+                _logger.LogWarning(
+                    "sp_n_ConsultaCreditoDisponible no devolvio renglon para el cliente {IDCliente}: el limite que se publica es el estatico de Clientes.[Limite Credito].",
+                    idCliente);
+            }
+            else
             {
                 limite = ReadDecimal(credito, "LimiteCredito", "limiteCredito");
 
@@ -409,24 +452,30 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         saldo["limiteCredito"] = limite;
     }
 
-    // sp_n_ConsultaCreditoDisponible. Si no esta desplegado o truena, se devuelve
-    // null y el llamador se queda con el limite estatico: es mejor un limite
-    // conservador que dejar a alguien sin poder capturar.
+    // sp_n_ConsultaCreditoDisponible: en Tauro el limite NO es el estatico del
+    // cliente, es el que calcula este SP con el promedio de pagos.
+    //
+    // ESTA RECAIDA TAMPOCO PUEDE SER SILENCIOSA, Y POR LA MISMA RAZON QUE LOS
+    // SALDOS. Aqui decia "si truena se devuelve null y el llamador se queda con
+    // el limite estatico: es mejor un limite conservador". El estatico no es el
+    // conservador: es el MAS GRANDE de los dos. El caso que se midio al escribir
+    // AgregarDisponibleAsync —cliente 5, estatico 10,000 contra 5,000
+    // calculado— es exactamente esto: tragarse el error aqui subia el
+    // disponible 5,000 pesos. Es el mismo defecto de los saldos por la otra
+    // puerta.
+    //
+    // Asi que el error de SQL se relanza y lo convierte en 409 el llamador. Lo
+    // que si se tolera, porque es un dato y no una falla, es que el SP corra y
+    // devuelva CERO renglones: ahi no hay nada que calcular y el estatico es lo
+    // unico que hay. Eso se anota y se sigue.
     private static async Task<DataRow?> ConsultarCreditoDisponibleAsync(
         SqlConnection conn, int idCliente, CancellationToken ct)
     {
-        try
-        {
-            await using var cmd = CreateStoredProcedureCommand("sp_n_ConsultaCreditoDisponible", conn);
-            cmd.Parameters.AddWithValue("@IDCliente", idCliente);
+        await using var cmd = CreateStoredProcedureCommand("sp_n_ConsultaCreditoDisponible", conn);
+        cmd.Parameters.AddWithValue("@IDCliente", idCliente);
 
-            var tabla = await ExecuteFirstTableAsync(cmd, ct);
-            return tabla.Rows.Count > 0 ? tabla.Rows[0] : null;
-        }
-        catch (SqlException)
-        {
-            return null;
-        }
+        var tabla = await ExecuteFirstTableAsync(cmd, ct);
+        return tabla.Rows.Count > 0 ? tabla.Rows[0] : null;
     }
 
     public async Task<PedidoRowsResponse> BuscarProductoAsync(PedidoProductoBuscarRequest request, CancellationToken ct)
@@ -1294,6 +1343,30 @@ ORDER BY Fecha;";
       folio: sumar en C# evita meter el resultado en una tabla temporal cuya
       definicion tendria que seguir a la del SP cada vez que legacy le agregue
       una columna.
+
+      SI EL SP FALLA, NO SE CAPTURA. NO SE INVENTA UN SALDO DE CERO.
+      -------------------------------------------------------------
+      Aqui habia un `catch (SqlException) { }` sin log y sin relanzar, con el
+      comentario "se devuelve el renglon en ceros... lo que no se hace es
+      inventar cifras". Inventaba la peor de todas. El renglon en ceros dice
+      "este cliente no debe nada", y esos dos ceros los lee
+      AgregarDisponibleAsync para calcular
+
+          disponible = limite - saldoPendiente - saldoVencido
+
+      o sea que un error de SQL entregaba el LIMITE DE CREDITO COMPLETO como
+      disponible. El vendedor veia saldo 0 y credito al tope, y le vendia a
+      quien no puede pagar; y ese mismo `disponible` viaja como @Disponible al
+      capturar, que es con lo que legacy decide si el pedido necesita visto
+      bueno. Un fallo de lectura se convertia en credito que nadie autorizo.
+
+      El llamador no podia distinguir "la consulta fallo" de "no debe nada":
+      los dos casos son el mismo renglon de ceros.
+
+      Asi que se relanza. Sin saldos no hay captura de credito posible, y
+      negarse es la unica respuesta honesta: 409 con el motivo. El renglon en
+      ceros sigue existiendo para el caso REAL en que el SP corre bien y
+      devuelve cero folios pendientes — ese cero si es un dato.
     */
     private async Task<DataTable> ConsultarSaldosClienteWebAsync(SqlConnection conn, int idCliente, CancellationToken ct)
     {
@@ -1350,10 +1423,15 @@ ORDER BY Fecha;";
             fila["maxDiasVencidosCascos"] = maxCascos;
             fila["diasVencimientoMostrar"] = maxDias.ToString(CultureInfo.InvariantCulture);
         }
-        catch (SqlException)
+        catch (SqlException ex)
         {
-            // Se devuelve el renglon en ceros. Sin saldos la pantalla sigue
-            // sirviendo para consultar; lo que no se hace es inventar cifras.
+            _logger.LogError(ex,
+                "sp_n_rptVentasSaldos fallo para el cliente {IDCliente}: NO se devuelven saldos en ceros (eso regalaba el limite de credito completo). La peticion se rechaza.",
+                idCliente);
+
+            throw new ConflictException(
+                "No se pudieron leer los saldos del cliente, asi que no se calcula su credito disponible. Intente de nuevo; si sigue, avise a soporte.",
+                ex.Message);
         }
 
         return tabla;
