@@ -244,17 +244,30 @@ public partial class CatalogosAdminController
             "Unidad territorial dada de alta.");
     }
 
+    /// <summary>
+    /// Modificacion de unidad territorial. <b>Sin cuerpo</b>: el SP de legacy
+    /// recibe unicamente el id.
+    /// </summary>
+    /// <remarks>
+    /// AQUI SE EXIGIA UN CUERPO QUE SE TIRABA. El PUT declaraba
+    /// <c>UnidadTerritorialRequest</c> como obligatorio (clave, idStatus,
+    /// unidadTerritorial) y el repositorio no mandaba ninguno de los tres al
+    /// procedimiento: renombrar una unidad era un no-op silencioso con 200 de
+    /// respuesta. El motivo de fondo esta en
+    /// <c>CatalogosAdminRepository.ActualizarUnidadTerritorialAsync</c> — Legacy
+    /// manda solo el id y su SP no existe en ninguna de las dos bases, asi que no
+    /// se puede adivinar la firma. Se quito del contrato en vez de seguir
+    /// pidiendolo. Un cuerpo que mande un front viejo se ignora sin romperse.
+    /// </remarks>
     [HttpPut("unidades-territoriales/{id:int}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ActualizarUnidadTerritorial([FromRoute] int id, [FromBody] UnidadTerritorialRequest? request, CancellationToken ct)
+    public async Task<IActionResult> ActualizarUnidadTerritorial([FromRoute] int id, CancellationToken ct)
     {
-        if (request is null) return BadRequest(new { ok = false, message = "Body requerido." });
-
         var sinPermiso = await ExigirPermisoAsync(PermisosTerritorialEditar, ct);
         if (sinPermiso != null) return sinPermiso;
 
-        return Responder(await _service.ActualizarUnidadTerritorialAsync(id, request, IdUsuarioLegacy(), Equipo(), ct),
+        return Responder(await _service.ActualizarUnidadTerritorialAsync(id, ct),
             "Unidad territorial actualizada.");
     }
 
