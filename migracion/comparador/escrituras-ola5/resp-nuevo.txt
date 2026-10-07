@@ -1,0 +1,38 @@
+### tipoobra.alta
+{"ok":true,"message":"Tipo de obra dado de alta.","data":{"id":4,"mensaje":""}}
+### tipocontratacion.alta
+{"ok":true,"message":"Tipo de contratacion dado de alta.","data":{"id":4,"mensaje":""}}
+### tipodocumento.alta
+{"ok":true,"message":"Tipo de documento dado de alta.","data":{"id":6,"mensaje":""}}
+### tiporecurso.alta
+{"ok":true,"message":"Tipo de recurso dado de alta.","data":{"id":3,"mensaje":""}}
+### puesto.alta
+{"ok":true,"message":"Puesto dado de alta.","data":{"id":3,"mensaje":""}}
+### unidadmedida.alta
+{"ok":true,"message":"Unidad de medida dada de alta.","data":{"id":7,"mensaje":""}}
+### residente.alta
+{"ok":true,"message":"Residente dado de alta.","data":{"id":1,"mensaje":""}}
+### tipoobra.cambio
+{"ok":true,"message":"Tipo de obra actualizado.","data":{"id":1,"mensaje":""}}
+### tipoobra.baja
+{"ok":true,"message":"Tipo de obra actualizado.","data":{"id":1,"mensaje":""}}
+### puesto.cambio
+{"ok":true,"message":"Puesto actualizado.","data":{"id":1,"mensaje":""}}
+### unidadmedida.cambio
+{"ok":true,"message":"Unidad de medida actualizada.","data":{"id":1,"mensaje":""}}
+### tipocontratacion.cambio
+{"ok":true,"message":"Tipo de contratacion actualizado.","data":{"id":1,"mensaje":""}}
+### tipodocumento.cambio
+{"ok":true,"message":"Tipo de documento actualizado.","data":{"id":1,"mensaje":""}}
+### tiporecurso.cambio
+{"ok":true,"message":"Tipo de recurso actualizado.","data":{"id":1,"mensaje":""}}
+### grupo.alta1
+{"ok":true,"message":"Grupo dado de alta.","data":{"id":1,"mensaje":""}}
+### grupo.alta2
+{"ok":true,"message":"Grupo dado de alta.","data":{"id":2,"mensaje":""}}
+### grupo.cambio
+{"ok":true,"message":"Grupo actualizado.","data":{"id":1,"mensaje":""}}
+### grupo.bajar
+{"ok":true,"message":"Grupo movido.","data":{"id":1,"mensaje":""}}
+### grupo.subir
+{"ok":true,"message":"Grupo movido.","data":{"id":1,"mensaje":""}}

@@ -1,0 +1,45 @@
+{
+  "nombre": "Cobranzas - detalle de una cobranza",
+  "_porque": [
+    "sp_n_ConsultarCobranzaDetalle esta en Produccion_svr con sus dos parametros.",
+    "Se elige la cobranza 208623 porque es la primera que devuelve la consulta en",
+    "esta base y tiene renglones: comparar un detalle vacio no probaria el mapeo."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cobranzasdetalle/consultar",
+    "body": { "IDCobranza": 208623, "Presentacion": 0 }
+  },
+  "nuevo": { "method": "GET", "path": "/api/cobranzas/208623/detalle" },
+  "camino_legacy": "result.cobranzasDetalle",
+  "camino_nuevo": "data",
+  "ordenar_por": "idCobranzaDetalle",
+  "ignorar": [
+    "FechaCobranzaFtm",
+    "FechaCobranzaModificacionFtm",
+    "FechaCancelacionCobranzaFtm",
+    "FechaEmisionVentaFtm",
+    "FechaEmisionCortoFtm",
+    "FechaVencimientoVentaFtm",
+    "FechaCancelacionVentaFtm",
+    "FolioVentaFtm",
+    "TotalPagarFtm",
+    "AbonosFtm",
+    "DescuentosFtm",
+    "SaldoFtm",
+    "Cargos",
+    "inicialCascos",
+    "inicialCreditosZ",
+    "inicialImporteZ",
+    "inicialSaldoCascos",
+    "inicialSaldoFavor",
+    "inicialSaldoFavorCascos",
+    "inicialSaldoImporte"
+  ],
+  "diferencias_intencionales": [
+    "Fuera las columnas *Ftm: la misma fecha o el mismo importe otra vez, ya formateados por la base para las rejillas de WinForms (FolioVentaFtm, TotalPagarFtm, AbonosFtm, DescuentosFtm, SaldoFtm y las siete de fecha).",
+    "Fuera Cargos: el DTO de Legacy lo declara y el SELECT del SP no lo manda. Era un campo que nunca traia dato.",
+    "SIETE CAMPOS QUE LEGACY PERDIA. El SP manda inicialCascos, inicialCreditosZ, inicialImporteZ, inicialSaldoCascos, inicialSaldoFavor, inicialSaldoFavorCascos e inicialSaldoImporte, y el DTO de Legacy no los declaraba, asi que el mapeo por nombre los tiraba en silencio. Son los saldos de arranque del renglon: lo que el cliente ya debia o tenia a favor, en dinero y en cascos, antes de esta cobranza. Ahora llegan.",
+    "El nuevo exige idCobranza > 0. En Legacy el endpoint aceptaba 0 y el SP devolvia una lista vacia, que se lee como 'esta cobranza no tiene renglones' y no como 'no me dijiste cual'."
+  ]
+}

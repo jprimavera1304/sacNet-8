@@ -38,6 +38,26 @@ hace honesta la comparación.
 > backends. Reconectan solos en la siguiente petición; no hay que reiniciar
 > nada.
 
+### El candado, cuando hay varios agentes
+
+La base es **una sola** y varios agentes trabajan a la vez. Restaurar mientras
+otro está a mitad de su tanda **le invalida la comparación sin que se entere**:
+sus dos lados dejan de salir del mismo estado. Pasó tres veces en una jornada, y
+además deja el pool de conexiones envenenado.
+
+Por eso `volver` ahora **falla** si hay un candado de otro. No depende de que
+cada quien se acuerde de consultarlo:
+
+```bash
+export MAC_CANDADO=5081        # tu puerto, para que el candado lleve tu nombre
+./instantanea.sh tomar         # antes de tu tanda
+...
+./instantanea.sh soltar-candado   # al terminar, SIEMPRE
+```
+
+Si `volver` te dice que hay un candado ajeno: espera, o usa transacciones con
+rollback en vez de la instantánea.
+
 ## Qué se compara: DOS cosas, no una
 
 1. **La respuesta HTTP.** Con el comparador de siempre.

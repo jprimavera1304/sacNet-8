@@ -1,0 +1,38 @@
+### tipoobra.alta
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":4,"mensaje":"","mensajeFacturama":null}}
+### tipocontratacion.alta
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":4,"mensaje":"","mensajeFacturama":null}}
+### tipodocumento.alta
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":6,"mensaje":"","mensajeFacturama":null}}
+### tiporecurso.alta
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":3,"mensaje":"","mensajeFacturama":null}}
+### puesto.alta
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":3,"mensaje":"","mensajeFacturama":null}}
+### unidadmedida.alta
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":7,"mensaje":"","mensajeFacturama":null}}
+### residente.alta
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":1,"mensaje":"","mensajeFacturama":null}}
+### tipoobra.cambio
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":1,"mensaje":"","mensajeFacturama":null}}
+### tipoobra.baja
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":1,"mensaje":"","mensajeFacturama":null}}
+### puesto.cambio
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":1,"mensaje":"","mensajeFacturama":null}}
+### unidadmedida.cambio
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":1,"mensaje":"","mensajeFacturama":null}}
+### tipocontratacion.cambio
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":1,"mensaje":"","mensajeFacturama":null}}
+### tipodocumento.cambio
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":1,"mensaje":"","mensajeFacturama":null}}
+### tiporecurso.cambio
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":1,"mensaje":"","mensajeFacturama":null}}
+### grupo.alta1
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":1,"mensaje":"","mensajeFacturama":null}}
+### grupo.alta2
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":2,"mensaje":"","mensajeFacturama":null}}
+### grupo.cambio
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":1,"mensaje":"","mensajeFacturama":null}}
+### grupo.bajar
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":1,"mensaje":"","mensajeFacturama":null}}
+### grupo.subir
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":1,"mensaje":"","mensajeFacturama":null}}

@@ -803,7 +803,192 @@ public sealed class PermissionService : IPermissionService
         new("proyectos.crear", "Proyectos - Crear", "proyectos"),
         new("proyectos.editar", "Proyectos - Modificar", "proyectos"),
 
-        new("sincronizacion.ver", "Sincronización - Consultar la cola", "sincronizacion")
+        new("sincronizacion.ver", "Sincronización - Consultar la cola", "sincronizacion"),
+
+        /*
+          OBRA (MC), AVIACION, GASOLINAS Y COBRANZAS.
+          Los modulos que faltaban de MacServicios2.
+
+          NINGUNA DE ESTAS CLAVES CAE EN LAS CUATRO FAMILIAS QUE GOBIERNA MAC31
+          (ventas.*, reportes.*, empleados.*, prestamos.*), y eso es a proposito,
+          no casualidad. Para esas cuatro, el puente de permisos BORRA del snapshot
+          lo que diga el web y lo recalcula desde los botones de la forma de Mac31
+          (ver la seccion de EnsureVentasPermissionsSyncedAsync mas abajo): una
+          clave `ventas.cobranzas.crear` se habria guardado en WUsuarioPermiso y
+          habria desaparecido en el siguiente calculo, sin error y sin rastro.
+          Cobranzas se llama `cobranzas.*` por eso.
+
+          OJO AL MEZCLAR CON LA OLA 3: las cuatro claves marcadas abajo con
+          "(tambien de la ola 3)" las siembra tambien esa entrega. Estan aqui
+          porque las usan los endpoints de este archivo y sin la fila en WPermiso
+          nadie puede tenerlas; sembrar dos veces la misma clave es inofensivo —
+          SincronizarCatalogo salta la que ya existe (PermissionExistsAsync)— pero
+          al mezclar las dos ramas hay que dejar UNA sola linea por clave.
+        */
+
+        // --- Obra (MC): las cuatro de lectura, compartidas con la ola 3 ---
+        new("obra.ver_modulo", "Obra - Ver módulo", "obra"),                    // (tambien de la ola 3)
+        new("obra.catalogos.ver", "Obra - Catálogos: Ver", "obra"),             // (tambien de la ola 3)
+        new("obra.contratos.ver", "Obra - Contratos: Ver", "obra"),             // (tambien de la ola 3)
+        new("obra.proveedores.ver", "Obra - Proveedores: Ver", "obra"),         // (tambien de la ola 3)
+
+        // --- Obra (MC): escrituras de los catalogos ---
+        new("obra.catalogos.crear", "Obra - Catálogos: Crear", "obra"),
+        new("obra.catalogos.editar", "Obra - Catálogos: Editar", "obra"),
+        /* Partida presupuestal: clave propia porque el renglon trae el monto
+           autorizado del presupuesto, no solo un nombre. */
+        new("obra.partidas.ver", "Obra - Partidas presupuestales: Ver", "obra"),
+        new("obra.partidas.crear", "Obra - Partidas presupuestales: Crear", "obra"),
+        new("obra.partidas.editar", "Obra - Partidas presupuestales: Editar", "obra"),
+        /* Proveedores de obra: el renglon trae RFC, CURP, telefono y correo. */
+        new("obra.proveedores.crear", "Obra - Proveedores: Crear", "obra"),
+        new("obra.proveedores.editar", "Obra - Proveedores: Editar", "obra"),
+
+        // --- Obra (MC): contratos y lo que les cuelga ---
+        new("obra.contratos.crear", "Obra - Contratos: Crear", "obra"),
+        new("obra.contratos.editar", "Obra - Contratos: Editar", "obra"),
+        /* Cerrar un contrato o un convenio es aparte de editarlo: es lo que deja
+           de admitir estimaciones. */
+        new("obra.contratos.cerrar", "Obra - Contratos: Cerrar/Reabrir", "obra"),
+        new("obra.convenios.ver", "Obra - Convenios: Ver", "obra"),
+        new("obra.convenios.crear", "Obra - Convenios: Crear", "obra"),
+        new("obra.convenios.editar", "Obra - Convenios: Editar", "obra"),
+        /* Capturar cantidades estimadas es autorizar un pago; no lo hace quien
+           mantiene el catalogo de conceptos. */
+        new("obra.estimaciones.editar", "Obra - Estimaciones: Capturar", "obra"),
+
+        // --- Aviacion ---
+        new("aviacion.ver_modulo", "Aviación - Ver módulo", "aviacion"),
+        new("aviacion.cajas.editar", "Aviación - Cajas: Editar", "aviacion"),
+        new("aviacion.conceptos.ver", "Aviación - Conceptos: Ver", "aviacion"),
+        new("aviacion.conceptos.crear", "Aviación - Conceptos: Crear", "aviacion"),
+        new("aviacion.conceptos.editar", "Aviación - Conceptos: Editar", "aviacion"),
+        new("aviacion.cuentas.ver", "Aviación - Cuentas: Ver", "aviacion"),
+        new("aviacion.cuentas.crear", "Aviación - Cuentas: Crear", "aviacion"),
+        new("aviacion.cuentas.editar", "Aviación - Cuentas: Editar", "aviacion"),
+        /* "Aceptar" es lo que convierte un alta hecha en una caja en un renglon
+           bueno del central: lo hace quien supervisa, no quien captura. */
+        new("aviacion.cuentas.aceptar", "Aviación - Cuentas: Aceptar", "aviacion"),
+        new("aviacion.economicos.ver", "Aviación - Económicos: Ver", "aviacion"),
+        new("aviacion.economicos.crear", "Aviación - Económicos: Crear", "aviacion"),
+        new("aviacion.economicos.editar", "Aviación - Económicos: Editar", "aviacion"),
+        new("aviacion.economicos.aceptar", "Aviación - Económicos: Aceptar", "aviacion"),
+        /* Reasignar cambia de dueno una unidad y deja rastro en el historico. */
+        new("aviacion.economicos.reasignar", "Aviación - Económicos: Reasignar", "aviacion"),
+        new("aviacion.fianzas.ver", "Aviación - Motivos de fianza: Ver", "aviacion"),
+        new("aviacion.fianzas.crear", "Aviación - Motivos de fianza: Crear", "aviacion"),
+        new("aviacion.fianzas.editar", "Aviación - Motivos de fianza: Editar", "aviacion"),
+        new("aviacion.operadores.ver", "Aviación - Operadores: Ver", "aviacion"),
+        new("aviacion.operadores.crear", "Aviación - Operadores: Crear", "aviacion"),
+        new("aviacion.operadores.editar", "Aviación - Operadores: Editar", "aviacion"),
+        new("aviacion.operadores.aceptar", "Aviación - Operadores: Aceptar", "aviacion"),
+        new("aviacion.permisionarios.ver", "Aviación - Permisionarios: Ver", "aviacion"),
+        new("aviacion.permisionarios.crear", "Aviación - Permisionarios: Crear", "aviacion"),
+        new("aviacion.permisionarios.editar", "Aviación - Permisionarios: Editar", "aviacion"),
+        new("aviacion.permisionarios.aceptar", "Aviación - Permisionarios: Aceptar", "aviacion"),
+        new("aviacion.impresoras.ver", "Aviación - Impresoras: Ver", "aviacion"),
+        new("aviacion.impresoras.editar", "Aviación - Impresoras: Configurar", "aviacion"),
+        new("aviacion.polizas.ver", "Aviación - Pólizas: Ver", "aviacion"),
+        /* Generar una poliza emite los cheques con los que se paga: no es editar. */
+        new("aviacion.polizas.generar", "Aviación - Pólizas: Generar", "aviacion"),
+        new("aviacion.polizas.cancelar", "Aviación - Pólizas: Cancelar", "aviacion"),
+        new("aviacion.polizas.editar", "Aviación - Pólizas: Corregir cheques y encabezado", "aviacion"),
+        new("aviacion.recaudaciones.ver", "Aviación - Recaudaciones: Ver", "aviacion"),
+        /* En una caja son tres personas distintas: el cajero cobra, el supervisor
+           cancela, y el corte lo hace quien entrega el dinero. */
+        new("aviacion.recaudaciones.cobrar", "Aviación - Recaudaciones: Cobrar", "aviacion"),
+        new("aviacion.recaudaciones.cancelar", "Aviación - Recaudaciones: Cancelar", "aviacion"),
+        new("aviacion.recaudaciones.cortar", "Aviación - Recaudaciones: Cerrar el día", "aviacion"),
+
+        // --- Gasolinas ---
+        new("gasolinas.ver_modulo", "Gasolinas - Ver módulo", "gasolinas"),
+        new("gasolinas.ver", "Gasolinas - Ver", "gasolinas"),
+        new("gasolinas.crear", "Gasolinas - Capturar recibo", "gasolinas"),
+        new("gasolinas.editar", "Gasolinas - Corregir recibo", "gasolinas"),
+        new("gasolinas.cancelar", "Gasolinas - Cancelar recibo", "gasolinas"),
+
+        // --- Cobranzas ---
+        new("cobranzas.ver_modulo", "Cobranzas - Ver módulo", "cobranzas"),
+        new("cobranzas.ver", "Cobranzas - Ver", "cobranzas"),
+        new("cobranzas.crear", "Cobranzas - Armar cobranza", "cobranzas"),
+        new("cobranzas.editar", "Cobranzas - Cambiar contenido", "cobranzas"),
+        new("cobranzas.cancelar", "Cobranzas - Cancelar", "cobranzas"),
+        new("cobranzas.pendientes.ver", "Cobranzas - Pendiente y vencida", "cobranzas"),
+
+        /*
+          OLA 4 — LAS ESCRITURAS DE VENTAS, EN FAMILIAS QUE NO SON `ventas.*`.
+
+          Esto no es capricho de nomenclatura. Para `ventas.*` manda Mac31: mas
+          abajo, al armar el snapshot, se BORRA del usuario todo lo que empiece
+          por "ventas." y no este en VentasWebPermissionSeeds, y se recalcula
+          desde los botones de la forma CONSULTA DE VENTAS. Una clave nueva ahi
+          se guarda en WUsuarioPermiso y desaparece en el siguiente calculo, sin
+          error y sin rastro — la cicatriz de "pendientes de autorizar".
+
+          Mac31 tiene UN boton por pantalla y aqui hace falta mas fino, porque
+          dentro de la misma pantalla hay operaciones que mueven dinero y otras
+          que no: guardar el reparto de un cobro de cascos no mueve nada,
+          APLICARLO mueve los saldos de los clientes. Donde Mac31 si tiene una
+          llave que vale, los endpoints la aceptan ADEMAS de la nueva
+          (`usados.ver` o `ventas.usados`), para que nadie se quede sin acceso el
+          primer dia.
+        */
+        new("usados.ver", "Cascos usados - Consultar", "usados"),
+        new("usados.cobros_dinero.editar", "Cascos usados - Cobros de dinero: registrar y repartir", "usados"),
+        new("usados.cobros_dinero.aplicar", "Cascos usados - Cobros de dinero: APLICAR a los saldos", "usados"),
+        new("usados.cobros_dinero.cancelar", "Cascos usados - Cobros de dinero: cancelar aplicacion", "usados"),
+        new("usados.cobros.editar", "Cascos usados - Ingresos: registrar", "usados"),
+        new("usados.cobros.cancelar", "Cascos usados - Ingresos: cancelar", "usados"),
+        new("usados.excedentes.editar", "Cascos usados - Excedentes: registrar", "usados"),
+        new("usados.excedentes.cancelar", "Cascos usados - Excedentes: cancelar", "usados"),
+        new("usados.movimientos.editar", "Cascos usados - Movimientos de almacen: registrar", "usados"),
+        new("usados.movimientos.cancelar", "Cascos usados - Movimientos de almacen: cancelar", "usados"),
+        new("usados.tipos.editar", "Cascos usados - Catalogo de tipos: crear y modificar", "usados"),
+
+        new("cobranza.ver", "Cobranza - Consultar", "cobranza"),
+        new("cobranza.cobranzas.editar", "Cobranza - Cobranzas: crear y modificar", "cobranza"),
+        new("cobranza.cobranzas.cancelar", "Cobranza - Cobranzas: cancelar", "cobranza"),
+        new("cobranza.concentrados.editar", "Cobranza - Concentrados: crear y modificar", "cobranza"),
+        new("cobranza.concentrados.cancelar", "Cobranza - Concentrados: cancelar", "cobranza"),
+        new("cobranza.cobros.editar", "Cobranza - Cobros: modificar", "cobranza"),
+        new("cobranza.cobros.cerrar", "Cobranza - Cobros: cerrar", "cobranza"),
+        new("cobranza.cobros.abrir", "Cobranza - Cobros: reabrir", "cobranza"),
+        new("cobranza.cobros.cancelar", "Cobranza - Cobros: cancelar", "cobranza"),
+
+        new("garantias.ver", "Garantias - Consultar", "garantias"),
+        new("garantias.editar", "Garantias - Registrar y modificar", "garantias"),
+        new("garantias.cancelar", "Garantias - Cancelar", "garantias"),
+        new("garantias.aceptar", "Garantias - Aceptar en el centro de servicio", "garantias"),
+        new("garantias.registro.editar", "Garantias - Registro previo: crear", "garantias"),
+        new("garantias.registro.cancelar", "Garantias - Registro previo: cancelar", "garantias"),
+
+        new("descuentos.ver", "Descuentos - Consultar", "descuentos"),
+        new("descuentos.editar", "Descuentos - Crear y modificar", "descuentos"),
+        new("descuentos.eliminar", "Descuentos - Eliminar", "descuentos"),
+        new("descuentos.simular", "Descuentos - Simular", "descuentos"),
+        new("descuentos.ajustes.ver", "Descuentos - Ajustes de venta: consultar", "descuentos"),
+        new("descuentos.ajustes.crear", "Descuentos - Ajustes de venta: solicitar", "descuentos"),
+        new("descuentos.ajustes.autorizar", "Descuentos - Ajustes de venta: autorizar o rechazar", "descuentos"),
+
+        new("inventario.ajustes.ver", "Inventario - Ajustes: consultar", "inventario"),
+        new("inventario.ajustes.crear", "Inventario - Ajustes: capturar", "inventario"),
+        new("inventario.ajustes.cancelar", "Inventario - Ajustes: cancelar", "inventario"),
+        new("inventario.pedidos.ver", "Inventario - Inventario de pedidos: consultar", "inventario"),
+        new("inventario.pedidos.crear", "Inventario - Inventario de pedidos: capturar", "inventario"),
+        new("inventario.pedidos.cancelar", "Inventario - Inventario de pedidos: cancelar", "inventario"),
+
+        new("facturacion.ver", "Facturacion - Consultar facturas", "facturacion"),
+        new("facturacion.timbrar", "Facturacion - Timbrar", "facturacion"),
+        new("facturacion.cancelar", "Facturacion - Cancelar un CFDI", "facturacion"),
+        new("facturacion.enviar", "Facturacion - Enviar la factura por correo", "facturacion"),
+
+        new("cobros.pagos.editar", "Cobros - Pagos de remision: capturar", "cobros"),
+        new("cobros.pagos.cancelar", "Cobros - Pagos de remision: cancelar", "cobros"),
+        new("cobros.pagos.aplicar", "Cobros - Pagos del nuevo esquema: aplicar", "cobros"),
+        new("cobros.pagos.incobrable", "Cobros - Declarar una remision incobrable", "cobros"),
+        new("cobros.pagos.kilos", "Cobros - Pagos por kilo", "cobros"),
+        new("cobros.transferencias.cancelar", "Cobros - Cancelar transferencias bancarias", "cobros"),
+        new("cobros.reasignar", "Cobros - Reasignar remisiones de cliente o agente", "cobros")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)

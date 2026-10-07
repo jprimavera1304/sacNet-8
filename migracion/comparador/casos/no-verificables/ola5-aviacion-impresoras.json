@@ -1,0 +1,39 @@
+{
+  "nombre": "Aviacion - impresoras de un equipo (NO VERIFICABLE)",
+  "_porque": [
+    "NO SE PUEDE COMPARAR EN Produccion_svr: sp_n_ConsultaImpresoras y",
+    "sp_n_ActualizarImpresora no estan instalados (comprobado contra",
+    "sys.procedures y llamando a los dos lados; los dos contestan 'Could not find",
+    "stored procedure').",
+    "",
+    "LO QUE HAY QUE REVISAR CUANDO SE PUEDA, porque es una decision y no una copia:",
+    "",
+    "En este endpoint —y solo en este de los dos modulos— `equipo` VIAJA EN EL",
+    "CUERPO. No es la firma de quien hace el cambio: es la LLAVE del renglon, el",
+    "nombre de la computadora de cuyas impresoras se habla. Se deduce de que",
+    "sp_n_ConsultaImpresoras recibe @IDImpresora y @Equipo como FILTROS, y de que",
+    "sp_n_ActualizarImpresora no recibe ningun otro identificador de renglon: solo",
+    "@ImpresoraTickets, @ImpresoraReportes, @IDUsuario y @Equipo.",
+    "",
+    "Si al leer el SP resulta que @Equipo es solo auditoria y el renglon se",
+    "identifica de otra forma, hay que cambiarlo: el equipo volveria a salir del",
+    "token como en todo lo demas. Mientras, la identidad del usuario (@IDUsuario)",
+    "SI sale del token, aqui tambien.",
+    "",
+    "QUE HACE FALTA PARA CORRERLO: la base MacAviacion* en el servidor."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/impresoras/consultar",
+    "body": { "IDImpresora": 0, "Equipo": "" }
+  },
+  "nuevo": { "method": "GET", "path": "/api/aviacion/impresoras" },
+  "camino_legacy": "result.impresoras",
+  "camino_nuevo": "data",
+  "ordenar_por": "idImpresora",
+  "diferencias_intencionales": [
+    "No verificable en Produccion_svr: los dos procedimientos no estan. Legacy falla igual.",
+    "`equipo` viaja en el cuerpo del PUT porque aqui es la llave del renglon, no la firma. Es la UNICA excepcion a la regla de que la identidad sale del token, y esta anotada en el controlador y en el DTO.",
+    "El nuevo exige equipo, impresoraTickets e impresoraReportes; Legacy exigia los tres tambien."
+  ]
+}

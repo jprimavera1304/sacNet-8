@@ -1,0 +1,10 @@
+### contrato.cerrar
+{"ok":true,"message":"Contrato cerrado.","data":{"id":1,"mensaje":""}}
+### contrato.reabrir
+{"ok":true,"message":"Contrato reabierto.","data":{"id":1,"mensaje":""}}
+### gasolina.alta
+{"ok":true,"message":"Recibo de gasolina registrado.","data":{"id":1,"mensaje":""}}
+### gasolina.cambio
+{"ok":true,"message":"Recibo de gasolina actualizado.","data":{"id":1,"mensaje":""}}
+### gasolina.cancelar
+{"ok":true,"message":"Cancelacion procesada: revisa el resultado de cada recibo.","data":{"recibos":[{"idGasolina":38,"numeroRecibo":99990003,"resultado":"EL RECIBO 99990003 HA SIDO CANCELADO."}],"total":1}}

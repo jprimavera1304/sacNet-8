@@ -72,7 +72,35 @@ crear() {
   echo "Lista: $INSTANTANEA"
 }
 
+# Candado compartido. Varios agentes trabajan a la vez contra la MISMA base, y
+# restaurar mientras otro está a mitad de una tanda le invalida la comparación
+# sin que se entere: sus dos lados dejan de salir del mismo estado. Ya pasó tres
+# veces en una sola jornada, y además deja el pool de conexiones envenenado.
+#
+# Confiar en que cada quien consulte el candado no alcanzó. Ahora `volver`
+# FALLA si hay un candado de otro.
+CANDADOS="${MAC_CANDADOS:-/tmp}"
+MI_CANDADO="${MAC_CANDADO:-}"
+
+candado_ajeno() {
+  for c in "$CANDADOS"/instantanea-en-uso-*; do
+    [ -e "$c" ] || continue
+    [ "$c" = "$CANDADOS/instantanea-en-uso-$MI_CANDADO" ] && continue
+    echo "$c"
+    return 0
+  done
+  return 1
+}
+
 volver() {
+  local ajeno
+  if ajeno="$(candado_ajeno)"; then
+    echo "NO se restaura: otro agente tiene la base tomada ($ajeno)."
+    echo "Espera a que lo suelte, o usa transacciones con rollback."
+    echo "Si estás seguro de que quedó huérfano, bórralo a mano."
+    return 1
+  fi
+
   echo "Volviendo $BASE al estado de la instantánea..."
   # Las conexiones de los backends impiden el restore; se tiran y reconectan
   # solas. Es el precio de poder probar escrituras de verdad.
@@ -100,5 +128,7 @@ case "${1:-}" in
   volver) volver ;;
   soltar) soltar ;;
   estado) estado ;;
-  *) sed -n '2,30p' "$0" ; exit 2 ;;
+  tomar)  mkdir -p "$CANDADOS"; : > "$CANDADOS/instantanea-en-uso-${MI_CANDADO:-anonimo}"; echo "candado tomado" ;;
+  soltar-candado) rm -f "$CANDADOS/instantanea-en-uso-${MI_CANDADO:-anonimo}"; echo "candado soltado" ;;
+  *) sed -n '2,40p' "$0" ; exit 2 ;;
 esac

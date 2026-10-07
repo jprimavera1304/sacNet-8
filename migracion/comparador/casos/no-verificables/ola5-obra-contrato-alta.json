@@ -1,0 +1,70 @@
+{
+  "nombre": "Obra - alta de contrato (NO VERIFICABLE)",
+  "_porque": [
+    "NO SE PUEDE COMPARAR EN Produccion_svr, y el motivo es distinto del de los",
+    "convenios: aqui el procedimiento SI ESTA, pero es de una generacion ANTERIOR",
+    "a la que llama Legacy. Leido de sys.parameters:",
+    "",
+    "  sp_n_Insertar_MCContrato de esta base: 28 parametros.",
+    "  Legacy le manda 30: le anade @IDProveedorApoderado y @PartidasIndividuales.",
+    "",
+    "Asi que la llamada falla con 'Procedure or function sp_n_Insertar_MCContrato",
+    "has too many arguments specified' en LOS DOS LADOS. Lo mismo pasa con:",
+    "",
+    "  sp_n_Actualizar_MCContrato                    (faltan los dos mismos)",
+    "  sp_n_Insertar_MCContratoConcepto              (faltan @IDContratoPartida, @Ajuste, @ConceptoGlobal)",
+    "  sp_n_Actualizar_MCContratoConcepto            (los tres mismos)",
+    "  sp_n_Insertar_MCContratoConceptoFile          (faltan @Limpiar, @CrearGrupo, @Ajuste, @ConceptoGlobal, @PartidaPresupuestal)",
+    "  sp_n_Actualizar_MCContratoConceptoEstimacion  (faltan @IDContratoPartida, @CantidadesExcedentes, @PorcentajesExcedentes, @Ajustes)",
+    "  sp_n_Insertar_MCContratoEstimacion            (falta @PorcentajeAvanceFisicoReal)",
+    "  sp_n_Actualizar_MCContratoEstimacion          (falta el mismo)",
+    "  sp_n_Insertar_MCProveedor                     (10 parametros contra 28)",
+    "  sp_n_Actualizar_MCProveedor                   (11 contra 29)",
+    "",
+    "DECISION: se implementa contra el contrato de LEGACY, que es la",
+    "especificacion, y no contra la version vieja de esta base. Recortar los",
+    "parametros para que 'quepa' aqui seria migrar hacia atras y perder campos que",
+    "las pantallas de obra ya usan (el apoderado que firma, el ajuste de costos,",
+    "las cantidades excedentes de una estimacion).",
+    "",
+    "QUE HACE FALTA PARA CORRERLO: una base con los sp_n_ de obra en la version que",
+    "espera MacServicios2. Para saber si una base la tiene, basta con",
+    "   SELECT COUNT(*) FROM sys.parameters WHERE object_id = OBJECT_ID('sp_n_Insertar_MCContrato')",
+    "y ver si da 30."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/mccontratos",
+    "body": {
+      "IDProveedor": 1, "IDProveedorApoderado": 0, "IDContratoSupervisionExterna": 0,
+      "IDTipoObra": 1, "IDTipoContratacion": 1, "IDTipoRecurso": 1,
+      "IDResidenteSupervision": 0, "IDResidenteObra": 1,
+      "Contrato": "OLA5-NOVERIF-001", "Descripcion": "PRUEBA NO VERIFICABLE",
+      "Ubicacion": "", "FechaContratacion": "01-05-2026", "FechaInicio": "15-05-2026",
+      "FechaTermino": "15-08-2026", "SubTotal": 100, "IVA": 16, "Total": 116,
+      "FechaAsignacionRecurso": "", "NumeroOficio": "", "Folio": "", "Caso": "",
+      "NumeroProcedimiento": "", "Ejercicio": "2026", "SICV": 0, "SRCOP": 0, "LFD": 0,
+      "PartidasIndividuales": 0, "Observaciones": "", "IDUsuario": 3, "Equipo": "OLA5"
+    }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/obra/contratos",
+    "body": {
+      "idProveedor": 1, "idProveedorApoderado": 0, "idContratoSupervisionExterna": 0,
+      "idTipoObra": 1, "idTipoContratacion": 1, "idTipoRecurso": 1,
+      "idResidenteSupervision": 0, "idResidenteObra": 1,
+      "contrato": "OLA5-NOVERIF-001", "descripcion": "PRUEBA NO VERIFICABLE",
+      "fechaContratacion": "2026-05-01", "fechaInicio": "2026-05-15",
+      "fechaTermino": "2026-08-15", "subTotal": 100, "iva": 16, "total": 116,
+      "ejercicio": 2026, "partidasIndividuales": false
+    }
+  },
+  "diferencias_intencionales": [
+    "No verificable en Produccion_svr: el SP de esta base tiene 28 parametros y el contrato de Legacy son 30. Legacy falla igual.",
+    "OJO: ESTE CASO ESCRIBE. Solo se corre dentro del ciclo de instantanea (ver PROTOCOLO-ESCRITURAS.md). Mientras el SP sea el viejo, las dos llamadas fallan antes de tocar nada.",
+    "El ejercicio es un ENTERO. En Legacy era un string contra un parametro int del SP: con el ejercicio vacio, el alta completa reventaba con un error de conversion.",
+    "El nuevo exige que el total cuadre con subtotal mas IVA y que la fecha de termino no sea anterior a la de inicio. El SP guarda los numeros tal como llegan y no compara las fechas.",
+    "La firma (IDUsuario, Equipo) no viaja en el cuerpo del lado nuevo: sale del token."
+  ]
+}

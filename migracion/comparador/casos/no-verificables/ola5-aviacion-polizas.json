@@ -1,0 +1,57 @@
+{
+  "nombre": "Aviacion - polizas de cheques (NO VERIFICABLE)",
+  "_porque": [
+    "NO SE PUEDE COMPARAR EN Produccion_svr. Los ONCE procedimientos del modulo",
+    "faltan en esta base (comprobado contra sys.procedures):",
+    "",
+    "  sp_n_ConsultaPolizas, sp_n_ConsultaPolizaDetalle,",
+    "  sp_n_ConsultaPolizaCheques, sp_n_ConsultaPolizaEncabezados,",
+    "  sp_n_rptPolizaIngresos, sp_n_rptPolizaFianzas, sp_n_rptPolizaDocumentos,",
+    "  sp_n_InsertarPoliza, sp_n_CancelarPoliza,",
+    "  sp_n_ActualizarPolizaEncabezado, sp_n_ActualizarPolizaCheque",
+    "",
+    "Y ademas dbo.Constantes.AviacionDBServer esta vacia, asi que no hay servidor",
+    "central al que preguntar: todo este modulo vive alla, no en la base de la",
+    "empresa. El nuevo contesta 409 diciendolo; Legacy intenta",
+    "`new SqlConnection(\"\")` y contesta 400 con el stack trace.",
+    "",
+    "LO QUE QUEDA SIN COMPROBAR, Y HAY QUE MIRARLO CUANDO SE PUEDA:",
+    "",
+    "1. EL ORDEN DE @Params. Los tres reportes (ingresos, fianzas, documentos)",
+    "   reciben UN solo parametro: una cadena con los valores pegados. Legacy la",
+    "   recibia ya concatenada del cliente y la reenviaba sin mirarla, asi que su",
+    "   orden no esta escrito en ninguna parte de Legacy: esta DENTRO del SP, y el",
+    "   SP no esta aqui. El endpoint nuevo recibe la LISTA de valores y arma la",
+    "   cadena con \"~\" y formato invariante; cuando la base este disponible hay que",
+    "   leer el SP y tipar campo por campo.",
+    "",
+    "2. QUE EL ULTIMO DIA DEL RANGO ENTRE COMPLETO. Legacy, al GENERAR la poliza,",
+    "   le pegaba \" 00:00:00\" tambien a FechaFinal (PolizaService.cs:300), de modo",
+    "   que los cobros del ultimo dia se quedaban fuera. El nuevo manda 23:59:59.",
+    "   Es un cambio de comportamiento a proposito y hay que confirmar con datos",
+    "   que la poliza sale con MAS cheques, no con otros.",
+    "",
+    "QUE HACE FALTA PARA CORRERLO: una base MacAviacion* con el modulo instalado y",
+    "una empresa con Constantes.AviacionDBServer apuntando a ella."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/polizas/consultar",
+    "body": {
+      "IDPoliza": 0, "IDPolizaEncabezado": 0, "IDStatus": 1,
+      "FechaInicial": "", "FechaFinal": "",
+      "NumChequeInicial": 0, "NumChequeFinal": 0,
+      "NumPolizaInicial": 0, "NumPolizaFinal": 0
+    }
+  },
+  "nuevo": { "method": "GET", "path": "/api/aviacion/polizas", "query": { "idStatus": 1 } },
+  "camino_legacy": "result.polizas",
+  "camino_nuevo": "data",
+  "ordenar_por": "idPoliza",
+  "diferencias_intencionales": [
+    "No verificable en Produccion_svr: faltan los once procedimientos y la empresa no tiene el modulo configurado. Legacy falla igual.",
+    "Todos los filtros se combinan: en Legacy, mandar IDPoliza reconstruia el DTO y tiraba el resto (PolizaService.cs:50-56).",
+    "Las fechas van tipadas y en ISO; el nuevo no llama a sp_n_ConsultaConstantes, que es la rutina que cierra el dia del negocio.",
+    "Guardar el encabezado NO lleva id en la ruta: sp_n_ActualizarPolizaEncabezado no recibe ningun identificador de renglon, asi que la instalacion tiene uno."
+  ]
+}
