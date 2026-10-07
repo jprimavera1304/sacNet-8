@@ -61,28 +61,74 @@ public class SeguridadMacRepository : ISeguridadMacRepository
     // USUARIO DE MAC31
     // =======================================================================
 
+    /*
+      EL `SELECT MAX(IDUsuario)` LE DABA A UN CAPTURISTA EL USUARIO DEL OTRO.
+
+      Lo que habia: se llamaba a sp_n_InsertarUsuario en una conexion, se cerraba,
+      se abria OTRA y se preguntaba `SELECT ISNULL(MAX(IDUsuario), 0) FROM
+      dbo.Usuarios`. El id que contestaba era el ultimo de la TABLA, no el del
+      renglon que acababa de insertar esta peticion.
+
+      Con dos capturistas dando de alta a la vez -que es lo normal en un alta
+      masiva de empleados- al primero se le contesta el id del segundo. Y no
+      termina ahi: la pantalla sigue con ese id y le escribe los ALMACENES y los
+      PERMISOS al usuario equivocado. Se nota semanas despues, cuando alguien ve
+      lo que no debia.
+
+      COMO SE ARREGLA SIN TOCAR EL SP (prohibido editar un sp_n_):
+
+      `IDUsuario` es columna IDENTITY en dbo.Usuarios (comprobado en las dos
+      bases), asi que @@IDENTITY devuelve el id que generó ESTA SESION. La clave
+      es que sea LA MISMA conexion: @@IDENTITY es por sesion, no global -a
+      diferencia de IDENT_CURRENT, que tiene el mismo defecto que el MAX()-, asi
+      que otro usuario insertando al mismo tiempo no lo mueve.
+
+      No se usa SCOPE_IDENTITY() porque el INSERT ocurre DENTRO del procedimiento:
+      es otro ambito, y desde aqui SCOPE_IDENTITY() devolveria NULL.
+
+      Se comprobo que dbo.Usuarios no tiene disparadores en ninguna de las dos
+      bases (sys.triggers vacio), que es la unica cosa que podria hacer que
+      @@IDENTITY apuntara a otra tabla.
+
+      Y se verifica ademas que el renglon leido es el del usuario que se pidio:
+      si por lo que sea no cuadra, se contesta 0 en vez de un id ajeno. Es seguro
+      porque el propio procedimiento rechaza nombres repetidos
+      ("EL USUARIO YA ESTA REGISTRADO").
+    */
     public async Task<(ResultadoLegacy, int)> InsertarUsuarioMacAsync(CrearUsuarioMacRequest r, CancellationToken ct)
     {
-        var resultado = await EjecutarAsync("dbo.sp_n_InsertarUsuario", cmd =>
+        var usuario = Texto(r.Usuario);
+
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        ResultadoLegacy resultado;
+        await using (var cmd = Sp("dbo.sp_n_InsertarUsuario", conn))
         {
             cmd.Parameters.AddWithValue("@IDPerfil", r.IdPerfil);
             cmd.Parameters.AddWithValue("@NumUsuario", r.NumUsuario);
-            cmd.Parameters.AddWithValue("@Usuario", Texto(r.Usuario));
+            cmd.Parameters.AddWithValue("@Usuario", usuario);
             cmd.Parameters.AddWithValue("@Contrasena", Texto(r.Contrasena));
             cmd.Parameters.AddWithValue("@Nombre", Texto(r.Nombre));
             cmd.Parameters.AddWithValue("@AplicaContrasenaAutorizacion", r.AplicaContrasenaAutorizacion ? 1 : 0);
             cmd.Parameters.AddWithValue("@ContrasenaAutorizacion", Texto(r.ContrasenaAutorizacion));
             cmd.Parameters.AddWithValue("@Multicajas", r.Multicajas ? 1 : 0);
-        }, ct);
+
+            var dt = await FillAsync(cmd, ct);
+            resultado = BajaLogicaLegacy.LeerResultado(dt);
+        }
 
         if (!resultado.Ok) return (resultado, 0);
 
-        // El procedimiento no devuelve el id: se lee despues del exito, solo para
-        // poder contestar con la ubicacion del renglon nuevo.
-        await using var conn = GetConnection();
-        await conn.OpenAsync(ct);
-        await using var cmd2 = new SqlCommand("SELECT ISNULL(MAX(IDUsuario), 0) FROM dbo.Usuarios", conn);
-        var valor = await cmd2.ExecuteScalarAsync(ct);
+        // MISMA conexion = misma sesion = @@IDENTITY es el de este INSERT.
+        await using var cmdId = new SqlCommand(
+            @"SELECT CONVERT(int, ISNULL(@@IDENTITY, 0))
+              WHERE EXISTS (SELECT 1 FROM dbo.Usuarios
+                            WHERE IDUsuario = CONVERT(int, @@IDENTITY)
+                              AND Usuario = @Usuario);", conn);
+        cmdId.Parameters.AddWithValue("@Usuario", usuario);
+
+        var valor = await cmdId.ExecuteScalarAsync(ct);
         var id = valor is null or DBNull ? 0 : Convert.ToInt32(valor, CultureInfo.InvariantCulture);
         return (resultado, id);
     }

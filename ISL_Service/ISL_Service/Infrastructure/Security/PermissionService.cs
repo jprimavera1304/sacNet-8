@@ -7,6 +7,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Primitives;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
@@ -383,7 +384,69 @@ public sealed class PermissionService : IPermissionService
     private readonly IMemoryCache _cache;
     private readonly ILogger<PermissionService> _logger;
     private readonly IHostEnvironment _hostEnvironment;
-    private readonly ConcurrentDictionary<string, byte> _observedUserCacheKeys = new(StringComparer.Ordinal);
+    /*
+      QUITAR UN PERMISO NO QUITABA NADA, Y HASTA MEDIA HORA DESPUES.
+
+      Lo que habia aqui era `private readonly ConcurrentDictionary<string, byte>
+      _observedUserCacheKeys` —de INSTANCIA— y de el colgaba toda la
+      invalidacion. PermissionService es Scoped: una instancia nueva por
+      peticion, asi que ese diccionario nace VACIO cada vez. La IMemoryCache, en
+      cambio, es Singleton y sobrevive a todas.
+
+      Resultado: cuando un administrador cambiaba los permisos de un rol,
+      InvalidateEmpresaPermissionCache recorria un diccionario que como mucho
+      tenia la clave del propio administrador. No quitaba NI UNA clave de los
+      demas. Quien ya tenia el permiso lo conservaba 5 minutos (TTL activo) y
+      hasta 30 por el camino "stale" si la base fallaba al reconstruir. Y al
+      contrario: conceder un permiso tampoco surtia efecto a tiempo.
+
+      Encima, InvalidateUserPermissionCache compensaba con una lista fija de seis
+      nombres de rol ("SuperAdmin", "Admin", "User"...). La clave de cache
+      incluye el RolCodigo del tenant, asi que cualquier rol propio fuera de esa
+      lista no se invalidaba NUNCA.
+
+      COMO SE ARREGLA: con tokens de expiracion, no con una lista de claves. Cada
+      renglon de cache se cuelga de DOS CancellationTokenSource compartidos (uno
+      del usuario, uno de la empresa) que viven en este diccionario ESTATICO —
+      estatico para igualar la vida de la IMemoryCache, igual que _candados de
+      arriba. Invalidar es cancelar el token: la IMemoryCache tira de golpe todos
+      los renglones colgados de el, sin importar de que peticion vinieran ni con
+      que rol se guardaron, y sin tener que adivinar los nombres de rol.
+    */
+    private static readonly ConcurrentDictionary<string, CancellationTokenSource> _invalidadores =
+        new(StringComparer.Ordinal);
+
+    private static string AmbitoEmpresa(int empresaId) => $"perm:{empresaId}";
+
+    private static string AmbitoUsuario(Guid userId, int empresaId) => $"perm:{empresaId}:{userId:N}";
+
+    private static CancellationTokenSource Invalidador(string ambito)
+        => _invalidadores.GetOrAdd(ambito, _ => new CancellationTokenSource());
+
+    /// <summary>
+    /// Tira TODOS los renglones de cache colgados de ese ambito, en toda la
+    /// aplicacion y para cualquier rol. El CancellationTokenSource no se libera
+    /// a proposito: todavia hay renglones apuntando a su token y liberarlo haria
+    /// que la IMemoryCache reventara al consultarlo. Cancelado y sin referencias
+    /// lo recoge el GC solo.
+    /// </summary>
+    private static void DispararInvalidacion(string ambito)
+    {
+        if (_invalidadores.TryRemove(ambito, out var cts))
+            cts.Cancel();
+    }
+
+    /// <summary>
+    /// Las opciones con las que se guarda un renglon de permisos: su vigencia
+    /// normal, mas los dos tokens que permiten tirarlo antes.
+    /// </summary>
+    private static MemoryCacheEntryOptions OpcionesDeCache(Guid userId, int empresaId, TimeSpan vigencia)
+    {
+        var opciones = new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = vigencia };
+        opciones.AddExpirationToken(new CancellationChangeToken(Invalidador(AmbitoEmpresa(empresaId)).Token));
+        opciones.AddExpirationToken(new CancellationChangeToken(Invalidador(AmbitoUsuario(userId, empresaId)).Token));
+        return opciones;
+    }
 
     public PermissionService(AppDbContext db, IMemoryCache cache, ILogger<PermissionService> logger, IHostEnvironment hostEnvironment)
     {
@@ -1140,7 +1203,6 @@ public sealed class PermissionService : IPermissionService
 
         var cacheKey = BuildCacheKey(userId, empresaId, rolLegacy);
         var staleCacheKey = $"{cacheKey}:stale";
-        TrackObservedUserCacheKey(cacheKey);
 
         if (_cache.TryGetValue<PermissionSnapshot>(cacheKey, out var cached) && cached is not null)
             return cached;
@@ -1170,8 +1232,11 @@ public sealed class PermissionService : IPermissionService
                 return reciente;
 
             var snapshot = await BuildSnapshotAsync(userId, empresaId, rolLegacy, ct);
-            _cache.Set(cacheKey, snapshot, ActiveCacheTtl);
-            _cache.Set(staleCacheKey, snapshot, StaleCacheTtl);
+            // Los dos renglones -el vigente y el "stale" de rescate- se cuelgan
+            // de los tokens de invalidacion. Si no, revocar un permiso dejaria
+            // vivo el de rescate hasta 30 minutos.
+            _cache.Set(cacheKey, snapshot, OpcionesDeCache(userId, empresaId, ActiveCacheTtl));
+            _cache.Set(staleCacheKey, snapshot, OpcionesDeCache(userId, empresaId, StaleCacheTtl));
             return snapshot;
         }
         catch (Exception ex)
@@ -1954,40 +2019,23 @@ WHERE EmpresaId = @EmpresaId
         InvalidateUserPermissionCache(userId, empresaId);
     }
 
+    /// <summary>
+    /// Tira la cache de permisos de UN usuario de esa empresa, para todos los
+    /// roles y para todas las peticiones en vuelo. Ver _invalidadores.
+    /// </summary>
     private void InvalidateUserPermissionCache(Guid userId, int empresaId)
     {
-        var prefix = $"perm:{empresaId}:{userId:N}:";
-        foreach (var key in _observedUserCacheKeys.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)))
-        {
-            _cache.Remove(key);
-            _cache.Remove($"{key}:stale");
-            _observedUserCacheKeys.TryRemove(key, out _);
-        }
-
-        var roleCandidates = new[] { "SuperAdmin", "Admin", "User", "SUPER_ADMIN", "ADMIN", "USER" };
-        foreach (var role in roleCandidates)
-        {
-            var key = BuildCacheKey(userId, empresaId, role);
-            _cache.Remove(key);
-            _cache.Remove($"{key}:stale");
-            _observedUserCacheKeys.TryRemove(key, out _);
-        }
+        DispararInvalidacion(AmbitoUsuario(userId, empresaId));
     }
 
+    /// <summary>
+    /// Tira la cache de permisos de TODOS los usuarios de esa empresa. Es lo que
+    /// corre cuando se cambian los permisos de un rol: afecta a cualquiera que
+    /// lo tenga, no solo a quien hizo el cambio.
+    /// </summary>
     private void InvalidateEmpresaPermissionCache(int empresaId)
     {
-        var prefix = $"perm:{empresaId}:";
-        foreach (var key in _observedUserCacheKeys.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)))
-        {
-            _cache.Remove(key);
-            _cache.Remove($"{key}:stale");
-            _observedUserCacheKeys.TryRemove(key, out _);
-        }
-    }
-
-    private void TrackObservedUserCacheKey(string cacheKey)
-    {
-        _observedUserCacheKeys.TryAdd(cacheKey, 1);
+        DispararInvalidacion(AmbitoEmpresa(empresaId));
     }
 
     private async Task<OverrideTypeTokens> GetOverrideTypeTokensAsync(SqlConnection conn, CancellationToken ct)

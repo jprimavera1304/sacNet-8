@@ -43,13 +43,29 @@ public class VentasConsultaService : IVentasConsultaService
         return _repository.ConsultarCatalogosAsync(ct);
     }
 
-    public Task<VentasConsultaRowsResponse> ConsultarRemisionesAsync(VentasConsultaRequest request, int idUsuarioToken, CancellationToken ct)
+    public Task<VentasConsultaRowsResponse> ConsultarPendientesImprimirAsync(VentasConsultaRequest request, int idUsuarioToken, CancellationToken ct)
     {
         var safe = Prepare(request, idUsuarioToken);
+        return _repository.ConsultarPendientesImprimirAsync(safe, ct);
+    }
+
+    /// <summary>
+    /// Las remisiones que el usuario del token puede ver.
+    /// </summary>
+    /// <param name="puedeVerDeOtros">
+    /// true si tiene `ventas.consultar` (o la instalacion no tiene permisos
+    /// encendidos): entonces @IDUsuario se respeta tal cual viene. false: se
+    /// acota a sus propios renglones. Ver <see cref="AcotarFiltroDeUsuario"/>.
+    /// </param>
+    public Task<VentasConsultaRowsResponse> ConsultarRemisionesAsync(VentasConsultaRequest request, int idUsuarioToken, bool puedeVerDeOtros, CancellationToken ct)
+    {
+        var safe = Prepare(request, idUsuarioToken);
+        AcotarFiltroDeUsuario(safe, idUsuarioToken, puedeVerDeOtros);
         return _repository.ConsultarRemisionesAsync(safe, ct);
     }
 
-    public Task<VentasConsultaRowsResponse> ConsultarPedidosAsync(VentasConsultaRequest request, int idUsuarioToken, CancellationToken ct)
+    /// <inheritdoc cref="ConsultarRemisionesAsync(VentasConsultaRequest,int,bool,CancellationToken)"/>
+    public Task<VentasConsultaRowsResponse> ConsultarPedidosAsync(VentasConsultaRequest request, int idUsuarioToken, bool puedeVerDeOtros, CancellationToken ct)
     {
         var safe = Prepare(request, idUsuarioToken);
         safe.Formato = 0;
@@ -57,19 +73,78 @@ public class VentasConsultaService : IVentasConsultaService
         // mismo que se guarda al crear el pedido -> garantiza que empaten.
         if (safe.SoloMisPedidos && idUsuarioToken > 0)
             safe.IDUsuario = idUsuarioToken;
+        AcotarFiltroDeUsuario(safe, idUsuarioToken, puedeVerDeOtros);
         return _repository.ConsultarPedidosAsync(safe, ct);
     }
 
-    public Task<VentasConsultaRowsResponse> ConsultarPendientesImprimirAsync(VentasConsultaRequest request, int idUsuarioToken, CancellationToken ct)
+    /// <inheritdoc cref="ConsultarRemisionesAsync(VentasConsultaRequest,int,bool,CancellationToken)"/>
+    public Task<VentasConsultaRowsResponse> ConsultarPagosAsync(VentasConsultaRequest request, int idUsuarioToken, bool puedeVerDeOtros, CancellationToken ct)
     {
         var safe = Prepare(request, idUsuarioToken);
-        return _repository.ConsultarPendientesImprimirAsync(safe, ct);
+        AcotarFiltroDeUsuario(safe, idUsuarioToken, puedeVerDeOtros);
+        return _repository.ConsultarPagosAsync(safe, ct);
     }
 
-    public Task<VentasConsultaRowsResponse> ConsultarPagosAsync(VentasConsultaRequest request, int idUsuarioToken, CancellationToken ct)
+    /*
+      LOS DOS PARAMETROS DE USUARIO NO SON LO MISMO. UNO ES QUIEN PREGUNTA Y EL
+      OTRO ES A QUIEN SE QUIERE VER.
+
+      Se leyeron los dos procedimientos en la base para no adivinar:
+
+      - @IDUsuarioActual es QUIEN PREGUNTA. En `sp_n_ConsultaVentasPedidos`
+        (linea 133-134 de su definicion) es el candado de almacen:
+            AND Ped.IDAlmacen IN (SELECT IDAlmacen FROM UsuariosAlmacenes
+                                  WHERE IDUsuario = @IDUsuarioActual AND IDStatus = 1)
+        Es decir: es un CONTROL DE SEGURIDAD, y por eso NO puede venir del
+        cuerpo. Antes se rellenaba del token solo si el cuerpo lo traia en 0, o
+        sea que el cuerpo ganaba: mandando el id de otro (o un 0) se consultaba
+        con el candado de otro, o sin candado. Ahora sale SIEMPRE del token y lo
+        que venga en el cuerpo se descarta.
+
+      - @IDUsuario es A QUIEN SE QUIERE VER: un FILTRO legitimo de pantalla.
+        `sp_n_ConsultaVentas` lo documenta en su propia linea 565-566
+        ("Busqueda por IDUsuario") y `sp_n_ConsultaVentasPedidos` lo usa como
+        `Usu.IDUsuario IN (fn_RegresaTablaUsuarios(@IDUsuario))`. Se conserva
+        como filtro, pero acotado: ver AcotarFiltroDeUsuario.
+
+      SALVEDAD QUE HAY QUE ESCRIBIR, NO ESCONDER: en `sp_n_ConsultaVentas` el
+      candado de almacen por @IDUsuarioActual esta COMENTADO dentro del propio
+      procedimiento (lineas 547-548 de su definicion, en las dos bases). O sea
+      que ahi @IDUsuarioActual hoy no recorta nada, y pasarlo bien no cambia el
+      resultado todavia. No se puede arreglar desde aqui sin editar un sp_n_, lo
+      cual esta prohibido; haria falta un `sp_w_ConsultaVentas` envolvente que
+      aplicara el recorte. Queda anotado en ola-12-seguridad.md.
+    */
+    private static VentasConsultaRequest Prepare(VentasConsultaRequest? request, int idUsuarioToken)
     {
-        var safe = Prepare(request, idUsuarioToken);
-        return _repository.ConsultarPagosAsync(safe, ct);
+        var safe = request ?? new VentasConsultaRequest();
+        safe.IDUsuarioActual = idUsuarioToken;
+        return safe;
+    }
+
+    /*
+      EL FILTRO "DE QUIEN QUIERO VER" NECESITA PERMISO.
+
+      @IDUsuario es un filtro, no identidad, pero un filtro que apunta a OTRA
+      persona tiene que estar autorizado. La frontera que ya existe en el
+      sistema es `ventas.consultar` (btnBuscar de Consultar ventas en Mac31):
+      quien la tiene es quien Mac31 deja usar esa pantalla con todos sus
+      filtros. Quien NO la tiene -el caso real es el repartidor del movil, que
+      solo lleva `app_movil.pedidos`- queda amarrado a sus propios renglones:
+
+        - si pide los de otro usuario, se le niega (403 en el controlador);
+        - si no pide a nadie en particular (0 = "todos"), se le acota a los
+          suyos. Eso tapa el agujero de omitir `SoloMisPedidos`: antes, un
+          cliente movil que no mandaba esa bandera veia los pedidos de todos.
+
+      Donde la instalacion no tiene modelo de permisos encendido, TodoPermitido
+      es true y nada de esto cambia: esas bases funcionan hoy asi.
+    */
+    private static void AcotarFiltroDeUsuario(VentasConsultaRequest safe, int idUsuarioToken, bool puedeVerDeOtros)
+    {
+        if (puedeVerDeOtros) return;
+        if (idUsuarioToken <= 0) return;
+        safe.IDUsuario = idUsuarioToken;
     }
 
     /// Sin parametros a proposito: btnPedidosFaltantes_Click no pide nada —ni
@@ -77,14 +152,6 @@ public class VentasConsultaService : IVentasConsultaService
     /// dia por su cuenta. Ver ConsultarPedidosFaltantesAsync en el repositorio.
     public Task<List<VentasPedidoFaltanteItem>> ConsultarPedidosFaltantesAsync(CancellationToken ct)
         => _repository.ConsultarPedidosFaltantesAsync(ct);
-
-    private static VentasConsultaRequest Prepare(VentasConsultaRequest? request, int idUsuarioToken)
-    {
-        var safe = request ?? new VentasConsultaRequest();
-        if (safe.IDUsuarioActual <= 0 && idUsuarioToken > 0)
-            safe.IDUsuarioActual = idUsuarioToken;
-        return safe;
-    }
 
     /*
       PREPARAR EL REPORTE: DEJAR LOS PARAMETROS Y ARMAR LA DIRECCION

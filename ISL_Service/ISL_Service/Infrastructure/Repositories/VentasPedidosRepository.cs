@@ -76,20 +76,20 @@ public class VentasPedidosRepository : IVentasPedidosRepository
         if (request == null || request.IdsPedido.Count == 0)
             return new AutorizarPedidosResponse(new List<PedidoResultadoDto>(), string.Empty);
 
-        var idUsuarioProcesar = request.IdUsuarioProcesar
-            ?? request.IdUsuarioAutorizar
-            ?? request.IdUsuario
-            ?? (idUsuarioToken > 0 ? idUsuarioToken : 0);
-        var idUsuarioAutorizar = request.IdUsuarioAutorizar
-            ?? request.IdUsuario
-            ?? (idUsuarioToken > 0 ? idUsuarioToken : 0);
+        /*
+          QUIEN PROCESA Y QUIEN AUTORIZA SALEN DEL TOKEN, NO DEL CUERPO.
 
-        var equipoProcesar = string.IsNullOrWhiteSpace(request.EquipoProcesar)
-            ? (string.IsNullOrWhiteSpace(request.Equipo) ? equipoToken : request.Equipo!)
-            : request.EquipoProcesar!;
-        var equipoAutorizar = string.IsNullOrWhiteSpace(request.EquipoAutorizar)
-            ? (string.IsNullOrWhiteSpace(request.Equipo) ? equipoToken : request.Equipo!)
-            : request.EquipoAutorizar!;
+          Antes el token era el ultimo recurso: se tomaba IdUsuarioProcesar, si
+          no IdUsuarioAutorizar, si no IdUsuario, y solo si ninguno venia, el
+          token. Es la autoria de una escritura -queda en
+          Pedidos.IDUsuarioProceso y Pedidos.IDUsuarioAutorizo- asi que el
+          cuerpo no puede ganar. Los campos ya no existen en el DTO.
+        */
+        var idUsuarioProcesar = idUsuarioToken > 0 ? idUsuarioToken : 0;
+        var idUsuarioAutorizar = idUsuarioProcesar;
+
+        var equipoProcesar = equipoToken;
+        var equipoAutorizar = equipoToken;
 
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);

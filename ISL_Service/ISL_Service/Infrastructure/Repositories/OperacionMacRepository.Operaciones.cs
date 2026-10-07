@@ -345,7 +345,36 @@ public partial class OperacionMacRepository
 
             if (!resultado.Ok)
             {
-                await tx.RollbackAsync(ct);
+                /*
+                  EL ROLLBACK VA PROTEGIDO, Y NO ES PARANOIA.
+
+                  `sp_n_InsertarBancoTransferencia` hace `BEGIN TRAN` y, en su
+                  camino de error, un `ROLLBACK TRAN` DESNUDO: sin @@TRANCOUNT,
+                  sin SAVE TRAN. Dentro de una transaccion abierta desde C#, ese
+                  rollback NO deshace "lo suyo": deshace la transaccion EXTERNA,
+                  la nuestra. Y despues el procedimiento regresa normal.
+
+                  Asi que al llegar aqui la transaccion puede estar YA deshecha, y
+                  entonces `tx.RollbackAsync` lanzaba "This SqlTransaction has
+                  completed". Esa excepcion se llevaba por delante el mensaje que
+                  este metodo acaba de construir con tanto cuidado ("Movimiento
+                  250: ...") y el usuario recibia un 500 pelado al rechazar UN
+                  movimiento de su archivo.
+
+                  El efecto en la base es el mismo -nada queda escrito, que es lo
+                  que se buscaba-, asi que tragarse este fallo concreto no esconde
+                  nada: solo evita que el aviso bueno se pierda.
+                */
+                try
+                {
+                    await tx.RollbackAsync(ct);
+                }
+                catch (InvalidOperationException)
+                {
+                    // El propio procedimiento ya deshizo la transaccion. El lote
+                    // no quedo escrito, que es lo que importa.
+                }
+
                 var mensaje = string.IsNullOrWhiteSpace(resultado.Mensaje)
                     ? $"La base rechazo el movimiento {m.Num}."
                     : $"Movimiento {m.Num}: {resultado.Mensaje}";

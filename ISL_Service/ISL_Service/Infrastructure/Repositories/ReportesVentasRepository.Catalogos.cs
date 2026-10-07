@@ -221,12 +221,40 @@ public partial class ReportesVentasRepository
     }
 
 
+    /*
+      @IDEmpresaCS IBA CABLEADO EN 1, Y 1 ES ZARAGOZA.
+
+      Lo que decia era `cmd.Parameters.AddWithValue("@IDEmpresaCS", 1);` -el unico
+      filtro de este metodo que no iba en 0- y el procedimiento SI lo usa: cuando
+      @IDCliente es 0 agrega `AND C.IDEmpresaCS = @IDEmpresaCS` (linea 126 de la
+      definicion de sp_n_ConsultaClientes). No es "0 = todas": es una igualdad
+      siempre.
+
+      El numero correcto esta en la base, en `Constantes.IDEmpresaCS`, que es
+      justo "que empresa es esta instalacion". Comprobado leyendolo:
+
+          Produccion_svr (Tauro)   -> IDEmpresaCS = 0
+          MacZ           (Zaragoza)-> IDEmpresaCS = 1
+
+      O sea que el 1 cableado era el valor de Zaragoza aplicado tambien a Tauro.
+      En Tauro recortaba el padron a los clientes marcados como de Zaragoza y en
+      Zaragoza dejaba fuera los de CS1..CS5 y LURO. Sin error y sin aviso: una
+      lista mas corta, que es el peor modo de equivocarse.
+
+      Ahora sale de Constantes. El parametro sigue existiendo por si algun dia hay
+      que pedir el padron de otra empresa; quien no lo pasa, obtiene el de la
+      instalacion que esta contestando.
+    */
     private static async Task<List<ReportesVentasClienteItem>> ConsultarClientesAsync(
         SqlConnection conn,
         int? numero,
         int? idCliente,
-        CancellationToken ct)
+        CancellationToken ct,
+        int? idEmpresaCs = null)
     {
+        var empresaCs = idEmpresaCs
+            ?? (await ConsultarConstantesAsync(conn, ct)).IDEmpresaCS;
+
         await using var cmd = new SqlCommand("sp_n_ConsultaClientes", conn)
         {
             CommandType = CommandType.StoredProcedure,
@@ -247,7 +275,7 @@ public partial class ReportesVentasRepository
         cmd.Parameters.AddWithValue("@RFC", "");
         cmd.Parameters.AddWithValue("@IDTipoCliente", 0);
         cmd.Parameters.AddWithValue("@ConHuella", 0);
-        cmd.Parameters.AddWithValue("@IDEmpresaCS", 1);
+        cmd.Parameters.AddWithValue("@IDEmpresaCS", empresaCs);
         cmd.Parameters.AddWithValue("@EsMostrador", 0);
         cmd.Parameters.AddWithValue("@Referencia", "");
         cmd.Parameters.AddWithValue("@Formato", 0);

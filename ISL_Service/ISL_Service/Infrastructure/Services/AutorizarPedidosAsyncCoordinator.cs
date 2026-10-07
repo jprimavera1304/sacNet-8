@@ -127,12 +127,9 @@ public class AutorizarPedidosAsyncCoordinator : IAutorizarPedidosAsyncCoordinato
         {
             IdsPedido = ids,
             AsyncMode = false,
-            IdUsuario = src?.IdUsuario,
-            IdUsuarioProcesar = src?.IdUsuarioProcesar,
-            IdUsuarioAutorizar = src?.IdUsuarioAutorizar,
-            Equipo = src?.Equipo,
-            EquipoProcesar = src?.EquipoProcesar,
-            EquipoAutorizar = src?.EquipoAutorizar,
+            // La autoria ya no viaja en el request: la lleva el coordinador en
+            // idUsuarioToken/equipoToken, que vienen del token de quien lanzo la
+            // operacion. No hay nada de identidad que clonar.
             IDTipoPagoCS = src?.IDTipoPagoCS,
             IDBancoTransferCS = src?.IDBancoTransferCS,
             TransferenciaCS = src?.TransferenciaCS,

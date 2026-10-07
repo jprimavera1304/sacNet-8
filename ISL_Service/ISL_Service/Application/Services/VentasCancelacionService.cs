@@ -40,9 +40,14 @@ public class VentasCancelacionService : IVentasCancelacionService
 
     private readonly IVentasCancelacionRepository _repo;
 
-    public VentasCancelacionService(IVentasCancelacionRepository repo)
+    /// Para dejar constancia del caso "fuera del concentrado y sin cancelar", que
+    /// es el unico de este servicio que deja dinero suelto. Ver CancelarAsync.
+    private readonly ILogger<VentasCancelacionService> _logger;
+
+    public VentasCancelacionService(IVentasCancelacionRepository repo, ILogger<VentasCancelacionService> logger)
     {
         _repo = repo;
+        _logger = logger;
     }
 
     public async Task<VentasCancelacionVerificarResponse> VerificarAsync(IReadOnlyCollection<int> idsVenta, CancellationToken ct)
@@ -89,14 +94,76 @@ public class VentasCancelacionService : IVentasCancelacionService
         if (conConcentrado.Count > 0)
             await ValidarContrasenaAsync(request.Contrasena, idUsuario, equipo, ct);
 
+        /*
+          SON DOS ESCRITURAS Y NO SE PUEDEN ENVOLVER EN UNA TRANSACCION. SE DICE
+          POR QUE, Y SE DEJA DE FALLAR EN SILENCIO.
+
+          LO QUE PASABA
+          -------------
+          Por cada venta se hacian dos cosas en este orden: quitarla del
+          concentrado (sp_n_ActualizarConcentradoDetalle) y luego cancelarla
+          (sp_n_CancelarVenta). Dos procedimientos, dos conexiones, sin
+          transaccion. Si el segundo fallaba, la remision salia del concentrado
+          pero seguia VIVA y POR COBRAR: fuera de la lista del cobrador, o sea
+          invisible. Dinero que nadie va a ir a buscar. Y el bucle seguia con las
+          demas ventas, acumulando casos.
+
+          POR QUE NO SE ENVUELVE
+          ----------------------
+          Se leyeron los tres procedimientos en la base:
+
+            sp_n_ActualizarConcentradoDetalle  BEGIN TRAN + ROLLBACK TRAN desnudo
+            sp_n_CancelarVenta                 BEGIN TRAN + ROLLBACK TRAN desnudo
+            sp_n_ConsultarConcentradoFolio     no abre nada (solo lee)
+
+          Ninguno de los dos que escriben consulta @@TRANCOUNT ni usa SAVE TRAN.
+          Un `ROLLBACK TRAN` desnudo dentro de una transaccion abierta desde C# no
+          deshace lo del procedimiento: deshace LA NUESTRA, y despues el
+          procedimiento regresa normal. El resultado seria peor que lo que hay: al
+          intentar el commit, C# revienta y el usuario recibe un 500 en vez del
+          mensaje de negocio. Es el mismo defecto que ya estaba documentado en la
+          carga de estado de cuenta bancario (OperacionMacRepository).
+
+          Para hacerlo atomico de verdad haria falta un `sp_w_CancelarVentaDelConcentrado`
+          que hiciera los dos pasos con una sola transaccion bien hecha. Eso es
+          cambio en la base y no se hace desde aqui: los sp_n_ no se editan.
+
+          LO QUE SI SE HACE
+          -----------------
+          Dejar de fallar callado. Si una venta ya salio del concentrado y su
+          cancelacion NO prospero, se PARA -no se siguen ensuciando las demas- y se
+          contesta 409 nombrando el folio y diciendo exactamente en que estado
+          quedo, para que alguien lo arregle hoy y no dentro de un mes. El caso se
+          registra ademas como error del servidor.
+        */
         var resultados = new List<VentasCancelacionResultado>();
 
         foreach (var e in evaluados)
         {
-            if (e.Concentrado is not null)
-                await _repo.QuitarDelConcentradoAsync(e.Venta, e.Concentrado, idUsuario, equipo, ct);
+            var saleDelConcentrado = e.Concentrado is not null;
+            if (saleDelConcentrado)
+                await _repo.QuitarDelConcentradoAsync(e.Venta, e.Concentrado!, idUsuario, equipo, ct);
 
-            resultados.Add(await _repo.CancelarAsync(e.Venta, idUsuario, equipo, ct));
+            var resultado = await _repo.CancelarAsync(e.Venta, idUsuario, equipo, ct);
+            resultados.Add(resultado);
+
+            if (saleDelConcentrado && !resultado.Cancelada)
+            {
+                _logger.LogError(
+                    "REMISION FUERA DEL CONCENTRADO Y SIN CANCELAR. idVenta={IdVenta} folio={Folio} concentrado={IdConcentrado} usuario={IdUsuario} mensaje={Mensaje}",
+                    e.Venta.IdVenta, resultado.Folio, e.Concentrado!.IdConcentrado, idUsuario, resultado.Mensaje);
+
+                var yaCanceladas = resultados.Where(x => x.Cancelada).Select(x => x.Folio).ToList();
+
+                throw new ConflictException(
+                    $"La remisión {resultado.Folio} SALIÓ del concentrado pero NO se pudo cancelar, "
+                    + "así que sigue viva y por cobrar fuera de la lista del cobrador. "
+                    + "Hay que volver a agregarla al concentrado o cancelarla desde Mac31 antes de seguir. "
+                    + $"Detalle de la base: {resultado.Mensaje}",
+                    $"Concentrado {e.Concentrado!.IdConcentrado}, IDVenta {e.Venta.IdVenta}. "
+                    + $"Canceladas antes de parar: {(yaCanceladas.Count == 0 ? "ninguna" : string.Join(", ", yaCanceladas))}. "
+                    + "Las remisiones restantes de la selección NO se tocaron.");
+            }
         }
 
         return new VentasCancelacionResponse

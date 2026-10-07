@@ -154,6 +154,51 @@ public class VentasFacturacionService : IVentasFacturacionService
         var idParametros = await GuardarParametrosAsync(timbrada, request.Observaciones, idUsuario, equipo, ct);
         timbrada.IdParametros = idParametros;
 
+        /*
+          EL COMPLEMENTO SE TIMBRA ANTE EL SAT Y DESPUES SE ESCRIBE EN MAC31. SI
+          FALLA A MEDIAS, SE PARA Y SE DICE.
+
+          QUE PASABA
+          ----------
+          El bucle insertaba un renglon por documento pagado y, si uno fallaba,
+          SEGUIA con los demas. Peor: RegistrarSiQuedoHuerfano dejaba el aviso en
+          timbrada.Mensaje y las dos lineas siguientes lo PISABAN con el mensaje
+          del propio insert, asi que la siguiente iteracion exitosa borraba la
+          unica senal que llegaba al usuario. El controlador contestaba siempre
+          200 con ok:true y "Complemento de pago timbrado.".
+
+          Resultado real: el pago existe ante el SAT, Mac31 cree que esas facturas
+          siguen sin abono, y nadie se entera. Eso se re-cobra o se re-timbra.
+
+          POR QUE NO SE ENVUELVE EN UNA TRANSACCION
+          -----------------------------------------
+          Dos razones, y las dos son de peso:
+
+          1. La parte irreversible es el timbrado ante el SAT, y eso NO entra en
+             ninguna transaccion de SQL Server. Una transaccion alrededor de los
+             inserts no evitaria el desfase; solo cambiaria cuales renglones
+             quedan.
+          2. `sp_n_InsertarVentaFactura` hace `BEGIN TRAN` y, en el camino de
+             error, un `ROLLBACK TRAN` DESNUDO (lineas 412 y 644 de su
+             definicion, leidas en la base). Dentro de una transaccion abierta
+             desde C#, ese rollback se lleva la transaccion EXTERNA y despues el
+             procedimiento regresa normal: al intentar el commit, C# revienta y el
+             usuario recibe un 500 en vez del mensaje. Es exactamente el defecto
+             que ya esta documentado en la carga de estado de cuenta bancario. Y
+             no se puede arreglar desde aqui: habria que editar un sp_n_, que esta
+             prohibido, o escribir un sp_w_ envolvente que usara SAVE TRAN y
+             @@TRANCOUNT. Eso es cambio en la base y queda anotado.
+
+          QUE SE HACE EN SU LUGAR
+          -----------------------
+          Lo unico honesto: cortar en el primer fallo -no seguir ensuciando- y
+          contestar 409 nombrando el UUID, el id de Facturapi y exactamente que
+          renglones SI quedaron escritos y cuales no, para que alguien pueda
+          terminarlo a mano. Un error ruidoso y accionable, en vez de un 200 que
+          miente.
+        */
+        var documentosEscritos = new List<int>();
+
         for (var i = 0; i < request.Documentos.Count; i++)
         {
             var documento = request.Documentos[i];
@@ -193,8 +238,18 @@ public class VentasFacturacionService : IVentasFacturacionService
                 idVentaFacturaRelacionada: documento.IdVentaFactura,
                 idUsuario, equipo, ct);
 
-            RegistrarSiQuedoHuerfano(insertado, timbrada, i);
+            if (!insertado.Hecho)
+            {
+                RegistrarSiQuedoHuerfano(insertado, timbrada, i);
+                throw new ConflictException(
+                    timbrada.Mensaje ?? "El complemento se timbro ante el SAT pero no se pudo guardar en Mac31.",
+                    $"Documentos escritos: {(documentosEscritos.Count == 0 ? "ninguno" : string.Join(", ", documentosEscritos))}. "
+                    + $"Fallo en el documento {i + 1} de {request.Documentos.Count} (IDVentaFactura relacionada {documento.IdVentaFactura}). "
+                    + $"Los documentos siguientes NO se intentaron. UUID {timbrada.Uuid}, Facturapi {timbrada.IdFacturapi}, IDParametros {idParametros}.");
+            }
+
             if (insertado.Id is > 0) timbrada.IdsVentaFactura.Add(insertado.Id.Value);
+            documentosEscritos.Add(documento.IdVentaFactura);
             timbrada.Resultado = insertado.Resultado;
             timbrada.Mensaje = insertado.Mensaje;
         }
@@ -425,7 +480,14 @@ public class VentasFacturacionService : IVentasFacturacionService
                 totalFacturadoVenta: timbrada.Total, tipo, fechaPago, fechaPagoSat, numComplementos,
                 request.IdVentaFacturaRelacionada, idUsuario, equipo, ct);
 
-            RegistrarSiQuedoHuerfano(unico, timbrada, 0);
+            if (!unico.Hecho)
+            {
+                RegistrarSiQuedoHuerfano(unico, timbrada, 0);
+                throw new ConflictException(
+                    timbrada.Mensaje ?? "El comprobante se timbro ante el SAT pero no se pudo guardar en Mac31.",
+                    $"Renglon unico. UUID {timbrada.Uuid}, Facturapi {timbrada.IdFacturapi}, IDParametros {idParametros}.");
+            }
+
             if (unico.Id is > 0) timbrada.IdsVentaFactura.Add(unico.Id.Value);
             timbrada.Resultado = unico.Resultado;
             timbrada.Mensaje = unico.Mensaje;
@@ -440,6 +502,22 @@ public class VentasFacturacionService : IVentasFacturacionService
           renglon de factura con total cero descuadra el "cuanto se ha facturado de
           esta remision" que despues decide si se puede volver a facturar.
         */
+        /*
+          MISMO CORTE QUE EN EL COMPLEMENTO DE PAGO, Y POR LO MISMO.
+
+          Una remision que no se escribe queda, para Mac31, SIN FACTURAR: se puede
+          volver a facturar y se duplica. Antes el bucle seguia y el mensaje del
+          huerfano lo pisaba la iteracion siguiente, asi que el usuario veia 200 y
+          "timbrado". Ahora se corta en el primer fallo y se dice que remisiones SI
+          quedaron escritas y cual fallo.
+
+          Lo de la transaccion es igual que alla: el timbrado ante el SAT no entra
+          en ninguna, y `sp_n_InsertarVentaFactura` hace ROLLBACK TRAN desnudo, asi
+          que envolverlo convertiria el fallo en un 500 con la transaccion externa
+          deshecha. Haria falta un sp_w_ envolvente con SAVE TRAN: cambio en la base.
+        */
+        var remisionesEscritas = new List<int>();
+
         for (var i = 0; i < request.IdsVenta.Count; i++)
         {
             var idVenta = request.IdsVenta[i];
@@ -455,8 +533,18 @@ public class VentasFacturacionService : IVentasFacturacionService
                 totalDeEsta, tipo, fechaPago, fechaPagoSat, numComplementos,
                 request.IdVentaFacturaRelacionada, idUsuario, equipo, ct);
 
-            RegistrarSiQuedoHuerfano(insertado, timbrada, i);
+            if (!insertado.Hecho)
+            {
+                RegistrarSiQuedoHuerfano(insertado, timbrada, i);
+                throw new ConflictException(
+                    timbrada.Mensaje ?? "El comprobante se timbro ante el SAT pero no se pudo guardar en Mac31.",
+                    $"Remisiones escritas: {(remisionesEscritas.Count == 0 ? "ninguna" : string.Join(", ", remisionesEscritas))}. "
+                    + $"Fallo en la venta {idVenta} (renglon {i + 1} de {request.IdsVenta.Count}). Las siguientes NO se intentaron. "
+                    + $"UUID {timbrada.Uuid}, Facturapi {timbrada.IdFacturapi}, IDParametros {idParametros}.");
+            }
+
             if (insertado.Id is > 0) timbrada.IdsVentaFactura.Add(insertado.Id.Value);
+            remisionesEscritas.Add(idVenta);
             timbrada.Resultado = insertado.Resultado;
             timbrada.Mensaje = insertado.Mensaje;
         }
