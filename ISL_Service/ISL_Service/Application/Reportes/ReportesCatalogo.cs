@@ -105,10 +105,19 @@ public static class ReportesCatalogo
         Ventas("clientes_facturas_rfc", "Clientes Facturas RFC"),
         Ventas("cascos", "Cascos"),
         Ventas("garantias", "Garantias"),
+        // El permiso reportes.ventas.garantias_registradas.ver YA existe en
+        // WPermiso (lo genero el script del catalogo legacy), aunque el nodo que
+        // lo abria en Mac31 este comentado hoy.
+        Ventas("garantias_registradas", "Registro de Garantias"),
         Ventas("cascos_excedentes", "Cascos Excedentes"),
         new("liquidaciones", "ventas", "Liquidaciones", SinPermiso),
         new("cobros_dinero_y_cascos", "ventas", "Cobros Dinero y Cascos", SinPermiso),
         Ventas("movimientos_centros", "Movimientos Centros"),
+        // 1415 y 1420 no tienen nodo propio en Mac31: los dispara el mismo boton
+        // de "Movimientos Centros" (ReportesMenu.cs:4048-4058), asi que llevan su
+        // permiso. Aqui son claves aparte para poder pedir y comprobar cada uno.
+        new("centros_pagos_entradas_salidas", "ventas", "Centros Pagos Entradas y Salidas", "reportes.ventas.movimientos_centros.ver"),
+        new("centros_garantias", "ventas", "Centros Garantias", "reportes.ventas.movimientos_centros.ver"),
         Ventas("centros_de_servicio", "Centros de Servicio"),
         Ventas("hoja_de_cobro_total_cobrado", "Hoja de Cobro Total Cobrado"),
         Ventas("hoja_de_cobro_total_cascos", "Hoja de Cobro Total Cascos"),
@@ -132,7 +141,11 @@ public static class ReportesCatalogo
         Grupo("administracion", "gastos", "Gastos"),
         Grupo("administracion", "impuestos", "Impuestos"),
         Grupo("administracion", "accesos", "Accesos"),
-        Grupo("administracion", "asistencias", "Asistencias")
+        Grupo("administracion", "asistencias", "Asistencias"),
+        // Nodo del arbol del modulo MC (ReportesMenu.cs:966). Su permiso seria
+        // reportes.administracion.control_acumulado_de_estimaciones.ver y NO esta
+        // en WPermiso, asi que entra abierto, como los otros cinco: no se invento.
+        new("control_acumulado_de_estimaciones", "administracion", "Control Acumulado de Estimaciones", SinPermiso)
     ];
 
     private static readonly Dictionary<string, ReporteCatalogoItem> _porClave =

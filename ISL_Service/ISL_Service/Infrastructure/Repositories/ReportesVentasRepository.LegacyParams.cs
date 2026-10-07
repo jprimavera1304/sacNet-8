@@ -56,9 +56,19 @@ public partial class ReportesVentasRepository
         return ReporteVentasConcentradosDetalle;
     }
 
+    /*
+      EL NODO "Cobranza" DE MAC31 ES EL 1160, NO EL 1161.
+
+      1160, 1161 y 1162 se llaman igual y comparten sp_n_rptVentasSaldosGlobales.
+      El arbol de Mac31 reparte asi (ReportesMenu.cs:732-740):
+        "Cobranza"           -> 1160  (esta clave)
+        "Cobranza Detallado" -> 1172  (clave cobranza_detallado)
+        "Cobranza Pagadas"   -> 1162 / 1166
+      El 1161 no lo usa ningun nodo: era el que estaba aqui por descarte.
+    */
     private static int ResolveReporteCobranza(ReportesVentasCobranzaRequest request)
     {
-        return ReporteVentasCobranzaDetalladoZara;
+        return ReporteVentasCobranzaDetallado;
     }
 
     private static bool IsAcumuladoresProductosReporte(int idReporte)
@@ -91,26 +101,55 @@ public partial class ReportesVentasRepository
 
     private static bool IsCobranzaReporte(int idReporte)
     {
-        return idReporte == ReporteVentasCobranzaDetalladoZara
+        return idReporte == ReporteVentasCobranzaDetallado
+            || idReporte == ReporteVentasCobranzaDetalladoZara
             || idReporte == ReporteVentasCobranzaPagadasDetalladoZara
             || idReporte == ReporteVentasCobranzaPagadasTotalizadoZara
             || idReporte == ReporteVentasCobranzaDesglosado
             || idReporte == ReporteVentasCobranzaZaragoza;
     }
 
-    private static int ResolveReporteLegacyVentas(ReportesVentasLegacyRequest request)
+    /*
+      DE LA CLAVE DEL CATALOGO AL IDReporte.
+
+      Es async y recibe la conexion porque tres familias no se pueden resolver
+      sin preguntarle a la base QUIEN ES ESTA EMPRESA: Pagos (71/75 contra 72/76
+      contra 77) y Listas de Precios (1240 contra las cuatro de Tauro) eligen el
+      id por Constantes.Funcionalidad y Constantes.EsCentroServicio, igual que
+      Mac31. Resolverlo con una constante de C# seria correcto para una empresa y
+      silenciosamente falso para la otra.
+    */
+    private static async Task<int> ResolveReporteLegacyVentasAsync(
+        SqlConnection conn,
+        ReportesVentasLegacyRequest request,
+        CancellationToken ct)
     {
         if (request.IDReporte > 0)
             return request.IDReporte;
 
-        return (request.ReporteKey ?? "").Trim().ToLowerInvariant() switch
+        var clave = (request.ReporteKey ?? "").Trim().ToLowerInvariant();
+
+        if (clave is "pagos" or "listas_de_precios" or "listas_de_precios_imp")
         {
+            var constants = await ConsultarConstantesAsync(conn, ct);
+            return clave == "pagos"
+                ? ResolveReportePagos(request.Formato, constants)
+                : ResolveReporteListasPrecios(request, constants);
+        }
+
+        return clave switch
+        {
+            "acumuladores_y_productos" => ResolveReporte(request),
+            "folios" => ResolveReporteFoliosLegacy(request),
+            "remisiones" => ResolveStatusFolio(request.EstatusFolio) == 4 ? ReporteVentasRemisionesSaldoFavor : ReporteVentasRemisiones,
+            "facturas" => ReporteVentasFacturas,
+            "concentrados" => ReporteVentasConcentradosDetalle,
+            "cobranza" => ReporteVentasCobranzaDetallado,
             "motobaterias" => ResolveReporteMotobaterias(request.FormatoMotobaterias),
             "cobranza_detallado" => ReporteVentasCobranzaZaragoza,
             "cobranza_pagadas" => ResolveFormatoDetallado(request.Formato) ? ReporteVentasCobranzaPagadasDetalladoZara : ReporteVentasCobranzaPagadasTotalizadoZara,
-            "estado_de_cuenta" => ResolveReporteEstadoCuenta(request.DineroCascos),
+            "estado_de_cuenta" => ResolveReporteEstadoCuenta(request.FormatoEstadoCuenta),
             "rutas_de_agentes" => ReporteVentasCobranzaDesglosado,
-            "pagos" => ResolveFormatoDetallado(request.Formato) ? ReporteVentasPagosDetallado : ReporteVentasPagosTotalizado,
             "descuentos" => ReporteVentasPagosDescuentos,
             "transferencias_duplicadas" => ReporteVentasPagosTransferenciasDuplicadas,
             "transferencias_clientes" => ReporteTransferenciasClientes,
@@ -126,7 +165,7 @@ public partial class ReportesVentasRepository
             "clientes_con_compra_por_dia" => ReporteClientesConCompraPorDia,
             "clientes_sin_compra" => ReporteClientesSinCompra,
             "clientes_facturas_rfc" => ReporteClientesFacturasRFC,
-            "clientes_acum_moto_lub" => ReporteClientesAcumMotoLub,
+            "clientes_acum_moto_lub" => ResolveReporteClientesAcumMotoLub(request),
             "clientes_acum_moto_lub_clarios" => ReporteClientesAcumMotoLubClarios,
             "compras_acumuladores_y_productos" => request.IDGrupoCategoria == GrupoCategoriaAcumuladores ? ReporteCompraAcumuladores : ReporteCompraProductos,
             "compras_facturas" => ReporteComprasFacturas,
@@ -139,14 +178,16 @@ public partial class ReportesVentasRepository
             "liquidaciones" => ReporteVentasLiquidaciones,
             "cobros_dinero_y_cascos" => (request.DineroCascos ?? "").Trim().Equals("cascos", StringComparison.OrdinalIgnoreCase) ? ReporteVentasCobrosCascos : ReporteVentasCobrosDinero,
             "movimientos_centros" => ReporteCentrosRemisiones,
+            "centros_pagos_entradas_salidas" => ReporteCentrosPagosEntradasSalidas,
+            "centros_garantias" => ReporteCentrosGarantias,
             "centros_de_servicio" => ReporteCentrosCompleto,
             "hoja_de_cobro_total_cobrado" => ResolveFormatoDetallado(request.Formato) ? ReporteHojaCobroTotalCobradoDetallado : ReporteHojaCobroTotalCobradoTotalizado,
             "hoja_de_cobro_total_cascos" => ReporteHojaCobroTotalCascos,
             "hoja_de_cobro_cheques" => ReporteHojaCobroCheques,
             "garantias" => ReporteGarantias,
+            "garantias_registradas" => ReporteGarantiasRegistradas,
             "gasolinas" => ResolveReporteGasolinas(request.Formato),
-            "listas_de_precios" => ResolveReporteListasPrecios(request),
-            "listas_de_precios_imp" => ResolveReporteListasPrecios(request),
+            "control_acumulado_de_estimaciones" => ReporteControlAcumuladoEstimaciones,
             "cortes" => ReporteCortes,
             "gastos" => ResolveFormatoDetallado(request.Formato) ? ReporteGastosDetallado : ReporteGastosTotalizado,
             "impuestos" => ReporteVentasRemisionesImpuestos,
@@ -163,11 +204,81 @@ public partial class ReportesVentasRepository
             : ReporteGasolinasDetallado;
     }
 
-    private static int ResolveReporteListasPrecios(ReportesVentasLegacyRequest request)
+    /*
+      LISTAS DE PRECIOS: EL id SALE DE LA EMPRESA Y DEL COMBO, NO DE UNA CONSTANTE.
+
+      Mac31 (ReportesMenu.cs:3925-3952): si la categoria no es acumuladores es
+      siempre el 1245; si es acumuladores, el 1240 EXCEPTO cuando la empresa es
+      Tauro, donde el combo cboTipoLista elige entre las cuatro listas
+      personalizadas. Los cuatro SP piden los mismos 17 parametros que el 1240.
+    */
+    private static int ResolveReporteListasPrecios(ReportesVentasLegacyRequest request, LegacyConstants constants)
     {
-        return request.IDGrupoCategoria == GrupoCategoriaAcumuladores
-            ? ReporteListasPreciosZaragoza
-            : ReporteListasPreciosProductosZaragoza;
+        if (request.IDGrupoCategoria != GrupoCategoriaAcumuladores)
+            return ReporteListasPreciosProductosZaragoza;
+
+        if (!EsTauro(constants))
+            return ReporteListasPreciosZaragoza;
+
+        return request.TipoLista switch
+        {
+            2 => ReporteListasPreciosTauroTodasMenosTauro,
+            3 => ReporteListasPreciosTauroCroGonXtLthClAmFpDy,
+            4 => ReporteListasPreciosTauroFpAmLth,
+            _ => ReporteListasPreciosTauroTodas
+        };
+    }
+
+    /*
+      PAGOS: 71/75 en Zaragoza, 77 en Tauro, 72/76 en un centro de servicio.
+
+      Los cinco comparten sp_n_rptVentasPagosGlobales y los mismos 12
+      parametros; cambia la plantilla. Mac31 elige igual
+      (ReportesMenu.cs:3341-3397): el detallado se vuelve 77 cuando
+      funcionalidad == "TAU", y los dos se vuelven 72/76 cuando
+      EsCentroServicio == 1. El 76 no tiene renglon en dbo.Reportes en ninguna de
+      las dos bases, asi que en un centro de servicio el totalizado se queda en
+      el 75: es mejor imprimir el papel generico que un 500.
+    */
+    private static int ResolveReportePagos(string? formato, LegacyConstants constants)
+    {
+        if (!ResolveFormatoDetallado(formato))
+            return ReporteVentasPagosTotalizado;
+
+        if (constants.EsCentroServicio == 1)
+            return ReporteVentasPagosDetalladoCS;
+
+        return EsTauro(constants)
+            ? ReporteVentasPagosDetalladoTauro
+            : ReporteVentasPagosDetallado;
+    }
+
+    private static bool EsTauro(LegacyConstants constants)
+        => (constants.Funcionalidad ?? "").Trim().ToUpperInvariant().Contains("TAU");
+
+    /*
+      CLIENTES ACUM MOTO LUB: 116 normal, 118 el mensual de todas las categorias,
+      119 el mensual de una categoria. Un solo spV2 y un solo nodo en Mac31.
+    */
+    private static int ResolveReporteClientesAcumMotoLub(ReportesVentasLegacyRequest request)
+    {
+        if (!request.VentasMensual)
+            return ReporteClientesAcumMotoLub;
+
+        return request.IDGrupoCategoria > 0
+            ? ReporteClientesAcumMotoLubMensualCategoria
+            : ReporteClientesAcumMotoLubMensual;
+    }
+
+    /// <summary>La misma eleccion que el endpoint propio de folios.</summary>
+    private static int ResolveReporteFoliosLegacy(ReportesVentasLegacyRequest request)
+    {
+        if (request.FoliosDineroCascos)
+            return ReporteVentasFoliosDineroUsados;
+
+        return ResolveStatusFolio(request.EstatusFolio) == 4
+            ? ReporteVentasRemisionesSaldoFavor
+            : ReporteVentasFoliosGlobal;
     }
 
     private static int ResolveReporteMotobaterias(string? formato)
@@ -181,9 +292,32 @@ public partial class ReportesVentasRepository
         };
     }
 
+    /*
+      EL FORMATO ES EL QUE DECIDE, Y ANTES NO DECIDIA NADA.
+
+      Esta funcion recibia su parametro y devolvia siempre 1370, asi que las
+      constantes 1375 y 1380 existian sin que nadie pudiera alcanzarlas. Peor:
+      ResolveFormatoEstadoCuenta si traducia "dinero" a Formato=1, de modo que al
+      1370 se le pedia un formato que su plantilla no es.
+
+      El reparto es el de Mac31 (ReportesMenu.cs:2495-2512), y los tres leen los
+      mismos 9 parametros:
+        "" / ambos  -> 1370  Estado de Cuenta          (sp_n_rptVentasEstadoCuenta)
+        dinero      -> 1375  Estado de Cuenta DINERO   (sp_n_rptVentasEstadoCuentaGlobales)
+        cascos      -> 1380  Estado de Cuenta CASCOS   (idem)
+
+      Nota de herencia: en Mac31 el combo cboFormatoEdoCuenta esta COMENTADO
+      (ReportesMenu.cs:1375), asi que alla siempre sale el 1370. 1375 y 1380 son
+      papel que la base tiene y que Mac31 hoy no sabe pedir.
+    */
     private static int ResolveReporteEstadoCuenta(string? formato)
     {
-        return ReporteVentasEstadoCuenta;
+        return (formato ?? "").Trim().ToLowerInvariant() switch
+        {
+            "dinero" => ReporteVentasEstadoCuentaDinero,
+            "cascos" => ReporteVentasEstadoCuentaCascos,
+            _ => ReporteVentasEstadoCuenta
+        };
     }
 
     private static int ResolveReporteInventarioActual(ReportesVentasLegacyRequest request)
@@ -256,6 +390,8 @@ public partial class ReportesVentasRepository
             ReporteClientesDescuentos or
             ReporteClientesDescuentosSin or
             ReporteClientesAcumMotoLub or
+            ReporteClientesAcumMotoLubMensual or
+            ReporteClientesAcumMotoLubMensualCategoria or
             ReporteClientesAcumMotoLubClarios or
             ReporteCompraAcumuladores or
             ReporteCompraProductos or
@@ -277,6 +413,11 @@ public partial class ReportesVentasRepository
             ReporteGasolinasMensual or
             ReporteListasPreciosZaragoza or
             ReporteListasPreciosProductosZaragoza or
+            ReporteListasPreciosTauroTodas or
+            ReporteListasPreciosTauroTodasMenosTauro or
+            ReporteListasPreciosTauroCroGonXtLthClAmFpDy or
+            ReporteListasPreciosTauroFpAmLth or
+            ReporteControlAcumuladoEstimaciones or
             ReporteCortes or
             ReporteGastosDetallado or
             ReporteGastosTotalizado or
@@ -289,6 +430,7 @@ public partial class ReportesVentasRepository
             ReporteVentasDescuentosAjustes or
             ReporteVentasUsadosCreditos or
             ReporteGarantias or
+            ReporteGarantiasRegistradas or
             ReporteVentasCascosExcedentes or
             ReporteVentasLiquidaciones or
             ReporteVentasCobrosDinero or
@@ -300,6 +442,8 @@ public partial class ReportesVentasRepository
             ReporteTransferenciasEstatus or
             ReporteTransferenciasFolios or
             ReporteCentrosRemisiones or
+            ReporteCentrosPagosEntradasSalidas or
+            ReporteCentrosGarantias or
             ReporteCentrosCompleto or
             ReporteHojaCobroTotalCobradoDetallado or
             ReporteHojaCobroTotalCobradoTotalizado or
@@ -344,13 +488,23 @@ public partial class ReportesVentasRepository
         CancellationToken ct)
     {
         var idReporte = ResolveReporteRemisiones(request);
-        return await BuildDocumentosVentaLegacyParamsAsync(conn, idReporte, request, ct);
+        return await BuildDocumentosVentaLegacyParamsAsync(conn, idReporte, request, request.EstatusFolio, request.IDUsuarios, ct);
     }
 
+    /*
+      Recibe estatusFolio e idUsuarios aparte en vez de pedir un
+      ReportesVentasRemisionesRequest: asi lo pueden llamar tanto los endpoints
+      propios (remisiones, folios, facturas) como la ruta generica
+      legacy/generar, que trae los mismos campos en otro DTO. Antes esa ruta no
+      podia, y las claves remisiones/folios/facturas del catalogo acababan en un
+      500 "Reporte de ventas no soportado".
+    */
     private static async Task<LegacyReportParams> BuildDocumentosVentaLegacyParamsAsync(
         SqlConnection conn,
         int idReporte,
-        ReportesVentasRemisionesRequest request,
+        ReportesVentasAcumuladoresProductosRequest request,
+        string? estatusFolio,
+        List<int>? idUsuarios,
         CancellationToken ct,
         int formato = 1,
         int tipo = 0)
@@ -366,11 +520,11 @@ public partial class ReportesVentasRepository
             Param4 = ResolveTipoDocumento(request.Documento).ToString(),
             Param5 = idCliente.ToString(),
             Param6 = JoinIds(request.IDAgentes),
-            Param7 = ResolveStatusFolio(request.EstatusFolio).ToString(),
+            Param7 = ResolveStatusFolio(estatusFolio).ToString(),
             Param8 = request.FechaInicial.ToString("yyyy-MM-dd"),
             Param9 = request.FechaFinal.ToString("yyyy-MM-dd"),
             Param10 = ResolvePresentacion(request.Salida).ToString(),
-            Param11 = JoinIds(request.IDUsuarios),
+            Param11 = JoinIds(idUsuarios),
             Param12 = formato.ToString(),
             Param13 = tipo.ToString(),
             Param14 = idReporte == ReporteVentasRemisiones && request.SoloServiciosDomicilio
@@ -379,14 +533,16 @@ public partial class ReportesVentasRepository
         };
     }
 
-    private static LegacyReportParams BuildConcentradosLegacyParams(ReportesVentasConcentradosRequest request)
+    private static LegacyReportParams BuildConcentradosLegacyParams(
+        ReportesVentasAcumuladoresProductosRequest request,
+        List<int>? idRepartidores)
     {
         return new LegacyReportParams
         {
             NombreEquipo = ResolveLegacyNombreEquipo(request),
             IDUsuario = ResolveLegacyIDUsuario(request),
             Param1 = BuildLegacyUsuarioParam(request),
-            Param2 = JoinIds(request.IDRepartidores),
+            Param2 = JoinIds(idRepartidores),
             Param3 = FormatLegacyStartDateTime(request.FechaInicial),
             Param4 = FormatLegacyEndDateTime(request.FechaFinal),
             Param5 = ResolvePresentacion(request.Salida).ToString()
@@ -395,11 +551,12 @@ public partial class ReportesVentasRepository
 
     private static async Task<LegacyReportParams> BuildCobranzaLegacyParamsAsync(
         SqlConnection conn,
-        ReportesVentasCobranzaRequest request,
+        ReportesVentasAcumuladoresProductosRequest request,
+        string? cobranzaStatus,
         CancellationToken ct)
     {
         var idCliente = await ResolveClienteLegacyAsync(conn, request, ct);
-        var idsCliente = ResolveCobranzaStatus(request.CobranzaStatus) == 4
+        var idsCliente = ResolveCobranzaStatus(cobranzaStatus) == 4
             ? JoinIds(request.IDClientes)
             : idCliente.ToString();
         if (string.IsNullOrWhiteSpace(idsCliente))
@@ -414,7 +571,7 @@ public partial class ReportesVentasRepository
             Param3 = idCliente.ToString(),
             Param4 = JoinIds(request.IDAgentes),
             Param5 = "0",
-            Param6 = ResolveCobranzaStatus(request.CobranzaStatus).ToString(),
+            Param6 = ResolveCobranzaStatus(cobranzaStatus).ToString(),
             Param7 = "1",
             Param8 = FormatLegacyStartDateTime(request.FechaInicial),
             Param9 = FormatLegacyEndDateTime(request.FechaFinal),
@@ -431,6 +588,40 @@ public partial class ReportesVentasRepository
         ReportesVentasLegacyRequest request,
         CancellationToken ct)
     {
+        /*
+          LAS SEIS FAMILIAS QUE TIENEN ENDPOINT PROPIO.
+
+          Sus claves estaban en el catalogo pero no aqui, asi que el POST pasaba
+          la validacion y moria abajo con 500. Se delegan a los mismos
+          constructores que usa su endpoint propio: un solo juego de parametros,
+          no dos que puedan separarse.
+        */
+        switch (idReporte)
+        {
+            case ReporteVentaAcumuladores:
+            case ReporteVentaProductos:
+                return await BuildLegacyParamsAsync(conn, idReporte, request, ct);
+
+            case ReporteVentasRemisiones:
+            case ReporteVentasRemisionesSaldoFavor:
+            case ReporteVentasFoliosGlobal:
+            case ReporteVentasFoliosDineroUsados:
+                return await BuildDocumentosVentaLegacyParamsAsync(
+                    conn, idReporte, request, request.EstatusFolio, request.IDUsuarios, ct);
+
+            case ReporteVentasFacturas:
+                return await BuildDocumentosVentaLegacyParamsAsync(
+                    conn, idReporte, request, request.EstatusFolio, request.IDUsuarios, ct,
+                    formato: 0, tipo: ResolveTipoFactura(request.TipoFactura));
+
+            case ReporteVentasConcentradosDetalle:
+                return BuildConcentradosLegacyParams(request, request.IDRepartidores);
+
+            case ReporteVentasCobranzaDetallado:
+            case ReporteVentasCobranzaDetalladoZara:
+                return await BuildCobranzaLegacyParamsAsync(conn, request, request.CobranzaStatus, ct);
+        }
+
         var idCliente = await ResolveClienteLegacyAsync(conn, request, ct);
         var idsCliente = JoinIds(request.IDClientes);
         if (string.IsNullOrWhiteSpace(idsCliente))
@@ -586,6 +777,8 @@ public partial class ReportesVentasRepository
             case ReporteClientesSinCompra:
             case ReporteClientesFacturasRFC:
             case ReporteClientesAcumMotoLub:
+            case ReporteClientesAcumMotoLubMensual:
+            case ReporteClientesAcumMotoLubMensualCategoria:
             case ReporteClientesAcumMotoLubClarios:
                 legacy.Param2 = idsEmpresa;
                 legacy.Param3 = fechaInicial;
@@ -598,6 +791,12 @@ public partial class ReportesVentasRepository
                     legacy.Param8 = request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria.ToString() : "1";
                     legacy.Param9 = "2025";
                 }
+                // El mensual pide la categoria en Param8: 0 = todas (reporte 118),
+                // 1 acumuladores / 2 moto / 3 lubricantes (reporte 119).
+                if (idReporte == ReporteClientesAcumMotoLubMensual)
+                    legacy.Param8 = "0";
+                if (idReporte == ReporteClientesAcumMotoLubMensualCategoria)
+                    legacy.Param8 = (request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria : GrupoCategoriaAcumuladores).ToString();
                 break;
 
             case ReporteClientesGlobal:
@@ -772,20 +971,60 @@ public partial class ReportesVentasRepository
                 legacy.Param6 = presentacion;
                 break;
 
+            /*
+              EL ESTADO DE CUENTA ES DE UN CLIENTE, Y POR ESO SE EXIGE UNO.
+
+              sp_n_rptVentasEstadoCuenta ignora las fechas que se le pasan: trae
+              TODAS las ventas desde 2024 ("La Fecha Inicial es SIEMPRE desde que
+              se empezo") y luego las recorre con cursores anidados. Lo unico que
+              recorta el trabajo es el filtro de cliente (@IDCliente <> 0).
+
+              Medido en Produccion_svr: con un cliente concreto el reporte sale en
+              3.5 s; sin cliente el SELECT seguia vivo pasados los 400 s, y Azure
+              corta la peticion HTTP a los 230, asi que en produccion eso es un 502
+              fijo. El SP es de legacy y no se toca; lo que se arregla es la
+              llamada, y se arregla pidiendo lo mismo que pide Mac31, donde la
+              forma del Estado de Cuenta FUERZA "por cliente" y esconde las otras
+              dos opciones (ReportesMenu.cs:1378-1381).
+
+              Se rebota con InvalidOperationException, que el controlador traduce a
+              400: es mejor decir que falta el cliente que dejar al usuario
+              esperando siete minutos un 502.
+            */
             case ReporteVentasEstadoCuenta:
             case ReporteVentasEstadoCuentaDinero:
             case ReporteVentasEstadoCuentaCascos:
+                if (idCliente <= 0)
+                    throw new InvalidOperationException("El estado de cuenta es de un cliente: elige uno.");
                 legacy.Param2 = idsEmpresa;
                 legacy.Param3 = idCliente.ToString();
                 legacy.Param4 = idsAgente;
                 legacy.Param5 = fechaInicial;
                 legacy.Param6 = fechaFinal;
-                legacy.Param7 = ResolveFormatoEstadoCuenta(request.DineroCascos);
+                legacy.Param7 = ResolveFormatoEstadoCuenta(request.FormatoEstadoCuenta);
                 legacy.Param8 = presentacion;
                 legacy.Param9 = idsCliente;
                 break;
 
+            /*
+              LOS CENTROS SON DOS FORMAS, NO UNA.
+
+              El 1445 (sp_n_rptEntradasSalidasCentrosGlobales) mete IDsCentro en
+              Param4 y corre la presentacion a Param5. El 1410, el 1415 y el 1420
+              no filtran por centro: su #ParamIds declara Param4 como Presentacion
+              (int). Mac31 les manda el MISMO renglon que al 1445, asi que alla la
+              presentacion se les pierde y solo salen "a pantalla" por accidente
+              (IDsCentro vacio convierte a 0, que es Pantalla). Aqui se les manda
+              lo que su SP pide, y el Excel de los tres funciona.
+            */
             case ReporteCentrosRemisiones:
+            case ReporteCentrosPagosEntradasSalidas:
+            case ReporteCentrosGarantias:
+                legacy.Param2 = fechaInicial;
+                legacy.Param3 = fechaFinal;
+                legacy.Param4 = presentacion;
+                break;
+
             case ReporteCentrosCompleto:
                 legacy.Param2 = fechaInicial;
                 legacy.Param3 = fechaFinal;
@@ -806,6 +1045,34 @@ public partial class ReportesVentasRepository
                 legacy.Param8 = fechaFinal;
                 legacy.Param9 = presentacion;
                 legacy.Param10 = formato;
+                break;
+
+            /*
+              1236 Registro de Garantias. No es el molde del 1235: su SP
+              (sp_n_rptConsultarGarantiasRegistradas) solo pide productos y fechas.
+              Nota de herencia: el nodo que lo abria en Mac31 esta COMENTADO
+              (ReportesMenu.cs:808-809), y su case de parametros tampoco existe
+              alla, asi que hoy este reporte no sale en Mac31 aunque su SP y sus
+              plantillas esten completos.
+            */
+            case ReporteGarantiasRegistradas:
+                legacy.Param2 = JoinIds(request.IDProductos);
+                legacy.Param3 = FormatLegacyStartDateTime(request.FechaInicial);
+                legacy.Param4 = FormatLegacyEndDateTime(request.FechaFinal);
+                legacy.Param5 = presentacion;
+                break;
+
+            /*
+              1250 Control Acumulado de Estimaciones. En Mac31 se imprime desde la
+              pantalla de estimaciones del modulo MC, con la estimacion y el
+              contrato de la fila seleccionada; desde el arbol de reportes truena,
+              porque alla el nodo existe y el case de parametros no
+              (ReportesMenu.cs:966 sin case -> Param2..4 nulos -> "PARAMETROS NULL").
+            */
+            case ReporteControlAcumuladoEstimaciones:
+                legacy.Param2 = request.IDContratoEstimacion.ToString(CultureInfo.InvariantCulture);
+                legacy.Param3 = request.IDContrato.ToString(CultureInfo.InvariantCulture);
+                legacy.Param4 = presentacion;
                 break;
 
             case ReporteGarantias:
@@ -873,6 +1140,10 @@ public partial class ReportesVentasRepository
 
             case ReporteListasPreciosZaragoza:
             case ReporteListasPreciosProductosZaragoza:
+            case ReporteListasPreciosTauroTodas:
+            case ReporteListasPreciosTauroTodasMenosTauro:
+            case ReporteListasPreciosTauroCroGonXtLthClAmFpDy:
+            case ReporteListasPreciosTauroFpAmLth:
                 var listaConstants = await ConsultarConstantesAsync(conn, ct);
                 var esListaCosto = (request.ReporteKey ?? "").Trim().Equals("listas_de_precios_imp", StringComparison.OrdinalIgnoreCase);
                 legacy.Param2 = "0";
@@ -890,7 +1161,12 @@ public partial class ReportesVentasRepository
                 legacy.Param14 = request.IncluirDescuentos ? "1" : "0";
                 legacy.Param15 = (listaConstants.IDEmpresaCS > 0 ? listaConstants.IDEmpresaCS : 1).ToString(CultureInfo.InvariantCulture);
                 legacy.Param16 = "0";
-                legacy.Param17 = "1";
+                // Param17 = tipo de lista. Lo leen las cuatro listas de Tauro y es
+                // el mismo numero con el que se eligio el IDReporte: si aqui va "1"
+                // fijo, el 1244 imprime el encabezado de "todas menos Tauro" con
+                // los datos de "todas".
+                legacy.Param17 = Math.Clamp(request.TipoLista <= 0 ? 1 : request.TipoLista, 1, 4)
+                    .ToString(CultureInfo.InvariantCulture);
                 break;
 
             default:
@@ -1355,7 +1631,7 @@ public partial class ReportesVentasRepository
             ReporteTransferenciasClientes or ReporteTransferenciasEstatus => "Param10",
             ReporteTransferenciasFolios => "Param6",
             ReporteVentasCobrosDinero or ReporteVentasCobrosCascos => "Param2",
-            ReporteCentrosRemisiones or ReporteCentrosCompleto => "Param2",
+            ReporteCentrosRemisiones or ReporteCentrosPagosEntradasSalidas or ReporteCentrosGarantias or ReporteCentrosCompleto => "Param2",
             ReporteVentasLiquidaciones => "Param2",
             ReporteCompraAcumuladores or ReporteCompraProductos => "Param8",
             ReporteInventarioAcumuladores or ReporteInventarioProductos or ReporteInventarioFiltros or ReporteInventarioAcumuladoresCosto or ReporteInventarioProductosCosto or ReporteInventarioFiltrosCosto or ReportePedidoAcumuladores or ReportePedidoProductos => "Param8",
@@ -1377,7 +1653,7 @@ public partial class ReportesVentasRepository
             ReporteTransferenciasClientes or ReporteTransferenciasEstatus => "Param11",
             ReporteTransferenciasFolios => "Param7",
             ReporteVentasCobrosDinero or ReporteVentasCobrosCascos => "Param3",
-            ReporteCentrosRemisiones or ReporteCentrosCompleto => "Param3",
+            ReporteCentrosRemisiones or ReporteCentrosPagosEntradasSalidas or ReporteCentrosGarantias or ReporteCentrosCompleto => "Param3",
             ReporteVentasLiquidaciones => "Param3",
             ReporteCompraAcumuladores or ReporteCompraProductos => "Param9",
             ReporteInventarioAcumuladores or ReporteInventarioProductos or ReporteInventarioFiltros or ReporteInventarioAcumuladoresCosto or ReporteInventarioProductosCosto or ReporteInventarioFiltrosCosto or ReportePedidoAcumuladores or ReportePedidoProductos => "Param8",
@@ -1532,7 +1808,9 @@ public partial class ReportesVentasRepository
             };
         }
 
-        if (idReporte is ReporteListasPreciosZaragoza or ReporteListasPreciosProductosZaragoza)
+        if (idReporte is ReporteListasPreciosZaragoza or ReporteListasPreciosProductosZaragoza
+            or ReporteListasPreciosTauroTodas or ReporteListasPreciosTauroTodasMenosTauro
+            or ReporteListasPreciosTauroCroGonXtLthClAmFpDy or ReporteListasPreciosTauroFpAmLth)
         {
             return new ReportesVentasLegacyRequest
             {
@@ -1544,7 +1822,8 @@ public partial class ReportesVentasRepository
                 IDSubcategorias = SplitLegacyIds(ReadString(row, "Param11")),
                 IDMarcas = SplitLegacyIds(ReadString(row, "Param12")),
                 Comentarios = ReadString(row, "Param13"),
-                Redondear = ReadString(row, "Param8") == "1"
+                Redondear = ReadString(row, "Param8") == "1",
+                TipoLista = Math.Max(1, ReadInt(row, "Param17"))
             };
         }
 
@@ -1578,7 +1857,12 @@ public partial class ReportesVentasRepository
             ReporteVentasCascosExcedentes => "Param7",
             ReporteVentasCobrosDinero or ReporteVentasCobrosCascos => "Param6",
             ReporteVentasEstadoCuenta or ReporteVentasEstadoCuentaDinero or ReporteVentasEstadoCuentaCascos => "Param8",
-            ReporteCentrosRemisiones or ReporteCentrosCompleto => "Param5",
+            ReporteCentrosCompleto => "Param5",
+            // 1410, 1415 y 1420 leen la presentacion en Param4; solo el 1445
+            // mete IDsCentro en medio y la corre a Param5 (sus #ParamIds lo dicen).
+            ReporteCentrosRemisiones or ReporteCentrosPagosEntradasSalidas or ReporteCentrosGarantias => "Param4",
+            ReporteGarantiasRegistradas => "Param5",
+            ReporteControlAcumuladoEstimaciones => "Param4",
             ReporteVentasLiquidaciones => "Param6",
             ReporteHojaCobroTotalCobradoDetallado or ReporteHojaCobroTotalCobradoTotalizado or ReporteHojaCobroTotalCascos or ReporteHojaCobroCheques => "Param9",
             ReporteGarantias => "Param9",
@@ -1587,7 +1871,9 @@ public partial class ReportesVentasRepository
             ReporteCortes or ReporteAccesosMac => "Param4",
             ReporteAsistenciasZaragoza => "Param5",
             ReporteVentasRemisionesImpuestos => "Param10",
-            ReporteListasPreciosZaragoza or ReporteListasPreciosProductosZaragoza => "Param6",
+            ReporteListasPreciosZaragoza or ReporteListasPreciosProductosZaragoza
+                or ReporteListasPreciosTauroTodas or ReporteListasPreciosTauroTodasMenosTauro
+                or ReporteListasPreciosTauroCroGonXtLthClAmFpDy or ReporteListasPreciosTauroFpAmLth => "Param6",
             ReporteClientesGlobal => "Param5",
             ReporteClientesDescuentos or ReporteClientesDescuentosSin => "Param7",
             _ => "Param7"

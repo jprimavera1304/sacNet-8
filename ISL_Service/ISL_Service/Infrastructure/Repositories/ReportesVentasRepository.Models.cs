@@ -56,6 +56,21 @@ public partial class ReportesVentasRepository
         public int IDDescuentoCompra { get; set; }
         public int IDDescuentoListaPrecios { get; set; }
         public int IDEmpresaCS { get; set; }
+
+        /*
+          QUIEN ES ESTA EMPRESA, EN LAS PALABRAS DE LEGACY.
+
+          "TAU" = Tauro, "ZARA" = Zaragoza. Mac31 lee lo mismo
+          (Variables.funcionalidad) y con eso elige entre reportes que son el
+          mismo papel con otra plantilla: 71 contra 77 en Pagos, 1240 contra las
+          cuatro listas personalizadas de Tauro. Sin este dato el backend nuevo
+          imprimia siempre la variante genérica, y en Tauro eso no es lo que ve
+          el usuario en Mac31.
+        */
+        public string Funcionalidad { get; set; } = "";
+
+        /// <summary>1 cuando la instalacion es un centro de servicio.</summary>
+        public int EsCentroServicio { get; set; }
     }
 
     private sealed class LegacyTemplate

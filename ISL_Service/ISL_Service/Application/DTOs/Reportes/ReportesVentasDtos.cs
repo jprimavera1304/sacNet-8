@@ -93,6 +93,52 @@ public class ReportesVentasLegacyRequest : ReportesVentasAcumuladoresProductosRe
     public List<int> IDAutos { get; set; } = new();
     public List<int> IDCentros { get; set; } = new();
     public List<int> IDStatusGarantias { get; set; } = new();
+
+    /*
+      LOS CAMPOS QUE LE FALTABAN A LA RUTA GENERICA.
+
+      Hasta ahora seis claves del catalogo (acumuladores_y_productos, folios,
+      remisiones, facturas, concentrados, cobranza) pasaban la validacion del
+      catalogo y morian abajo con 500 "Reporte de ventas no soportado", porque
+      solo se podian pedir por su endpoint propio. Con estos campos la ruta
+      generica arma los mismos parametros que esos endpoints y ya no hay una
+      clave del catalogo que la ruta no acepte.
+    */
+    public bool FoliosDineroCascos { get; set; }
+    public string CobranzaStatus { get; set; } = "pagadas";
+
+    /*
+      QUE ESTADO DE CUENTA SE QUIERE. Vacio = dinero y cascos (1370),
+      "dinero" = 1375, "cascos" = 1380.
+
+      Es un campo aparte de DineroCascos a proposito: alla "dinero" es el valor
+      por omision porque el reporte de Cobros SIEMPRE es de uno de los dos, y
+      aqui el valor por omision tiene que ser "los dos", como el combo de Mac31.
+      Compartirlos haria que pedir un estado de cuenta sin decir nada devolviera
+      el de dinero.
+    */
+    public string FormatoEstadoCuenta { get; set; } = "";
+
+    /*
+      CUAL DE LAS CUATRO LISTAS PERSONALIZADAS DE TAURO.
+
+      Es el combo cboTipoLista de Mac31: 1 = todas las marcas,
+      2 = todas menos Tauro, 3 = FP/CALE/DYNAMO/LTH/AMERICA/CRONOS/GOHNER/XTREME,
+      4 = FP/AMERICA/LTH. Viaja ademas como Param17 al SP, igual que en Mac31.
+    */
+    public int TipoLista { get; set; } = 1;
+
+    /// <summary>Clientes Acum Moto Lub: el acumulado mensual (118 / 119).</summary>
+    public bool VentasMensual { get; set; }
+
+    /// <summary>Control Acumulado de Estimaciones (1250): la estimacion a imprimir.</summary>
+    public int IDContratoEstimacion { get; set; }
+
+    /// <summary>Control Acumulado de Estimaciones (1250): su contrato.</summary>
+    public int IDContrato { get; set; }
+
+    /// <summary>Registro de Garantias (1236): filtro de productos, vacio = todos.</summary>
+    public List<int> IDProductos { get; set; } = new();
 }
 
 public class ReportesVentasPreviewResponse
