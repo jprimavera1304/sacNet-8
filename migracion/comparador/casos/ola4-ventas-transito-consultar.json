@@ -46,9 +46,32 @@
   "camino_legacy": "result.ventas",
   "camino_nuevo": "data.rows",
   "ordenar_por": null,
-  "solo_campos": [],
+  "solo_campos": [
+    "IDVentaDetalle",
+    "IDVenta",
+    "IDCliente",
+    "IDProducto",
+    "IDGarantia",
+    "Codigo",
+    "Cantidad",
+    "Productos",
+    "Folio",
+    "FolioFtm",
+    "FechaEmision",
+    "FechaEmisionFtm",
+    "FechaEmisionCortoFtm",
+    "FechaAcepto",
+    "FechaAceptoFtm",
+    "IDUsuarioAcepto",
+    "UsuarioAcepto",
+    "EquipoAcepto",
+    "Estatus",
+    "NombreCliente",
+    "NumeroCliente"
+  ],
   "ignorar": [],
   "diferencias_intencionales": [
-    "Legacy convierte la fecha con ConvertFtmDate leyendo formatoFechaDB de Constantes (sp_n_ConsultaConstantes, el del cierre del dia); el nuevo la manda en ISO."
+    "Legacy convierte la fecha con ConvertFtmDate leyendo formatoFechaDB de Constantes (sp_n_ConsultaConstantes, el del cierre del dia); el nuevo la manda en ISO.",
+    "`solo_campos` hace falta aqui y por eso se escribe: Legacy reusa el VentaDTO completo (cientos de propiedades: abonos, cargos, cascos, codigoPostal, apellidoPaterno...) y manda en 0 / null todas las que el procedimiento no devuelve. Se comparan los 21 campos que el DTO nuevo promete. Esto no se veia antes porque el caso devolvia lista vacia."
   ]
 }

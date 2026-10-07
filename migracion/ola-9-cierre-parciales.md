@@ -9,13 +9,16 @@ explica la tabla:
 * **Los frentes 2 y 3 se quedaron sin filas.** Cuando se escribió el encargo el
   tablero tenía 17 `por-verificar` y 136 `parcial`. Al terminar esta ola tiene
   **0 y 0**: los otros tres agentes las cerraron mientras esto corría. El detalle
-  de qué se encontró en cada una, antes de que se vaciaran, está en §3 y §4.
+  de qué se encontró en cada una, antes de que se vaciaran, está en §7.
 * **El frente 1 sí era mío y creció.** La auditoría había encontrado 18 casos que
   comparan lista vacía contra lista vacía. Barriendo los **135** casos del banco
   aparecieron **27**: las 18 de la auditoría más 9 que entraron después con las
   olas 4 y 5. Están todas tratadas.
 * **De paso salió un fallo que tiraba dos endpoints**, y no era de los casos sino
   del código: §2.
+* **El banco cierra en 135 de 135 contra Legacy**, con los seis rescates
+  comparados de verdad. Media jornada no se pudo correr nada contra Legacy, y la
+  razón vale leerla: §6.
 
 ---
 
@@ -237,9 +240,9 @@ a marzo de 2026 no hay parámetro que los salve.
 
 ---
 
-## 6. Lo que quedó BLOQUEADO y necesita tu permiso
+## 6. El cierre del día bloqueó el banco media jornada, y cómo se destrabó
 
-**No se pudo correr el banco contra Legacy en esta ola, y no es por el código.**
+Hay que contarlo porque va a volver a pasar mañana.
 
 ```
 Constantes.FechaOperacion = 2026-10-06      hoy = 2026-10-07
@@ -252,24 +255,15 @@ está atrasada inserta en `FechaOperacionLog`, borra y rehace
 Es la rutina de cierre del día del negocio
 (`CUIDADO-consultas-que-escriben.md`).
 
-O sea: **la primera llamada a Legacy de hoy hace el cierre del día y rehace el
-corte de inventario de ayer.** No se disparó. Dos razones:
+O sea: **la primera llamada a Legacy del día hace el cierre y rehace el corte de
+inventario de ayer.** Y como casi todo endpoint de Legacy empieza por ahí, **el
+banco entero queda bloqueado** mientras la fecha esté atrasada: no hay forma de
+comparar nada sin disparar una escritura en la base, con otros tres agentes
+trabajando contra ella.
 
-1. es una escritura en la base, y el protocolo dice que eso se hace a propósito y
-   de forma controlada, no de pasada dentro de una tanda de comparaciones;
-2. hay otros tres agentes trabajando contra `Produccion_svr` ahora mismo, y
-   rodar la fecha les cambia los datos a media tanda — exactamente la
-   «diferencia que no es del backend sino del orden en que se preguntó» que el
-   comparador vigila.
-
-**Lo que hace falta de ti:** autorizar que la fecha de operación ruede una vez,
-avisando a los cuatro frentes, o decir que se espere. En cuanto ruede, el banco
-corre normal: los casos ya están escritos y apuntados a datos reales.
-
-**Mientras tanto, lo que sí se comprobó, y cómo.** Para los tres casos
-re-apuntados en §4 se ejecutó el **mismo stored procedure que llama Legacy**,
-directo con `sqlcmd` y con los mismos parámetros, y se contrastó renglón por
-renglón contra la respuesta del backend nuevo:
+No se disparó desde aquí a propósito. Lo que se hizo mientras tanto fue
+comprobar los tres casos re-apuntados contra el **mismo stored procedure que
+llama Legacy**, ejecutado directo con `sqlcmd` y con los mismos parámetros:
 
 | caso | renglones del SP | renglones del nuevo | mismos ids |
 |---|---|---|---|
@@ -277,14 +271,36 @@ renglón contra la respuesta del backend nuevo:
 | `ola4-garantias-aceptar-pendientes` | 340 | 340 | sí |
 | `ola4-ventas-transito-consultar` | 306 | 306 | sí |
 
-No es una comparación contra Legacy y no se cuenta como tal: Legacy podría
-transformar algo entre el SP y el JSON. Pero sí prueba que el endpoint nuevo
-devuelve **los renglones del procedimiento y no otros**, que es lo que el `OK`
-vacío no probaba.
+**Se destrabó solo, y eso es justo el problema.** A media tarde la fecha ya estaba
+en `2026-10-07`: alguno de los otros frentes llamó a Legacy y el cierre corrió sin
+que nadie lo decidiera. Es exactamente el escenario que `CUIDADO` describe —
+«pasa a la primera llamada» — y confirma que la precaución no es teórica: el día
+se cerró por efecto secundario de una prueba.
 
-Los tres casos re-apuntados de §3 (`cliente-log`, `usuario-fechas`,
-`huellas-empleados`) **sí** se corrieron contra Legacy, antes de que cambiara el
-día, y los tres quedaron en OK.
+A partir de ahí el banco corrió normal, y con él se comparó todo lo de esta ola
+contra Legacy (§1 y §7).
+
+**Lo que conviene decidir, para mañana:** rodar la fecha de operación **primero y
+a propósito**, una sola vez, antes de abrir cualquier tanda de comparaciones del
+día. Hacerlo así cuesta un comando; dejar que lo dispare la primera prueba
+significa que ese día las dos mitades de alguna comparación salieron de estados
+distintos y nadie lo sabrá.
+
+### Lo que sí quedó pendiente de permiso
+
+**Las 9 comparaciones apuntadas a MacZ.** Para correrlas hacen falta dos cosas
+que hoy no se pueden tocar:
+
+* Legacy saca su base del `Web.config` de `Legacy/`, y `Legacy/` no se modifica.
+  Se destraba con una **copia** de la carpeta del proyecto fuera de `Legacy/`
+  apuntando a MacZ, servida por otro IIS Express en otro puerto: copiar no es
+  modificar.
+* El usuario de pruebas del backend nuevo (`BancoPruebas`) **no existe en MacZ**;
+  cada empresa tiene su base y su padrón de usuarios. Hace falta uno equivalente
+  allá, y eso es una escritura en MacZ que no se hizo sin preguntar.
+
+Con esas dos cosas se cierran las nueve de un tirón, y con ellas los módulos de
+cobros y de usados de Zaragoza, que en Tauro no se usan.
 
 ---
 
@@ -355,11 +371,23 @@ comprobó contra el tablero, que ya estaba viejo, y no contra la rama.
 | Fallos de código encontrados y arreglados | **1**, que tiraba **2** endpoints comparados (choque de ruta) |
 | Pruebas | **413** en verde (412 + la nueva de rutas, que se comprobó que falla cuando debe) |
 | Casos del banco | **135** (134 + `ola4-garantias-aceptar-pendientes`) |
+| Banco completo contra Legacy al cerrar | **135 de 135 en verde**, sin que la fecha de operación se moviera durante la corrida |
+
+Los seis rescates se corrieron **contra Legacy**, no sólo contra el SP, y los seis
+quedaron en OK. El último en caer fue `ola4-ventas-transito-consultar`: con 306
+renglones reales salió DIF por lo mismo que `cliente-log` —Legacy reusa el
+`VentaDTO` completo y manda en 0/null cientos de propiedades que el procedimiento
+no devuelve—, y se acotó con `solo_campos` a los 21 campos que el DTO nuevo
+promete. Es la cuarta vez en esta ola que **la diferencia escondida detrás de un
+caso vacío es el DTO reusado de Legacy**: `cliente-log`, `usuario-fechas`,
+`huellas` y ahora `transito`. Cuando un caso no ve renglones, ese es el defecto
+que no ve.
 
 Lo que queda abierto, y es de quien decida:
 
-1. **Rodar la fecha de operación** para poder volver a correr el banco contra
-   Legacy (§6). Hoy bloquea a los cuatro frentes, no sólo a este.
+1. **Rodar la fecha de operación a propósito al empezar el día**, antes de abrir
+   cualquier tanda (§6). Hoy se cerró el día por efecto secundario de la prueba de
+   alguien, y eso afecta a los cuatro frentes, no sólo a este.
 2. **Las 9 comparaciones apuntadas a MacZ.** Para correrlas hacen falta dos cosas
    que hoy no se pueden tocar: la base de Legacy sale de su `Web.config`, y el
    usuario de pruebas del backend nuevo no existe en MacZ. Con una copia de la
