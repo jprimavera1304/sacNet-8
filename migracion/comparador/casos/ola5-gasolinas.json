@@ -1,0 +1,57 @@
+{
+  "nombre": "Gasolinas - recibos de un repartidor",
+  "_porque": [
+    "Los cuatro sp_n_ de gasolinas SI estan en Produccion_svr y con la misma",
+    "firma que espera Legacy, asi que este endpoint es comparable de verdad.",
+    "",
+    "Se filtra por UN repartidor (5072) y no se piden los 2554 recibos de la",
+    "tabla. Sin filtro, la respuesta de Legacy pesa 2.2 MB y la del nuevo 2.0 MB,",
+    "y pedir eso y los 39760 renglones de cobranzas en la misma corrida tira el",
+    "backend por memoria. El tamano de estas respuestas sin paginar queda anotado",
+    "como pendiente en ola-5-obra-aviacion.md. La pregunta que se compara es la",
+    "misma en los dos lados.",
+    "",
+    "La corrida SIN filtro tambien se hizo y salio OK: 2554 renglones y la unica",
+    "diferencia fue el 0 contra null de los dos campos que estan en `ignorar`."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/gasolinas/consultar",
+    "body": {
+      "IDGasolina": 0,
+      "IDAuto": 0,
+      "IDRepartidor": 5072,
+      "Existe": 0,
+      "NumeroRecibo": "",
+      "FechaInicial": "",
+      "FechaFinal": "",
+      "FechaInicialCaptura": "",
+      "FechaFinalCaptura": ""
+    }
+  },
+  "nuevo": { "method": "GET", "path": "/api/gasolinas", "query": { "idRepartidor": 5072 } },
+  "camino_legacy": "result.gasolinas",
+  "camino_nuevo": "data",
+  "ordenar_por": "idGasolina",
+  "solo_campos": [
+    "idGasolina", "idAuto", "idRepartidor", "numeroRecibo", "auto", "modelo",
+    "placas", "nombreAuto", "repartidor", "kmInicial", "kmFinal",
+    "kmRecorridos", "kmLitro", "totalRecibo", "litrosReales", "precioLitro",
+    "fechaRecibo", "fecha", "equipo", "idUsuario", "usuario",
+    "fechaModificacion", "equipoModificacion", "idUsuarioModificacion",
+    "modificada", "fechaCancelacion", "equipoCancelacion",
+    "idUsuarioCancelacion", "cancelada", "numRegistros", "primerIDGasolina"
+  ],
+  "ignorar": [
+    "idUsuarioModificacion",
+    "idUsuarioCancelacion"
+  ],
+  "diferencias_intencionales": [
+    "idUsuarioModificacion e idUsuarioCancelacion: Legacy manda 0 y el nuevo manda null. El SP los devuelve NULL cuando el recibo no se ha modificado ni cancelado, y el DTO de Legacy los declaraba como int NO anulable, asi que el NULL se convertia en 0. Un 0 ahi apunta al usuario 0, que no existe: es la misma decision que tomo la ola 3 con las fechas de LEFT JOIN (null y no 0001-01-01). Es la UNICA diferencia que sale en los 2554 renglones.",
+    "Fuera las columnas *Ftm (FechaReciboFtm, FechaFtm, FechaModificacionFtm, FechaCancelacionFtm): son el mismo valor ya formateado por la base para las rejillas de WinForms. El front formatea con la configuracion de quien mira la pantalla.",
+    "Fuera IDStatus, UsuarioModificacion y UsuarioCancelacion: el DTO de Legacy los DECLARA y el SELECT del SP NO los manda, asi que Legacy publicaba tres campos que nunca traian dato (comprobado en el cuerpo de sp_n_ConsultarGasolinas).",
+    "Fuera la segunda copia de Equipo, FechaModificacion y FechaCancelacion: el SELECT del SP las trae dos veces por un copiar y pegar, y el DataTable renombraba la segunda a Equipo1 / FechaModificacion1.",
+    "El filtro por numero de recibo YA NO tira los demas filtros: en Legacy, mandar NumeroRecibo reconstruia el DTO y perdia IDAuto, IDRepartidor y las cuatro fechas.",
+    "Las fechas del filtro van tipadas y en ISO, asi que el nuevo NO llama a sp_n_ConsultaConstantes (la rutina que cierra el dia del negocio) para leer formatoFechaDB."
+  ]
+}

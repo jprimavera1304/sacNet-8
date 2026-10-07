@@ -1,0 +1,58 @@
+{
+  "nombre": "Cobranzas - consulta de un repartidor",
+  "_porque": [
+    "sp_n_ConsultarCobranzas esta en Produccion_svr con los 11 parametros que",
+    "manda Legacy: comparable.",
+    "",
+    "A Legacy se le mandan los folios VACIOS a proposito, no en cero. Su servicio",
+    "hace `FolioInicialCobranza = \"0\" + FolioInicialCobranza` y despues",
+    "`if (FolioInicialCobranza != \"0\")`: con el folio vacio la cadena queda en",
+    "\"0\", la condicion es falsa, NO se reconstruye el DTO y se mandan todos los",
+    "filtros al SP. Es la unica forma de que Legacy haga la misma pregunta que el",
+    "nuevo.",
+    "",
+    "IDUsuarioActual va en 0 porque es lo que trae el token de BancoPruebas",
+    "(idUsuario = 0, no tiene vinculo con Mac31) y el nuevo lo saca de ahi.",
+    "",
+    "Se filtra por UN repartidor para que el caso se pueda repetir: sin filtro la",
+    "respuesta son 39760 renglones y 23 MB. La corrida SIN filtro tambien se hizo",
+    "y salio OK, cero diferencias en los 39760 renglones."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/cobranzas/consultar",
+    "body": {
+      "IDUsuarioActual": 0,
+      "IDCobranza": 0,
+      "IDRepartidor": 7145,
+      "IDUsuarioCobranza": 0,
+      "FolioInicialCobranza": "",
+      "FolioFinalCobranza": "",
+      "FechaInicialCobranza": "",
+      "FechaFinalCobranza": "",
+      "IDEmpresaVenta": 0,
+      "FolioInicialVenta": "",
+      "FolioFinalVenta": ""
+    }
+  },
+  "nuevo": { "method": "GET", "path": "/api/cobranzas", "query": { "idRepartidor": 7145 } },
+  "camino_legacy": "result.cobranzas",
+  "camino_nuevo": "data",
+  "ordenar_por": "idCobranza",
+  "solo_campos": [
+    "idCobranza", "idRepartidor", "folio", "repartidor", "fecha", "equipo",
+    "idUsuario", "usuario", "idAlmacen", "almacen", "fechaModificacion",
+    "equipoModifico", "idUsuarioModifico", "usuarioModifico",
+    "fechaModificacionMostrar", "fechaCancelacion", "equipoCancelo",
+    "idUsuarioCancelo", "usuarioCancelo", "fechaCancelacionMostrar",
+    "cancelada", "numFolios", "numProductos", "pesoKg", "totalPagar",
+    "abonos", "descuentos", "saldo", "observaciones"
+  ],
+  "diferencias_intencionales": [
+    "Fuera FechaFtm, FechaModificacionFtm y FechaCancelacionFtm: la misma fecha otra vez, ya formateada por la base para las rejillas de WinForms.",
+    "Fuera EsFacturaParaPago y FacturaParaPago: el DTO de Legacy los declara y el SP no los manda. Eran dos campos que nunca traian dato.",
+    "El filtro por folio de cobranza YA NO tira los demas filtros, y el filtro por folio de VENTA ya funciona: en Legacy su rama estaba escrita con la condicion del folio de cobranza repetida (copiar y pegar), asi que era codigo muerto y nunca se ejecutaba.",
+    "IDUsuarioActual —que es con lo que el SP decide que cobranzas se ven— sale del token, no del cuerpo. En Legacy, mandando el id de otro se veian las cobranzas de otro.",
+    "Las fechas del filtro van tipadas y en ISO: el nuevo no llama a sp_n_ConsultaConstantes, que es la rutina que cierra el dia del negocio."
+  ]
+}

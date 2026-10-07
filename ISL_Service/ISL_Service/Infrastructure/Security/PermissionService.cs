@@ -462,6 +462,7 @@ public sealed class PermissionService : IPermissionService
         new("cheques.activar", "Cheques - Cambiar estatus", "cheques"),
 
         /*
+<<<<<<< HEAD
           PERMISOS DE LOS CATALOGOS DE SOLO LECTURA (ola 1 de la migracion de MacServicios2).
 
           Son cinco y no uno porque el contenido no es igual de inocente:
@@ -803,7 +804,117 @@ public sealed class PermissionService : IPermissionService
         new("proyectos.crear", "Proyectos - Crear", "proyectos"),
         new("proyectos.editar", "Proyectos - Modificar", "proyectos"),
 
-        new("sincronizacion.ver", "Sincronización - Consultar la cola", "sincronizacion")
+        new("sincronizacion.ver", "Sincronización - Consultar la cola", "sincronizacion"),
+
+        /*
+          OBRA (MC), AVIACION, GASOLINAS Y COBRANZAS.
+          Los modulos que faltaban de MacServicios2.
+
+          NINGUNA DE ESTAS CLAVES CAE EN LAS CUATRO FAMILIAS QUE GOBIERNA MAC31
+          (ventas.*, reportes.*, empleados.*, prestamos.*), y eso es a proposito,
+          no casualidad. Para esas cuatro, el puente de permisos BORRA del snapshot
+          lo que diga el web y lo recalcula desde los botones de la forma de Mac31
+          (ver la seccion de EnsureVentasPermissionsSyncedAsync mas abajo): una
+          clave `ventas.cobranzas.crear` se habria guardado en WUsuarioPermiso y
+          habria desaparecido en el siguiente calculo, sin error y sin rastro.
+          Cobranzas se llama `cobranzas.*` por eso.
+
+          OJO AL MEZCLAR CON LA OLA 3: las cuatro claves marcadas abajo con
+          "(tambien de la ola 3)" las siembra tambien esa entrega. Estan aqui
+          porque las usan los endpoints de este archivo y sin la fila en WPermiso
+          nadie puede tenerlas; sembrar dos veces la misma clave es inofensivo —
+          SincronizarCatalogo salta la que ya existe (PermissionExistsAsync)— pero
+          al mezclar las dos ramas hay que dejar UNA sola linea por clave.
+        */
+
+        // --- Obra (MC): las cuatro de lectura, compartidas con la ola 3 ---
+        new("obra.ver_modulo", "Obra - Ver módulo", "obra"),                    // (tambien de la ola 3)
+        new("obra.catalogos.ver", "Obra - Catálogos: Ver", "obra"),             // (tambien de la ola 3)
+        new("obra.contratos.ver", "Obra - Contratos: Ver", "obra"),             // (tambien de la ola 3)
+        new("obra.proveedores.ver", "Obra - Proveedores: Ver", "obra"),         // (tambien de la ola 3)
+
+        // --- Obra (MC): escrituras de los catalogos ---
+        new("obra.catalogos.crear", "Obra - Catálogos: Crear", "obra"),
+        new("obra.catalogos.editar", "Obra - Catálogos: Editar", "obra"),
+        /* Partida presupuestal: clave propia porque el renglon trae el monto
+           autorizado del presupuesto, no solo un nombre. */
+        new("obra.partidas.ver", "Obra - Partidas presupuestales: Ver", "obra"),
+        new("obra.partidas.crear", "Obra - Partidas presupuestales: Crear", "obra"),
+        new("obra.partidas.editar", "Obra - Partidas presupuestales: Editar", "obra"),
+        /* Proveedores de obra: el renglon trae RFC, CURP, telefono y correo. */
+        new("obra.proveedores.crear", "Obra - Proveedores: Crear", "obra"),
+        new("obra.proveedores.editar", "Obra - Proveedores: Editar", "obra"),
+
+        // --- Obra (MC): contratos y lo que les cuelga ---
+        new("obra.contratos.crear", "Obra - Contratos: Crear", "obra"),
+        new("obra.contratos.editar", "Obra - Contratos: Editar", "obra"),
+        /* Cerrar un contrato o un convenio es aparte de editarlo: es lo que deja
+           de admitir estimaciones. */
+        new("obra.contratos.cerrar", "Obra - Contratos: Cerrar/Reabrir", "obra"),
+        new("obra.convenios.ver", "Obra - Convenios: Ver", "obra"),
+        new("obra.convenios.crear", "Obra - Convenios: Crear", "obra"),
+        new("obra.convenios.editar", "Obra - Convenios: Editar", "obra"),
+        /* Capturar cantidades estimadas es autorizar un pago; no lo hace quien
+           mantiene el catalogo de conceptos. */
+        new("obra.estimaciones.editar", "Obra - Estimaciones: Capturar", "obra"),
+
+        // --- Aviacion ---
+        new("aviacion.ver_modulo", "Aviación - Ver módulo", "aviacion"),
+        new("aviacion.cajas.editar", "Aviación - Cajas: Editar", "aviacion"),
+        new("aviacion.conceptos.ver", "Aviación - Conceptos: Ver", "aviacion"),
+        new("aviacion.conceptos.crear", "Aviación - Conceptos: Crear", "aviacion"),
+        new("aviacion.conceptos.editar", "Aviación - Conceptos: Editar", "aviacion"),
+        new("aviacion.cuentas.ver", "Aviación - Cuentas: Ver", "aviacion"),
+        new("aviacion.cuentas.crear", "Aviación - Cuentas: Crear", "aviacion"),
+        new("aviacion.cuentas.editar", "Aviación - Cuentas: Editar", "aviacion"),
+        /* "Aceptar" es lo que convierte un alta hecha en una caja en un renglon
+           bueno del central: lo hace quien supervisa, no quien captura. */
+        new("aviacion.cuentas.aceptar", "Aviación - Cuentas: Aceptar", "aviacion"),
+        new("aviacion.economicos.ver", "Aviación - Económicos: Ver", "aviacion"),
+        new("aviacion.economicos.crear", "Aviación - Económicos: Crear", "aviacion"),
+        new("aviacion.economicos.editar", "Aviación - Económicos: Editar", "aviacion"),
+        new("aviacion.economicos.aceptar", "Aviación - Económicos: Aceptar", "aviacion"),
+        /* Reasignar cambia de dueno una unidad y deja rastro en el historico. */
+        new("aviacion.economicos.reasignar", "Aviación - Económicos: Reasignar", "aviacion"),
+        new("aviacion.fianzas.ver", "Aviación - Motivos de fianza: Ver", "aviacion"),
+        new("aviacion.fianzas.crear", "Aviación - Motivos de fianza: Crear", "aviacion"),
+        new("aviacion.fianzas.editar", "Aviación - Motivos de fianza: Editar", "aviacion"),
+        new("aviacion.operadores.ver", "Aviación - Operadores: Ver", "aviacion"),
+        new("aviacion.operadores.crear", "Aviación - Operadores: Crear", "aviacion"),
+        new("aviacion.operadores.editar", "Aviación - Operadores: Editar", "aviacion"),
+        new("aviacion.operadores.aceptar", "Aviación - Operadores: Aceptar", "aviacion"),
+        new("aviacion.permisionarios.ver", "Aviación - Permisionarios: Ver", "aviacion"),
+        new("aviacion.permisionarios.crear", "Aviación - Permisionarios: Crear", "aviacion"),
+        new("aviacion.permisionarios.editar", "Aviación - Permisionarios: Editar", "aviacion"),
+        new("aviacion.permisionarios.aceptar", "Aviación - Permisionarios: Aceptar", "aviacion"),
+        new("aviacion.impresoras.ver", "Aviación - Impresoras: Ver", "aviacion"),
+        new("aviacion.impresoras.editar", "Aviación - Impresoras: Configurar", "aviacion"),
+        new("aviacion.polizas.ver", "Aviación - Pólizas: Ver", "aviacion"),
+        /* Generar una poliza emite los cheques con los que se paga: no es editar. */
+        new("aviacion.polizas.generar", "Aviación - Pólizas: Generar", "aviacion"),
+        new("aviacion.polizas.cancelar", "Aviación - Pólizas: Cancelar", "aviacion"),
+        new("aviacion.polizas.editar", "Aviación - Pólizas: Corregir cheques y encabezado", "aviacion"),
+        new("aviacion.recaudaciones.ver", "Aviación - Recaudaciones: Ver", "aviacion"),
+        /* En una caja son tres personas distintas: el cajero cobra, el supervisor
+           cancela, y el corte lo hace quien entrega el dinero. */
+        new("aviacion.recaudaciones.cobrar", "Aviación - Recaudaciones: Cobrar", "aviacion"),
+        new("aviacion.recaudaciones.cancelar", "Aviación - Recaudaciones: Cancelar", "aviacion"),
+        new("aviacion.recaudaciones.cortar", "Aviación - Recaudaciones: Cerrar el día", "aviacion"),
+
+        // --- Gasolinas ---
+        new("gasolinas.ver_modulo", "Gasolinas - Ver módulo", "gasolinas"),
+        new("gasolinas.ver", "Gasolinas - Ver", "gasolinas"),
+        new("gasolinas.crear", "Gasolinas - Capturar recibo", "gasolinas"),
+        new("gasolinas.editar", "Gasolinas - Corregir recibo", "gasolinas"),
+        new("gasolinas.cancelar", "Gasolinas - Cancelar recibo", "gasolinas"),
+
+        // --- Cobranzas ---
+        new("cobranzas.ver_modulo", "Cobranzas - Ver módulo", "cobranzas"),
+        new("cobranzas.ver", "Cobranzas - Ver", "cobranzas"),
+        new("cobranzas.crear", "Cobranzas - Armar cobranza", "cobranzas"),
+        new("cobranzas.editar", "Cobranzas - Cambiar contenido", "cobranzas"),
+        new("cobranzas.cancelar", "Cobranzas - Cancelar", "cobranzas"),
+        new("cobranzas.pendientes.ver", "Cobranzas - Pendiente y vencida", "cobranzas")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)

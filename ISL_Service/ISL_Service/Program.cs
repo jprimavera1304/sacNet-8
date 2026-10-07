@@ -179,6 +179,33 @@ builder.Services.AddScoped<IChequesService, ChequesService>();
 builder.Services.AddScoped<ITemporadasRepository, TemporadasRepository>();
 builder.Services.AddScoped<ITemporadasService, TemporadasService>();
 
+/* -------------------- OBRA (MC) Y AVIACION --------------------
+   Los dos modulos de MacServicios2 que faltaban: obra publica (contratos,
+   convenios, estimaciones, partidas) y aviacion (recaudaciones, permisionarios,
+   economicos, polizas), mas cobranzas y gasolinas.
+
+   La conexion de aviacion se registra aparte porque NO es la de la empresa:
+   sale de dbo.Constantes.AviacionDBServer. El porque esta en
+   Infrastructure/Data/ConexionDeAviacion.cs. */
+builder.Services.AddScoped<ISL_Service.Infrastructure.Data.IConexionDeAviacion, ISL_Service.Infrastructure.Data.ConexionDeAviacion>();
+
+builder.Services.AddScoped<IObraCatalogosEscrituraRepository, ObraCatalogosEscrituraRepository>();
+builder.Services.AddScoped<IObraCatalogosEscrituraService, ObraCatalogosEscrituraService>();
+builder.Services.AddScoped<IObraContratosRepository, ObraContratosRepository>();
+builder.Services.AddScoped<IObraContratosService, ObraContratosService>();
+
+builder.Services.AddScoped<IAviacionCatalogosRepository, AviacionCatalogosRepository>();
+builder.Services.AddScoped<IAviacionCatalogosService, AviacionCatalogosService>();
+builder.Services.AddScoped<IAviacionPolizasRepository, AviacionPolizasRepository>();
+builder.Services.AddScoped<IAviacionPolizasService, AviacionPolizasService>();
+builder.Services.AddScoped<IAviacionRecaudacionesRepository, AviacionRecaudacionesRepository>();
+builder.Services.AddScoped<IAviacionRecaudacionesService, AviacionRecaudacionesService>();
+
+builder.Services.AddScoped<IGasolinasRepository, GasolinasRepository>();
+builder.Services.AddScoped<IGasolinasService, GasolinasService>();
+builder.Services.AddScoped<ICobranzasRepository, CobranzasRepository>();
+builder.Services.AddScoped<ICobranzasService, CobranzasService>();
+
 builder.Services.AddScoped<IDashboardVentasRepository, DashboardVentasRepository>();
 builder.Services.AddScoped<IDashboardVentasService, DashboardVentasService>();
 builder.Services.AddScoped<IDashboardVentasReportService, DashboardVentasReportService>();

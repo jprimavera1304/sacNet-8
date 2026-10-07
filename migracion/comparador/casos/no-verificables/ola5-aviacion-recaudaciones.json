@@ -1,0 +1,55 @@
+{
+  "nombre": "Aviacion - recaudaciones (NO VERIFICABLE)",
+  "_porque": [
+    "NO SE PUEDE COMPARAR EN Produccion_svr. De los siete procedimientos del",
+    "modulo, en esta base hay DOS y uno de ellos es de otra generacion",
+    "(comprobado contra sys.procedures y sys.parameters):",
+    "",
+    "  sp_n_ConsultaRecaudaciones            ESTA, pero con 9 parametros; el",
+    "                                        repositorio de Legacy le manda 31.",
+    "                                        Falla con 'too many arguments' en los",
+    "                                        dos lados. (Ya lo anoto la ola 3.)",
+    "  sp_n_InsertarRecaudacion              ESTA.",
+    "  sp_n_CancelarRecaudacion              NO esta.",
+    "  sp_n_InsertarRecaudacionCorte         NO esta.",
+    "  sp_n_ConsultaRecaudacionesCortes      NO esta.",
+    "  sp_n_ConsultaRecaudacionesRecurrentes NO esta.",
+    "  sp_n_ConsultaRecaudacionNextID        NO esta.",
+    "",
+    "NO se recorto el juego de parametros para que 'quepa' en la version vieja de",
+    "esta base: eso seria migrar hacia atras. Se implementa contra el contrato de",
+    "Legacy, que es la especificacion.",
+    "",
+    "LO QUE QUEDA SIN COMPROBAR Y ES LO MAS IMPORTANTE DEL LOTE: que pedir UNA",
+    "recaudacion devuelva UNA. En Legacy, al recibir IDRecaudacion con la lista",
+    "IDsRecaudacionLst vacia —el caso normal— se reconstruia el DTO y IDsRecaudacion",
+    "quedaba en cadena vacia: se perdia el id pedido Y todos los demas filtros, y el",
+    "SP devolvia TODAS las recaudaciones de la base. El endpoint nuevo manda los",
+    "filtros tal como llegan; hay una prueba unitaria que lo fija",
+    "(Ola5AviacionReglasTests.Pedir_Una_Recaudacion_Devuelve_Esa_Y_No_Todas), pero",
+    "contra la base no se ha podido ver.",
+    "",
+    "QUE HACE FALTA PARA CORRERLO: una base MacAviacion* con el modulo de",
+    "recaudaciones en su version actual."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/recaudaciones/consultar",
+    "body": { "IDRecaudacion": 0, "IDStatus": 1 }
+  },
+  "nuevo": {
+    "method": "POST",
+    "path": "/api/aviacion/recaudaciones/consultar",
+    "body": { "idRecaudacion": 0, "idStatus": 1 }
+  },
+  "camino_legacy": "result.recaudaciones",
+  "camino_nuevo": "data",
+  "ordenar_por": "idRecaudacion",
+  "diferencias_intencionales": [
+    "No verificable en Produccion_svr: cinco de los siete procedimientos faltan y el que queda es una version vieja (9 parametros contra 31). Legacy falla igual.",
+    "La consulta va por POST aunque sea una lectura: el filtro son 31 campos con seis listas de ids dentro y no cabe en una query string. Es la misma decision que toma el resto del backend nuevo para las consultas de ventas.",
+    "Todos los filtros se combinan. Ver el bloque de arriba: es el defecto mas grave que se encontro en el lote.",
+    "El cobro exige que importeCuentas cuadre con la suma de los importes y que numCuentas coincida con la lista. El SP guarda los tres numeros tal como llegan y no recalcula ninguno.",
+    "La ruta es api/aviacion/recaudaciones y no api/recaudaciones porque esa ya existe en el backend nuevo y es otra cosa: el ticket anonimo por QR."
+  ]
+}
