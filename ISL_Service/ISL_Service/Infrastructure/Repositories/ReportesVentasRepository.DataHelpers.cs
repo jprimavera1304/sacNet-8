@@ -175,6 +175,10 @@ public partial class ReportesVentasRepository
     {
         var columns = idReporte switch
         {
+            // El 10 (Venta de Acumuladores) es el reporte estrella y su lista de
+            // columnas llevaba escrita desde el principio; faltaba este case, asi
+            // que su xlsx salia con los nombres crudos del SP.
+            ReporteVentaAcumuladores => VentaAcumuladoresExcelColumns,
             ReporteVentaProductos => VentaProductosExcelColumns,
             ReporteVentasFoliosGlobal => VentasFoliosGlobalExcelColumns,
             ReporteVentasFoliosDineroUsados => VentasFoliosDineroUsadosExcelColumns,
@@ -196,6 +200,8 @@ public partial class ReportesVentasRepository
             ReporteVentasCobranzaPagadasDetalladoZara => VentasCobranzaPagadasDetalladoZaraExcelColumns,
             ReporteVentasCobranzaPagadasTotalizadoZara => VentasCobranzaPagadasTotalizadoZaraExcelColumns,
             ReporteVentasCobranzaDesglosado or ReporteVentasCobranzaZaragoza => VentasCobranzaDesglosadoExcelColumns,
+            // 1160 es el gemelo del 1161: mismo spV2, mismas columnas.
+            ReporteVentasCobranzaDetallado => VentasCobranzaDetalladoZaraExcelColumns,
             ReporteHojaCobroTotalCascos => HojaCobroTotalCascosExcelColumns,
             _ => Array.Empty<LegacyExcelColumn>()
         };
