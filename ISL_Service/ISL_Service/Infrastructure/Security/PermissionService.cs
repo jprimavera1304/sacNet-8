@@ -389,7 +389,82 @@ public sealed class PermissionService : IPermissionService
         new("cheques.ver", "Cheques - Ver", "cheques"),
         new("cheques.crear", "Cheques - Crear", "cheques"),
         new("cheques.editar", "Cheques - Editar", "cheques"),
-        new("cheques.activar", "Cheques - Cambiar estatus", "cheques")
+        new("cheques.activar", "Cheques - Cambiar estatus", "cheques"),
+
+        /*
+          OLA 4 — LAS ESCRITURAS DE VENTAS, EN FAMILIAS QUE NO SON `ventas.*`.
+
+          Esto no es capricho de nomenclatura. Para `ventas.*` manda Mac31: mas
+          abajo, al armar el snapshot, se BORRA del usuario todo lo que empiece
+          por "ventas." y no este en VentasWebPermissionSeeds, y se recalcula
+          desde los botones de la forma CONSULTA DE VENTAS. Una clave nueva ahi
+          se guarda en WUsuarioPermiso y desaparece en el siguiente calculo, sin
+          error y sin rastro — la cicatriz de "pendientes de autorizar".
+
+          Mac31 tiene UN boton por pantalla y aqui hace falta mas fino, porque
+          dentro de la misma pantalla hay operaciones que mueven dinero y otras
+          que no: guardar el reparto de un cobro de cascos no mueve nada,
+          APLICARLO mueve los saldos de los clientes. Donde Mac31 si tiene una
+          llave que vale, los endpoints la aceptan ADEMAS de la nueva
+          (`usados.ver` o `ventas.usados`), para que nadie se quede sin acceso el
+          primer dia.
+        */
+        new("usados.ver", "Cascos usados - Consultar", "usados"),
+        new("usados.cobros_dinero.editar", "Cascos usados - Cobros de dinero: registrar y repartir", "usados"),
+        new("usados.cobros_dinero.aplicar", "Cascos usados - Cobros de dinero: APLICAR a los saldos", "usados"),
+        new("usados.cobros_dinero.cancelar", "Cascos usados - Cobros de dinero: cancelar aplicacion", "usados"),
+        new("usados.cobros.editar", "Cascos usados - Ingresos: registrar", "usados"),
+        new("usados.cobros.cancelar", "Cascos usados - Ingresos: cancelar", "usados"),
+        new("usados.excedentes.editar", "Cascos usados - Excedentes: registrar", "usados"),
+        new("usados.excedentes.cancelar", "Cascos usados - Excedentes: cancelar", "usados"),
+        new("usados.movimientos.editar", "Cascos usados - Movimientos de almacen: registrar", "usados"),
+        new("usados.movimientos.cancelar", "Cascos usados - Movimientos de almacen: cancelar", "usados"),
+        new("usados.tipos.editar", "Cascos usados - Catalogo de tipos: crear y modificar", "usados"),
+
+        new("cobranza.ver", "Cobranza - Consultar", "cobranza"),
+        new("cobranza.cobranzas.editar", "Cobranza - Cobranzas: crear y modificar", "cobranza"),
+        new("cobranza.cobranzas.cancelar", "Cobranza - Cobranzas: cancelar", "cobranza"),
+        new("cobranza.concentrados.editar", "Cobranza - Concentrados: crear y modificar", "cobranza"),
+        new("cobranza.concentrados.cancelar", "Cobranza - Concentrados: cancelar", "cobranza"),
+        new("cobranza.cobros.editar", "Cobranza - Cobros: modificar", "cobranza"),
+        new("cobranza.cobros.cerrar", "Cobranza - Cobros: cerrar", "cobranza"),
+        new("cobranza.cobros.abrir", "Cobranza - Cobros: reabrir", "cobranza"),
+        new("cobranza.cobros.cancelar", "Cobranza - Cobros: cancelar", "cobranza"),
+
+        new("garantias.ver", "Garantias - Consultar", "garantias"),
+        new("garantias.editar", "Garantias - Registrar y modificar", "garantias"),
+        new("garantias.cancelar", "Garantias - Cancelar", "garantias"),
+        new("garantias.aceptar", "Garantias - Aceptar en el centro de servicio", "garantias"),
+        new("garantias.registro.editar", "Garantias - Registro previo: crear", "garantias"),
+        new("garantias.registro.cancelar", "Garantias - Registro previo: cancelar", "garantias"),
+
+        new("descuentos.ver", "Descuentos - Consultar", "descuentos"),
+        new("descuentos.editar", "Descuentos - Crear y modificar", "descuentos"),
+        new("descuentos.eliminar", "Descuentos - Eliminar", "descuentos"),
+        new("descuentos.simular", "Descuentos - Simular", "descuentos"),
+        new("descuentos.ajustes.ver", "Descuentos - Ajustes de venta: consultar", "descuentos"),
+        new("descuentos.ajustes.crear", "Descuentos - Ajustes de venta: solicitar", "descuentos"),
+        new("descuentos.ajustes.autorizar", "Descuentos - Ajustes de venta: autorizar o rechazar", "descuentos"),
+
+        new("inventario.ajustes.ver", "Inventario - Ajustes: consultar", "inventario"),
+        new("inventario.ajustes.crear", "Inventario - Ajustes: capturar", "inventario"),
+        new("inventario.ajustes.cancelar", "Inventario - Ajustes: cancelar", "inventario"),
+        new("inventario.pedidos.ver", "Inventario - Inventario de pedidos: consultar", "inventario"),
+        new("inventario.pedidos.crear", "Inventario - Inventario de pedidos: capturar", "inventario"),
+        new("inventario.pedidos.cancelar", "Inventario - Inventario de pedidos: cancelar", "inventario"),
+
+        new("facturacion.ver", "Facturacion - Consultar facturas", "facturacion"),
+        new("facturacion.timbrar", "Facturacion - Timbrar", "facturacion"),
+        new("facturacion.cancelar", "Facturacion - Cancelar un CFDI", "facturacion"),
+        new("facturacion.enviar", "Facturacion - Enviar la factura por correo", "facturacion"),
+
+        new("cobros.pagos.editar", "Cobros - Pagos de remision: capturar", "cobros"),
+        new("cobros.pagos.cancelar", "Cobros - Pagos de remision: cancelar", "cobros"),
+        new("cobros.pagos.aplicar", "Cobros - Pagos del nuevo esquema: aplicar", "cobros"),
+        new("cobros.pagos.incobrable", "Cobros - Declarar una remision incobrable", "cobros"),
+        new("cobros.pagos.kilos", "Cobros - Pagos por kilo", "cobros"),
+        new("cobros.transferencias.cancelar", "Cobros - Cancelar transferencias bancarias", "cobros"),
+        new("cobros.reasignar", "Cobros - Reasignar remisiones de cliente o agente", "cobros")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)
