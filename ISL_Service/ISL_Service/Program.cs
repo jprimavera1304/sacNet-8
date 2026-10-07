@@ -153,6 +153,10 @@ builder.Services.AddScoped<ISeguridadMacService, SeguridadMacService>();
 builder.Services.AddScoped<INominaBatchRepository, NominaBatchRepository>();
 builder.Services.AddScoped<INominaBatchService, NominaBatchService>();
 
+// -------------------- SUELTOS: PROYECTOS, RECORDATORIOS, SERVICIOS, SINCRONIZACION --------------------
+builder.Services.AddScoped<ISueltosRepository, SueltosRepository>();
+builder.Services.AddScoped<ISueltosService, SueltosService>();
+
 builder.Services.AddScoped<ICategoriasRepository, CategoriasRepository>();
 builder.Services.AddScoped<ICategoriasService, CategoriasService>();
 builder.Services.AddScoped<IProfesoresRepository, ProfesoresRepository>();

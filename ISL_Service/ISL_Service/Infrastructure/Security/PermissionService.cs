@@ -540,7 +540,34 @@ public sealed class PermissionService : IPermissionService
         new("nomina.ver_modulo", "Nómina - Ver módulo", "nomina"),
         new("nomina.recibos.calcular", "Nómina - Calcular recibos del periodo", "nomina"),
         new("nomina.periodos.generar", "Nómina - Generar periodos", "nomina"),
-        new("nomina.prestamos.descontar", "Nómina - Descontar préstamos de la nómina", "nomina")
+        new("nomina.prestamos.descontar", "Nómina - Descontar préstamos de la nómina", "nomina"),
+
+        /*
+          LOS CUATRO SUELTOS (ola 6): recordatorios, servicios, proyectos de obra
+          por consulta ciudadana y la cola de sincronizacion de cajas.
+
+          Van con permiso propio por modulo y no colgados de otro, porque son
+          pantallas de empresas distintas: proyectos y sincronizacion solo existen
+          en algunas instalaciones (sus procedimientos no estan en Produccion_svr),
+          y colgarlos de un permiso compartido le daria a todas las empresas
+          casillas de modulos que no tienen.
+        */
+        new("recordatorios.ver_modulo", "Recordatorios - Ver módulo", "recordatorios"),
+        new("recordatorios.ver", "Recordatorios - Consultar", "recordatorios"),
+        new("recordatorios.crear", "Recordatorios - Crear", "recordatorios"),
+        new("recordatorios.editar", "Recordatorios - Modificar", "recordatorios"),
+
+        new("servicios.ver_modulo", "Servicios - Ver módulo", "servicios"),
+        new("servicios.ver", "Servicios - Consultar", "servicios"),
+        new("servicios.crear", "Servicios - Registrar", "servicios"),
+        new("servicios.cancelar", "Servicios - Cancelar", "servicios"),
+
+        new("proyectos.ver_modulo", "Proyectos - Ver módulo", "proyectos"),
+        new("proyectos.ver", "Proyectos - Consultar", "proyectos"),
+        new("proyectos.crear", "Proyectos - Crear", "proyectos"),
+        new("proyectos.editar", "Proyectos - Modificar", "proyectos"),
+
+        new("sincronizacion.ver", "Sincronización - Consultar la cola", "sincronizacion")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)
