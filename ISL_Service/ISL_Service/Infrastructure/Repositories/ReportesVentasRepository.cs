@@ -241,10 +241,12 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         ReportesVentasCobranzaRequest request,
         CancellationToken ct = default)
     {
-        var idReporte = ResolveReporteCobranza(request);
-
         await using var conn = GetConnection(await BaseDeCentroAsync(request.IdCentro, ct));
         await conn.OpenAsync(ct);
+
+        // El id se resuelve DESPUES de abrir la conexion porque depende de la
+        // empresa (1160 en Tauro, 1161 en Zaragoza), y eso lo dice la base.
+        var idReporte = ResolveReporteCobranza(await ConsultarConstantesAsync(conn, ct));
 
         var legacyParams = await BuildCobranzaLegacyParamsAsync(conn, request, request.CobranzaStatus, ct);
         var parametroId = await GuardarParametrosAsync(conn, idReporte, legacyParams, ct);
