@@ -107,3 +107,67 @@ contra la base algo que creía inofensivo. Por eso **`no` significa comprobado y
   (`comparador/instantanea.sh`).
 - Las 37 con `?` son de bases que no están en esta máquina (Aviación). No se
   tratan como lecturas.
+
+---
+
+## El backend NUEVO tambien cierra el dia, en seis lugares
+
+Medido el 07-oct-2026, leyendo el procedimiento de la base, no el codigo que lo
+llama.
+
+Los seis sitios que ejecutan `sp_n_ConsultaConstantes` en `ISL_Service`:
+
+| Archivo | Linea | Para que lo llama |
+|---|---|---|
+| `RemisionImpresionRepository.cs` | 384 | rutas de imagenes y `Funcionalidad` |
+| `ReportesVentasRepository.Rendering.cs` | 41 | logo, marca de agua, `IDEmpresaCS` |
+| `VentasConsultaRepository.cs` | 368 | fechas de operacion y dos banderas |
+| `VentasMultiPagoRepository.cs` | 183 | `PrecioCascoKilo`, `IDBancoEmpresa` |
+| `VentasPedidoCapturaRepository.cs` | 1174 | **el porcentaje de IVA** |
+| `VentasPedidoCapturaRepository.cs` | 1500 | la fecha de operacion, formateada |
+
+Los seis son lecturas. Ninguno quiere escribir nada. Los seis cierran el dia.
+
+### Por que `@ValidaActividad = 0` no salva
+
+Los seis pasan `@ValidaActividad = 0`, y los comentarios del codigo dan por
+hecho que con eso el procedimiento se porta como una consulta. **No es cierto.**
+El `IF` de `@ValidaActividad` solo envuelve el bloque de `UsuariosActividad`. El
+cierre del dia esta **fuera**, colgado de su propia condicion:
+
+```sql
+IF ( CAST(@FechaOperacion as date) < CAST(GETDATE() as date) )
+BEGIN
+  INSERT INTO FechaOperacionLog ...
+  DELETE AlmacenProductoHist WHERE Fecha = @FechaAnterior
+  INSERT INTO AlmacenProductoHist ...          -- freeze del inventario
+  UPDATE Constantes SET FechaOperacion = CAST(GETDATE() as date) ...
+END
+```
+
+O sea: **basta con que la fecha de operacion este atrasada**. La primera
+peticion de la manana que pase por cualquiera de esos seis sitios cierra el dia
+del negocio. Pedir el IVA para calcular un costo mueve la fecha de operacion y
+rehace el corte de inventario.
+
+### Y en Zaragoza hay un segundo efecto
+
+Mas abajo, la rama `IF @Funcionalidad = 'ZARA'` **inserta** en
+`[Usuarios Fechas]` si el usuario que recibe no tiene fila. Los seis sitios
+mandan `@IDUsuario = 0`, asi que en Zaragoza cada una de esas lecturas crea y
+usa la fila del **usuario 0**. Es el mismo agujero que ya estaba anotado para
+los usuarios solo-web, pero provocado por el backend nuevo, no por la identidad.
+
+### La salida
+
+`Querrys/31 Constantes Solo Lectura/01_sp_w_ConsultaConstantesSoloLectura.sql`:
+el mismo procedimiento sin las escrituras, devolviendo **exactamente las mismas
+columnas**, para que cada sitio cambie una cadena y no como lee los datos. No se
+toca `sp_n_ConsultaConstantes`: Mac31 lo sigue llamando y el cierre del dia
+sigue ocurriendo donde siempre ocurrio.
+
+**Pendiente:** instalarlo en `MacZ` y `Produccion_svr` locales y cambiar los seis
+sitios. La instalacion quedo sin hacer porque el permiso para ejecutar contra la
+base se denego en esta sesion. Mientras no este, **los seis sitios siguen
+cerrando el dia**, y cambiarlos antes de que el procedimiento exista dejaria el
+backend roto.
