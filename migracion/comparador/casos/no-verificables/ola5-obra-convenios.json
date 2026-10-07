@@ -1,0 +1,41 @@
+{
+  "nombre": "Obra - convenios (NO VERIFICABLE)",
+  "_porque": [
+    "NO SE PUEDE COMPARAR EN Produccion_svr: los CUATRO procedimientos de",
+    "convenios faltan en esta base (comprobado contra sys.procedures):",
+    "",
+    "  sp_n_Consultar_MCConvenios",
+    "  sp_n_Insertar_MCConvenio",
+    "  sp_n_Actualizar_MCConvenio",
+    "  sp_n_Actualizar_MCConvenioStatus",
+    "",
+    "Y la tabla MC_Convenios tampoco esta. Comprobado llamando a los dos lados:",
+    "los dos contestan \"Could not find stored procedure\" con el mismo nombre.",
+    "",
+    "Lo mismo vale para las partidas del clasificador presupuestal",
+    "(sp_n_Consultar_MCPartidas, sp_n_Insertar_MCPartida,",
+    "sp_n_Actualizar_MCPartida), para las partidas y los periodos de un contrato",
+    "(sp_n_*_MCContratoPartida / MCContratoPeriodo) y para",
+    "sp_n_Consultar_MCContratosConceptosEstimacionesAcumulado (de este la base",
+    "tiene sp_n_Consultar_MCContratosConceptosEstimaciones, sin \"Acumulado\" y con",
+    "3 parametros en vez de 4: no es el mismo).",
+    "",
+    "QUE HACE FALTA PARA CORRERLO: una base con el modulo de obra publica instalado",
+    "completo (Constantes.EsAlcaldiaMC = 1), que es el mismo pendiente que ya dejo",
+    "la ola 3 para los gerentes de obra."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/mcconvenios/consultar",
+    "body": { "IDConvenio": 0, "IDContrato": 0, "IDStatus": 1 }
+  },
+  "nuevo": { "method": "GET", "path": "/api/obra/convenios", "query": { "idStatus": 1 } },
+  "camino_legacy": "result.convenios",
+  "camino_nuevo": "data",
+  "ordenar_por": "idConvenio",
+  "diferencias_intencionales": [
+    "No verificable en Produccion_svr: los cuatro procedimientos y la tabla no estan. Legacy falla igual.",
+    "Los importes de un convenio SI pueden ser negativos (un convenio modificatorio puede reducir el monto contratado), pero el total tiene que cuadrar con subtotal mas IVA: el SP guarda los tres numeros tal como llegan.",
+    "Cerrar y reabrir un convenio es su propia ruta con su propio permiso (obra.contratos.cerrar), no un campo de la modificacion."
+  ]
+}

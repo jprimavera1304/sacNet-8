@@ -1,0 +1,37 @@
+{
+  "nombre": "Aviacion - permisionarios (NO VERIFICABLE)",
+  "_porque": [
+    "NO SE PUEDE COMPARAR EN Produccion_svr: sp_n_ConsultaPermisionarios no esta",
+    "instalado en esta base. Comprobado contra sys.procedures, y comprobado",
+    "llamando a los dos lados:",
+    "",
+    "  Legacy -> \"[No se pudo procesar sp_n_ConsultaPermisionarios] - Could not",
+    "             find stored procedure 'sp_n_ConsultaPermisionarios'.\"",
+    "  nuevo  -> 500 { message: 'Error de base de datos.',",
+    "             detail: \"Could not find stored procedure 'dbo.sp_n_ConsultaPermisionarios'.\" }",
+    "",
+    "Lo mismo vale para las cuatro escrituras del catalogo",
+    "(sp_n_InsertarPermisionario, sp_n_ActualizarPermisionario,",
+    "sp_n_AceptarPermisionario) y para sp_n_ConsultaPermisionarioNextNumCuenta.",
+    "",
+    "QUE HACE FALTA PARA CORRERLO: la base MacAviacion* en el servidor."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catpermisionarios/consultar",
+    "body": {
+      "IDPermisionario": 0, "IDStatus": 1, "NumPermisionario": 0,
+      "CuentaContablePermisionario": "", "NombrePermisionario": "",
+      "PendienteAceptacion": 0
+    }
+  },
+  "nuevo": { "method": "GET", "path": "/api/aviacion/permisionarios", "query": { "idStatus": 1 } },
+  "camino_legacy": "result.catPermisionarios",
+  "camino_nuevo": "data",
+  "ordenar_por": "idPermisionario",
+  "diferencias_intencionales": [
+    "No verificable en Produccion_svr: el procedimiento no esta instalado. Legacy falla igual.",
+    "/consultar y /consultar/server son el mismo endpoint con ?central=true|false.",
+    "El siguiente numero de cuenta de permisionario NO lleva parametros: Legacy mandaba al SP la cadena \"0\" literal y no el id del DTO, porque el numero es el siguiente del catalogo y no depende de ningun permisionario."
+  ]
+}

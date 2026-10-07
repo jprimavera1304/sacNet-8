@@ -1,0 +1,46 @@
+{
+  "nombre": "Aviacion - cuentas (NO VERIFICABLE)",
+  "_porque": [
+    "NO SE PUEDE COMPARAR EN Produccion_svr, y por DOS motivos independientes:",
+    "",
+    "1. EL PROCEDIMIENTO DE ESTA BASE ES OTRO. sp_n_ConsultaCuentas existe aqui,",
+    "   pero declara SEIS parametros y con otros nombres (@IDCuenta, @IDStatus,",
+    "   @NumCuenta int, @NumConcepto, @Cuenta, @DebeHaber), mientras que el",
+    "   repositorio de Legacy le manda DIEZ (@IDConcepto, @NumCuenta varchar,",
+    "   @CuentaContable, @NombreCuenta, @DebeHaber, @Auxiliar,",
+    "   @TarjetaDistribucion, @PendienteAceptacion...). Comprobado contra",
+    "   sys.parameters. Legacy falla con 'Procedure or function",
+    "   sp_n_ConsultaCuentas has too many arguments specified.' y el backend nuevo",
+    "   con el MISMO mensaje: se comprobo llamando a los dos.",
+    "",
+    "2. LA EMPRESA NO TIENE EL MODULO. dbo.Constantes.AviacionDBServer esta VACIA",
+    "   y AviacionIDCaja es 0 en esta base: Tauro no es una instalacion de",
+    "   aviacion. Esa columna es la CADENA DE CONEXION al servidor central de",
+    "   aviacion, y sin ella no hay a donde preguntar. Legacy hace",
+    "   `new SqlConnection(\"\")` y revienta con un ArgumentException que su servicio",
+    "   convierte en 400 con el stack trace; el nuevo contesta 409 'Esta empresa no",
+    "   tiene configurado el modulo de Aviacion'.",
+    "",
+    "QUE HACE FALTA PARA CORRERLO: una base MacAviacion* en el servidor, y una",
+    "empresa con Constantes.AviacionDBServer apuntando a ella."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/catcuentas/consultar",
+    "body": {
+      "IDCuenta": 0, "IDConcepto": 0, "IDStatus": 1, "NumCuenta": "",
+      "CuentaContable": "", "NombreCuenta": "", "DebeHaber": "",
+      "Auxiliar": 0, "TarjetaDistribucion": 0, "PendienteAceptacion": 0
+    }
+  },
+  "nuevo": { "method": "GET", "path": "/api/aviacion/cuentas", "query": { "idStatus": 1 } },
+  "camino_legacy": "result.catCuentas",
+  "camino_nuevo": "data",
+  "ordenar_por": "idCuenta",
+  "diferencias_intencionales": [
+    "No verificable en Produccion_svr: el SP de esta base es una version mas vieja (6 parametros contra 10) y la empresa no tiene configurado el modulo. Legacy falla igual, con el mismo mensaje de SQL Server.",
+    "/consultar y /consultar/server de Legacy son el MISMO endpoint aqui, con ?central=true|false. El false pregunta a la replica local de la caja; el true, al servidor central de Constantes.AviacionDBServer.",
+    "Fuera las columnas *Ftm y el (result, mensaje) de los SP de escritura.",
+    "El filtro debeHaber solo admite \"D\" o \"H\": el SP lo concatena a un WHERE sin mirarlo."
+  ]
+}

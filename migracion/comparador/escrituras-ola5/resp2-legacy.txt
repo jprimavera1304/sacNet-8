@@ -1,0 +1,10 @@
+### contrato.cerrar
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":1,"mensaje":"","mensajeFacturama":null}}
+### contrato.reabrir
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":1,"mensaje":"","mensajeFacturama":null}}
+### gasolina.alta
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":1,"mensaje":"","mensajeFacturama":null}}
+### gasolina.cambio
+{"id":0,"status":200,"result":{"tablaLst":null,"modelLst":null,"IDResult":null,"result":1,"mensaje":"","mensajeFacturama":null}}
+### gasolina.cancelar
+{"id":0,"status":200,"result":{"tablaLst":[{"RowError":"","RowState":2,"Table":[{"IDGasolina":38,"NumeroRecibo":99990003,"resultado":"EL RECIBO 99990003 HA SIDO CANCELADO."}],"ItemArray":[38,99990003,"EL RECIBO 99990003 HA SIDO CANCELADO."],"HasErrors":false}],"modelLst":null,"IDResult":null,"result":0,"mensaje":null,"mensajeFacturama":null}}
