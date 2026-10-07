@@ -11,9 +11,12 @@ namespace ISL_Service.Tests;
 public class ReportesCatalogoTests
 {
     [Fact]
-    public void Catalogo_Tiene_Los_53_Reportes_Con_Clave_Unica()
+    public void Catalogo_Tiene_Los_57_Reportes_Con_Clave_Unica()
     {
-        Assert.Equal(53, ReportesCatalogo.Reportes.Count);
+        // 53 + los cuatro que la ola 7 saco del hueco: garantias_registradas (1236),
+        // centros_pagos_entradas_salidas (1415), centros_garantias (1420) y
+        // control_acumulado_de_estimaciones (1250).
+        Assert.Equal(57, ReportesCatalogo.Reportes.Count);
         Assert.Equal(
             ReportesCatalogo.Reportes.Count,
             ReportesCatalogo.Reportes.Select(x => x.Clave).Distinct(StringComparer.OrdinalIgnoreCase).Count());
@@ -54,6 +57,9 @@ public class ReportesCatalogoTests
     [InlineData("clientes_sin_descuentos")]
     [InlineData("liquidaciones")]
     [InlineData("cobros_dinero_y_cascos")]
+    // Y el sexto, que entro con la ola 7: su permiso por regla seria
+    // reportes.administracion.control_acumulado_de_estimaciones.ver y tampoco esta.
+    [InlineData("control_acumulado_de_estimaciones")]
     public void Reportes_Sin_Permiso_No_Se_Bloquean(string clave)
     {
         Assert.NotNull(ReportesCatalogo.Buscar(clave));
@@ -61,14 +67,26 @@ public class ReportesCatalogoTests
     }
 
     [Fact]
-    public void Ningun_Permiso_Se_Usa_En_Dos_Reportes()
+    public void Un_Permiso_Solo_Se_Comparte_Cuando_MAC31_Comparte_El_NODO()
     {
-        var permisos = ReportesCatalogo.Reportes
+        /*
+          Regla: un permiso por reporte. La unica excepcion es el nodo
+          "Movimientos Centros" de Mac31, que al imprimirse genera TRES reportes
+          (1410, 1415 y 1420) con el mismo clic; inventarles dos permisos nuevos
+          seria poder apagar en el web algo que alla no se puede apagar aparte.
+        */
+        var compartidos = ReportesCatalogo.Reportes
             .Where(x => x.Permiso is not null)
-            .Select(x => x.Permiso!)
+            .GroupBy(x => x.Permiso!, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        Assert.Equal(permisos.Length, permisos.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Equal(new[] { "reportes.ventas.movimientos_centros.ver" }, compartidos);
+        Assert.Equal(
+            3,
+            ReportesCatalogo.Reportes.Count(x => x.Permiso == "reportes.ventas.movimientos_centros.ver"));
     }
 
     [Fact]

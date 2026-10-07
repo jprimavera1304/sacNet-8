@@ -168,7 +168,8 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         await using var conn = GetConnection(await BaseDeCentroAsync(request.IdCentro, ct));
         await conn.OpenAsync(ct);
 
-        var legacyParams = await BuildDocumentosVentaLegacyParamsAsync(conn, idReporte, request, ct);
+        var legacyParams = await BuildDocumentosVentaLegacyParamsAsync(
+            conn, idReporte, request, request.EstatusFolio, request.IDUsuarios, ct);
         var parametroId = await GuardarParametrosAsync(conn, idReporte, legacyParams, ct);
         var config = await ConsultarConfiguracionAsync(conn, idReporte, ct);
 
@@ -195,6 +196,8 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
             conn,
             idReporte,
             request,
+            request.EstatusFolio,
+            request.IDUsuarios,
             ct,
             formato: 0,
             tipo: ResolveTipoFactura(request.TipoFactura));
@@ -220,7 +223,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         await using var conn = GetConnection(await BaseDeCentroAsync(request.IdCentro, ct));
         await conn.OpenAsync(ct);
 
-        var legacyParams = BuildConcentradosLegacyParams(request);
+        var legacyParams = BuildConcentradosLegacyParams(request, request.IDRepartidores);
         var parametroId = await GuardarParametrosAsync(conn, idReporte, legacyParams, ct);
         var config = await ConsultarConfiguracionAsync(conn, idReporte, ct);
 
@@ -243,7 +246,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         await using var conn = GetConnection(await BaseDeCentroAsync(request.IdCentro, ct));
         await conn.OpenAsync(ct);
 
-        var legacyParams = await BuildCobranzaLegacyParamsAsync(conn, request, ct);
+        var legacyParams = await BuildCobranzaLegacyParamsAsync(conn, request, request.CobranzaStatus, ct);
         var parametroId = await GuardarParametrosAsync(conn, idReporte, legacyParams, ct);
         var config = await ConsultarConfiguracionAsync(conn, idReporte, ct);
 
@@ -261,10 +264,27 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         ReportesVentasLegacyRequest request,
         CancellationToken ct = default)
     {
-        var idReporte = ResolveReporteLegacyVentas(request);
-
         await using var conn = GetConnection(await BaseDeCentroAsync(request.IdCentro, ct));
         await conn.OpenAsync(ct);
+
+        // La conexion se abre ANTES de resolver el id porque Pagos y Listas de
+        // Precios eligen entre variantes segun Constantes (que empresa es esta).
+        var idReporte = await ResolveReporteLegacyVentasAsync(conn, request, ct);
+
+        /*
+          EL 118 SOLO EXISTE EN EXCEL, Y NO ES UNA DECISION DE DISEÑO: ES EL SP.
+
+          Mac31 dice por que y lo fuerza igual: "Acumuladores, Moto y Lubricantes
+          no caben en pantalla, por eso se mandan solo a Excel"
+          (ReportesMenu.cs:3597-3601). Comprobado en Produccion_svr: con
+          Presentacion = 0 el propio sp_n_rptClienteCompraAcumMotoLubMensual
+          revienta con "Incorrect syntax near the keyword 'FROM'" (su rama de
+          pantalla arma mal el SQL); con Presentacion = 3 entrega el xlsx
+          completo. El SP es de legacy y no se toca, asi que se le pide lo unico
+          que sabe contestar.
+        */
+        if (idReporte == ReporteClientesAcumMotoLubMensual)
+            request.Salida = "excel";
 
         var legacyParams = await BuildLegacyVentasParamsAsync(conn, idReporte, request, ct);
         var parametroId = await GuardarParametrosAsync(conn, idReporte, legacyParams, ct);
@@ -507,6 +527,10 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
             {
                 reportHtml = GenerateFormatoNormalHtml(logo, constants.LogoWatermark, config.NombreReporte, data, templates, template, request);
             }
+
+            // Ultimo filtro antes del PDF: un <img> que no se puede cargar hace
+            // que wkhtmltopdf no entregue NADA. Ver SanearImagenesNoCargables.
+            reportHtml = SanearImagenesNoCargables(reportHtml);
         }
 
         if (!string.IsNullOrWhiteSpace(errorParams) && string.IsNullOrWhiteSpace(reportHtml))

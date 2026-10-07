@@ -32,6 +32,17 @@ public partial class ReportesVentasRepository
     private const int ReporteClientesDescuentos = 113;
     private const int ReporteClientesDescuentosSin = 114;
     private const int ReporteClientesAcumMotoLub = 116;
+
+    /*
+      118 y 119 son el MISMO reporte que el 116 y el MISMO spV2
+      (sp_n_rptClienteCompraAcumMotoLubMensual): lo unico que cambia es la
+      plantilla. En Mac31 los tres salen del nodo "Clientes Acum Moto Lub":
+      sin "mensual" es el 116; con "mensual" y categoria "todas" es el 118
+      (que Mac31 fuerza a Excel porque no cabe en pantalla); con "mensual" y
+      una categoria concreta es el 119. Ver ReportesMenu.cs:3587-3610.
+    */
+    private const int ReporteClientesAcumMotoLubMensual = 118;
+    private const int ReporteClientesAcumMotoLubMensualCategoria = 119;
     private const int ReporteCompraAcumuladores = 120;
     private const int ReporteClientesAcumMotoLubClarios = 121;
     private const int ReporteCompraProductos = 125;
@@ -51,6 +62,15 @@ public partial class ReportesVentasRepository
     private const int ReporteVentasPagosComparativo = 493;
     private const int ReporteAsistenciasZaragoza = 1026;
     private const int ReporteVentasDescuentosAjustes = 1030;
+    /*
+      1160 ES EL QUE USA EL NODO REAL DEL MENU DE MAC31.
+
+      1160, 1161 y 1162 se llaman igual ("Cobranza Detallado"), comparten
+      sp_n_rptVentasSaldosGlobales y tienen 3 plantillas cada uno. Mac31 cuelga
+      el 1160 del nodo "Cobranza" (ReportesMenu.cs:733) y el 1162 del de
+      "Cobranza Pagadas". El motor nuevo solo conocia el 1161 y el 1162.
+    */
+    private const int ReporteVentasCobranzaDetallado = 1160;
     private const int ReporteVentasCobranzaDetalladoZara = 1161;
     private const int ReporteVentasCobranzaPagadasDetalladoZara = 1162;
     private const int ReporteVentasCobranzaPagadasTotalizadoZara = 1166;
@@ -63,8 +83,25 @@ public partial class ReportesVentasRepository
     private const int ReporteGasolinasDetallado = 1230;
     private const int ReporteGasolinasMensual = 1231;
     private const int ReporteGarantias = 1235;
+    private const int ReporteGarantiasRegistradas = 1236;
     private const int ReporteListasPreciosZaragoza = 1240;
     private const int ReporteListasPreciosCosto = 1242;
+
+    /*
+      LAS CUATRO LISTAS PERSONALIZADAS DE TAURO.
+
+      Son cuatro spV2 distintos, pero los cuatro leen EXACTAMENTE los mismos 17
+      parametros que el 1240 (comprobado en sys.objects: los cuatro declaran el
+      mismo bloque "-- Param 1..17" y el mismo #ParamIds). En Mac31 no son
+      cuatro nodos: son las cuatro opciones del combo cboTipoLista del nodo
+      "Listas de Precios", y solo aparecen cuando Constantes.Funcionalidad
+      contiene "TAU" (ReportesMenu.cs:3927-3950).
+    */
+    private const int ReporteListasPreciosTauroTodas = 1243;
+    private const int ReporteListasPreciosTauroTodasMenosTauro = 1244;
+    private const int ReporteListasPreciosTauroCroGonXtLthClAmFpDy = 1246;
+    private const int ReporteListasPreciosTauroFpAmLth = 1247;
+    private const int ReporteControlAcumuladoEstimaciones = 1250;
     private const int ReporteListasPreciosProductosZaragoza = 1245;
     private const int ReporteVentasCascosExcedentes = 1305;
     private const int ReporteVentasLiquidaciones = 1319;
@@ -83,6 +120,18 @@ public partial class ReportesVentasRepository
     private const int ReporteTransferenciasEstatus = 1406;
     private const int ReporteTransferenciasFolios = 1407;
     private const int ReporteCentrosRemisiones = 1410;
+
+    /*
+      1415 y 1420 LOS GENERA MAC31 SOLO, PEGADOS AL 1410.
+
+      En Mac31 no tienen nodo propio: cuando el usuario imprime "Movimientos
+      Centros" (1410), ReportesMenu.cs:4048-4058 reusa el MISMO renglon de
+      parametros y lo vuelve a guardar dos veces mas, con el id cambiado a 1415
+      y a 1420. Aqui se exponen como dos claves para que cada uno se pueda pedir
+      y comprobar por separado, con el permiso del nodo que los dispara.
+    */
+    private const int ReporteCentrosPagosEntradasSalidas = 1415;
+    private const int ReporteCentrosGarantias = 1420;
     private const int ReporteCentrosCompleto = 1445;
     private const int ReporteClientesFacturasRFC = 1440;
     private const int ReporteHojaCobroTotalCobradoDetallado = 1465;

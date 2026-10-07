@@ -251,6 +251,24 @@ public class ReportesVentasController : PermisoControllerBase
         if (await ExigirPermisoCentroAsync(request.IdCentro, ct) is { } centroNegado)
             return centroNegado;
 
+        /*
+          EL ESTADO DE CUENTA SIN CLIENTE SE RECHAZA AQUI, NO ABAJO.
+
+          sp_n_rptVentasEstadoCuenta no respeta las fechas (trae todo desde 2024)
+          y recorre el resultado con cursores anidados: con un cliente tarda 3.5 s
+          y sin cliente pasa de 400 s, que en Azure es un 502 a los 230. Mac31
+          nunca llega a ese caso porque su forma fuerza "por cliente"
+          (ReportesMenu.cs:1378-1381).
+
+          Es un error del cliente, asi que contesta 400 y lo dice; el repositorio
+          mantiene la misma guarda por si alguien entra por otro camino.
+        */
+        if (string.Equals(request.ReporteKey?.Trim(), "estado_de_cuenta", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(request.TipoReporte?.Trim(), "cliente", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = "El estado de cuenta es de un cliente: manda tipoReporte \"cliente\" y el cliente en idClientes." });
+        }
+
         HydrateLegacyContext(request);
         var result = await _service.GenerarLegacyVentasAsync(request, ct);
         result.Url = BuildReportesV3WUrl(result.ParametrosLegacy, request.IdCentro);

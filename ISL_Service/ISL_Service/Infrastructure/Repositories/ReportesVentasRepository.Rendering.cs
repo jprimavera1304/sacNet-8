@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using System.Text.RegularExpressions;
 using ISL_Service.Application.DTOs.Reportes;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Data;
@@ -61,7 +62,9 @@ public partial class ReportesVentasRepository
             LogoWatermark = pathImagenes + (Convert.ToString(row["LogoMacWM"]) ?? ""),
             IDDescuentoCompra = ReadInt(row, "IDDescuentoCompra"),
             IDDescuentoListaPrecios = ReadInt(row, "IDDescuentoListaPrecios"),
-            IDEmpresaCS = ReadInt(row, "IDEmpresaCS")
+            IDEmpresaCS = ReadInt(row, "IDEmpresaCS"),
+            Funcionalidad = ReadString(row, "Funcionalidad"),
+            EsCentroServicio = ReadInt(row, "EsCentroServicio")
         };
     }
 
@@ -556,6 +559,65 @@ public partial class ReportesVentasRepository
         }
 
         return html;
+    }
+
+    /*
+      UNA IMAGEN QUE NO SE PUEDE CARGAR SE QUITA DEL HTML.
+
+      wkhtmltopdf 0.12.4 sale con codigo 1 ("network error:
+      ContentNotFoundError") cuando un <img> apunta a algo que no existe, y
+      entonces NO HAY DOCUMENTO. Las banderas --load-error-handling ignore y
+      --load-media-error-handling ignore no cubren este caso (comprobado con el
+      exe empaquetado), asi que la unica defensa es no escribir el <img>.
+
+      Pasa de verdad, con dos causas distintas:
+      * plantillas con tags de imagen que el motor no conoce: el cuerpo del 1250
+        pide #LogoCdMx#, que ReplaceRemainingTags convierte en "----" y
+        wkhtmltopdf intenta abrir como archivo;
+      * plantillas que apuntan a archivos de la maquina de legacy: el mismo 1250
+        pide C:\Mac21\imagenes\GobiernoCDMX.png, que no esta ni empaquetado ni en
+        este servidor.
+
+      Se quita solo el <img> que no se puede cargar: el resto del papel sale
+      igual. Lo que no se toca es data: ni http(s) — esos los resuelve el
+      navegador interno, y si fallan ya solo dejan el hueco.
+    */
+    private static string SanearImagenesNoCargables(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html) || html.IndexOf("<img", StringComparison.OrdinalIgnoreCase) < 0)
+            return html;
+
+        return Regex.Replace(
+            html,
+            @"<img\b[^>]*?>",
+            match => ImagenSePuedeCargar(match.Value) ? match.Value : "",
+            RegexOptions.IgnoreCase);
+    }
+
+    private static bool ImagenSePuedeCargar(string imgTag)
+    {
+        var src = Regex.Match(imgTag, @"src\s*=\s*(?:""(?<v>[^""]*)""|'(?<v>[^']*)'|(?<v>[^\s>]+))", RegexOptions.IgnoreCase)
+            .Groups["v"].Value.Trim();
+
+        if (string.IsNullOrEmpty(src))
+            return false;
+        if (src.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
+            || src.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || src.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return true;
+        // Un tag sin resolver ("#LogoCdMx#") o ya reemplazado por el relleno de
+        // ReplaceRemainingTags ("----") no es una ruta: no hay nada que cargar.
+        if (src.StartsWith('#') || src.Trim('-').Length == 0)
+            return false;
+
+        try
+        {
+            return File.Exists(src);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static string ReplaceRemainingTags(string html)
