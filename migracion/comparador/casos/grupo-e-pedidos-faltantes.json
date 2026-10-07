@@ -1,23 +1,23 @@
 {
   "nombre": "Pedidos faltantes del dia",
   "_porque": [
-    "Legacy: POST /api/pedidos/faltante/consultar -> sp_n_ConsultaPedidoFaltante con",
-    "@Fecha='' y @IDEmpresaCS del cuerpo (PedidoRepository.spConsultarFaltante).",
-    "El nuevo: GET api/ventas/consulta/pedidos-faltantes corre el MISMO SP con",
-    "@Fecha='' y @IDEmpresaCS=0 fijos (VentasConsultaRepository.cs:134-140), igual",
-    "que Mac31, que lo llama con un PedidoInputDTO vacio. Por eso a Legacy se le",
-    "manda IDEmpresaCS=0: para preguntar LO MISMO.",
-    "ADVERTENCIA DE COBERTURA: el SP filtra por dentro con",
-    "CAST(Fecha as date) = CAST(GETDATE() as date) y la base local no tiene",
-    "pedidos de HOY, asi que los dos lados contestan lista vacia. El caso prueba",
-    "que la llamada, la autorizacion y el envoltorio funcionan en los dos; no",
-    "prueba el contenido de los renglones. Para probarlo de verdad hace falta un",
-    "pedido con faltante del dia, y aqui no se toca la base para fabricarlo."
+    "ESTE CASO COMPARABA LISTA VACIA CONTRA LISTA VACIA: el OK no probaba nada.",
+    "Contado hoy: [Pedidos Producto Faltante] = 0 renglones en Produccion_svr (Tauro) y 618 en MacZ",
+    "(Zaragoza).",
+    "NO VERIFICABLE NI EN MACZ, y la razon es la fecha, no la tabla: el",
+    "procedimiento filtra por dentro con",
+    "CAST(pedDetFal.Fecha as date) = CAST(GETDATE() as date) -- no acepta fecha,",
+    "siempre es HOY. En MacZ hay 618 renglones pero el ultimo es del",
+    "2026-07-14, asi que tambien devuelve vacio. Para cerrarlo hace falta un",
+    "pedido con faltante capturado HOY, y aqui no se toca la base para",
+    "fabricarlo."
   ],
   "legacy": {
     "method": "POST",
     "path": "/api/pedidos/faltante/consultar",
-    "body": { "IDEmpresaCS": 0 }
+    "body": {
+      "IDEmpresaCS": 0
+    }
   },
   "nuevo": {
     "method": "GET",
@@ -31,7 +31,16 @@
     "El nuevo entrega solo las diez columnas que pinta la rejilla (Numero, Nombre, FechaFtm, GrupoCategoria, Categoria, Marca, Clave, CantidadSolicitada, CantidadPedido, CantidadFaltante). Si el SP trajera mas, no viajan."
   ],
   "solo_campos": [
-    "Numero", "Nombre", "FechaFtm", "GrupoCategoria", "Categoria", "Marca",
-    "Clave", "CantidadSolicitada", "CantidadPedido", "CantidadFaltante"
-  ]
+    "Numero",
+    "Nombre",
+    "FechaFtm",
+    "GrupoCategoria",
+    "Categoria",
+    "Marca",
+    "Clave",
+    "CantidadSolicitada",
+    "CantidadPedido",
+    "CantidadFaltante"
+  ],
+  "_no_verificable_aqui": true
 }

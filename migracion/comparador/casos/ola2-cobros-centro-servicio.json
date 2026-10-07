@@ -1,17 +1,16 @@
 {
   "nombre": "Cobros de centro de servicio por folio",
   "_porque": [
-    "En Tauro (Produccion_svr) la tabla Cobros esta VACIA: esta empresa no usa",
-    "la pantalla de cobros de centro de servicio. Los dos lados coinciden en el",
-    "vacio, que es la unica verdad disponible aqui y es la misma que comprueba",
-    "el caso de galleros de la ola de catalogos.",
-    "",
+    "ESTE CASO COMPARABA LISTA VACIA CONTRA LISTA VACIA: el OK no probaba nada.",
+    "Contado hoy: Cobros = 0 renglones en Produccion_svr (Tauro) y 21485 en MacZ",
+    "(Zaragoza).",
     "Se pide por FolioCobro = 1 y no con los dos filtros en cero porque el",
     "endpoint nuevo exige al menos uno: con ambos en cero el procedimiento",
     "barre todos los cobros de todos los centros.",
-    "",
-    "Para que valga de verdad hay que volver a correrlo contra una base que SI",
-    "tenga cobros de centro de servicio (Zaragoza / MacZ)."
+    "DONDE SI HAY DATOS: MacZ. Este caso queda APUNTADO A ESA BASE: para que",
+    "valga de verdad hay que correrlo con los dos backends apuntando a MacZ.",
+    "Aqui no se puede: Legacy saca su base del Web.config de Legacy/, que no",
+    "se toca, y el usuario de pruebas del backend nuevo no existe en esa base."
   ],
   "legacy": {
     "method": "POST",
@@ -30,5 +29,6 @@
     }
   },
   "camino_legacy": "result.cobros",
-  "camino_nuevo": "data.rows"
+  "camino_nuevo": "data.rows",
+  "_base_con_datos": "MacZ"
 }

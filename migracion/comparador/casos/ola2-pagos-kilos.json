@@ -1,18 +1,16 @@
 {
   "nombre": "Pagos por kilo de un cliente",
   "_porque": [
-    "Se pide por IDCliente 1534 y SIN rango de fechas, a proposito: Legacy pasa",
-    "FechaInicial y FechaFinal TAL CUAL al procedimiento, sin convertir el",
-    "formato y sin pegarles la hora (ConsultaVentasPagosService.findKilosAsync,",
-    ":72-96) — es el unico de la familia que no lo hace. En esta base",
-    "formatoFechaDB vale 'MM-dd-yyyy', asi que un rango escrito como",
-    "'01-02-2026' lo lee el procedimiento como el 2 de enero. El backend nuevo",
-    "lo normaliza a ISO y por lo tanto NO coincidiria con Legacy en un rango.",
-    "Esa diferencia es deliberada y esta anotada abajo; comparar sin rango deja",
-    "ver lo que si tiene que coincidir.",
-    "",
-    "En Tauro la tabla de pagos por kilo esta vacia: los dos lados coinciden en",
-    "el vacio."
+    "ESTE CASO COMPARABA LISTA VACIA CONTRA LISTA VACIA: el OK no probaba nada.",
+    "Contado hoy: VentasPagosKilos = 0 renglones en Produccion_svr (Tauro) y 0 en MacZ",
+    "(Zaragoza).",
+    "HALLAZGO AL REVISAR LA TABLA: `sp_n_ConsultarVentasPagosKilos` DECLARA",
+    "@IDCliente pero no lo usa en ninguna linea de su WHERE armado -- filtra",
+    "por IDVentaPagoKilo, IDCobro, IDVenta y fecha, nunca por cliente. Asi que",
+    "el 1534 de este caso no filtra nada en ninguno de los dos lados: con",
+    "datos, los dos devolverian TODOS los pagos por kilo del rango.",
+    "No verificable aqui de todas formas: VentasPagosKilos esta vacia en las",
+    "dos bases."
   ],
   "legacy": {
     "method": "POST",
@@ -32,5 +30,6 @@
   "camino_nuevo": "data.rows",
   "diferencias_intencionales": [
     "El rango de fechas SI se normaliza en el backend nuevo y en Legacy no. Legacy manda la cadena de la pantalla sin tocarla a un procedimiento que espera el formato de la base (MM-dd-yyyy aqui), asi que un filtro 'del 1 al 28 de febrero' le llega como 'del 2 de enero al...'. El nuevo convierte a ISO yyyy-MM-dd y le pega 00:00:00 / 23:59:59 como el resto de la familia. El nuevo es mas fiel al filtro que pidio el usuario, no menos."
-  ]
+  ],
+  "_no_verificable_aqui": true
 }

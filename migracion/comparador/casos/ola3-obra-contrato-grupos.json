@@ -1,10 +1,10 @@
 {
   "nombre": "Obra - grupos de contrato",
   "_porque": [
-    "MC_ContratosGrupos esta vacia en esta base. Los dos lados dan vacio.",
-    "Con el `tablaLst` vacio el camino es `result.tablaLst` y no",
-    "`result.tablaLst.0.Table` (ver el caso de residentes). Cuando haya grupos",
-    "capturados hay que cambiarlo."
+    "ESTE CASO COMPARABA LISTA VACIA CONTRA LISTA VACIA: el OK no probaba nada.",
+    "Contado hoy: MC_ContratosGrupos = 0 renglones en Produccion_svr (Tauro) y 0 en MacZ",
+    "(Zaragoza).",
+    "Ver la nota de obra en ola3-obra-contrato-conceptos."
   ],
   "legacy": {
     "method": "POST",
@@ -27,5 +27,6 @@
   ],
   "diferencias_intencionales": [
     "Fuera `@Formato`: el interruptor 0/1 de Mac31 hace que el MISMO procedimiento devuelva otras columnas, con los encabezados en espanol. El Excel lo arma el front con los mismos datos."
-  ]
+  ],
+  "_no_verificable_aqui": true
 }

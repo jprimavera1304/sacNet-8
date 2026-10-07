@@ -1,14 +1,26 @@
 {
   "nombre": "Huellas registradas de usuarios",
   "_porque": [
-    "UsuariosHuellas esta vacia en esta base: los dos lados dan vacio.",
-    "A Legacy se le manda el valor magico IDUsuario = -1 ('todas') y los otros dos",
-    "en 0. En el nuevo eso se pide con origen=usuario&todas=true: el -1 no viaja",
-    "por HTTP, porque si viajara un `id=-1` por error de un front se volveria",
-    "'dame todas las huellas de la empresa' sin que nadie lo hubiera pedido.",
-    "OJO con los defaults de Legacy: el de @IDEmpleado en el procedimiento es -1,",
-    "asi que omitirlo trae las huellas de toda la nomina de regalo. Aqui se manda",
-    "0 explicito en los dos lados."
+    "ESTE CASO COMPARABA LISTA VACIA CONTRA LISTA VACIA: el OK no probaba nada.",
+    "Contado hoy: UsuariosHuellas = 0 renglones en Produccion_svr (Tauro) y 12 en MacZ",
+    "(Zaragoza).",
+    "LA RAMA DE EMPLEADOS SI SE PUEDE PROBAR AQUI y ahora se prueba, en el",
+    "caso hermano `ola3-huellas-empleados` (62 renglones con la huella",
+    "completa). Este caso cubre solo la rama de usuarios, que en Tauro no",
+    "tiene datos.",
+    "A Legacy se le manda el valor magico IDUsuario = -1 ('todas') y los otros",
+    "dos en 0. En el nuevo eso se pide con origen=usuario&todas=true: el -1 no",
+    "viaja por HTTP, porque si viajara un `id=-1` por error de un front se",
+    "volveria 'dame todas las huellas de la empresa' sin que nadie lo pidiera.",
+    "OJO con los defaults de Legacy: el de @IDEmpleado en el procedimiento es",
+    "-1, asi que omitirlo trae las huellas de toda la nomina de regalo. Aqui se",
+    "manda 0 explicito en los dos lados.",
+    "La tercera rama, origen=cliente, tampoco es verificable: ClientesHuellas",
+    "tiene 0 renglones en las dos bases.",
+    "DONDE SI HAY DATOS: MacZ. Este caso queda APUNTADO A ESA BASE: para que",
+    "valga de verdad hay que correrlo con los dos backends apuntando a MacZ.",
+    "Aqui no se puede: Legacy saca su base del Web.config de Legacy/, que no",
+    "se toca, y el usuario de pruebas del backend nuevo no existe en esa base."
   ],
   "legacy": {
     "method": "POST",
@@ -37,5 +49,6 @@
     "El nuevo pide UN origen por llamada y devuelve ese. El procedimiento emite un result set POR CADA filtro que se cumple y Legacy leia solo `Tables[0]`: con dos origenes a la vez, las huellas del segundo se perdian sin aviso. Y con los tres en 0 no emite NINGUN result set, y Legacy contestaba 500.",
     "El nuevo agrega `origen` ('usuario'/'empleado'/'cliente') y publica el id de la huella y el de la persona con nombres unicos (`idHuella`, `idPersona`). El DTO de Legacy declaraba los seis a la vez y en cada bloque cuatro salian en 0.",
     "`huella` sale en base64 en los dos lados (byte[] serializado), asi que el lector de huellas del cliente no cambia."
-  ]
+  ],
+  "_base_con_datos": "MacZ"
 }

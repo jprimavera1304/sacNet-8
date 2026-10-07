@@ -1,8 +1,10 @@
 {
   "nombre": "Usuario - fechas de operacion abiertas",
   "_porque": [
-    "Usuario 9, que en esta base no tiene renglones en UsuariosFechas: los dos",
-    "lados dan vacio.",
+    "Usuario 40: el unico con renglones en UsuariosFechas en esta base (los 2 que",
+    "hay). ANTES este caso pedia el usuario 9, que no tiene ninguno, asi que",
+    "comparaba LISTA VACIA CONTRA LISTA VACIA y el OK no probaba nada. Lo",
+    "encontro la auditoria de cobertura.",
     "`idUsuario` es obligatorio de hecho: el WHERE del procedimiento siempre",
     "compara contra el, no hay rama de 'todos', asi que con 0 devuelve vacio.",
     "Nota de datos: la tabla es `UsuariosFechas`, SIN espacio. No es la",
@@ -13,24 +15,25 @@
     "method": "POST",
     "path": "/api/usuarios/fechas/consultar",
     "body": {
-      "IDUsuario": 9
+      "IDUsuario": 40
     }
   },
   "nuevo": {
     "method": "GET",
     "path": "/api/usuarios/fechas",
     "query": {
-      "idUsuario": 9
+      "idUsuario": 40
     }
   },
   "camino_nuevo": "data",
   "ordenar_por": "IDUsuarioFecha",
   "ignorar": [
     "result",
-    "mensaje"
+    "mensaje",
+    "FechaFtm"
   ],
   "diferencias_intencionales": [
-    "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla.",
+    "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla. Con el caso apuntado a datos reales esta diferencia SI aparece (antes no, porque la lista venia vacia), asi que `FechaFtm` esta en `ignorar`.",
     "Fuera `result` y `mensaje` de cada renglon."
   ]
 }

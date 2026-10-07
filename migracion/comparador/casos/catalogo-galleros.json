@@ -1,9 +1,12 @@
 {
   "nombre": "Catalogo de galleros",
   "_porque": [
-    "En Produccion_svr [Catalogo Galleros] esta vacio, asi que este caso prueba",
-    "la forma y que los dos lados coincidan en 'no hay nada', no el contenido.",
-    "Queda escrito para que corra de verdad en la base que si tiene galleros."
+    "ESTE CASO COMPARABA LISTA VACIA CONTRA LISTA VACIA: el OK no probaba nada.",
+    "Contado hoy: [Catalogo Galleros] = 0 renglones en Produccion_svr (Tauro) y 0 en MacZ",
+    "(Zaragoza).",
+    "El catalogo de galleros no se usa en NINGUNA de las dos empresas que hay",
+    "en esta maquina. No verificable aqui: hace falta una base de un centro",
+    "(MacZCS*) que si lleve galleros."
   ],
   "legacy": {
     "method": "POST",
@@ -20,5 +23,6 @@
   },
   "camino_legacy": "result.galleros",
   "camino_nuevo": "data",
-  "ordenar_por": "idGallero"
+  "ordenar_por": "idGallero",
+  "_no_verificable_aqui": true
 }

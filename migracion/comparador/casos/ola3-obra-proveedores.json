@@ -1,9 +1,11 @@
 {
   "nombre": "Obra - proveedores",
   "_porque": [
-    "MC_Proveedores esta vacia en esta base: los dos lados devuelven cero",
-    "renglones. El envoltorio de Legacy aqui si es tipado (`result.proveedores`),",
-    "asi que el desenvoltorio por defecto lo resuelve solo."
+    "ESTE CASO COMPARABA LISTA VACIA CONTRA LISTA VACIA: el OK no probaba nada.",
+    "Contado hoy: MC_Proveedores = 0 renglones en Produccion_svr (Tauro) y 0 en MacZ",
+    "(Zaragoza).",
+    "Ver la nota de obra en ola3-obra-contrato-conceptos.",
+    "OJO: MC_Proveedores (obra) no es Proveedores (compras), que SI tiene 52."
   ],
   "legacy": {
     "method": "POST",
@@ -30,5 +32,6 @@
   "diferencias_intencionales": [
     "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla.",
     "Fuera `@Formato`: el interruptor 0/1 de Mac31 hace que el MISMO procedimiento devuelva otras columnas, con los encabezados en espanol. El Excel lo arma el front con los mismos datos."
-  ]
+  ],
+  "_no_verificable_aqui": true
 }

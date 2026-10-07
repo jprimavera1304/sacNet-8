@@ -1,12 +1,15 @@
 {
   "nombre": "Cobro de dinero y usados: renglones",
   "_porque": [
-    "CobrosDineroUsado esta vacia en Tauro (esta empresa no usa esa pantalla),",
-    "asi que los dos lados coinciden en el vacio. Para que valga de verdad hay",
-    "que volver a correrlo contra Zaragoza (MacZ), que si la usa.",
-    "",
+    "ESTE CASO COMPARABA LISTA VACIA CONTRA LISTA VACIA: el OK no probaba nada.",
+    "Contado hoy: CobrosDineroUsado = 0 renglones en Produccion_svr (Tauro) y 13664 en MacZ",
+    "(Zaragoza).",
     "Dos parametros alternativos y ninguna transformacion en C#",
-    "(VentasCobrosDineroUsadoService.cs:28-53)."
+    "(VentasCobrosDineroUsadoService.cs:28-53).",
+    "DONDE SI HAY DATOS: MacZ. Este caso queda APUNTADO A ESA BASE: para que",
+    "valga de verdad hay que correrlo con los dos backends apuntando a MacZ.",
+    "Aqui no se puede: Legacy saca su base del Web.config de Legacy/, que no",
+    "se toca, y el usuario de pruebas del backend nuevo no existe en esa base."
   ],
   "legacy": {
     "method": "POST",
@@ -25,5 +28,6 @@
     }
   },
   "camino_legacy": "result.cobrosDineroUsados",
-  "camino_nuevo": "data.rows"
+  "camino_nuevo": "data.rows",
+  "_base_con_datos": "MacZ"
 }

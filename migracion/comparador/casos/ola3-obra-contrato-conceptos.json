@@ -1,12 +1,14 @@
 {
   "nombre": "Obra - conceptos de contrato",
   "_porque": [
-    "MC_ContratosConceptos esta vacia en esta base. Los dos lados dan vacio.",
-    "Cuando haya contratos capturados hay que revisar los renglones SINTETICOS",
-    "de cabecera de grupo que mete el procedimiento (IDContratoConcepto = 0,",
-    "Concepto = el nombre del grupo). Solo aparecen cuando se pide con",
-    "idContrato e idStatus concretos, porque su propio INSERT los compara",
-    "literales sin pasar por fn_RegresaTablaStatus."
+    "ESTE CASO COMPARABA LISTA VACIA CONTRA LISTA VACIA: el OK no probaba nada.",
+    "Contado hoy: MC_ContratosConceptos = 0 renglones en Produccion_svr (Tauro) y 0 en MacZ",
+    "(Zaragoza).",
+    "Todo el modulo de obra (MC_*) esta sin datos en las dos bases:",
+    "MC_Contratos 0, MC_ContratosConceptos 0, MC_ContratosEstimaciones 0,",
+    "MC_ContratosGrupos 0, MC_Proveedores 0, MC_Residentes 0. Solo tienen",
+    "renglones los catalogos chicos (MC_Puestos 2, MC_TiposObra 3...), que",
+    "si estan comparados con datos reales en otros casos."
   ],
   "legacy": {
     "method": "POST",
@@ -29,5 +31,6 @@
   "diferencias_intencionales": [
     "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla.",
     "Fuera `@Formato`: el interruptor 0/1 de Mac31 hace que el MISMO procedimiento devuelva otras columnas, con los encabezados en espanol. El Excel lo arma el front con los mismos datos."
-  ]
+  ],
+  "_no_verificable_aqui": true
 }
