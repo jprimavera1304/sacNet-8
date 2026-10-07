@@ -1,0 +1,670 @@
+[
+  {
+    "nombre": "ajuste-inventario-crear",
+    "legacy": {
+      "path": "/api/ajusteinventario",
+      "method": "POST",
+      "body": {
+        "IDAlmacen": 2,
+        "IDProducto": 10316,
+        "IDUsuario": 3,
+        "Entrada": 5,
+        "Salida": 0,
+        "Motivo": "PRUEBA OLA4",
+        "Equipo": "BANCOPRUEBAS"
+      }
+    },
+    "nuevo": {
+      "path": "/api/inventario/ajustes",
+      "method": "POST",
+      "body": {
+        "idAlmacen": 2,
+        "idProducto": 10316,
+        "entrada": 5,
+        "salida": 0,
+        "motivo": "PRUEBA OLA4"
+      }
+    },
+    "fotos": {
+      "ajustes": "SELECT COUNT(*), ISNULL(SUM(Entrada),0), ISNULL(SUM(Salida),0), ISNULL(MAX(IDAjusteInventario),0) FROM dbo.[Ajuste Inventario] WHERE IDProducto=10316 AND IDAlmacen=2;",
+      "existencia": "SELECT Existencia FROM dbo.AlmacenProducto WHERE IDAlmacen=2 AND IDProducto=10316;"
+    },
+    "notas": [
+      "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+    ]
+  },
+  {
+    "nombre": "ajuste-inventario-cancelar",
+    "legacy": {
+      "path": "/api/ajusteinventario",
+      "method": "PUT",
+      "body": {
+        "IDAjusteInventario": 71928,
+        "IDUsuario": 3,
+        "Equipo": "BANCOPRUEBAS"
+      }
+    },
+    "nuevo": {
+      "path": "/api/inventario/ajustes/cancelar",
+      "method": "POST",
+      "body": {
+        "idAjusteInventario": 71928
+      }
+    },
+    "fotos": {
+      "cancelado": "SELECT CASE WHEN [Fecha Cancelacion] IS NULL THEN 0 ELSE 1 END FROM dbo.[Ajuste Inventario] WHERE IDAjusteInventario=71928;",
+      "existencia": "SELECT ap.Existencia FROM dbo.AlmacenProducto ap JOIN dbo.[Ajuste Inventario] ai ON ai.IDAlmacen=ap.IDAlmacen AND ai.IDProducto=ap.IDProducto WHERE ai.IDAjusteInventario=71928;"
+    },
+    "notas": [
+      "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+    ]
+  },
+  {
+    "nombre": "tipo-usado-crear",
+    "legacy": {
+      "path": "/api/cattipousado",
+      "method": "POST",
+      "body": {
+        "TipoUsado": "PRUEBA OLA4",
+        "TipoUsadoCorto": "P4",
+        "VentaCostoCargoSinIva": 10,
+        "VentaCostoCargoConIva": 11.6,
+        "VentaCostoCreditoSinIva": 9,
+        "VentaCostoCreditoConIva": 10.44,
+        "Bonificacion": 1,
+        "CostoExcedentes": 2,
+        "PesoKg": 3,
+        "Orden": 99
+      }
+    },
+    "nuevo": {
+      "path": "/api/inventario/tipos-usado",
+      "method": "POST",
+      "body": {
+        "tipoUsado": "PRUEBA OLA4",
+        "tipoUsadoCorto": "P4",
+        "ventaCostoCargoSinIva": 10,
+        "ventaCostoCargoConIva": 11.6,
+        "ventaCostoCreditoSinIva": 9,
+        "ventaCostoCreditoConIva": 10.44,
+        "bonificacion": 1,
+        "costoExcedentes": 2,
+        "pesoKg": 3,
+        "orden": 99
+      }
+    },
+    "fotos": {
+      "tipos": "SELECT COUNT(*), ISNULL(MAX(IDTipoUsado),0) FROM dbo.[Catalogo TiposUsados];",
+      "nuevo": "SELECT [Tipo de Usado], TipoUsadoCorto, [Costo Cargo], CostoCargoConIva, Bonificacion, CostoExcedentes, PesoKg, Orden FROM dbo.[Catalogo TiposUsados] WHERE [Tipo de Usado] = 'PRUEBA OLA4';"
+    },
+    "notas": [
+      "Este procedimiento no recibe firma: no declara IDUsuario ni Equipo."
+    ]
+  },
+  {
+    "nombre": "tipo-usado-actualizar",
+    "legacy": {
+      "path": "/api/cattipousado",
+      "method": "PUT",
+      "body": {
+        "IDTipoUsado": 1,
+        "IDStatus": 1,
+        "TipoUsado": "PRUEBA MOD",
+        "TipoUsadoCorto": "PM",
+        "VentaCostoCargoSinIva": 20,
+        "VentaCostoCargoConIva": 23.2,
+        "VentaCostoCreditoSinIva": 18,
+        "VentaCostoCreditoConIva": 20.88,
+        "Bonificacion": 2,
+        "CostoExcedentes": 3,
+        "PesoKg": 4,
+        "Orden": 5
+      }
+    },
+    "nuevo": {
+      "path": "/api/inventario/tipos-usado",
+      "method": "PUT",
+      "body": {
+        "idTipoUsado": 1,
+        "tipoUsado": "PRUEBA MOD",
+        "tipoUsadoCorto": "PM",
+        "ventaCostoCargoSinIva": 20,
+        "ventaCostoCargoConIva": 23.2,
+        "ventaCostoCreditoSinIva": 18,
+        "ventaCostoCreditoConIva": 20.88,
+        "bonificacion": 2,
+        "costoExcedentes": 3,
+        "pesoKg": 4,
+        "orden": 5
+      }
+    },
+    "fotos": {
+      "fila": "SELECT IDStatus, [Tipo de Usado], TipoUsadoCorto, [Costo Cargo], CostoCargoConIva, [Costo Credito], CostoCreditoConIva, Bonificacion, CostoExcedentes, PesoKg, Orden FROM dbo.[Catalogo TiposUsados] WHERE IDTipoUsado=1;"
+    },
+    "notas": [
+      "El nuevo CONSERVA el IDStatus que tenia el renglon (lo lee antes); legacy lo toma del cuerpo. En este caso se le manda a legacy el mismo que ya tiene, para que el efecto sea comparable."
+    ]
+  },
+  {
+    "nombre": "usados-movimiento-crear",
+    "legacy": {
+      "path": "/api/usadosmovimientos",
+      "method": "POST",
+      "body": {
+        "IDAlmacenUsado": 1,
+        "IDGallero": 0,
+        "IDRepartidor": 1,
+        "Motivo": "PRUEBA OLA4",
+        "IDsTipoUsadoLst": [
+          1
+        ],
+        "PreciosCambioLst": [
+          1.5
+        ],
+        "PreciosUnitarioLst": [
+          2.5
+        ],
+        "CantidadesSalidaLst": [
+          1
+        ],
+        "CantidadesEntradaLst": [
+          2
+        ],
+        "TotalPagarEntrada": 5,
+        "IDCobro": 0,
+        "IDVenta": 0,
+        "IDTipoCompra": 0,
+        "IDTipoVenta": 0,
+        "IDUsuario": 3,
+        "Equipo": "BANCOPRUEBAS"
+      }
+    },
+    "nuevo": {
+      "path": "/api/ventas/usados/movimientos",
+      "method": "POST",
+      "body": {
+        "idAlmacenUsado": 1,
+        "idRepartidor": 1,
+        "motivo": "PRUEBA OLA4",
+        "idsTipoUsado": [
+          1
+        ],
+        "preciosCambio": [
+          1.5
+        ],
+        "preciosUnitario": [
+          2.5
+        ],
+        "cantidadesSalida": [
+          1
+        ],
+        "cantidadesEntrada": [
+          2
+        ],
+        "totalPagarEntrada": 5
+      }
+    },
+    "fotos": {
+      "movimientos": "SELECT COUNT(*), ISNULL(MAX(IDUsadoMovimiento),0) FROM dbo.UsadosMovimientos;",
+      "detalle": "SELECT COUNT(*), ISNULL(SUM(CantidadEntrada),0), ISNULL(SUM(CantidadSalida),0) FROM dbo.UsadosMovimientosDetalle;"
+    },
+    "notas": [
+      "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+    ]
+  },
+  {
+    "nombre": "inventario-pedidos-crear",
+    "legacy": {
+      "path": "/api/inventariopedidos",
+      "method": "POST",
+      "body": {
+        "IDStatus": 1,
+        "Observaciones": "PRUEBA OLA4",
+        "IDsProductoLst": [
+          10316
+        ],
+        "CodigosLst": [
+          "COD4"
+        ],
+        "CantidadesInventarioLst": [
+          10
+        ],
+        "CantidadesVentasLst": [
+          2
+        ],
+        "CantidadesFaltanteLst": [
+          1
+        ],
+        "CantidadesPedidoLst": [
+          3
+        ],
+        "IDUsuario": 3,
+        "Equipo": "BANCOPRUEBAS"
+      }
+    },
+    "nuevo": {
+      "path": "/api/inventario/pedidos",
+      "method": "POST",
+      "body": {
+        "idStatus": 1,
+        "observaciones": "PRUEBA OLA4",
+        "partidas": [
+          {
+            "idProducto": 10316,
+            "codigo": "COD4",
+            "cantidadInventario": 10,
+            "cantidadVentas": 2,
+            "cantidadFaltante": 1,
+            "cantidadPedido": 3
+          }
+        ]
+      }
+    },
+    "fotos": {
+      "cabeceras": "SELECT COUNT(*), ISNULL(MAX(IDInventarioPedido),0) FROM dbo.InventarioPedidos;",
+      "detalle": "SELECT COUNT(*), ISNULL(SUM(Inventario),0), ISNULL(SUM(Ventas),0), ISNULL(SUM(Faltante),0), ISNULL(SUM(Pedido),0) FROM dbo.InventarioPedidosDetalle;"
+    },
+    "notas": [
+      "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+    ]
+  },
+  {
+    "nombre": "inventario-pedidos-cancelar",
+    "legacy": {
+      "path": "/api/inventariopedidos/cancelar",
+      "method": "POST",
+      "body": {
+        "IDInventarioPedido": 1071,
+        "IDUsuario": 3,
+        "Equipo": "BANCOPRUEBAS"
+      }
+    },
+    "nuevo": {
+      "path": "/api/inventario/pedidos/cancelar",
+      "method": "POST",
+      "body": {
+        "idInventarioPedido": 1071
+      }
+    },
+    "fotos": {
+      "fila": "SELECT IDStatus, CASE WHEN FechaCancelacion IS NULL THEN 0 ELSE 1 END FROM dbo.InventarioPedidos WHERE IDInventarioPedido=1071;"
+    },
+    "notas": [
+      "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+    ]
+  },
+  {
+    "nombre": "garantia-crear",
+    "legacy": {
+      "path": "/api/garantias",
+      "method": "POST",
+      "body": {
+        "IDEmpresa": 1,
+        "IDCliente": 2597,
+        "IDRepartidor": 1,
+        "IDAlmacen": 2,
+        "IDUsuario": 3,
+        "IDProducto": 10316,
+        "FechaIngreso": "06-10-2026",
+        "Ticket": "T-OLA4",
+        "Vigencia": "12",
+        "Garantia": "G-OLA4",
+        "Motivo": "PRUEBA OLA4",
+        "Equipo": "BANCOPRUEBAS",
+        "GarantiaMayorista": 0,
+        "IDEmpresaMayorista": 0,
+        "IDProductoCambio": 0
+      }
+    },
+    "nuevo": {
+      "path": "/api/ventas/garantias",
+      "method": "POST",
+      "body": {
+        "idEmpresa": 1,
+        "idCliente": 2597,
+        "idRepartidor": 1,
+        "idAlmacen": 2,
+        "idProducto": 10316,
+        "fechaIngreso": "2026-10-06",
+        "ticket": "T-OLA4",
+        "vigencia": "12",
+        "garantia": "G-OLA4",
+        "motivo": "PRUEBA OLA4"
+      }
+    },
+    "fotos": {
+      "garantias": "SELECT COUNT(*), ISNULL(MAX(IDGarantia),0) FROM dbo.Garantias;",
+      "nueva": "SELECT IDCliente, IDProducto, IDAlmacen, IDStatusGarantia, Ticket, Vigencia, Garantia, Motivo, CONVERT(varchar(19), FechaIngreso, 120) FROM dbo.Garantias WHERE Ticket = 'T-OLA4';"
+    },
+    "notas": [
+      "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+    ]
+  },
+  {
+    "nombre": "garantia-registro-crear",
+    "legacy": {
+      "path": "/api/garantias/registrar",
+      "method": "POST",
+      "body": {
+        "IDEmpresa": 1,
+        "IDProducto": 10316,
+        "Ticket": "TR-OLA4",
+        "Vigencia": "12",
+        "Garantia": "GR-OLA4",
+        "Observaciones": "PRUEBA OLA4",
+        "IDUsuario": 3,
+        "Equipo": "BANCOPRUEBAS"
+      }
+    },
+    "nuevo": {
+      "path": "/api/ventas/garantias/registros",
+      "method": "POST",
+      "body": {
+        "idEmpresa": 1,
+        "idProducto": 10316,
+        "ticket": "TR-OLA4",
+        "vigencia": "12",
+        "garantia": "GR-OLA4",
+        "observaciones": "PRUEBA OLA4"
+      }
+    },
+    "fotos": {
+      "registros": "SELECT COUNT(*), ISNULL(MAX(IDGarantiaRegistro),0) FROM dbo.GarantiasRegistro;",
+      "nuevo": "SELECT IDProducto, IDStatus, Folio, Ticket, Vigencia, Garantia, Observaciones FROM dbo.GarantiasRegistro WHERE Ticket = 'TR-OLA4';"
+    },
+    "notas": [
+      "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+    ]
+  },
+  {
+    "nombre": "cobranza-crear",
+    "legacy": {
+      "path": "/api/cobranzas",
+      "method": "POST",
+      "body": {
+        "IDRepartidor": 1,
+        "IDsVentaAgregar": "370852",
+        "IDUsuario": 3,
+        "Equipo": "BANCOPRUEBAS",
+        "Observaciones": "PRUEBA OLA4",
+        "IDCobro": 0,
+        "esCobro": 0,
+        "IDAlmacen": 0
+      }
+    },
+    "nuevo": {
+      "path": "/api/ventas/cobranza/cobranzas",
+      "method": "POST",
+      "body": {
+        "idRepartidor": 1,
+        "idsVentaAgregar": [
+          370852
+        ],
+        "observaciones": "PRUEBA OLA4"
+      }
+    },
+    "fotos": {
+      "cobranzas": "SELECT COUNT(*), ISNULL(MAX(IDCobranza),0), ISNULL(MAX(Folio),0) FROM dbo.Cobranza;",
+      "detalle": "SELECT COUNT(*) FROM dbo.CobranzaDetalle WHERE IDVenta=370852;"
+    },
+    "notas": [
+      "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+    ]
+  },
+  {
+    "nombre": "cobranza-cancelar",
+    "legacy": {
+      "path": "/api/cobranzas/cancelar",
+      "method": "POST",
+      "body": {
+        "IDsCobranza": "208623",
+        "IDUsuario": 3,
+        "Equipo": "BANCOPRUEBAS",
+        "IDsCobro": ""
+      }
+    },
+    "nuevo": {
+      "path": "/api/ventas/cobranza/cobranzas/cancelar",
+      "method": "POST",
+      "body": {
+        "idsCobranza": [
+          208623
+        ]
+      }
+    },
+    "fotos": {
+      "fila": "SELECT CASE WHEN [Fecha Cancelacion] IS NULL THEN 0 ELSE 1 END FROM dbo.Cobranza WHERE IDCobranza=208623;",
+      "detalle": "SELECT COUNT(*) FROM dbo.CobranzaDetalle WHERE IDCobranza=208623;"
+    },
+    "notas": [
+      "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+    ]
+  },
+  {
+    "nombre": "descuento-detalle-crear",
+    "legacy": {
+      "path": "/api/descuentosdetalle",
+      "method": "POST",
+      "body": {
+        "IDDescuento": 53518,
+        "IDCategoria": 86,
+        "IDMarca": 87,
+        "Porcentaje": "5",
+        "AplicarTodos": 0,
+        "IDUsuario": 3,
+        "Equipo": "BANCOPRUEBAS"
+      }
+    },
+    "nuevo": {
+      "path": "/api/ventas/descuentos/detalle",
+      "method": "POST",
+      "body": {
+        "idDescuento": 53518,
+        "idCategoria": 86,
+        "idMarca": 87,
+        "porcentaje": "5",
+        "aplicarTodos": 0
+      }
+    },
+    "fotos": {
+      "detalle": "SELECT COUNT(*), ISNULL(SUM(Porcentaje),0) FROM dbo.[Detalle Descuentos] WHERE IDDescuento=53518;",
+      "log": "SELECT COUNT(*) FROM dbo.[Detalle Descuentos Log] WHERE IDDescuento=53518;"
+    },
+    "notas": [
+      "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+    ]
+  },
+  {
+    "nombre": "descuento-detalle-eliminar",
+    "legacy": {
+      "path": "/api/descuentosdetalle",
+      "method": "DELETE",
+      "body": {
+        "IDDescuentoDetalle": 2285617,
+        "IDDescuento": 53518,
+        "IDCategoria": 86,
+        "IDMarca": 87,
+        "IDUsuario": 3,
+        "Equipo": "BANCOPRUEBAS"
+      }
+    },
+    "nuevo": {
+      "path": "/api/ventas/descuentos/detalle/eliminar",
+      "method": "POST",
+      "body": {
+        "idDescuentoDetalle": 2285617,
+        "idDescuento": 53518,
+        "idCategoria": 86,
+        "idMarca": 87
+      }
+    },
+    "fotos": {
+      "detalle": "SELECT COUNT(*) FROM dbo.[Detalle Descuentos] WHERE IDDescuentoDetalle=2285617;",
+      "total": "SELECT COUNT(*) FROM dbo.[Detalle Descuentos] WHERE IDDescuento=53518;"
+    },
+    "notas": [
+      "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+    ]
+  },
+  {
+    "nombre": "venta-actualizar-observaciones",
+    "legacy": {
+      "path": "/api/ventas/actualizar",
+      "method": "POST",
+      "body": {
+        "IDVenta": 370852,
+        "Observaciones": "PRUEBA OLA4"
+      }
+    },
+    "nuevo": {
+      "path": "/api/ventas/actualizar",
+      "method": "POST",
+      "body": {
+        "idVenta": 370852,
+        "observaciones": "PRUEBA OLA4"
+      }
+    },
+    "fotos": {
+      "fila": "SELECT ISNULL(ObservacionesPago,'<null>'), ISNULL(Observaciones,'<null>') FROM dbo.Ventas WHERE IDVenta=370852;"
+    },
+    "notas": [
+      "Este procedimiento no recibe firma: declara solo @IDVenta y @Observaciones.",
+      "OJO: escribe en Ventas.ObservacionesPago, NO en Ventas.Observaciones. La primera foto miraba la columna equivocada y daba verde sin mirar nada."
+    ]
+  },
+  {
+    "nombre": "venta-incobrable",
+    "legacy": {
+      "path": "/api/ventaspagos/incobrable",
+      "method": "POST",
+      "body": {
+        "IDVenta": 370842,
+        "IDUsuario": 3,
+        "Equipo": "BANCOPRUEBAS"
+      }
+    },
+    "nuevo": {
+      "path": "/api/ventas/pagos/incobrable",
+      "method": "POST",
+      "body": {
+        "idVenta": 370842
+      }
+    },
+    "fotos": {
+      "pagos": "SELECT COUNT(*), ISNULL(SUM(Abono),0), ISNULL(SUM(Cargo),0), ISNULL(MAX(IDTipoPago),0) FROM dbo.[Ventas Pagos] WHERE IDVenta=370842;",
+      "venta": "SELECT Abonos, [Total a Pagar], Descuentos, ISNULL(SaldoIncobrable,0), ISNULL(SaldoIncobrableDinero,0), ISNULL(SaldoIncobrableCascos,0), CASE WHEN [Fecha Pago] IS NULL THEN 0 ELSE 1 END FROM dbo.Ventas WHERE IDVenta=370842;",
+      "pagosUsados": "SELECT COUNT(*) FROM dbo.[Ventas Pagos Usados] WHERE IDVenta=370842;"
+    },
+    "notas": [
+      "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+    ]
+  },
+  {
+    "nombre": "venta-reasignar-agente",
+    "legacy": {
+      "path": "/api/ventasreasignacion",
+      "method": "POST",
+      "body": {
+        "IDCliente": 2597,
+        "IDAgente": 7,
+        "IDUsuario": 3,
+        "CambiarCliente": 0,
+        "IDsVenta": "370852",
+        "Equipo": "BANCOPRUEBAS",
+        "Motivo": "PRUEBA OLA4"
+      }
+    },
+    "nuevo": {
+      "path": "/api/ventas/reasignar",
+      "method": "POST",
+      "body": {
+        "idCliente": 2597,
+        "idAgente": 7,
+        "cambiarCliente": 0,
+        "idsVenta": [
+          370852
+        ],
+        "motivo": "PRUEBA OLA4"
+      }
+    },
+    "fotos": {
+      "ventaAgente": "SELECT IDCliente, IDAgente FROM dbo.Ventas WHERE IDVenta=370852;",
+      "bitacora": "SELECT COUNT(*), ISNULL(MAX(IDAgenteAnterior),0), ISNULL(MAX(IDAgenteNuevo),0) FROM dbo.[Ventas Reasignacion] WHERE IDVenta=370852;"
+    },
+    "notas": [
+      "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+    ]
+  },
+  {
+    "nombre": "descuento-ajuste-crear",
+    "legacy": {
+      "path": "/api/ventasdescuentosajustes",
+      "method": "POST",
+      "body": {
+        "IDTipoLiquidacion": 1,
+        "IDVenta": 370853,
+        "IDEmpresa": 11,
+        "Folio": 1,
+        "IDUsuario": 3,
+        "DescuentoGlobal": "5",
+        "IDVentasDetalle": "1069325",
+        "VentaDetalleDescuento1": "5",
+        "VentaDetalleDescuento2": "0",
+        "VentaDetalleDescuento3": "0",
+        "DescuentoAdicional": "0",
+        "Fecha": "06-10-2026",
+        "Observaciones": "PRUEBA OLA4",
+        "NuevoTotalPagar": 100,
+        "FechaLiquidacion": "06-10-2026",
+        "TextoDescuentos": "5 %",
+        "TextoDescuentosPorLinea": "L 5%",
+        "DescuentoAplicar": 5,
+        "Diferencia": 0
+      }
+    },
+    "nuevo": {
+      "path": "/api/ventas/descuentos/ajustes",
+      "method": "POST",
+      "body": {
+        "idTipoLiquidacion": 1,
+        "idVenta": 370853,
+        "idEmpresa": 11,
+        "folio": 1,
+        "descuentoGlobal": [
+          5
+        ],
+        "idsVentaDetalle": [
+          1069325
+        ],
+        "descuento1": [
+          5
+        ],
+        "descuento2": [
+          0
+        ],
+        "descuento3": [
+          0
+        ],
+        "descuentoAdicional": [
+          0
+        ],
+        "fecha": "2026-10-06",
+        "observaciones": "PRUEBA OLA4",
+        "nuevoTotalPagar": 100,
+        "fechaLiquidacion": "2026-10-06",
+        "textoDescuentos": "5 %",
+        "textoDescuentosPorLinea": "L 5%",
+        "descuentoAplicar": 5,
+        "diferencia": 0
+      }
+    },
+    "fotos": {
+      "ajustes": "SELECT COUNT(*), ISNULL(MAX(IDVentasDescuentosAjustes),0) FROM dbo.VentasDescuentosAjustes;",
+      "nuevo": "SELECT IDTipoLiquidacion, IDVenta, Folio, DescuentoGlobal, IDVentasDetalle, VentaDetalleDescuento1, CONVERT(varchar(10), Fecha, 120), CONVERT(varchar(10), [Fecha Liquidacion], 120), [Nuevo Total Pagar], [Texto Descuentos], [Descuento Aplicar] FROM dbo.VentasDescuentosAjustes WHERE Observaciones = 'PRUEBA OLA4';"
+    },
+    "notas": [
+      "LA FECHA VA SIN HORA: el procedimiento le pega la hora el mismo (`@Fecha = @Fecha + ' ' + <hora>`), y con la hora dentro guarda NULL sin dar error (ANSI_WARNINGS OFF). La foto compara la fecha guardada.",
+      "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+    ]
+  }
+]

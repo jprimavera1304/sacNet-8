@@ -135,6 +135,31 @@ builder.Services.AddScoped<ICatalogosRepository, CatalogosRepository>();
 // Los 28 catalogos de solo lectura que venian de MacServicios2 (ver CatalogosGeneralesController).
 builder.Services.AddScoped<ICatalogosGeneralesRepository, CatalogosGeneralesRepository>();
 builder.Services.AddScoped<ICatalogosGeneralesService, CatalogosGeneralesService>();
+
+
+// -------------------- ESCRITURAS DE CATALOGOS DE MAC31 (ola 6) --------------------
+builder.Services.AddScoped<ICatalogosAdminRepository, CatalogosAdminRepository>();
+builder.Services.AddScoped<ICatalogosAdminService, CatalogosAdminService>();
+
+// -------------------- FICHAS MAESTRAS DE MAC31: CLIENTE, PRODUCTO, PROVEEDOR --------------------
+builder.Services.AddScoped<IMaestrosRepository, MaestrosRepository>();
+builder.Services.AddScoped<IMaestrosService, MaestrosService>();
+
+// -------------------- OPERACION DIARIA: COMPRAS, CORTES, TRANSFERENCIAS, VIGENCIAS --------------------
+builder.Services.AddScoped<IOperacionMacRepository, OperacionMacRepository>();
+builder.Services.AddScoped<IOperacionMacService, OperacionMacService>();
+
+// -------------------- USUARIOS DE MAC31, HUELLAS, CONSTANTES Y PARAMETROS --------------------
+builder.Services.AddScoped<ISeguridadMacRepository, SeguridadMacRepository>();
+builder.Services.AddScoped<ISeguridadMacService, SeguridadMacService>();
+
+// -------------------- BATCHES DE NOMINA (calcular recibos, generar periodos, descontar prestamos) --------------------
+builder.Services.AddScoped<INominaBatchRepository, NominaBatchRepository>();
+builder.Services.AddScoped<INominaBatchService, NominaBatchService>();
+
+// -------------------- SUELTOS: PROYECTOS, RECORDATORIOS, SERVICIOS, SINCRONIZACION --------------------
+builder.Services.AddScoped<ISueltosRepository, SueltosRepository>();
+builder.Services.AddScoped<ISueltosService, SueltosService>();
 builder.Services.AddScoped<ICategoriasRepository, CategoriasRepository>();
 builder.Services.AddScoped<ICategoriasService, CategoriasService>();
 builder.Services.AddScoped<IProfesoresRepository, ProfesoresRepository>();

@@ -1,0 +1,555 @@
+{
+  "fecha_inicio": "2026-10-06",
+  "fecha_fin": "2026-10-06",
+  "casos": [
+    {
+      "nombre": "ajuste-inventario-crear",
+      "legacy": {
+        "status": 200,
+        "cuerpo": "{\"id\":0,\"status\":200,\"result\":{\"tablaLst\":null,\"modelLst\":null,\"IDResult\":null,\"result\":1,\"mensaje\":\"\",\"mensajeFacturama\":null}}",
+        "delta": {
+          "ajustes": {
+            "antes": "0 0 0 0",
+            "despues": "1 20 0 71929"
+          },
+          "existencia": {
+            "antes": "12",
+            "despues": "32"
+          }
+        }
+      },
+      "nuevo": {
+        "status": 200,
+        "cuerpo": "{\"ok\":true,\"message\":\"Ajuste capturado.\",\"data\":{\"resultado\":1,\"mensaje\":\"\",\"id\":null,\"filas\":[{\"result\":1,\"mensaje\":\"\"}],\"tablasExtra\":[],\"hecho\":true}}",
+        "delta": {
+          "ajustes": {
+            "antes": "0 0 0 0",
+            "despues": "1 20 0 71929"
+          },
+          "existencia": {
+            "antes": "12",
+            "despues": "32"
+          }
+        }
+      },
+      "mismo_efecto_en_base": true,
+      "notas": [
+        "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+      ]
+    },
+    {
+      "nombre": "ajuste-inventario-cancelar",
+      "legacy": {
+        "status": 200,
+        "cuerpo": "{\"id\":0,\"status\":200,\"result\":{\"tablaLst\":null,\"modelLst\":null,\"IDResult\":null,\"result\":1,\"mensaje\":\"\",\"mensajeFacturama\":null}}",
+        "delta": {
+          "cancelado": {
+            "antes": "0",
+            "despues": "1"
+          },
+          "existencia": {
+            "antes": "3",
+            "despues": "2"
+          }
+        }
+      },
+      "nuevo": {
+        "status": 200,
+        "cuerpo": "{\"ok\":true,\"message\":\"Ajuste cancelado.\",\"data\":{\"resultado\":1,\"mensaje\":\"\",\"id\":null,\"filas\":[{\"result\":1,\"mensaje\":\"\"}],\"tablasExtra\":[],\"hecho\":true}}",
+        "delta": {
+          "cancelado": {
+            "antes": "0",
+            "despues": "1"
+          },
+          "existencia": {
+            "antes": "3",
+            "despues": "2"
+          }
+        }
+      },
+      "mismo_efecto_en_base": true,
+      "notas": [
+        "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+      ]
+    },
+    {
+      "nombre": "tipo-usado-crear",
+      "legacy": {
+        "status": 200,
+        "cuerpo": "{\"id\":0,\"status\":200,\"result\":{\"tablaLst\":[{\"RowError\":\"\",\"RowState\":2,\"Table\":[{\"result\":1,\"mensaje\":\"\"}],\"ItemArray\":[1,\"\"],\"HasErrors\":false}],\"modelLst\":null,\"IDResult\":null,\"result\":0,\"mensaje\":null,\"mensajeFacturama\":null}}",
+        "delta": {
+          "tipos": {
+            "antes": "8 8",
+            "despues": "9 9"
+          },
+          "nuevo": {
+            "antes": "",
+            "despues": "PRUEBA OLA4 P4 10.00 11.60 1.00 2.00 3.00 99"
+          }
+        }
+      },
+      "nuevo": {
+        "status": 200,
+        "cuerpo": "{\"ok\":true,\"message\":\"Tipo de casco creado.\",\"data\":{\"resultado\":1,\"mensaje\":\"\",\"id\":null,\"filas\":[{\"result\":1,\"mensaje\":\"\"}],\"tablasExtra\":[],\"hecho\":true}}",
+        "delta": {
+          "tipos": {
+            "antes": "8 8",
+            "despues": "9 9"
+          },
+          "nuevo": {
+            "antes": "",
+            "despues": "PRUEBA OLA4 P4 10.00 11.60 1.00 2.00 3.00 99"
+          }
+        }
+      },
+      "mismo_efecto_en_base": true,
+      "notas": [
+        "Este procedimiento no recibe firma: no declara IDUsuario ni Equipo."
+      ]
+    },
+    {
+      "nombre": "tipo-usado-actualizar",
+      "legacy": {
+        "status": 200,
+        "cuerpo": "{\"id\":0,\"status\":200,\"result\":{\"tablaLst\":[{\"RowError\":\"\",\"RowState\":2,\"Table\":[{\"result\":1,\"mensaje\":\"\"}],\"ItemArray\":[1,\"\"],\"HasErrors\":false}],\"modelLst\":null,\"IDResult\":null,\"result\":0,\"mensaje\":null,\"mensajeFacturama\":null}}",
+        "delta": {
+          "fila": {
+            "antes": "1 11141608 CHICO (2) CHICO(2) 448.28 520.00 448.28 520.00 44.00 190.00 1.00 2",
+            "despues": "1 PRUEBA MOD PM 20.00 23.20 18.00 20.88 2.00 3.00 4.00 5"
+          }
+        }
+      },
+      "nuevo": {
+        "status": 200,
+        "cuerpo": "{\"ok\":true,\"message\":\"Tipo de casco actualizado.\",\"data\":{\"resultado\":1,\"mensaje\":\"\",\"id\":null,\"filas\":[{\"result\":1,\"mensaje\":\"\"}],\"tablasExtra\":[],\"hecho\":true}}",
+        "delta": {
+          "fila": {
+            "antes": "1 11141608 CHICO (2) CHICO(2) 448.28 520.00 448.28 520.00 44.00 190.00 1.00 2",
+            "despues": "1 PRUEBA MOD PM 20.00 23.20 18.00 20.88 2.00 3.00 4.00 5"
+          }
+        }
+      },
+      "mismo_efecto_en_base": true,
+      "notas": [
+        "El nuevo CONSERVA el IDStatus que tenia el renglon (lo lee antes); legacy lo toma del cuerpo. En este caso se le manda a legacy el mismo que ya tiene, para que el efecto sea comparable."
+      ]
+    },
+    {
+      "nombre": "usados-movimiento-crear",
+      "legacy": {
+        "status": 200,
+        "cuerpo": "{\"id\":0,\"status\":200,\"result\":{\"tablaLst\":null,\"modelLst\":null,\"IDResult\":\"3\",\"result\":1,\"mensaje\":\"\",\"mensajeFacturama\":null}}",
+        "delta": {
+          "movimientos": {
+            "antes": "2 2",
+            "despues": "3 3"
+          },
+          "detalle": {
+            "antes": "8 31 0",
+            "despues": "10 33 1"
+          }
+        }
+      },
+      "nuevo": {
+        "status": 200,
+        "cuerpo": "{\"ok\":true,\"message\":\"Movimiento registrado.\",\"data\":{\"resultado\":1,\"mensaje\":\"\",\"id\":1,\"filas\":[{\"result\":1,\"mensaje\":\"\",\"IDResult\":1}],\"tablasExtra\":[],\"hecho\":true}}",
+        "delta": {
+          "movimientos": {
+            "antes": "2 2",
+            "despues": "3 3"
+          },
+          "detalle": {
+            "antes": "8 31 0",
+            "despues": "10 33 1"
+          }
+        }
+      },
+      "mismo_efecto_en_base": true,
+      "notas": [
+        "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+      ]
+    },
+    {
+      "nombre": "inventario-pedidos-crear",
+      "legacy": {
+        "status": 200,
+        "cuerpo": "{\"id\":0,\"status\":200,\"result\":{\"tablaLst\":null,\"modelLst\":null,\"IDResult\":\"2071\",\"result\":1,\"mensaje\":\"\",\"mensajeFacturama\":null}}",
+        "delta": {
+          "cabeceras": {
+            "antes": "77 1071",
+            "despues": "78 2071"
+          }
+        }
+      },
+      "nuevo": {
+        "status": 200,
+        "cuerpo": "{\"ok\":true,\"message\":\"Inventario de pedidos capturado.\",\"data\":{\"resultado\":1,\"mensaje\":\"\",\"id\":2071,\"filas\":[{\"result\":1,\"mensaje\":\"\",\"IDResult\":2071}],\"tablasExtra\":[],\"hecho\":true}}",
+        "delta": {
+          "cabeceras": {
+            "antes": "77 1071",
+            "despues": "78 2071"
+          }
+        }
+      },
+      "mismo_efecto_en_base": true,
+      "notas": [
+        "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+      ]
+    },
+    {
+      "nombre": "inventario-pedidos-cancelar",
+      "legacy": {
+        "status": 200,
+        "cuerpo": "{\"id\":0,\"status\":200,\"result\":{\"tablaLst\":null,\"modelLst\":null,\"IDResult\":null,\"result\":1,\"mensaje\":\"\",\"mensajeFacturama\":null}}",
+        "delta": {
+          "fila": {
+            "antes": "0 0",
+            "despues": "2 1"
+          }
+        }
+      },
+      "nuevo": {
+        "status": 200,
+        "cuerpo": "{\"ok\":true,\"message\":\"Inventario de pedidos cancelado.\",\"data\":{\"resultado\":1,\"mensaje\":\"\",\"id\":null,\"filas\":[{\"result\":1,\"mensaje\":\"\"}],\"tablasExtra\":[],\"hecho\":true}}",
+        "delta": {
+          "fila": {
+            "antes": "0 0",
+            "despues": "2 1"
+          }
+        }
+      },
+      "mismo_efecto_en_base": true,
+      "notas": [
+        "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+      ]
+    },
+    {
+      "nombre": "garantia-crear",
+      "legacy": {
+        "status": 200,
+        "cuerpo": "{\"id\":0,\"status\":200,\"result\":{\"tablaLst\":null,\"modelLst\":null,\"IDResult\":\"\",\"result\":0,\"mensaje\":\"\",\"mensajeFacturama\":null}}",
+        "delta": {
+          "garantias": {
+            "antes": "2037 3997",
+            "despues": "2038 3998"
+          },
+          "nueva": {
+            "antes": "",
+            "despues": "2597 10316 2 1 T-OLA4 12 G-OLA4 PRUEBA OLA4 2026-10-06 00:00:00"
+          }
+        }
+      },
+      "nuevo": {
+        "status": 200,
+        "cuerpo": "{\"ok\":true,\"message\":\"Garantia registrada.\",\"data\":{\"resultado\":1,\"mensaje\":\"\",\"id\":null,\"filas\":[{\"result\":1,\"mensaje\":\"\"}],\"tablasExtra\":[],\"hecho\":true}}",
+        "delta": {
+          "garantias": {
+            "antes": "2037 3997",
+            "despues": "2038 3998"
+          },
+          "nueva": {
+            "antes": "",
+            "despues": "2597 10316 2 1 T-OLA4 12 G-OLA4 PRUEBA OLA4 2026-10-06 00:00:00"
+          }
+        }
+      },
+      "mismo_efecto_en_base": true,
+      "notas": [
+        "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+      ]
+    },
+    {
+      "nombre": "garantia-registro-crear",
+      "legacy": {
+        "status": 200,
+        "cuerpo": "{\"id\":0,\"status\":200,\"result\":{\"tablaLst\":null,\"modelLst\":null,\"IDResult\":\"\",\"result\":0,\"mensaje\":\"\",\"mensajeFacturama\":null}}",
+        "delta": {
+          "registros": {
+            "antes": "0 0",
+            "despues": "1 1"
+          },
+          "nuevo": {
+            "antes": "",
+            "despues": "10316 1 1 TR-OLA4 12 GR-OLA4 PRUEBA OLA4"
+          }
+        }
+      },
+      "nuevo": {
+        "status": 200,
+        "cuerpo": "{\"ok\":true,\"message\":\"Registro de garantia creado.\",\"data\":{\"resultado\":1,\"mensaje\":\"\",\"id\":null,\"filas\":[{\"result\":1,\"mensaje\":\"\"}],\"tablasExtra\":[],\"hecho\":true}}",
+        "delta": {
+          "registros": {
+            "antes": "0 0",
+            "despues": "1 1"
+          },
+          "nuevo": {
+            "antes": "",
+            "despues": "10316 1 1 TR-OLA4 12 GR-OLA4 PRUEBA OLA4"
+          }
+        }
+      },
+      "mismo_efecto_en_base": true,
+      "notas": [
+        "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+      ]
+    },
+    {
+      "nombre": "cobranza-crear",
+      "legacy": {
+        "status": 200,
+        "cuerpo": "{\"id\":0,\"status\":200,\"result\":{\"tablaLst\":null,\"modelLst\":null,\"IDResult\":\"208624|0|0\",\"result\":1,\"mensaje\":\"\",\"mensajeFacturama\":null}}",
+        "delta": {
+          "cobranzas": {
+            "antes": "39806 208623 120699",
+            "despues": "39807 208624 120700"
+          },
+          "detalle": {
+            "antes": "0",
+            "despues": "1"
+          }
+        }
+      },
+      "nuevo": {
+        "status": 200,
+        "cuerpo": "{\"ok\":true,\"message\":\"Cobranza creada.\",\"data\":{\"resultado\":1,\"mensaje\":\"\",\"id\":208624,\"filas\":[{\"result\":1,\"mensaje\":\"\",\"IDCobranza\":208624,\"FolioCobranza\":120700,\"IDCobro\":0,\"FolioCobro\":0}],\"tablasExtra\":[],\"hecho\":true}}",
+        "delta": {
+          "cobranzas": {
+            "antes": "39806 208623 120699",
+            "despues": "39807 208624 120700"
+          },
+          "detalle": {
+            "antes": "0",
+            "despues": "1"
+          }
+        }
+      },
+      "mismo_efecto_en_base": true,
+      "notas": [
+        "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+      ]
+    },
+    {
+      "nombre": "cobranza-cancelar",
+      "legacy": {
+        "status": 200,
+        "cuerpo": "{\"id\":0,\"status\":200,\"result\":{\"tablaLst\":[{\"RowError\":\"\",\"RowState\":2,\"Table\":[{\"IDCobranza\":208623,\"FolioCobranza\":120699,\"resultado\":\"LA COBRANZA 120699 - ISACC PARAMO  HA SIDO CANCELADO.\"}],\"ItemArray\":[208623,120699,\"LA COBRANZA 120699 - ISACC PARAMO  HA SIDO CANCELADO.\"],\"HasErrors\":false}],\"modelLst\":null,\"IDResult\":null,\"result\":0,\"mensaje\":null,\"mensajeFacturama\":null}}",
+        "delta": {
+          "fila": {
+            "antes": "0",
+            "despues": "1"
+          }
+        }
+      },
+      "nuevo": {
+        "status": 200,
+        "cuerpo": "{\"ok\":true,\"message\":\"Cobranzas canceladas.\",\"data\":{\"resultado\":null,\"mensaje\":null,\"id\":208623,\"filas\":[{\"IDCobranza\":208623,\"FolioCobranza\":120699,\"resultado\":\"LA COBRANZA 120699 - ISACC PARAMO  HA SIDO CANCELADO.\"}],\"tablasExtra\":[],\"hecho\":true}}",
+        "delta": {
+          "fila": {
+            "antes": "0",
+            "despues": "1"
+          }
+        }
+      },
+      "mismo_efecto_en_base": true,
+      "notas": [
+        "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+      ]
+    },
+    {
+      "nombre": "descuento-detalle-crear",
+      "legacy": {
+        "status": 200,
+        "cuerpo": "{\"id\":0,\"status\":200,\"result\":{\"descuentosDetalle\":[{\"IDDescuentoDetalle\":0,\"IDDescuento\":0,\"IDGrupoCategoria\":0,\"IDCategoria\":0,\"IDMarca\":0,\"GrupoCategoria\":null,\"Categoria\":null,\"Marca\":null,\"Porcentaje\":0.0,\"IDDescuentoDetalleLog\":0,\"IDUsuario\":0,\"PorcentajeAnterior\":0.0,\"PorcentajeNuevo\":0.0,\"Incrementar\":0,\"EsBaja\":0,\"Accion\":null,\"Fecha\":\"0001-01-01T00:00:00\",\"FechaFtm\":null,\"Usuario\":null,\"Equipo\":null,\"result\":1,\"mensaje\":\"\"}]}}",
+        "delta": {
+          "detalle": {
+            "antes": "10 200.0000",
+            "despues": "11 205.0000"
+          },
+          "log": {
+            "antes": "11",
+            "despues": "12"
+          }
+        }
+      },
+      "nuevo": {
+        "status": 200,
+        "cuerpo": "{\"ok\":true,\"message\":\"Renglon agregado.\",\"data\":{\"resultado\":1,\"mensaje\":\"\",\"id\":null,\"filas\":[{\"result\":1,\"mensaje\":\"\"}],\"tablasExtra\":[],\"hecho\":true}}",
+        "delta": {
+          "detalle": {
+            "antes": "10 200.0000",
+            "despues": "11 205.0000"
+          },
+          "log": {
+            "antes": "11",
+            "despues": "12"
+          }
+        }
+      },
+      "mismo_efecto_en_base": true,
+      "notas": [
+        "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+      ]
+    },
+    {
+      "nombre": "descuento-detalle-eliminar",
+      "legacy": {
+        "status": 200,
+        "cuerpo": "{\"id\":0,\"status\":200,\"result\":{\"descuentosDetalle\":[{\"IDDescuentoDetalle\":0,\"IDDescuento\":0,\"IDGrupoCategoria\":0,\"IDCategoria\":0,\"IDMarca\":0,\"GrupoCategoria\":null,\"Categoria\":null,\"Marca\":null,\"Porcentaje\":0.0,\"IDDescuentoDetalleLog\":0,\"IDUsuario\":0,\"PorcentajeAnterior\":0.0,\"PorcentajeNuevo\":0.0,\"Incrementar\":0,\"EsBaja\":0,\"Accion\":null,\"Fecha\":\"0001-01-01T00:00:00\",\"FechaFtm\":null,\"Usuario\":null,\"Equipo\":null,\"result\":1,\"mensaje\":\"\"}]}}",
+        "delta": {
+          "detalle": {
+            "antes": "1",
+            "despues": "0"
+          },
+          "total": {
+            "antes": "10",
+            "despues": "9"
+          }
+        }
+      },
+      "nuevo": {
+        "status": 200,
+        "cuerpo": "{\"ok\":true,\"message\":\"Renglon eliminado.\",\"data\":{\"resultado\":1,\"mensaje\":\"\",\"id\":null,\"filas\":[{\"result\":1,\"mensaje\":\"\"}],\"tablasExtra\":[],\"hecho\":true}}",
+        "delta": {
+          "detalle": {
+            "antes": "1",
+            "despues": "0"
+          },
+          "total": {
+            "antes": "10",
+            "despues": "9"
+          }
+        }
+      },
+      "mismo_efecto_en_base": true,
+      "notas": [
+        "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+      ]
+    },
+    {
+      "nombre": "venta-actualizar-observaciones",
+      "legacy": {
+        "status": 200,
+        "cuerpo": "{\"id\":0,\"status\":200,\"result\":{\"tablaLst\":null,\"modelLst\":null,\"IDResult\":null,\"result\":1,\"mensaje\":\"\",\"mensajeFacturama\":null}}",
+        "delta": {
+          "fila": {
+            "antes": "<null>",
+            "despues": "PRUEBA OLA4"
+          }
+        }
+      },
+      "nuevo": {
+        "status": 200,
+        "cuerpo": "{\"ok\":true,\"message\":\"Remision actualizada.\",\"data\":{\"resultado\":1,\"mensaje\":\"\",\"id\":null,\"filas\":[{\"result\":1,\"mensaje\":\"\"}],\"tablasExtra\":[],\"hecho\":true}}",
+        "delta": {
+          "fila": {
+            "antes": "<null>",
+            "despues": "PRUEBA OLA4"
+          }
+        }
+      },
+      "mismo_efecto_en_base": true,
+      "notas": [
+        "Este procedimiento no recibe firma: declara solo @IDVenta y @Observaciones.",
+        "OJO: escribe en Ventas.ObservacionesPago, NO en Ventas.Observaciones. La primera foto miraba la columna equivocada y daba verde sin mirar nada."
+      ]
+    },
+    {
+      "nombre": "venta-incobrable",
+      "legacy": {
+        "status": 200,
+        "cuerpo": "{\"id\":0,\"status\":200,\"result\":{\"tablaLst\":[{\"RowError\":\"\",\"RowState\":2,\"Table\":[{\"result\":1,\"mensaje\":\"\"}],\"ItemArray\":[1,\"\"],\"HasErrors\":false}],\"modelLst\":null,\"IDResult\":null,\"result\":0,\"mensaje\":null,\"mensajeFacturama\":null}}",
+        "delta": {
+          "venta": {
+            "antes": "4024.00 5384.00 .00 .00 .00 .00 0",
+            "despues": "4024.00 5384.00 .00 1360.00 .00 1360.00 1"
+          },
+          "pagosUsados": {
+            "antes": "0",
+            "despues": "1"
+          }
+        }
+      },
+      "nuevo": {
+        "status": 200,
+        "cuerpo": "{\"ok\":true,\"message\":\"Remision declarada incobrable.\",\"data\":{\"resultado\":1,\"mensaje\":\"\",\"id\":null,\"filas\":[{\"result\":1,\"mensaje\":\"\"}],\"tablasExtra\":[],\"hecho\":true}}",
+        "delta": {
+          "venta": {
+            "antes": "4024.00 5384.00 .00 .00 .00 .00 0",
+            "despues": "4024.00 5384.00 .00 1360.00 .00 1360.00 1"
+          },
+          "pagosUsados": {
+            "antes": "0",
+            "despues": "1"
+          }
+        }
+      },
+      "mismo_efecto_en_base": true,
+      "notas": [
+        "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+      ]
+    },
+    {
+      "nombre": "venta-reasignar-agente",
+      "legacy": {
+        "status": 200,
+        "cuerpo": "{\"id\":0,\"status\":200,\"result\":{\"tablaLst\":[{\"RowError\":\"\",\"RowState\":2,\"Table\":[{\"result\":1,\"mensaje\":\"\"}],\"ItemArray\":[1,\"\"],\"HasErrors\":false}],\"modelLst\":null,\"IDResult\":null,\"result\":0,\"mensaje\":null,\"mensajeFacturama\":null}}",
+        "delta": {
+          "bitacora": {
+            "antes": "0 0 0",
+            "despues": "1 7 7"
+          }
+        }
+      },
+      "nuevo": {
+        "status": 200,
+        "cuerpo": "{\"ok\":true,\"message\":\"Remisiones reasignadas.\",\"data\":{\"resultado\":1,\"mensaje\":\"\",\"id\":null,\"filas\":[{\"result\":1,\"mensaje\":\"\"}],\"tablasExtra\":[],\"hecho\":true}}",
+        "delta": {
+          "bitacora": {
+            "antes": "0 0 0",
+            "despues": "1 7 7"
+          }
+        }
+      },
+      "mismo_efecto_en_base": true,
+      "notas": [
+        "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+      ]
+    },
+    {
+      "nombre": "descuento-ajuste-crear",
+      "legacy": {
+        "status": 200,
+        "cuerpo": "{\"id\":0,\"status\":200,\"result\":{\"ventasDescuentosAjustes\":[{\"IDVentasDescuentosAjustes\":0,\"IDVenta\":0,\"IDVentaDetalle\":0,\"IDCliente\":0,\"NumeroCliente\":0,\"NombreCliente\":null,\"IDAgente\":0,\"Agente\":0,\"NombreAgente\":null,\"FechaCancelacion\":null,\"FechaPago\":null,\"IDEmpresa\":0,\"Empresa\":null,\"Folio\":null,\"FechaEmision\":null,\"FechaVencimiento\":null,\"IDAlmacen\":0,\"Almacen\":null,\"IDProducto\":0,\"Codigo\":null,\"Concepto\":null,\"PrecioLista\":0.0,\"Cantidad\":0,\"MontoDescuento\":0.0,\"ImportePartida\":0.0,\"TotalMontoDescuento\":0.0,\"TotalImportePartidas\":0.0,\"TotalUsadosCargo\":0.0,\"SubTotal\":0.0,\"Iva\":0.0,\"Importe\":0.0,\"Creditos\":0.0,\"IvaCreditos\":0.0,\"TotalCreditos\":0.0,\"TotalPagar\":0.0,\"NuevoMontoDescuento\":0.0,\"PorcentajeDescuento1\":0.0,\"PorcentajeDescuento2\":0.0,\"PorcentajeDescuento3\":0.0,\"DescuentoAdicional\":0.0,\"NuevoImportePartida\":0.0,\"NuevoTotalDescuentos\":0.0,\"NuevoTotalImportePartidas\":0.0,\"NuevoS",
+        "delta": {
+          "ajustes": {
+            "antes": "8776 27569",
+            "despues": "8777 27570"
+          },
+          "nuevo": {
+            "antes": "",
+            "despues": "1 370853 0 5 1069325 5 2026-10-06 2026-10-06 100.00 5 % 5.00"
+          }
+        }
+      },
+      "nuevo": {
+        "status": 200,
+        "cuerpo": "{\"ok\":true,\"message\":\"Ajuste solicitado.\",\"data\":{\"resultado\":1,\"mensaje\":\"\",\"id\":null,\"filas\":[{\"result\":1,\"mensaje\":\"\"}],\"tablasExtra\":[],\"hecho\":true}}",
+        "delta": {
+          "ajustes": {
+            "antes": "8776 27569",
+            "despues": "8777 27570"
+          },
+          "nuevo": {
+            "antes": "",
+            "despues": "1 370853 0 5 1069325 5 2026-10-06 2026-10-06 100.00 5 % 5.00"
+          }
+        }
+      },
+      "mismo_efecto_en_base": true,
+      "notas": [
+        "LA FECHA VA SIN HORA: el procedimiento le pega la hora el mismo (`@Fecha = @Fecha + ' ' + <hora>`), y con la hora dentro guarda NULL sin dar error (ANSI_WARNINGS OFF). La foto compara la fecha guardada.",
+        "La firma difiere a proposito: legacy recibe IDUsuario = 3 en el cuerpo y el nuevo escribe el 0 del token (el usuario del banco no esta ligado a Mac31). Las fotos no miran las columnas de firma."
+      ]
+    }
+  ]
+}

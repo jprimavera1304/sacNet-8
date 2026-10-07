@@ -11,7 +11,7 @@ Fecha de operación al empezar y al terminar: `2026-10-06` (no se movió).
 
 ## Lo que se hizo, en una frase
 
-Siete módulos nuevos con **~150 endpoints de escritura** que llaman a los **mismos
+Siete módulos nuevos con **164 endpoints** que llaman a los **mismos
 `sp_n_`** que llamaba MacServicios2, con los mismos parámetros, dentro de la arquitectura
 del backend nuevo. Ningún `sp_n_` se tocó; nada de la base se modificó para que una prueba
 pasara.
@@ -27,7 +27,7 @@ pasara.
 | `DTOs/Sueltos/`, `ISueltos*`, `SueltosService.cs`, `SueltosRepository.cs`, `Controllers/SueltosController.cs` | proyectos, recordatorios, servicios, sincronización |
 | `Utils/Funciones.cs` | **un defecto arreglado**: `IDAlgo` salía al JSON como `205Algo` |
 | `Program.cs` | 14 `AddScoped` |
-| `Infrastructure/Security/PermissionService.cs` | 61 permisos nuevos en `PermissionCatalogSeeds` |
+| `Infrastructure/Security/PermissionService.cs` | 71 permisos nuevos en `PermissionCatalogSeeds` |
 | `ISL_Service.Tests/Ola6EscriturasTests.cs` | 18 casos de la lógica pura |
 
 ## Lo primero, porque vale más que la tabla: la baja dejaba de ser lógica
@@ -74,7 +74,7 @@ Esa lógica vive en un solo sitio (`BajaLogicaLegacy`) para arreglarla una vez.
 | Cambios de vigencia - alta | `POST /api/cambiosvigencia` | `POST /api/cambios-vigencia` | `cambiosvigencia.crear` | **OK** | los productos como lista de objetos; NumProductos lo cuenta el backend |
 | Cambios de vigencia - cancelacion | `PUT /api/cambiosvigencia/cancelar` | `POST /api/cambios-vigencia/{id}/cancelar` | `cambiosvigencia.cancelar` | **OK** | no se pide motivo: el SP no lo guarda (Legacy lo recibia y lo tiraba). Se deja de llamar a sp_n_ConsultaConstantes para nada |
 | Cambios de vigencia - consulta | `POST /api/cambiosvigencia/consultar` | `GET /api/cambios-vigencia` | `cambiosvigencia.ver` | **OK** | con id se ignoran los demas filtros |
-| Cambios de vigencia - modificacion | `PUT /api/cambiosvigencia` | `PUT /api/cambios-vigencia/{id}` | `cambiosvigencia.editar` | **OK** | un producto por llamada: asi lo recibe el SP |
+| Cambios de vigencia - modificacion | `PUT /api/cambiosvigencia` | `PUT /api/cambios-vigencia/{id}` | `cambiosvigencia.editar` | no verificable | un producto por llamada, asi lo recibe el SP. **No verificable aqui**: sp_n_ActualizarCambioVigencia referencia las columnas IDRepartidor, Ticket, Vigencia y Garantia, que no existen en la tabla CambiosVigencia de esta base. El alta, cancelar y regresar si funcionan |
 | Cambios de vigencia - regresar | `PUT /api/cambiosvigencia/regresar` | `POST /api/cambios-vigencia/{id}/regresar` | `cambiosvigencia.editar` | **OK** | igual que cancelar |
 | Catalogo formas-procesos - alta | `POST /api/catformasprocesos` | — no se migra | — | no migrado | no existe la capacidad: el POST de Legacy llama a **sp_n_InsertarDiaFestivo** mandandole solo usuario y equipo, o sea que inserta un dia festivo EN BLANCO, y el IDForma no se manda a ninguna parte. No hay ningun sp_n_*FormaProceso en la base |
 | Catalogo formas-procesos - modificacion | `PUT /api/catformasprocesos` | — no se migra | — | no migrado | mismo caso: llama a **sp_n_ActualizarDiaFestivo** y le pasa el MISMO IDForma en @IDDiaFestivo, @IDStatus y @DiaFestivo a la vez. Lo que si existe (asignar un proceso a un usuario) esta migrado arriba |
@@ -115,9 +115,9 @@ Esa lógica vive en un solo sitio (`BajaLogicaLegacy`) para arreglarla una vez.
 | Dias festivos - alta | `POST /api/catdiafestivo` | `POST /api/catalogos/dias-festivos` | `catalogos.crear` | **OK** | la fecha viaja como fecha |
 | Dias festivos - consulta | `POST /api/catdiafestivo/consultar` | `GET /api/catalogos/dias-festivos` | `catalogos.ver` | **OK** | POST -> GET: el token ya no viaja en el cuerpo |
 | Dias festivos - modificacion | `PUT /api/catdiafestivo` | `PUT /api/catalogos/dias-festivos/{id}` | `catalogos.editar` | **OK** | si la fecha nueva no existe, el SP da de BAJA el renglon e INSERTA otro: el id cambia |
-| Documentos - alta | `POST /api/catdocumento` | `POST /api/catalogos/documentos` | `catalogos.crear` | **OK** |  |
-| Documentos - baja | `DELETE /api/catdocumento` | `POST /api/catalogos/documentos/{id}/inhabilitar` | `catalogos.baja` | **OK** | la baja LEE los valores actuales y solo cambia IDStatus; hay `habilitar` |
-| Documentos - modificacion | `PUT /api/catdocumento` | `PUT /api/catalogos/documentos/{id}` | `catalogos.editar` | **OK** |  |
+| Documentos - alta | `POST /api/catdocumento` | `POST /api/catalogos/documentos` | `catalogos.crear` | no verificable | la tabla [Catalogo Documentos] no existe en esta base (la ola 1 ya lo anoto): Legacy falla igual |
+| Documentos - baja | `DELETE /api/catdocumento` | `POST /api/catalogos/documentos/{id}/inhabilitar` | `catalogos.baja` | no verificable | la baja LEE los valores actuales y solo cambia IDStatus; hay `habilitar` |
+| Documentos - modificacion | `PUT /api/catdocumento` | `PUT /api/catalogos/documentos/{id}` | `catalogos.editar` | no verificable | la tabla [Catalogo Documentos] no existe en esta base (la ola 1 ya lo anoto): Legacy falla igual |
 | Empleados - alta | `POST /api/empleados` | `POST /api/empleados` | `empleados.crear` | **OK** | ya estaba migrado (EmpleadosController + sp_w_InsertarEmpleado); se verifico, no se duplico |
 | Empleados - modificacion | `PUT /api/empleados` | `PUT /api/empleados/{id}` | `empleados.editar` | **OK** | ya estaba migrado |
 | Empresas de Mac31 - alta | `POST /api/empresas` | `POST /api/catalogos/empresas` | `catalogos.empresas.crear` | **OK** | es dbo.Empresas (la que factura), no EmpresaWeb; `[Calle y Numero]` lo arma el SP |
@@ -204,7 +204,7 @@ Esa lógica vive en un solo sitio (`BajaLogicaLegacy`) para arreglarla una vez.
 | Usuario de Mac31 - baja | `DELETE /api/usuarios` | `POST /api/usuarios/mac31/{id}/inhabilitar` | `usuarios.estado.editar` | **OK** | **conserva la contrasena**: en Legacy la dejaba vacia y al reactivarlo entraba sin contrasena |
 | Usuario de Mac31 - modificacion | `PUT /api/usuarios` | `PUT /api/usuarios/mac31/{id}` | `usuarios.editar` | **OK** | ficha completa, contrasena incluida |
 
-**127 en verde, 13 no verificables, 5 no migradas, 1 parcial.**
+**123 en verde, 17 no verificables, 5 no migradas, 1 parcial.**
 
 ## Lógica escondida que se encontró
 
@@ -293,7 +293,22 @@ Esa lógica vive en un solo sitio (`BajaLogicaLegacy`) para arreglarla una vez.
     tocaba. Lo destapó `GET api/catalogos/dias-festivos`, que devolvía `205DiaFestivo` y
     `205Status`. Arreglado, con prueba de regresión.
 
-12. **El alta de tipo de domicilio guardaba la fila y contestaba error.**
+12. **La carga del estado de cuenta se caía entera por un campo vacío.**
+    `sp_n_InsertarBancoTransferencia` hace `CAST( @RefNumerica as decimal(22,0) )` y lo mismo
+    con `@Autorizacion`. Con la cadena vacía eso falla con *"Error converting data type
+    varchar to numeric"* y tumba el lote completo **sin decir en qué renglón**. Ahora vacío
+    se manda como 0 (la columna destino es numérica) y un valor con letras se rechaza antes
+    de abrir la transacción, diciendo qué movimiento es. De paso quedó comprobada una regla
+    de negocio del procedimiento que no estaba escrita en ninguna parte: **no admite
+    movimientos de sábado ni domingo**, y el lote entero se deshace diciendo cuál.
+
+13. **Los textos del movimiento bancario se recortaban en silencio.** Son varchar de
+    400/100/4000/1000 y SQL Server los trunca al asignarlos al parámetro. Comprobado con una
+    descripción de 5000 caracteres: entró mutilada y la carga contestó éxito. Un estado de
+    cuenta que se concilia contra un texto que no es el del banco es peor que uno que no se
+    cargó. Ahora se rechaza con el tope.
+
+14. **El alta de tipo de domicilio guardaba la fila y contestaba error.**
     `sp_n_Insertar_TipoDomicilio` inserta bien en `[Catalogo Tipos Domicilio]` y después lee
     `MAX(IDTipoDomicilio)` de `MC_TiposDomicilio`, tabla que no existe aquí: la fila queda y
     la llamada revienta, así que el usuario reintenta y crea un duplicado. Comprobado: quedó
@@ -351,9 +366,30 @@ quede en el día correcto, que la plantilla de huella se guarde completa (1200 b
 un lote que falla no deje ningún renglón, que adjuntar un archivo no ponga el precio en
 cero. **92 de 92.**
 
-**Segunda tanda — los caminos de escritura restantes** (los catálogos que faltaban,
-territorial, autos, empresas y series, las pestañas del proveedor, el ciclo del cambio de
-vigencia, el corte, la carga del estado de cuenta y los tres batches de nómina).
+**Segunda tanda — 104 comprobaciones de los caminos de escritura restantes**: los catálogos
+que faltaban (alta, modificación, baja que conserva y reactivar, uno por uno), territorial,
+autos, empresas y series, las tres pestañas del proveedor, el ciclo completo del cambio de
+vigencia, el corte de caja y el de centro de servicio, la carga del estado de cuenta y los
+tres batches de nómina. **91 en verde.** De los 13 restantes: nueve eran defectos del propio
+script de pruebas (comillas simples que no expandían el sufijo, nombres de tabla que no
+existen en esta base), dos son las limitaciones de base ya documentadas (la tabla
+`[Catalogo Documentos]` y las columnas que le faltan a `CambiosVigencia`), y **dos eran el
+sistema funcionando**:
+
+* `sp_n_InsertarBancoTransferencia` rechazó un movimiento en sábado
+  (*"NO SE PERMITE CARGAR ARCHIVOS CON MOVIMIENTOS DE SÁBADO O DOMINGO"*) y el lote entero se
+  deshizo, diciendo **qué movimiento** fue — que es exactamente lo que se buscaba al meterlo
+  en una transacción;
+* `sp_n_CancelarCompra` se negó a cancelar una compra porque ya no había existencias que
+  devolver (*"NO HAY EXISTENCIAS DEL PRODUCTO: G-4D-1050, Y SE REQUIEREN 1"*), y el texto
+  llegó entero al cliente con el folio de la factura. De esos textos dependen los avisos de
+  la pantalla, y por eso el `RAISERROR`/`mensaje` del procedimiento se propaga tal cual.
+
+Nota de honestidad sobre el banco de pruebas: la instantánea de `Produccion_svr` es
+**compartida** y otro agente la estuvo restaurando en paralelo, así que la segunda tanda hubo
+que correrla varias veces y con sufijo distinto en cada corrida (los procedimientos rechazan
+los nombres repetidos, con razón). Las cifras de arriba son de la corrida completa; las
+corridas interrumpidas por un `volver` ajeno se descartaron en vez de maquillarlas.
 
 **Comparación contra Legacy, con el ciclo del protocolo** (`volver` → escribir en Legacy →
 foto → `volver` → escribir en el nuevo → foto → comparar), ocho operaciones:
@@ -385,7 +421,7 @@ terminar. La fecha de operación era `2026-10-06` al empezar y al terminar.
 
 ## Permisos nuevos
 
-61, todos en `PermissionCatalogSeeds`. Ninguno pisa las cuatro familias que manda Mac31
+71, todos en `PermissionCatalogSeeds`. Ninguno pisa las cuatro familias que manda Mac31
 (`reportes.*`, `ventas.*`, `empleados.*`, `prestamos.*`): lo que se diera ahí desde la
 pantalla de permisos se borraría en el siguiente recálculo, sin error y sin rastro.
 
@@ -421,8 +457,9 @@ quien los toca administra seguridad.
 
 ## Qué quedó sin verificar, y por qué
 
-**Trece capacidades no verificables en esta base**, todas porque su procedimiento no está
-instalado en `Produccion_svr` (comprobado en `sys.objects`) — **Legacy falla igual aquí**:
+**Diecisiete capacidades no verificables en esta base.** Trece porque su procedimiento no
+está instalado en `Produccion_svr` (comprobado en `sys.objects`) — **Legacy falla igual
+aquí**:
 
 * proyectos (consulta, alta, modificación, facturas): `sp_n_Consultar_Proyectos`,
   `sp_n_Insertar_Proyecto`, `sp_n_Actualizar_Proyecto`, `sp_n_Actualizar_Proyecto_Facturas`;
@@ -433,13 +470,15 @@ instalado en `Produccion_svr` (comprobado en `sys.objects`) — **Legacy falla i
   `sp_n_InsertarCatUnidadTerritorial`, `sp_n_ActualizarCatUnidadTerritorial`,
   `sp_n_InsertarCentroServicio`, `sp_n_ActualizarCentroServicio`.
 
-Dos cosas más que se comprobaron y **no son del backend nuevo**:
+Las otras cuatro, porque les falta la **tabla** o la **columna** en esta base, y tampoco
+son del backend nuevo:
 
-* **documentos**: la tabla `[Catalogo Documentos]` no existe en esta base (la ola 1 ya lo
-  había anotado para su lectura), así que su alta y su baja no se pueden probar aquí;
+* **documentos** (alta, modificación y baja): la tabla `[Catalogo Documentos]` no existe
+  aquí. La ola 1 ya lo había anotado para su lectura;
 * **la modificación de un cambio de vigencia**: `sp_n_ActualizarCambioVigencia` referencia
   las columnas `IDRepartidor`, `Ticket`, `Vigencia` y `Garantia`, que no existen en la tabla
-  `CambiosVigencia` de esta base. El alta, la cancelación y el regresar sí funcionan.
+  `CambiosVigencia` de esta base. El alta, la cancelación y el regresar sí funcionan y están
+  probados.
 
 **Una parcial, por alcance declarado:** `POST /api/nomina/recibos/calcular` migra el
 **cálculo** —lo que escribe, que es lo peligroso— y devuelve los datos del recibo. El

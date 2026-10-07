@@ -130,8 +130,27 @@ namespace ISL_Service.Utils
 
             // "IDEmpleado" -> "idEmpleado": si arrancan dos mayusculas, se bajan
             // las dos, que es como lo escribe el resto de la API.
+            //
+            // CUIDADO CON SUMAR DOS char EN C#: 'i' + 'd' NO es "id", es 205.
+            // El operador + sobre dos char suma sus codigos y el resultado es un
+            // int, que luego se pega a la cadena como numero. Asi estaba escrito y
+            // asi se veia: sp_n_ConsultaDiasFestivos devuelve la columna
+            // IDDiaFestivo y el JSON salia con la llave "205DiaFestivo" (y
+            // "205Status" por IDStatus). Comprobado llamando
+            // GET api/catalogos/dias-festivos contra Produccion_svr.
+            //
+            // No se habia notado porque los SP de los primeros modulos que usan
+            // este helper (prestamos, asistencias, checador) ya devuelven sus
+            // columnas en camelCase, asi que esta rama no se tocaba nunca. En
+            // cuanto un SP devuelve IDAlgo, el front recibe una llave que no
+            // existe y el campo llega vacio sin ningun error.
+            //
+            // string.Concat concatena de verdad.
             if (nombre.Length > 1 && char.IsUpper(nombre[1]))
-                return char.ToLowerInvariant(nombre[0]) + char.ToLowerInvariant(nombre[1]) + nombre.Substring(2);
+                return string.Concat(
+                    char.ToLowerInvariant(nombre[0]).ToString(),
+                    char.ToLowerInvariant(nombre[1]).ToString(),
+                    nombre.Substring(2));
 
             return char.ToLowerInvariant(nombre[0]) + nombre.Substring(1);
         }

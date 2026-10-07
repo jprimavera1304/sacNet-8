@@ -625,7 +625,185 @@ public sealed class PermissionService : IPermissionService
         new("torneos.ver", "Torneos - Ver", "torneos"),
         new("torneos.crear", "Torneos - Crear", "torneos"),
         new("torneos.editar", "Torneos - Editar", "torneos"),
-        new("torneos.cancelar", "Torneos - Cancelar/Activar/Cerrar/Reactivar", "torneos")
+        new("torneos.cancelar", "Torneos - Cancelar/Activar/Cerrar/Reactivar", "torneos"),
+
+        /*
+          ESCRITURAS DE LOS CATALOGOS DE MAC31 (ola 6).
+
+          La familia `catalogos.*` es del WEB, no de Mac31: no esta entre las
+          cuatro que manda legacy (reportes, ventas, empleados, prestamos), asi
+          que lo que se da desde la pantalla de permisos SE RESPETA y no lo borra
+          el siguiente recalculo. Las lecturas (`catalogos.ver`,
+          `catalogos.marcas.ver`, `catalogos.galleros.ver`...) ya las sembro la
+          ola 1; aqui van las de escritura.
+
+          POR QUE NO UN SOLO `catalogos.editar` PARA TODO
+          ----------------------------------------------
+          Porque no todos los catalogos pesan lo mismo:
+           - galleros trae SALDO: es dinero;
+           - empresas trae RFC, regimen fiscal, CLABE y el folio con el que se
+             factura: es la identidad fiscal de la empresa;
+           - marcas y categorias deciden las columnas del concentrado: cambiar
+             una marca de columna cambia los reportes de toda la empresa;
+           - territorial le mueve el domicilio a clientes y proveedores que ya
+             estaban capturados;
+           - autos trae poliza y monto asegurado.
+          Quien captura un tipo de gasto no tiene por que poder cambiar el RFC
+          con el que se factura.
+
+          Territorial no tiene `.baja` a proposito: ciudades, municipios y
+          colonias no tienen IDStatus en la base, asi que no hay baja que dar.
+        */
+        new("catalogos.crear", "Catálogos - Dar de alta", "catalogos"),
+        new("catalogos.editar", "Catálogos - Modificar", "catalogos"),
+        new("catalogos.baja", "Catálogos - Dar de baja / reactivar", "catalogos"),
+
+        new("catalogos.marcas.crear", "Catálogos - Alta de marcas y categorías", "catalogos"),
+        new("catalogos.marcas.editar", "Catálogos - Modificar marcas y categorías", "catalogos"),
+        new("catalogos.marcas.baja", "Catálogos - Baja de marcas y categorías", "catalogos"),
+
+        new("catalogos.galleros.crear", "Catálogos - Alta de galleros", "catalogos"),
+        new("catalogos.galleros.editar", "Catálogos - Modificar galleros", "catalogos"),
+        new("catalogos.galleros.baja", "Catálogos - Baja de galleros", "catalogos"),
+
+        new("catalogos.empresas.crear", "Catálogos - Alta de empresas y series", "catalogos"),
+        new("catalogos.empresas.editar", "Catálogos - Modificar empresas y series", "catalogos"),
+        new("catalogos.empresas.baja", "Catálogos - Baja de empresas y series", "catalogos"),
+
+        new("catalogos.territorial.crear", "Catálogos - Alta territorial", "catalogos"),
+        new("catalogos.territorial.editar", "Catálogos - Modificar territorial", "catalogos"),
+
+        new("catalogos.autos.crear", "Catálogos - Alta de autos", "catalogos"),
+        new("catalogos.autos.editar", "Catálogos - Modificar autos", "catalogos"),
+        new("catalogos.autos.baja", "Catálogos - Baja de autos", "catalogos"),
+
+        /*
+          LAS FICHAS MAESTRAS: CLIENTE Y PRODUCTO (ola 6).
+
+          Proveedores NO aparece aqui porque sus cuatro claves ya existian arriba
+          (proveedores.ver/crear/editar/estado.editar) y son las mismas: no hacia
+          falta inventar otras.
+
+          Clientes tiene tres claves de mas, y cada una tiene su razon:
+           - `clientes.bonificaciones.editar` es DINERO: es lo que se le abona al
+             cliente por cada casco que entrega.
+           - `clientes.facturacion.editar` es el RFC y el regimen con el que se le
+             factura. Quien captura un telefono no tiene por que poder cambiarlo.
+           - `clientes.centros.editar` decide en que centros se le surte.
+          Las claves de LECTURA (clientes.ver, clientes.facturacion.ver,
+          clientes.log.ver, productos.ver) las sembro la ola 3.
+        */
+        new("clientes.crear", "Clientes - Dar de alta", "clientes"),
+        new("clientes.editar", "Clientes - Modificar", "clientes"),
+        new("clientes.estado.editar", "Clientes - Dar de baja / reactivar", "clientes"),
+        new("clientes.bonificaciones.editar", "Clientes - Editar bonificaciones de usados", "clientes"),
+        new("clientes.facturacion.editar", "Clientes - Editar datos de facturación", "clientes"),
+        new("clientes.centros.editar", "Clientes - Editar centros de servicio permitidos", "clientes"),
+
+        new("productos.crear", "Productos - Dar de alta", "productos"),
+        new("productos.editar", "Productos - Modificar", "productos"),
+        new("productos.estado.editar", "Productos - Dar de baja / reactivar", "productos"),
+
+        /*
+          OPERACION DIARIA (ola 6): compras, inventario en transito, cortes de
+          caja, transferencias bancarias y cambios de vigencia.
+
+          Las de transferencias estan separadas en cuatro porque son cuatro pasos
+          con consecuencias muy distintas: CARGAR el estado de cuenta no mueve
+          dinero, IDENTIFICAR solo dice de quien es un deposito, y APLICAR y
+          CANCELAR si mueven dinero — tocan Ventas, [Ventas Pagos],
+          [Ventas Pagos Usados] y el saldo del cliente. Quien sube el archivo del
+          banco no tiene por que poder aplicar pagos.
+
+          `inventario.transito.procesar` va aparte de compras porque mueve
+          existencias y se usa desde otra pantalla.
+        */
+        new("compras.ver_modulo", "Compras - Ver módulo", "compras"),
+        new("compras.ver", "Compras - Consultar", "compras"),
+        new("compras.editar", "Compras - Marcar como factura", "compras"),
+        new("compras.cancelar", "Compras - Cancelar", "compras"),
+
+        new("inventario.transito.procesar", "Inventario - Procesar tránsito", "inventario"),
+
+        new("cortes.ver_modulo", "Cortes - Ver módulo", "cortes"),
+        new("cortes.ver", "Cortes - Consultar", "cortes"),
+        new("cortes.crear", "Cortes - Guardar corte de caja", "cortes"),
+        new("cortes.cancelar", "Cortes - Cancelar", "cortes"),
+        new("cortes.cs.ver", "Cortes - Consultar centros de servicio", "cortes"),
+        new("cortes.cs.crear", "Cortes - Guardar retiro de centro de servicio", "cortes"),
+
+        new("transferencias.ver_modulo", "Transferencias - Ver módulo", "transferencias"),
+        new("transferencias.ver", "Transferencias - Consultar", "transferencias"),
+        new("transferencias.cargar", "Transferencias - Cargar estado de cuenta", "transferencias"),
+        new("transferencias.identificar", "Transferencias - Identificar cliente", "transferencias"),
+        new("transferencias.aplicar", "Transferencias - Aplicar pagos", "transferencias"),
+        new("transferencias.cancelar", "Transferencias - Cancelar movimiento", "transferencias"),
+
+        new("cambiosvigencia.ver_modulo", "Cambios de vigencia - Ver módulo", "cambiosvigencia"),
+        new("cambiosvigencia.ver", "Cambios de vigencia - Consultar", "cambiosvigencia"),
+        new("cambiosvigencia.crear", "Cambios de vigencia - Registrar", "cambiosvigencia"),
+        new("cambiosvigencia.editar", "Cambios de vigencia - Modificar / regresar", "cambiosvigencia"),
+        new("cambiosvigencia.cancelar", "Cambios de vigencia - Cancelar", "cambiosvigencia"),
+
+        /*
+          CONFIGURACION, HUELLAS Y NOMINA (ola 6).
+
+          POR QUE LA NOMINA NO USA `empleados.*` NI `prestamos.*`
+          -----------------------------------------------------
+          Porque esas dos familias las gobierna Mac31: el puente de permisos las
+          recalcula desde los botones de sus formas y BORRA lo que haya guardado el
+          web. Un `prestamos.descontar` dado desde la pantalla de permisos
+          desapareceria en el siguiente calculo, sin error y sin rastro, y el boton
+          quedaria apagado sin que nadie supiera por que. La familia `nomina.*` es
+          del web y si se respeta.
+
+          Los tres de nomina van separados porque son tres autoridades distintas:
+          calcular los recibos de un periodo, crear los periodos, y DESCONTAR los
+          prestamos de la nomina — este ultimo mueve dinero de la gente.
+
+          El usuario de Mac31 reusa las claves `usuarios.*` que ya existian: es el
+          mismo concepto visto desde la otra aplicacion, no uno nuevo.
+        */
+        new("constantes.editar", "Constantes - Editar parámetros de operación", "constantes"),
+        new("constantes.fechapagos.editar", "Constantes - Mover la fecha de operación de pagos", "constantes"),
+
+        new("huellas.editar", "Huellas - Registrar y cancelar", "huellas"),
+        new("seguridad.bitacora.registrar", "Seguridad - Registrar intentos de contraseña", "seguridad"),
+
+        new("reportes.parametros.ver", "Reportes - Leer parámetros guardados", "reportes"),
+        new("reportes.parametros.editar", "Reportes - Guardar parámetros", "reportes"),
+
+        new("nomina.ver_modulo", "Nómina - Ver módulo", "nomina"),
+        new("nomina.recibos.calcular", "Nómina - Calcular recibos del periodo", "nomina"),
+        new("nomina.periodos.generar", "Nómina - Generar periodos", "nomina"),
+        new("nomina.prestamos.descontar", "Nómina - Descontar préstamos de la nómina", "nomina"),
+
+        /*
+          LOS CUATRO SUELTOS (ola 6): recordatorios, servicios, proyectos de obra
+          por consulta ciudadana y la cola de sincronizacion de cajas.
+
+          Van con permiso propio por modulo y no colgados de otro, porque son
+          pantallas de empresas distintas: proyectos y sincronizacion solo existen
+          en algunas instalaciones (sus procedimientos no estan en Produccion_svr),
+          y colgarlos de un permiso compartido le daria a todas las empresas
+          casillas de modulos que no tienen.
+        */
+        new("recordatorios.ver_modulo", "Recordatorios - Ver módulo", "recordatorios"),
+        new("recordatorios.ver", "Recordatorios - Consultar", "recordatorios"),
+        new("recordatorios.crear", "Recordatorios - Crear", "recordatorios"),
+        new("recordatorios.editar", "Recordatorios - Modificar", "recordatorios"),
+
+        new("servicios.ver_modulo", "Servicios - Ver módulo", "servicios"),
+        new("servicios.ver", "Servicios - Consultar", "servicios"),
+        new("servicios.crear", "Servicios - Registrar", "servicios"),
+        new("servicios.cancelar", "Servicios - Cancelar", "servicios"),
+
+        new("proyectos.ver_modulo", "Proyectos - Ver módulo", "proyectos"),
+        new("proyectos.ver", "Proyectos - Consultar", "proyectos"),
+        new("proyectos.crear", "Proyectos - Crear", "proyectos"),
+        new("proyectos.editar", "Proyectos - Modificar", "proyectos"),
+
+        new("sincronizacion.ver", "Sincronización - Consultar la cola", "sincronizacion")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)
