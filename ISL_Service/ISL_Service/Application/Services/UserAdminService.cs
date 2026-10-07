@@ -61,7 +61,29 @@ public class UserAdminService : IUserAdminService
             estado: ESTADO_ACTIVO,
             ct);
 
-        // Usuario nuevo debe iniciar con permisos efectivos del rol (sin overrides heredados/previos).
+        /*
+          Usuario nuevo debe iniciar con permisos efectivos del rol (sin
+          overrides heredados/previos).
+
+          ANTES ESTE catch NO TENIA FILTRO NI REGISTRO.
+          ---------------------------------------------
+          El bloque existe por UNA razon concreta: en una base donde el esquema
+          de capacidades todavia no esta instalado, limpiar overrides no se
+          puede y no debe impedir dar de alta a nadie. Eso es correcto.
+
+          Pero el catch se comia TODO. Si la limpieza fallaba por cualquier otro
+          motivo —un error de la base, un interbloqueo, un permiso de SQL— el
+          usuario quedaba creado CON LOS OVERRIDES QUE HUBIERA, y la API
+          contestaba 200 como si nada. O sea: alguien recien dado de alta podia
+          nacer con permisos que nadie le dio, sin una sola linea en el registro.
+
+          Ahora:
+            - Si el esquema no esta (KeyNotFoundException, que es lo que lanza
+              PermissionService cuando faltan las tablas de capacidades), se
+              sigue adelante, pero QUEDA ESCRITO.
+            - Cualquier otro fallo se registra y SE RELANZA. Crear a medias un
+              usuario con permisos residuales es peor que fallar: fallar se ve.
+        */
         try
         {
             await _permissionService.UpsertUserOverridesAsync(
@@ -71,9 +93,18 @@ public class UserAdminService : IUserAdminService
                 Array.Empty<string>(),
                 ct);
         }
-        catch
+        catch (KeyNotFoundException ex)
         {
-            // Si el esquema de capacidades aún no existe, no bloquea la creación de usuario.
+            _logger.LogWarning(ex,
+                "El esquema de capacidades no está disponible en esta base: el usuario {Usuario} (id={UserId}, empresa={EmpresaId}) se creó sin limpiar overrides. No hay overrides que limpiar mientras el esquema no exista.",
+                usuarioNombre, entity.Id, entity.EmpresaId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Falló la limpieza de overrides del usuario nuevo {Usuario} (id={UserId}, empresa={EmpresaId}). Se corta aquí: dejarlo pasar lo dejaría con permisos residuales y contestando 200.",
+                usuarioNombre, entity.Id, entity.EmpresaId);
+            throw;
         }
 
         return new CreateUserResponse
