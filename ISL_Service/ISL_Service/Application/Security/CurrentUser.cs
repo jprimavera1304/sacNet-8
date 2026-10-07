@@ -19,10 +19,12 @@ public static class CurrentUser
     public static int GetEmpresaId(ClaimsPrincipal user)
     {
         var val = user.FindFirstValue("empresaId") ?? user.FindFirstValue("companyId");
-        if (string.IsNullOrWhiteSpace(val))
-            return 0;
-
-        return int.Parse(val);
+        // TryParse y no Parse: un claim no numerico (token de otra emision, o
+        // manipulado) tiraba la peticion entera con una FormatException que
+        // caia al catch generico del middleware como "Error interno.". Un
+        // empresaId que no es un numero es "no se sabe de que empresa", o sea 0,
+        // que es exactamente lo que ya se devuelve cuando el claim no viene.
+        return int.TryParse(val, out var empresaId) ? empresaId : 0;
     }
 
     /*
