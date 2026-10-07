@@ -1,7 +1,25 @@
 {
   "nombre": "ola4-usados-excedentes-consultar",
   "_porque": [
-    "sp_n_ConsultarVentasUsadosExcendentes, 7 parametros."
+    "ESTE CASO COMPARA LISTA VACIA CONTRA LISTA VACIA: el OK no prueba nada.",
+    "OJO, AQUI LA TABLA NO ESTA VACIA Y DE TODAS FORMAS NO DEVUELVE NADA.",
+    "dbo.VentasUsadosExcendentesResumen tiene 254 renglones en Produccion_svr",
+    "(8.347 en MacZ). Lo que los hace inalcanzables es un JOIN:",
+    "sp_n_ConsultarVentasUsadosExcendentes hace",
+    "`INNER JOIN Cobros Cob ON Cob.IDCobro = Exc.IDCobro`, y dbo.Cobros = 0 en",
+    "Tauro. Un INNER JOIN contra una tabla vacia tira TODOS los renglones.",
+    "Por eso probar otros IDVentaUsadoExcendente no sirve de nada: el maximo",
+    "que hay es justo el 4250 que el caso ya pide. Es la misma trampa que",
+    "sp_n_ConsultarVentasPagosKilos (ver ola2-pagos-kilos).",
+    "LECCION PARA EL RESTO DEL BANCO: 'la tabla tiene datos' no quiere decir",
+    "'el procedimiento devuelve renglones'. Hay que mirar los INNER JOIN.",
+    "DONDE SI HAY DATOS: MacZ. Este caso queda APUNTADO A ESA BASE: para que",
+    "valga de verdad hay que correrlo con los dos backends apuntando a MacZ.",
+    "Aqui no se puede: Legacy saca su base del Web.config de Legacy/, que no se",
+    "toca, y el usuario de pruebas del backend nuevo no existe en esa base.",
+    "",
+    "Lo que ya decia el caso:",
+    "  sp_n_ConsultarVentasUsadosExcendentes, 7 parametros."
   ],
   "legacy": {
     "method": "POST",
@@ -22,5 +40,6 @@
   "ordenar_por": "IDTipoUsado",
   "solo_campos": [],
   "ignorar": [],
-  "diferencias_intencionales": []
+  "diferencias_intencionales": [],
+  "_base_con_datos": "MacZ"
 }

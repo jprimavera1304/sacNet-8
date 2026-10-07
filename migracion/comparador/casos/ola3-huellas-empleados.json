@@ -1,0 +1,58 @@
+{
+  "nombre": "Huellas registradas de empleados",
+  "_porque": [
+    "LA RAMA QUE NUNCA SE HABIA PROBADO. El caso `ola3-huellas-usuarios` solo",
+    "pedia `origen=usuario`, y `UsuariosHuellas` esta vacia en esta base: comparaba",
+    "lista vacia contra lista vacia. La rama de empleados si tiene datos",
+    "(`EmpleadosHuellas`, 409 renglones; el procedimiento devuelve 62 tras filtrar",
+    "por empleado activo) y jamas se habia comparado.",
+    "A Legacy se le manda el valor magico @IDEmpleado = -1 ('todas') y los otros",
+    "dos en 0. En el nuevo eso se pide con origen=empleado&todas=true: el -1 no",
+    "viaja por HTTP, porque si viajara un `id=-1` por error de un front se",
+    "volveria 'dame todas las huellas de la nomina' sin que nadie lo pidiera.",
+    "Se comparan las huellas completas: ~16 MB de base64 por lado."
+  ],
+  "legacy": {
+    "method": "POST",
+    "path": "/api/huellas/consultar",
+    "body": {
+      "IDUsuario": 0,
+      "IDEmpleado": -1,
+      "IDCliente": 0
+    }
+  },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/huellas",
+    "query": {
+      "origen": "empleado",
+      "todas": "true"
+    }
+  },
+  "camino_nuevo": "data",
+  "ordenar_por": "idHuella",
+  "mapa_campos": {
+    "IDEmpleadoHuella": "idHuella",
+    "IDEmpleado": "idPersona"
+  },
+  "solo_campos": [
+    "idHuella",
+    "idPersona",
+    "nombre",
+    "idMano",
+    "mano",
+    "idDedo",
+    "dedo",
+    "huella"
+  ],
+  "ignorar": [
+    "result",
+    "mensaje"
+  ],
+  "diferencias_intencionales": [
+    "`mapa_campos` y `solo_campos` son IMPRESCINDIBLES aqui y por eso se escriben: el DTO de Legacy declara los SEIS identificadores de los tres origenes a la vez (IDUsuarioHuella, IDUsuario, IDEmpleadoHuella, IDEmpleado, IDClienteHuella, IDCliente) y en la rama de empleados los cuatro de usuario y cliente salen en 0. El nuevo publica dos: `idHuella` y `idPersona`. Se comparan los ocho campos que los dos lados prometen, incluida la huella completa.",
+    "El nuevo pide UN origen por llamada y devuelve ese. El procedimiento emite un result set POR CADA filtro que se cumple y Legacy leia solo `Tables[0]`: con dos origenes a la vez, las huellas del segundo se perdian sin aviso. Y con los tres en 0 no emite NINGUN result set, y Legacy contestaba 500.",
+    "El nuevo agrega `origen` ('usuario'/'empleado'/'cliente') y publica el id de la huella y el de la persona con nombres unicos (`idHuella`, `idPersona`). El DTO de Legacy declaraba los seis a la vez y en cada bloque cuatro salian en 0.",
+    "`huella` sale en base64 en los dos lados (byte[] serializado), asi que el lector de huellas del cliente no cambia."
+  ]
+}

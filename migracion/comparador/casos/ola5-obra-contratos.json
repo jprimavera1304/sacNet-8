@@ -1,26 +1,36 @@
 {
   "nombre": "Obra - contratos (consulta)",
   "_porque": [
-    "sp_n_Consultar_MCContratos esta en Produccion_svr con los 14 parametros que",
-    "manda Legacy: comparable.",
+    "ESTE CASO COMPARA LISTA VACIA CONTRA LISTA VACIA: el OK no prueba nada.",
+    "Contado hoy: dbo.MC_Contratos = 0 renglones en LAS DOS bases, y con el todo",
+    "el modulo de obra: MC_ContratosConceptos 0, MC_ContratosEstimaciones 0,",
+    "MC_ContratosGrupos 0, MC_Proveedores 0, MC_Residentes 0. Solo tienen",
+    "renglones los catalogos chicos (MC_Puestos 2, MC_TiposObra 3...), que si",
+    "estan comparados con datos reales en sus propios casos.",
+    "No verificable aqui.",
     "",
-    "La tabla MC_Contratos esta VACIA en Tauro (Tauro no es una instalacion de",
-    "obra publica), asi que los dos lados coinciden en el vacio. Eso prueba el",
-    "contrato de la llamada —que el SP se invoca con los parametros que espera y",
-    "no revienta— pero no el mapeo de columnas. Cuando haya datos hay que volver",
-    "a correrlo y mirar los campos.",
-    "",
-    "Este caso NO existia en la ola 3: alla se cayo porque su registro decia",
-    "escribe = si, y lo decia porque Legacy llamaba a sp_n_ConsultaConstantes",
-    "para leer formatoFechaDB. El nuevo no lo necesita (las fechas llegan",
-    "tipadas), asi que la consulta volvio a ser una consulta."
+    "Lo que ya decia el caso:",
+    "  sp_n_Consultar_MCContratos esta en Produccion_svr con los 14 parametros que",
+    "  manda Legacy: comparable.",
+    "  La tabla MC_Contratos esta VACIA en Tauro (Tauro no es una instalacion de",
+    "  obra publica), asi que los dos lados coinciden en el vacio. Eso prueba el",
+    "  contrato de la llamada —que el SP se invoca con los parametros que espera y",
+    "  no revienta— pero no el mapeo de columnas. Cuando haya datos hay que volver",
+    "  a correrlo y mirar los campos.",
+    "  Este caso NO existia en la ola 3: alla se cayo porque su registro decia",
+    "  escribe = si, y lo decia porque Legacy llamaba a sp_n_ConsultaConstantes",
+    "  para leer formatoFechaDB. El nuevo no lo necesita (las fechas llegan",
+    "  tipadas), asi que la consulta volvio a ser una consulta."
   ],
   "legacy": {
     "method": "POST",
     "path": "/api/mccontratos/consultar",
     "body": {}
   },
-  "nuevo": { "method": "GET", "path": "/api/obra/contratos" },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/obra/contratos"
+  },
   "camino_legacy": "result.contratos",
   "camino_nuevo": "data",
   "ordenar_por": "idContrato",
@@ -29,5 +39,6 @@
     "Fuera las columnas *Ftm: cada fecha y cada importe venian dos veces, el valor y su texto formateado por la base.",
     "Fuera @Formato: es el interruptor 0/1 (pantalla/Excel) del MISMO SP, que con 1 devuelve otras columnas con encabezados en espanol y con espacios.",
     "El nuevo NO llama a sp_n_ConsultaConstantes. Esa es la diferencia que convierte esta capacidad de escritura en lectura."
-  ]
+  ],
+  "_no_verificable_aqui": true
 }

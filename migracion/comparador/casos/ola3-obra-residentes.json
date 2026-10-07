@@ -1,15 +1,10 @@
 {
   "nombre": "Obra - residentes",
   "_porque": [
-    "MC_Residentes esta vacia en esta base: los dos lados devuelven cero",
-    "renglones y coinciden en el vacio. No se compara `tablaLst.0.Table`",
-    "porque con la lista vacia ese camino no existe: se apunta a `result.tablaLst`,",
-    "que es [] y compara bien contra el [] del nuevo. No se puede dejar sin",
-    "camino porque dentro de `result` hay SEIS llaves (tablaLst, modelLst,",
-    "IDResult, result, mensaje, mensajeFacturama) y el desenvoltorio por defecto",
-    "solo colapsa cuando hay una.",
-    "Cuando haya residentes capturados hay que cambiarlo a",
-    "\"result.tablaLst.0.Table\"."
+    "ESTE CASO COMPARABA LISTA VACIA CONTRA LISTA VACIA: el OK no probaba nada.",
+    "Contado hoy: MC_Residentes = 0 renglones en Produccion_svr (Tauro) y 0 en MacZ",
+    "(Zaragoza).",
+    "Ver la nota de obra en ola3-obra-contrato-conceptos."
   ],
   "legacy": {
     "method": "POST",
@@ -31,5 +26,6 @@
   ],
   "diferencias_intencionales": [
     "Fuera `@Formato`: el interruptor 0/1 de Mac31 hace que el MISMO procedimiento devuelva otras columnas, con los encabezados en espanol. El Excel lo arma el front con los mismos datos."
-  ]
+  ],
+  "_no_verificable_aqui": true
 }

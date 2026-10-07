@@ -1,30 +1,43 @@
 {
   "nombre": "Ficha de cliente - bitacora de cambios",
   "_porque": [
-    "Cliente 1, que en esta base no tiene movimientos: los dos lados dan vacio.",
+    "Cliente 20323: el que mas movimientos tiene en [Clientes Log] (8 de los 358",
+    "renglones de la tabla).",
+    "ANTES este caso pedia el cliente 1, que no tiene ninguno, asi que comparaba",
+    "LISTA VACIA CONTRA LISTA VACIA y el OK no probaba nada: un endpoint que",
+    "devolviera siempre [] pasaba igual. Lo encontro la auditoria de cobertura.",
     "No hay filtro por fecha en ninguno de los dos, y es a proposito: el WHERE de",
     "fechas del procedimiento esta COMENTADO en la base y sus dos parametros",
-    "tienen defaults de prueba de diciembre de 2024. Legacy tampoco los mandaba.",
-    "Ofrecer un rango que la base ignora es peor que no ofrecerlo."
+    "tienen defaults de prueba de diciembre de 2024. Legacy tampoco los mandaba."
   ],
   "legacy": {
     "method": "POST",
     "path": "/api/clientes/consultar/log",
     "body": {
-      "IDCliente": 1
+      "IDCliente": 20323
     }
   },
   "nuevo": {
     "method": "GET",
-    "path": "/api/clientes/1/log"
+    "path": "/api/clientes/20323/log"
   },
   "camino_nuevo": "data",
   "ordenar_por": "IDClientesLog",
+  "solo_campos": [
+    "IDClientesLog",
+    "IDAccion",
+    "Accion",
+    "IDUsuarioModificacion",
+    "FechaModificacion",
+    "UsuarioModificacion",
+    "EquipoModificacion"
+  ],
   "ignorar": [
     "result",
     "mensaje"
   ],
   "diferencias_intencionales": [
+    "`solo_campos` hace falta aqui y por eso se escribe: Legacy reusa el ClienteDTO de ochenta propiedades para la bitacora y manda setenta y dos vacias (0 / null) que el procedimiento no devuelve. Se comparan los SIETE campos que el procedimiento si manda y que el DTO nuevo promete. Esto no se veia antes porque el caso pedia un cliente sin movimientos y las dos listas venian vacias.",
     "Fuera los campos `*Ftm`: la base devolvia cada numero y cada fecha dos veces, el valor y su texto ya formateado. El front formatea con la configuracion del que mira la pantalla.",
     "Legacy devolvia el `ClienteDTO` COMPLETO (unas ochenta propiedades) con solo ocho llenas, porque reusaba el DTO del cliente para la bitacora. El nuevo tiene su propio DTO con los ocho campos que el procedimiento manda."
   ]

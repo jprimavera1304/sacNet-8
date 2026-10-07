@@ -1,7 +1,17 @@
 {
   "nombre": "ola4-usados-cheques-consultar",
   "_porque": [
-    "sp_n_ConsultarCobrosDineroUsadosCheques, 5 parametros."
+    "ESTE CASO COMPARA LISTA VACIA CONTRA LISTA VACIA: el OK no prueba nada.",
+    "Contado hoy: dbo.CobrosDineroUsadoCheques = 0 renglones en Produccion_svr",
+    "(Tauro) y 341 en MacZ (Zaragoza). Y su tabla madre CobrosDineroUsado = 0",
+    "aqui contra 13.664 alla.",
+    "DONDE SI HAY DATOS: MacZ. Este caso queda APUNTADO A ESA BASE: para que",
+    "valga de verdad hay que correrlo con los dos backends apuntando a MacZ.",
+    "Aqui no se puede: Legacy saca su base del Web.config de Legacy/, que no se",
+    "toca, y el usuario de pruebas del backend nuevo no existe en esa base.",
+    "",
+    "Lo que ya decia el caso:",
+    "  sp_n_ConsultarCobrosDineroUsadosCheques, 5 parametros."
   ],
   "legacy": {
     "method": "POST",
@@ -22,5 +32,6 @@
   "ordenar_por": null,
   "solo_campos": [],
   "ignorar": [],
-  "diferencias_intencionales": []
+  "diferencias_intencionales": [],
+  "_base_con_datos": "MacZ"
 }

@@ -1,10 +1,16 @@
 {
   "nombre": "Asistencia del dia",
   "_porque": [
-    "Nadie ha checado hoy en esta base: los dos lados dan vacio.",
-    "SIEMPRE ES HOY en los dos lados y no acepta fecha. El procedimiento declara",
-    "un @Fecha que no usa en ninguna linea (y que ademas es varchar(1), un solo",
-    "caracter): su filtro esta clavado a `FechaDia = CAST(GETDATE() as date)`.",
+    "ESTE CASO COMPARABA LISTA VACIA CONTRA LISTA VACIA: el OK no probaba nada.",
+    "NO VERIFICABLE, y la razon es la fecha: el procedimiento declara un",
+    "@Fecha que no usa en ninguna linea (y que ademas es varchar(1), un solo",
+    "caracter); su filtro esta clavado a `FechaDia = CAST(GETDATE() as date)`.",
+    "Nadie ha checado hoy en esta base. Se probo con las fechas reales que si",
+    "existen (2026-02-28, 2026-02-27, en los dos formatos) y el propio",
+    "procedimiento devuelve 0 renglones.",
+    "Para cerrarlo hace falta una base con asistencias atadas a un",
+    "PeriodosTipoSueldoDias de una fecha consultable; la local llega a marzo",
+    "de 2026.",
     "A Legacy se le manda el body vacio, que es MostrarAsistenciasNombres = 0."
   ],
   "legacy": {
@@ -25,5 +31,6 @@
   "diferencias_intencionales": [
     "EL INTERRUPTOR DE LOS NOMBRES YA NO VIENE DEL BODY. En Tauro el procedimiento tapa el nombre con dieciocho asteriscos cuando se le pide en 0 y lo ensena cuando se le pide en 1. Legacy dejaba ese 1 en el cuerpo de la peticion: cualquiera que supiera mandarlo destapaba la lista completa de quien llego y a que hora. En el nuevo lo decide el permiso `empleados.sueldo.ver`, y la respuesta trae `puedeVerNombres` para que la pantalla lo diga.",
     "Legacy devolvia el `EmpleadoPeriodoAsistenciaDTO` completo (unas sesenta propiedades: diaEntrada1..7, asistencias...) con solo cuatro llenas. El nuevo tiene su propio DTO de cuatro campos."
-  ]
+  ],
+  "_no_verificable_aqui": true
 }

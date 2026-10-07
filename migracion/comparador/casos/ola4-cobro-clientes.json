@@ -1,8 +1,20 @@
 {
   "nombre": "ola4-cobro-clientes",
   "_porque": [
-    "sp_n_ConsultarCobroClientes con un solo parametro. Cobros esta vacia en",
-    "Tauro, asi que los dos lados coinciden en el vacio."
+    "ESTE CASO COMPARA LISTA VACIA CONTRA LISTA VACIA: el OK no prueba nada.",
+    "Contado hoy: dbo.Cobros = 0 renglones en Produccion_svr (Tauro) y 21.485 en",
+    "MacZ (Zaragoza). Tauro no usa la pantalla de cobros, asi que ningun",
+    "IDCobro existe aqui y cualquier valor devuelve vacio.",
+    "Las tablas hijas van en la misma direccion: CobrosDineroUsadoClientes = 0",
+    "aqui y 5.025 en MacZ.",
+    "DONDE SI HAY DATOS: MacZ. Este caso queda APUNTADO A ESA BASE: para que",
+    "valga de verdad hay que correrlo con los dos backends apuntando a MacZ.",
+    "Aqui no se puede: Legacy saca su base del Web.config de Legacy/, que no se",
+    "toca, y el usuario de pruebas del backend nuevo no existe en esa base.",
+    "",
+    "Lo que ya decia el caso:",
+    "  sp_n_ConsultarCobroClientes con un solo parametro. Cobros esta vacia en",
+    "  Tauro, asi que los dos lados coinciden en el vacio."
   ],
   "legacy": {
     "method": "POST",
@@ -21,5 +33,6 @@
   "ordenar_por": null,
   "solo_campos": [],
   "ignorar": [],
-  "diferencias_intencionales": []
+  "diferencias_intencionales": [],
+  "_base_con_datos": "MacZ"
 }

@@ -1,9 +1,10 @@
 {
   "nombre": "Ficha de proveedor - documentos",
   "_porque": [
-    "Las tres tablas de anexos de proveedor estan vacias en esta base: los dos",
-    "lados devuelven cero renglones y coinciden en el vacio. Legacy aqui si",
-    "envuelve tipado, asi que el desenvoltorio por defecto alcanza."
+    "ESTE CASO COMPARABA LISTA VACIA CONTRA LISTA VACIA: el OK no probaba nada.",
+    "Contado hoy: ProveedoresDocumentos = 0 renglones en Produccion_svr (Tauro) y 0 en MacZ",
+    "(Zaragoza).",
+    "Ver la nota en ola3-proveedor-apoderados."
   ],
   "legacy": {
     "method": "POST",
@@ -28,5 +29,6 @@
     "El filtro de texto busca por PREFIJO (LIKE 'texto%') en los dos lados: asi lo hace el procedimiento, al contrario que la mayoria de los catalogos.",
     "El nuevo quita el apostrofo del filtro de texto. No es cosmetico: el procedimiento concatena el filtro y lo corre con EXEC(@Sql), asi que el SqlParameter no protege adentro, y Legacy no lo saneaba en la rama de consulta.",
     "Fuera `ArchivoFtm` ('SI'/'NO'): su CASE solo compara contra cadena vacia, asi que con el archivo en NULL contesta 'SI' y la pantalla ofrece descargar algo que no existe. El front mira `archivo`, que es la verdad."
-  ]
+  ],
+  "_no_verificable_aqui": true
 }

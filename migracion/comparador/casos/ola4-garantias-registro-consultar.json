@@ -1,8 +1,16 @@
 {
   "nombre": "ola4-garantias-registro-consultar",
   "_porque": [
-    "sp_n_ConsultarGarantiasRegistro, 9 parametros. GarantiasRegistro esta vacia",
-    "en Tauro: coinciden en el vacio."
+    "ESTE CASO COMPARA LISTA VACIA CONTRA LISTA VACIA: el OK no prueba nada.",
+    "Contado hoy: dbo.GarantiasRegistro = 0 renglones en LAS DOS bases",
+    "(Produccion_svr y MacZ). No verificable aqui.",
+    "No confundir con dbo.Garantias, que SI tiene 2.037 aqui y 24.854 en MacZ:",
+    "esa es la que comparan ola4-garantias-consultar y",
+    "ola4-garantias-aceptar-consultar.",
+    "",
+    "Lo que ya decia el caso:",
+    "  sp_n_ConsultarGarantiasRegistro, 9 parametros. GarantiasRegistro esta vacia",
+    "  en Tauro: coinciden en el vacio."
   ],
   "legacy": {
     "method": "POST",
@@ -23,5 +31,6 @@
   "ordenar_por": null,
   "solo_campos": [],
   "ignorar": [],
-  "diferencias_intencionales": []
+  "diferencias_intencionales": [],
+  "_no_verificable_aqui": true
 }
