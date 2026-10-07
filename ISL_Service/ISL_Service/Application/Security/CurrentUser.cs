@@ -25,7 +25,23 @@ public static class CurrentUser
         return int.Parse(val);
     }
 
+    /*
+      SER SUPERADMIN ES UN ROL, NO UN NUMERO DE EMPRESA.
+
+      Aqui decia ademas `|| GetEmpresaId(user) == 5`: cualquiera cuya empresa
+      fuera la 5 pasaba por SuperAdmin, sin importar su rol. Y no es un detalle
+      cosmetico, porque de esto cuelgan la administracion de usuarios, la de
+      empresas y el atajo que salta la comprobacion de permisos en
+      PermisoControllerBase.
+
+      Hoy esta inerte -ninguna de las dos bases tiene una empresa con Id 5- y
+      por eso nadie lo habia notado. Pero es una mina: el dia que una empresa
+      reciba ese id, todos sus usuarios se vuelven administradores del sistema
+      sin que nadie lo decida ni lo vea en ninguna pantalla.
+
+      Viene del commit del login, sin comentario que lo explique. No se le
+      encontro ningun uso legitimo: lo encontro la auditoria de cierre.
+    */
     public static bool IsSuperAdmin(ClaimsPrincipal user)
-        => string.Equals(GetRol(user), "SuperAdmin", StringComparison.OrdinalIgnoreCase)
-           || GetEmpresaId(user) == 5;
+        => string.Equals(GetRol(user), "SuperAdmin", StringComparison.OrdinalIgnoreCase);
 }
