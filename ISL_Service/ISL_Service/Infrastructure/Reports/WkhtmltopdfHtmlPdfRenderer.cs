@@ -176,6 +176,27 @@ public static class WkhtmltopdfHtmlPdfRenderer
             }
 
             startInfo.ArgumentList.Add("--enable-local-file-access");
+
+            /*
+              UNA IMAGEN QUE FALTA NO PUEDE COSTAR EL DOCUMENTO ENTERO.
+
+              Por omision wkhtmltopdf sale con codigo 1 y "ContentNotFoundError"
+              cuando no puede cargar UN recurso, y entonces no hay PDF: ni con
+              logo ni sin logo. Y hay plantillas de la base que apuntan a
+              archivos que solo existen en la maquina de legacy (el 1250 pide
+              GobiernoCDMX.png de C:\Mac21\imagenes) o al respaldo http de
+              itsysware, cuyo certificado esta caducado.
+
+              Con esto el reporte sale sin esa imagen, que es lo que hacia
+              MacReportes con NReco y lo que el usuario espera: vale mas el papel
+              sin logo que un 500. Los errores de carga siguen apareciendo en
+              stderr para quien los busque.
+            */
+            startInfo.ArgumentList.Add("--load-error-handling");
+            startInfo.ArgumentList.Add("ignore");
+            startInfo.ArgumentList.Add("--load-media-error-handling");
+            startInfo.ArgumentList.Add("ignore");
+
             startInfo.ArgumentList.Add("--orientation");
             startInfo.ArgumentList.Add(NormalizeOrientation(orientation));
             startInfo.ArgumentList.Add("--margin-top");
