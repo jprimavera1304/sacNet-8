@@ -262,6 +262,39 @@ builder.Services.AddScoped<IVentasUsadosConsultaService, VentasUsadosConsultaSer
 builder.Services.AddScoped<IVentasDescuentosConsultaRepository, VentasDescuentosConsultaRepository>();
 builder.Services.AddScoped<IVentasDescuentosConsultaService, VentasDescuentosConsultaService>();
 
+// Ola 4: las escrituras de ventas (cascos usados, cobranza, garantias,
+// descuentos, pedidos, pagos, inventario y facturacion). Todas llaman a los
+// mismos sp_n_ que Mac31; ninguno se toco.
+builder.Services.AddScoped<IVentasUsadosOperacionesRepository, VentasUsadosOperacionesRepository>();
+builder.Services.AddScoped<IVentasUsadosOperacionesService, VentasUsadosOperacionesService>();
+builder.Services.AddScoped<IVentasCobranzaOperacionesRepository, VentasCobranzaOperacionesRepository>();
+builder.Services.AddScoped<IVentasCobranzaOperacionesService, VentasCobranzaOperacionesService>();
+builder.Services.AddScoped<IVentasGarantiasRepository, VentasGarantiasRepository>();
+builder.Services.AddScoped<IVentasGarantiasService, VentasGarantiasService>();
+builder.Services.AddScoped<IInventarioOperacionesRepository, InventarioOperacionesRepository>();
+builder.Services.AddScoped<IInventarioOperacionesService, InventarioOperacionesService>();
+builder.Services.AddScoped<IVentasPagosOperacionesRepository, VentasPagosOperacionesRepository>();
+builder.Services.AddScoped<IVentasPagosOperacionesService, VentasPagosOperacionesService>();
+builder.Services.AddScoped<IPedidosOperacionesRepository, PedidosOperacionesRepository>();
+builder.Services.AddScoped<IPedidosOperacionesService, PedidosOperacionesService>();
+builder.Services.AddScoped<IVentasConsultasLegacyRepository, VentasConsultasLegacyRepository>();
+builder.Services.AddScoped<IVentasConsultasLegacyService, VentasConsultasLegacyService>();
+builder.Services.AddScoped<IVentasDescuentosRepository, VentasDescuentosRepository>();
+builder.Services.AddScoped<IVentasDescuentosService, VentasDescuentosService>();
+builder.Services.AddScoped<IVentasFacturacionRepository, VentasFacturacionRepository>();
+builder.Services.AddScoped<IVentasFacturacionService, VentasFacturacionService>();
+
+// El cliente de Facturapi. Va por HttpClient con nombre y NO por el SDK de
+// legacy (Facturapi.dll es de .NET Framework y no se puede referenciar desde
+// net8.0). El timeout es generoso porque timbrar un CFDI pasa por el PAC y por
+// el SAT, y NO se reintenta nunca: un reintento emitiria un segundo comprobante
+// fiscal real.
+builder.Services.AddHttpClient("facturapi", cliente =>
+{
+    cliente.Timeout = TimeSpan.FromSeconds(120);
+});
+builder.Services.AddScoped<ISL_Service.Infrastructure.Facturacion.FacturapiCliente>();
+
 // -------------------- ALMACEN CASCOS --------------------
 builder.Services.AddScoped<IAlmacenCascosRepository, AlmacenCascosRepository>();
 builder.Services.AddScoped<IAlmacenCascosService, AlmacenCascosService>();
