@@ -40,5 +40,20 @@
   ],
   "diferencias_intencionales": [
     "Igual que en cargos: los totales vienen repetidos en cada renglon y los dos lados toman el primero (VentasUsadosRepository.cs:183-187)."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDVenta 369614 es de Tauro: en MacZ el IDVenta mas alto es 140964, asi que el backend nuevo contestaba 409 'La remision 369614 no existe'. El 140949 tiene cargos y creditos a la vez.",
+      "legacy": {
+        "body": {
+          "IDVenta": 140949
+        }
+      },
+      "nuevo": {
+        "body": {
+          "idVenta": 140949
+        }
+      }
+    }
+  }
 }

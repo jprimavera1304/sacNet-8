@@ -59,5 +59,20 @@
   ],
   "diferencias_intencionales": [
     "Las 69 columnas que el procedimiento devuelve coinciden una por una, con el mismo valor. Lo unico que sobra en legacy son los 8 campos de la bitacora de cambios (IDClientesLog, IDAccion, Accion, IDUsuarioModificacion, UsuarioModificacion, FechaModificacion/Ftm, EquipoModificacion) y los 3 de su envoltorio (result, mensaje, mensajeFacturama): son el cascaron del DTO, el procedimiento no los trae y salen en 0/null. La bitacora se consulta aparte, con sp_n_ConsultarClientesLog."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDCliente 20316 es de Tauro; en MacZ se usa el 33320.",
+      "legacy": {
+        "body": {
+          "IDCliente": 33320
+        }
+      },
+      "nuevo": {
+        "body": {
+          "IDCliente": 33320
+        }
+      }
+    }
+  }
 }

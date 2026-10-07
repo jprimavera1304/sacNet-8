@@ -8,9 +8,15 @@
   "legacy": {
     "method": "POST",
     "path": "/api/cobranzasdetalle/consultar",
-    "body": { "IDCobranza": 208623, "Presentacion": 0 }
+    "body": {
+      "IDCobranza": 208623,
+      "Presentacion": 0
+    }
   },
-  "nuevo": { "method": "GET", "path": "/api/cobranzas/208623/detalle" },
+  "nuevo": {
+    "method": "GET",
+    "path": "/api/cobranzas/208623/detalle"
+  },
   "camino_legacy": "result.cobranzasDetalle",
   "camino_nuevo": "data",
   "ordenar_por": "idCobranzaDetalle",
@@ -41,5 +47,45 @@
     "Fuera Cargos: el DTO de Legacy lo declara y el SELECT del SP no lo manda. Era un campo que nunca traia dato.",
     "SIETE CAMPOS QUE LEGACY PERDIA. El SP manda inicialCascos, inicialCreditosZ, inicialImporteZ, inicialSaldoCascos, inicialSaldoFavor, inicialSaldoFavorCascos e inicialSaldoImporte, y el DTO de Legacy no los declaraba, asi que el mapeo por nombre los tiraba en silencio. Son los saldos de arranque del renglon: lo que el cliente ya debia o tenia a favor, en dinero y en cascos, antes de esta cobranza. Ahora llegan.",
     "El nuevo exige idCobranza > 0. En Legacy el endpoint aceptaba 0 y el SP devolvia una lista vacia, que se lee como 'esta cobranza no tiene renglones' y no como 'no me dijiste cual'."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "La IDCobranza 208623 es de Tauro; en MacZ se usa la 49334.",
+      "legacy": {
+        "body": {
+          "IDCobranza": 49334
+        }
+      },
+      "nuevo": {
+        "path": "/api/cobranzas/49334/detalle"
+      },
+      "diferencias_intencionales": [
+        "SALDOFAVORCASCOS: Legacy entrega 0 y el nuevo 25. No es nuestro. sp_n_ConsultarCobranzaDetalle devuelve las columnas 'SaldoFavor' y 'SaldoFavorCascos' (F mayuscula, como se llaman en dbo.Ventas) y el DTO de Legacy las declara 'Saldofavor' y 'SaldofavorCascos' (f minuscula): el mapeo por nombre exacto no empareja y Legacy las entrega en 0 SIEMPRE. En Tauro no se nota porque la cobranza de prueba no tenia saldo a favor de cascos. El nuevo entrega lo que dice la base. ES UN NUMERO QUE MAC31 NO ENSENA Y EL WEB SI VA A ENSENAR."
+      ],
+      "ignorar": [
+        "FechaCobranzaFtm",
+        "FechaCobranzaModificacionFtm",
+        "FechaCancelacionCobranzaFtm",
+        "FechaEmisionVentaFtm",
+        "FechaEmisionCortoFtm",
+        "FechaVencimientoVentaFtm",
+        "FechaCancelacionVentaFtm",
+        "FolioVentaFtm",
+        "TotalPagarFtm",
+        "AbonosFtm",
+        "DescuentosFtm",
+        "SaldoFtm",
+        "Cargos",
+        "inicialCascos",
+        "inicialCreditosZ",
+        "inicialImporteZ",
+        "inicialSaldoCascos",
+        "inicialSaldoFavor",
+        "inicialSaldoFavorCascos",
+        "inicialSaldoImporte",
+        "SaldoFavorCascos",
+        "SaldoFavor"
+      ]
+    }
+  }
 }

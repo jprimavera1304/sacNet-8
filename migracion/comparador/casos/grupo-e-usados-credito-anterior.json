@@ -43,5 +43,20 @@
     "Lo mismo del IDUsuario=1: lo exige el DTO de Legacy, no llega al SP.",
     "El nuevo entrega solo las cuatro columnas del historico (fecha, tipo, cantidad, usuario), que son las de la rejilla de abajo en Mac31. El resto del DTO de Legacy viene en 0/null."
   ],
-  "ordenar_por": "fecha"
+  "ordenar_por": "fecha",
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDVenta 369614 es de Tauro: en MacZ el IDVenta mas alto es 140964, asi que el backend nuevo contestaba 409 'La remision 369614 no existe'. El 140949 tiene cargos y creditos a la vez.",
+      "legacy": {
+        "body": {
+          "IDVenta": 140949
+        }
+      },
+      "nuevo": {
+        "body": {
+          "idVenta": 140949
+        }
+      }
+    }
+  }
 }

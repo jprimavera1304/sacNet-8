@@ -290,9 +290,22 @@ def comparar(izq, der, ignorar, donde="", diffs=None, ordenar_por=None):
             comparar(a[i], b[i], ignorar, "{}[{}]".format(donde, i), diffs, ordenar_por)
         return diffs
 
+    # `nada` escrita de dos formas no es una diferencia. Pasa cuando el
+    # procedimiento no emite ningun result set: Legacy deja el camino del caso en
+    # null y el nuevo entrega una lista vacia. Declararlo diferencia manda a
+    # alguien a buscar un dato que no existe en ninguno de los dos lados. Lo que
+    # SI se sigue viendo es que el caso no vio un renglon: eso lo cuenta
+    # `cuantos` y se imprime al final de cada corrida.
+    if _es_nada(izq) and _es_nada(der):
+        return diffs
+
     if izq != der:
         diffs.append(Diferencia(donde, izq, der, "valor distinto"))
     return diffs
+
+
+def _es_nada(valor):
+    return valor is None or valor == [] or valor == {}
 
 
 def _emparejar(a, b, ordenar_por):
@@ -343,8 +356,87 @@ def _json_o_texto(crudo):
         return {"_no_es_json": crudo[:2000]}
 
 
+EMPRESA = (os.environ.get("MAC_EMPRESA") or "tauro").strip().lower()
+
+
+def para_empresa(caso, empresa=None):
+    """Aplica el bloque `por_empresa` del caso, si lo tiene.
+
+    LOS IDS NO SON PORTABLES ENTRE EMPRESAS. Cada empresa tiene su base (MacZ es
+    Zaragoza, Produccion_svr es Tauro) y los ids no coinciden: el IDVenta 369614
+    existe en Tauro y en Zaragoza el maximo es 140964. Un caso escrito con ids de
+    Tauro, corrido contra Zaragoza, no compara nada: devuelve vacio de los dos
+    lados y sale OK sin ver un renglon, que es exactamente la mentira que el
+    comparador existe para evitar.
+
+    Lo que NO se hace es cambiarle los ids al caso: entonces se rompe la empresa
+    de la que venia. Cada caso que necesita otros parametros en otra empresa
+    declara su propio juego:
+
+        "por_empresa": {
+          "zaragoza": {
+            "_porque": "en MacZ el IDVenta mas alto es 140964",
+            "legacy": {"body": {"IDVenta": 140949}},
+            "nuevo":  {"body": {"idVenta": 140949}}
+          }
+        }
+
+    Se mezcla por encima del caso, campo por campo dentro de `body` y `query`,
+    asi que solo hace falta escribir lo que cambia. La empresa se elige con
+    MAC_EMPRESA; por omision es `tauro`, para que las corridas de siempre no
+    cambien de comportamiento.
+    """
+    bloque = (caso.get("por_empresa") or {}).get(empresa or EMPRESA)
+    if not bloque:
+        return caso
+
+    salida = dict(caso)
+    for lado in ("legacy", "nuevo"):
+        cambio = bloque.get(lado)
+        if not cambio:
+            continue
+        base = dict(salida.get(lado) or {})
+        for clave, valor in cambio.items():
+            if clave in ("body", "query") and isinstance(valor, dict) \
+                    and isinstance(base.get(clave), dict):
+                mezcla = dict(base[clave])
+                mezcla.update(valor)
+                base[clave] = mezcla
+            else:
+                base[clave] = valor
+        salida[lado] = base
+
+    for clave, valor in bloque.items():
+        if clave in ("legacy", "nuevo") or clave.startswith("_"):
+            continue
+        salida[clave] = valor
+    return salida
+
+
 def correr_caso(caso, cred, verbose=False):
+    caso = para_empresa(caso)
     nombre = caso.get("nombre", "(sin nombre)")
+
+    # `no_comparable` es para el caso en que los dos lados contestan BIEN y
+    # contestan DISTINTO porque se les esta preguntando otra cosa. Pasa al cambiar
+    # de empresa: Mac31 solo pregunta por el concentrado antes de cancelar cuando
+    # la funcionalidad es TAU, asi que en Zaragoza el backend nuevo -que copia esa
+    # guarda- no pide el dato que el servicio pelado de Legacy si devuelve.
+    #
+    # NO ES UN PERDON. Perdonar seria dejarlo en verde: esto sale aparte, con su
+    # razon escrita, y no cuenta como coincidencia. Lo que evita es que una
+    # diferencia explicada y cerrada tape las que todavia no lo estan.
+    if caso.get("no_comparable"):
+        return {
+            "nombre": nombre,
+            "estado_legacy": None,
+            "estado_nuevo": None,
+            "diferencias": [],
+            "intencionales": caso.get("diferencias_intencionales", []),
+            "renglones": 0,
+            "ok": False,
+            "no_comparable": caso["no_comparable"],
+        }
 
     leg = caso["legacy"]
     cuerpo_leg = dict(leg.get("body") or {})
@@ -395,7 +487,15 @@ def correr_caso(caso, cred, verbose=False):
         "diferencias": diffs,
         "intencionales": caso.get("diferencias_intencionales", []),
         "renglones": cuantos(datos_leg),
-        "ok": not diffs and est_leg == 200 and est_nue in (200, 204),
+        # `estado_nuevo_esperado` es para los casos donde el codigo distinto es
+        # el contrato, no un fallo: el nuevo contesta 404 donde Legacy devolvia
+        # una lista vacia con 200, o 500 donde Legacy tambien revienta pero
+        # envuelto en un 200 con `status:500` dentro. Se declara en el caso, con
+        # su porque, para que la corrida no quede en amarillo permanente y una
+        # diferencia NUEVA en ese mismo caso siga saltando.
+        "ok": (not diffs and est_leg == 200
+               and est_nue in (caso.get("estado_nuevo_esperado") and
+                               [caso["estado_nuevo_esperado"]] or (200, 204))),
     }
 
 
@@ -474,14 +574,25 @@ def main(argv):
         print("Pon MAC_SCRATCH, o LEGACY_TOKEN / NUEVO_TOKEN en el entorno.")
         return 2
 
+    print("empresa={}  base={}  legacy={}  nuevo={}".format(
+        EMPRESA, os.environ.get("MAC_SQL_BASE", "Produccion_svr"),
+        cred.legacy_base, cred.nuevo_base))
+
     fecha_antes = fecha_de_operacion()
     rutas = casos_de(objetivo)
-    bien, mal, vacios = [], [], []
+    bien, mal, vacios, aparte = [], [], [], []
 
     for ruta in rutas:
         with open(ruta, "r", encoding="utf-8") as fh:
             caso = json.load(fh)
         res = correr_caso(caso, cred, verbose)
+        if res.get("no_comparable"):
+            aparte.append((res["nombre"], res["no_comparable"]))
+            print("N/C  {}".format(res["nombre"]))
+            print("     no comparable: {}".format(res["no_comparable"]))
+            for nota in res["intencionales"]:
+                print("     intencional: {}".format(nota))
+            continue
         marca = "OK  " if res["ok"] else "DIF "
         print("{} {}  (legacy {} / nuevo {})".format(
             marca, res["nombre"], res["estado_legacy"], res["estado_nuevo"]))
@@ -499,8 +610,27 @@ def main(argv):
             if res["renglones"] == 0:
                 vacios.append(res["nombre"])
 
-    print("\n{} coinciden, {} con diferencias, {} casos".format(
-        len(bien), len(mal), len(rutas)))
+    print("\n{} coinciden, {} con diferencias, {} no comparables, {} casos".format(
+        len(bien), len(mal), len(aparte), len(rutas)))
+
+    if aparte:
+        print("\n{} NO COMPARABLES en esta empresa (los dos lados contestan bien "
+              "y se les esta preguntando otra cosa):".format(len(aparte)))
+        for nombre, razon in aparte:
+            print("  - {}: {}".format(nombre, razon))
+
+    # Los `vacios` se contaban desde siempre y NO se imprimian: el unico modo de
+    # enterarse era leer el `_porque` de cada caso. Un caso que compara vacio
+    # contra vacio sale OK y no prueba nada, asi que callarselo es justo lo
+    # contrario de lo que el comparador existe para hacer. Al cambiar de empresa
+    # cambian de sitio: en Tauro estaba vacio Cobros y en Zaragoza lo estan
+    # Cortes y EmpleadoPrestamos.
+    if vacios:
+        print("\n{} de los {} que coinciden NO VIERON UN RENGLON "
+              "(vacio contra vacio, no prueban nada):".format(
+                  len(vacios), len(bien)))
+        for nombre in vacios:
+            print("  - {}".format(nombre))
 
     fecha_despues = fecha_de_operacion()
     if fecha_antes and fecha_despues and fecha_antes != fecha_despues:

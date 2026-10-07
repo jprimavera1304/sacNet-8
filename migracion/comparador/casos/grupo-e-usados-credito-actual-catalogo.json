@@ -48,5 +48,20 @@
     "Legacy mapea las tres consultas al MISMO VentasUsadosCreditoDTO / VentasUsadosCargoDTO, asi que devuelve en 0/null un monton de columnas que el SP no trae en esa accion (relleno del DTO, no dato). El nuevo entrega solo lo que la pantalla usa. Se comparan los campos del contrato nuevo.",
     "Los *Ftm no viajan en el nuevo. Son texto ya formateado para los grids de WinForms (incluso con &nbsp; dentro, como CantidadUsadoCargoFtm = '&nbsp;&nbsp;&nbsp;2'). El numero va crudo y el formato lo pone el navegador: mandar el mismo dato dos veces, y uno de ellos con HTML de relleno, era de Mac31."
   ],
-  "ordenar_por": "idTipoUsado"
+  "ordenar_por": "idTipoUsado",
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDVenta 369614 es de Tauro: en MacZ el IDVenta mas alto es 140964, asi que el backend nuevo contestaba 409 'La remision 369614 no existe'. El 140949 tiene cargos y creditos a la vez.",
+      "legacy": {
+        "body": {
+          "IDVenta": 140949
+        }
+      },
+      "nuevo": {
+        "body": {
+          "idVenta": 140949
+        }
+      }
+    }
+  }
 }

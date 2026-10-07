@@ -22,10 +22,23 @@
   },
   "camino_legacy": "result.empleadosPrestamo.0",
   "camino_nuevo": "data",
-  "ignorar": ["fechaPago", "fechaCancelacion", "result", "mensaje"],
+  "ignorar": [
+    "fechaPago",
+    "fechaCancelacion",
+    "result",
+    "mensaje"
+  ],
   "diferencias_intencionales": [
     "El nuevo entrega el objeto y Legacy una lista de un elemento. Es la forma, no el dato.",
     "Mismas dos diferencias de representacion que en la lista: las fechas NULL que Legacy convierte en '0001-01-01' y el par result/mensaje que repite dentro del renglon.",
     "El nuevo contesta 404 si el prestamo no existe; Legacy devuelve lista vacia con 200."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "diferencias_intencionales": [
+        "EN ZARAGOZA dbo.EmpleadoPrestamos TIENE 0 RENGLONES: no hay ningun prestamo que pedir, con ningun id. El nuevo contesta 404, que es la diferencia intencional ya declarada en este caso ('el nuevo contesta 404 si el prestamo no existe; Legacy devuelve lista vacia con 200'). NO VERIFICABLE EN ZARAGOZA por falta de datos; en Tauro se verifica con el 9005."
+      ],
+      "estado_nuevo_esperado": 404
+    }
+  }
 }

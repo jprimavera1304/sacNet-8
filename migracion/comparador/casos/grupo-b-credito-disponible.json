@@ -32,5 +32,27 @@
   "diferencias_intencionales": [
     "El nuevo no devuelve IDCliente en este bloque: ya lo pidio el llamador y el bloque es de UN cliente.",
     "En el mismo bloque el nuevo agrega los saldos (saldoPendiente, saldoVencido, maxDiasVencidos*) y el 'disponible' ya restado. Mac31 hacia esa resta en la pantalla; aqui se hace en el servidor para que las dos pantallas no puedan discrepar."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDCliente 20316 es de Tauro; en MacZ se usa el 33320.",
+      "legacy": {
+        "body": {
+          "IDCliente": 33320
+        }
+      },
+      "nuevo": {
+        "body": {
+          "IDCliente": 33320
+        }
+      },
+      "solo_campos": [
+        "LimiteCredito"
+      ],
+      "diferencias_intencionales": [
+        "EN ZARAGOZA EL BLOQUE DE PAGOS NO VIAJA, Y ES LO MISMO QUE HACE MAC31. Mac31 solo llama al servicio de credito disponible cuando la funcionalidad contiene 'TAU' (Ventas.cs:1627), y Constantes.Funcionalidad vale 'TAU' en Produccion_svr y 'ZARA' en MacZ. El backend nuevo replica esa misma guarda (VentasPedidoCapturaRepository.cs), asi que en Zaragoza publica el limite estatico de Clientes.[Limite Credito] y no sumaPagosMeses, promedioPagosMeses, fechaInicialPagos ni fechaFinalPagos.",
+        "HALLAZGO DE LEGACY, NO DE ESTA MIGRACION: dentro de ese mismo bloque Mac31 tiene un 'if (funcionalidad.Contains(\"ZARA\"))' para pintar 'MONTO DE PAGOS $...' (Ventas.cs:1643). Como el bloque entero esta dentro del Contains(\"TAU\"), y 'ZARA' no contiene 'TAU', esa rama es CODIGO MUERTO: en Zaragoza nunca se ejecuta. El servicio de Legacy si sabe contestar (sumaPagosMeses 114332, promedio 38110.67 para el cliente 33320), pero Mac31 no se lo pregunta. Si el negocio quiere ese dato en Zaragoza, es una decision de producto: quitar la guarda en el backend nuevo es una linea."
+      ]
+    }
+  }
 }

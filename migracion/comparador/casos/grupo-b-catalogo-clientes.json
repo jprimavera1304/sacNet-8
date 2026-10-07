@@ -52,5 +52,20 @@
   "diferencias_intencionales": [
     "El procedimiento devuelve el cliente completo (direccion, correos, credito, descuentos...) y este endpoint nuevo entrega solo los cuatro campos que la pantalla de reportes necesita para el autocompletado: idCliente, numero, nombreCliente y nombre. No es una perdida: es el catalogo de un selector, no la ficha del cliente.",
     "El nuevo descarta renglones con IDCliente<=0 o Numero<=0; legacy los deja pasar."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDCliente 20316 es de Tauro. En MacZ el cliente 33320 si existe y tiene ventas.",
+      "legacy": {
+        "body": {
+          "IDCliente": 33320
+        }
+      },
+      "nuevo": {
+        "query": {
+          "idCliente": 33320
+        }
+      }
+    }
+  }
 }

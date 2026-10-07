@@ -13,22 +13,50 @@
   "legacy": {
     "method": "POST",
     "path": "/api/catbancos/consultar",
-    "body": { "IDBanco": 0, "IDStatus": 1, "Banco": "", "Formato": 0, "Identico": 0 }
+    "body": {
+      "IDBanco": 0,
+      "IDStatus": 1,
+      "Banco": "",
+      "Formato": 0,
+      "Identico": 0
+    }
   },
   "nuevo": {
     "method": "POST",
     "path": "/api/ventas/multipago/pantalla",
-    "body": { "idsVenta": [370852] }
+    "body": {
+      "idsVenta": [
+        370852
+      ]
+    }
   },
   "camino_legacy": "result.bancos",
   "camino_nuevo": "data.bancos",
   "ordenar_por": "id",
-  "mapa_campos": { "IDBanco": "id", "Banco": "nombre" },
-  "solo_campos": ["id", "nombre"],
+  "mapa_campos": {
+    "IDBanco": "id",
+    "Banco": "nombre"
+  },
+  "solo_campos": [
+    "id",
+    "nombre"
+  ],
   "ignorar": [],
   "diferencias_intencionales": [
     "Legacy manda ademas IDStatus, Status, result y mensaje; el nuevo entrega {id,nombre} porque es lo unico que necesita el desplegable de formas de pago.",
     "El nuevo descarta renglones con id<=0.",
     "No hay endpoint nuevo dedicado al catalogo de bancos: se sirve dentro de api/ventas/multipago/pantalla. Si alguna pantalla lo necesita suelto habra que exponerlo."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDVenta 370852 es de Tauro, y el catalogo de bancos se sirve dentro de la pantalla de multipago de una venta: con una venta que no existe no viene ningun banco. En MacZ se usa el 140964.",
+      "nuevo": {
+        "body": {
+          "idsVenta": [
+            140964
+          ]
+        }
+      }
+    }
+  }
 }

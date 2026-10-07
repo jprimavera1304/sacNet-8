@@ -44,5 +44,24 @@
     "IDDomicilio: el DTO de legacy lo escribe mal, 'IDDomilicio' (le falta la c). DataTableToList no empareja y legacy entrega 0 en los cinco renglones, PERDIENDO el dato. El nuevo entrega el IDDomicilio real del procedimiento (68092, 18735, 18735, 57556, 67940). El nuevo es mas fiel, no menos.",
     "PedidosPendientesImprimir es un campo que solo existe en el DTO de legacy: el procedimiento no lo devuelve y sale siempre en 0.",
     "El DTO de legacy TIRA cinco columnas que el procedimiento si devuelve (EquipoAutorizo, EquipoCancelo, EquipoImpresion, EquipoProceso, EquipoRechazo). El nuevo las pasa tal cual."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "En MacZ los 84.058 pedidos en estatus 1 son de la empresa 1; la 9 no tiene ninguno. Se acota con la ventana de un dia porque pedir los 84.058 de golpe revienta por memoria al comparar los dos lados renglon por renglon, y un dia cualquiera con pedidos reales prueba lo mismo.",
+      "legacy": {
+        "body": {
+          "IDEmpresa": 1,
+          "FechaInicial": "16-07-2026",
+          "FechaFinal": "16-07-2026"
+        }
+      },
+      "nuevo": {
+        "body": {
+          "IDEmpresa": 1,
+          "FechaInicial": "2026-07-16",
+          "FechaFinal": "2026-07-16"
+        }
+      }
+    }
+  }
 }

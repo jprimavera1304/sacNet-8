@@ -29,5 +29,22 @@
   },
   "camino_legacy": "result.concentradosFolio",
   "camino_nuevo": "data.rows",
-  "ordenar_por": "IDVenta"
+  "ordenar_por": "IDVenta",
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El folio 135346 y la empresa 9 son de Tauro. En MacZ el folio 130183 es de la empresa 1 y esta dentro del concentrado 62864.",
+      "legacy": {
+        "body": {
+          "IDEmpresaVenta": 1,
+          "FolioInicialVenta": "130183"
+        }
+      },
+      "nuevo": {
+        "body": {
+          "IDEmpresaVenta": 1,
+          "FolioVenta": "130183"
+        }
+      }
+    }
+  }
 }

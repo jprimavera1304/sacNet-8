@@ -40,5 +40,20 @@
   "diferencias_intencionales": [
     "El SP repite los totales en CADA renglon; los dos lados toman el primero (VentasUsadosRepository.cs:146-150). Por eso del lado de Legacy se mira el renglon 0.",
     "Este caso existe porque los totales del bloque no son un renglon mas: si se compararan solo los renglones, un error al elegir de que fila sacar los totales pasaria sin verse."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDVenta 369614 es de Tauro: en MacZ el IDVenta mas alto es 140964, asi que el backend nuevo contestaba 409 'La remision 369614 no existe'. El 140949 tiene cargos y creditos a la vez.",
+      "legacy": {
+        "body": {
+          "IDVenta": 140949
+        }
+      },
+      "nuevo": {
+        "body": {
+          "idVenta": 140949
+        }
+      }
+    }
+  }
 }

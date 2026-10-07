@@ -35,7 +35,9 @@
     "method": "POST",
     "path": "/api/ventas/cancelacion/verificar",
     "body": {
-      "idsVenta": [369643]
+      "idsVenta": [
+        369643
+      ]
     }
   },
   "camino_legacy": "result.concentrados.0.Folio",
@@ -44,5 +46,27 @@
     "Legacy expone la capacidad 'consultar concentrados' como pantalla propia y devuelve 29 campos del concentrado (repartidor, usuario, almacen, pesos, totales...). El nuevo NO tiene esa pantalla: reusa el SP solo para la pregunta de la cancelacion y devuelve del concentrado unicamente el folio, que es lo que se le ensena al usuario en el dialogo.",
     "Legacy decide 'dentro o fuera' en el front; el nuevo lo decide en el servidor: si FechaCancelacionFtm trae texto, devuelve null (no hay concentrado abierto) y no pide contrasena.",
     "La consulta general de concentrados con filtros (por folio de concentrado, repartidor, usuario, rango de fechas) NO existe en el backend nuevo. Queda como FALTA aparte."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El folio 135346 y el IDVenta 369643 son de Tauro. En MacZ el folio 130183 (IDVenta 140955) esta dentro del concentrado 62864.",
+      "legacy": {
+        "body": {
+          "FolioInicialVenta": "130183",
+          "FolioFinalVenta": "130183"
+        }
+      },
+      "nuevo": {
+        "body": {
+          "idsVenta": [
+            140955
+          ]
+        }
+      },
+      "diferencias_intencionales": [
+        "EN ZARAGOZA LA RESPUESTA ES 0 A PROPOSITO, Y ES LO MISMO QUE HACE MAC31. Mac31 solo pregunta por el concentrado antes de cancelar cuando la funcionalidad contiene 'TAU' (ConsultarVentas.cs:2945), y Constantes.Funcionalidad vale 'ZARA' en MacZ. El backend nuevo replica esa guarda (VentasCancelacionService.cs: 'if (candidato.PuedeCancelar && esTau)'), asi que en Zaragoza no pide contrasena ni devuelve folio de concentrado. El servicio pelado de Legacy si contesta -el folio 130183 esta en el concentrado abierto 62864, folio 19372-, pero Mac31 nunca se lo pregunta en Zaragoza."
+      ],
+      "no_comparable": "en Zaragoza no se le pregunta lo mismo a los dos lados. Mac31 solo consulta el concentrado antes de cancelar cuando la funcionalidad contiene 'TAU' (ConsultarVentas.cs:2945) y en MacZ vale 'ZARA', asi que el backend nuevo -que copia esa guarda- contesta 0 a proposito mientras el servicio pelado de Legacy devuelve el folio 19372. Se verifica en Tauro, donde la guarda si se abre."
+    }
+  }
 }

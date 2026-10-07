@@ -50,5 +50,22 @@
     "El nuevo agrega `origen` ('usuario'/'empleado'/'cliente') y publica el id de la huella y el de la persona con nombres unicos (`idHuella`, `idPersona`). El DTO de Legacy declaraba los seis a la vez y en cada bloque cuatro salian en 0.",
     "`huella` sale en base64 en los dos lados (byte[] serializado), asi que el lector de huellas del cliente no cambia."
   ],
-  "_base_con_datos": "MacZ"
+  "_base_con_datos": "MacZ",
+  "por_empresa": {
+    "zaragoza": {
+      "solo_campos": [
+        "dedo",
+        "huella",
+        "iddedo",
+        "idmano",
+        "mano",
+        "nombre"
+      ],
+      "diferencias_intencionales": [
+        "Este caso se escribio a ciegas contra Tauro, donde la tabla esta vacia: comparaba lista vacia contra lista vacia y el OK no probaba nada. Con los datos de Zaragoza se comparan de verdad 6 campos, y los 6 coinciden uno por uno.",
+        "Legacy manda ademas 6 campos que sp_n_ConsultarHuellas NO devuelve: son el cascaron de su DTO (DataTableToList deja el valor por omision, 0 o null, en lo que el procedimiento no trae). No son dato. Son: idcliente, idclientehuella, idempleado, idempleadohuella, idusuario, idusuariohuella.",
+        "Y sp_n_ConsultarHuellas SI devuelve 3 columnas que el DTO de Legacy no declara, asi que alla se pierden sin aviso: idhuella, idpersona, origen. El contrato nuevo las publica."
+      ]
+    }
+  }
 }

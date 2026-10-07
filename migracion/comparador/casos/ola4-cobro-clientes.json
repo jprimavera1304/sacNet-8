@@ -34,5 +34,58 @@
   "solo_campos": [],
   "ignorar": [],
   "diferencias_intencionales": [],
-  "_base_con_datos": "MacZ"
+  "_base_con_datos": "MacZ",
+  "por_empresa": {
+    "zaragoza": {
+      "solo_campos": [
+        "abonoscascos",
+        "abonosdinero",
+        "cantidadg1",
+        "cantidadg2",
+        "cantidadg3",
+        "cantidadg4",
+        "cantidadg5",
+        "cantidadg6",
+        "cantidadg7",
+        "cantidadmoto",
+        "cargo",
+        "cascos",
+        "cheque",
+        "clientemanual",
+        "descuento",
+        "dinero",
+        "efectivo",
+        "excedenteusados",
+        "fechacancelacion",
+        "fechacancelacionftm",
+        "folioventacascos",
+        "folioventacascosftm",
+        "folioventadinero",
+        "folioventadineroftm",
+        "id",
+        "idcliente",
+        "idcobro",
+        "idventaaplicosaldofavor",
+        "idventacascos",
+        "idventadinero",
+        "nombrecliente",
+        "numerocliente",
+        "observaciones",
+        "repartidor",
+        "saldocascos",
+        "saldodinero",
+        "saldofavor",
+        "tarjeta",
+        "tipodocumentocascos",
+        "tipodocumentodinero",
+        "total",
+        "transferencia"
+      ],
+      "diferencias_intencionales": [
+        "Este caso se escribio a ciegas contra Tauro, donde la tabla esta vacia: comparaba lista vacia contra lista vacia y el OK no probaba nada. Con los datos de Zaragoza se comparan de verdad 42 campos, y los 42 coinciden uno por uno.",
+        "Legacy manda ademas 55 campos que sp_n_ConsultarCobroClientes NO devuelve: son el cascaron de su DTO (DataTableToList deja el valor por omision, 0 o null, en lo que el procedimiento no trae). No son dato. Son: almacen, cancelada, conpagoscascos, conpagosdinero, conpagosdinerocascos, depositoefectivo, dinerocascosingresado, equipo, equipocancelo, equipocierre, equipocierremodificacion, equipomodifico, fecha, fechaaplicacion, fechaaplicacionftm, fechacancelacionmostrar, fechacierre, fechacierreftm, fechacierremodificacion, fechacierremodificacionftm, fechacierremostrar, fechacierremostrarmodificacion, fechaftm, fechamodificacion, fechamodificacionftm, fechamodificacionmostrar, folio, idalmacen, idcobranza, idcobrodinerousado, idconcentrado, idrepartidor, idusuario, idusuarioaplicacion, idusuariocancelo, idusuariocierre, idusuariocierremodificacion, idusuariomodifico, idusuariotrabajo, idventa, idventacobrodinero, idventacobrousado, ingresodinero, ingresousados, numfolios, totalcascos, totalencero, totalimporte, totalsaldocascos, totalsaldoimporte, usuario, usuariocancelo, usuariocierre, usuariocierremodificacion, usuariomodifico.",
+        "Y sp_n_ConsultarCobroClientes SI devuelve 6 columnas que el DTO de Legacy no declara, asi que alla se pierden sin aviso: depositoefecito, fechacobro, fechacobroftm, foliocobro, numcascos, usuariocancelacion. El contrato nuevo las publica."
+      ]
+    }
+  }
 }

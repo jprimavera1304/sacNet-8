@@ -37,5 +37,12 @@
   ],
   "diferencias_intencionales": [
     "El nuevo quita el apostrofo del filtro de texto. No es cosmetico: el procedimiento concatena el filtro y lo corre con EXEC(@Sql), asi que el SqlParameter no protege adentro, y Legacy no lo saneaba en la rama de consulta."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "diferencias_intencionales": [
+        "En MacZ el procedimiento no emite ningun result set para este filtro, asi que los dos lados entregan 'nada': Legacy un result.tablaLst vacio (y el camino del caso queda en null) y el nuevo una lista vacia. No es una diferencia de dato; es la misma nada escrita de dos formas."
+      ]
+    }
+  }
 }

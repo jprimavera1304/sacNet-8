@@ -1,7 +1,8 @@
-using System.Data;
+﻿using System.Data;
 using System.Globalization;
 using ISL_Service.Application.DTOs.Reportes;
 using ISL_Service.Application.Interfaces;
+using ISL_Service.Application.Reportes;
 using ISL_Service.Infrastructure.Data;
 using ISL_Service.Infrastructure.Reports;
 using Microsoft.Data.SqlClient;
@@ -57,18 +58,45 @@ public partial class ReportesVentasRepository
     }
 
     /*
-      EL NODO "Cobranza" DE MAC31 ES EL 1160, NO EL 1161.
+      EL NODO "Cobranza" ES EL 1160 EN TAURO Y EL 1161 EN ZARAGOZA.
 
       1160, 1161 y 1162 se llaman igual y comparten sp_n_rptVentasSaldosGlobales.
       El arbol de Mac31 reparte asi (ReportesMenu.cs:732-740):
         "Cobranza"           -> 1160  (esta clave)
         "Cobranza Detallado" -> 1172  (clave cobranza_detallado)
         "Cobranza Pagadas"   -> 1162 / 1166
-      El 1161 no lo usa ningun nodo: era el que estaba aqui por descarte.
+
+      AQUI DECIA "el 1161 no lo usa ningun nodo: era el que estaba aqui por
+      descarte". ERA FALSO, Y SOLO SE VE MIDIENDO CONTRA ZARAGOZA: Mac31 manda el
+      1160 en las dos empresas, pero el SERVICIO de Legacy lo cambia por el 1161
+      cuando la empresa es Zaragoza, antes de elegir la plantilla
+      (MacServicios2/.../ReporteV2Service.cs:783):
+
+          if ((funcionalidad.ToUpper() == "ZARA") &&
+              (IDReporte == (int)enumReportes.VentasCobranzaDetallado))
+          {
+              reporteInputDTO.idReporte = (int)enumReportes.VentasCobranzaDetalladoZara;
+              IDReporte = (int)enumReportes.VentasCobranzaDetalladoZara;
+          }
+
+      Es la UNICA rama por empresa que queda viva en todo ReporteV2Service.cs (la
+      de Listas de Precios Tauro esta comentada), y era la unica que faltaba
+      copiar. El SP devuelve el MISMO dato en los dos casos -no mira el id-, asi
+      que lo que cambiaba era solo la PLANTILLA: la del 1160 tiene 4 columnas de
+      importes ("Total a Pagar / Abonos / Desctos / Saldo") y la del 1161 tiene 11
+      ("Saldo Dinero / Cargos / Abonos / Desctos / Pagos Dinero / Pagos Cascos /
+      Pagos Diff Cascos / Saldo Cascos / Dias Venc"). Midiendo el mismo psp en
+      Zaragoza, el nuestro imprimia 1 298 importes contra los 6 734 de Legacy, y
+      46 de los nuestros eran numeros que Legacy no tiene: el dato correcto
+      siempre estuvo ahi, se estaba vaciando en el molde equivocado.
+
+      La condicion se copia TAL CUAL, con igualdad exacta a "ZARA" y no con un
+      "no es Tauro": una tercera empresa (MacL, funcionalidad distinta) seguiria
+      con el 1160, que es lo que hace Legacy.
     */
-    private static int ResolveReporteCobranza(ReportesVentasCobranzaRequest request)
+    private static int ResolveReporteCobranza(LegacyConstants constants)
     {
-        return ReporteVentasCobranzaDetallado;
+        return ReporteCobranzaPorEmpresa.Resolver(constants.Funcionalidad);
     }
 
     private static bool IsAcumuladoresProductosReporte(int idReporte)
@@ -129,9 +157,11 @@ public partial class ReportesVentasRepository
 
         var clave = (request.ReporteKey ?? "").Trim().ToLowerInvariant();
 
-        if (clave is "pagos" or "listas_de_precios" or "listas_de_precios_imp")
+        if (clave is "pagos" or "listas_de_precios" or "listas_de_precios_imp" or "cobranza")
         {
             var constants = await ConsultarConstantesAsync(conn, ct);
+            if (clave == "cobranza")
+                return ResolveReporteCobranza(constants);
             return clave == "pagos"
                 ? ResolveReportePagos(request.Formato, constants)
                 : ResolveReporteListasPrecios(request, constants);
@@ -144,7 +174,8 @@ public partial class ReportesVentasRepository
             "remisiones" => ResolveStatusFolio(request.EstatusFolio) == 4 ? ReporteVentasRemisionesSaldoFavor : ReporteVentasRemisiones,
             "facturas" => ReporteVentasFacturas,
             "concentrados" => ReporteVentasConcentradosDetalle,
-            "cobranza" => ReporteVentasCobranzaDetallado,
+            // "cobranza" NO esta aqui: depende de la empresa y se resuelve arriba,
+            // con las constantes en la mano.
             "motobaterias" => ResolveReporteMotobaterias(request.FormatoMotobaterias),
             "cobranza_detallado" => ReporteVentasCobranzaZaragoza,
             "cobranza_pagadas" => ResolveFormatoDetallado(request.Formato) ? ReporteVentasCobranzaPagadasDetalladoZara : ReporteVentasCobranzaPagadasTotalizadoZara,

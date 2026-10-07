@@ -89,5 +89,86 @@
   ],
   "diferencias_intencionales": [
     "Legacy declara 1 campos que el procedimiento NO devuelve y salen en 0/null: Cargos. Es relleno del DTO (DataTableToList empareja por nombre exacto y lo que no encuentra lo deja en su valor por omision), no un dato, asi que no se compara."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDConcentrado 133102 es de Tauro. En MacZ el 62864 tiene seis notas.",
+      "legacy": {
+        "body": {
+          "IDConcentrado": 62864
+        }
+      },
+      "nuevo": {
+        "path": "/api/ventas/concentrados/62864/detalle"
+      },
+      "solo_campos": [
+        "abonos",
+        "almacen",
+        "canceladaconcentrado",
+        "canceladaventa",
+        "cantidadusadocredito",
+        "cascos",
+        "costousadocredito",
+        "creditosz",
+        "descuentos",
+        "detalle",
+        "empresa",
+        "equipoconcentrado",
+        "equipoconcentradomodifico",
+        "equipoventa",
+        "fechacancelacionconcentrado",
+        "fechacancelacionconcentradoftm",
+        "fechacancelacionventa",
+        "fechacancelacionventaftm",
+        "fechaconcentrado",
+        "fechaconcentradoftm",
+        "fechaconcentradomodificacion",
+        "fechaconcentradomodificacionftm",
+        "fechaemisioncortoftm",
+        "fechaemisionventa",
+        "fechaemisionventaftm",
+        "fechavencimientoventa",
+        "fechavencimientoventaftm",
+        "folioconcentrado",
+        "folioventa",
+        "folioventaftm",
+        "idalmacen",
+        "idcliente",
+        "idconcentrado",
+        "idconcentradodetalle",
+        "idempresa",
+        "idgarantia",
+        "idrepartidor",
+        "idstatus",
+        "idusuarioconcentrado",
+        "idusuarioconcentradomodifico",
+        "idusuarioventa",
+        "idventa",
+        "importeusadocredito",
+        "importez",
+        "ivausadocredito",
+        "nombrecliente",
+        "numerocliente",
+        "observaciones",
+        "pesokg",
+        "productos",
+        "repartidor",
+        "saldocascos",
+        "saldofavor",
+        "saldofavorcascos",
+        "saldoimporte",
+        "totalpagar",
+        "totalusadocredito",
+        "usuarioconcentrado",
+        "usuarioconcentradomodifico",
+        "usuarioventa",
+        "valido"
+      ],
+      "diferencias_intencionales": [
+        "Este caso se escribio a ciegas contra Tauro, donde la tabla esta vacia: comparaba lista vacia contra lista vacia y el OK no probaba nada. Con los datos de Zaragoza se comparan de verdad 61 campos, y los 61 coinciden uno por uno.",
+        "Legacy manda ademas 2 campos que sp_n_ConsultarConcentradoDetalle NO devuelve: son el cascaron de su DTO (DataTableToList deja el valor por omision, 0 o null, en lo que el procedimiento no trae). No son dato. Son: cargos, solodevueltas.",
+        "Y sp_n_ConsultarConcentradoDetalle SI devuelve 1 columnas que el DTO de Legacy no declara, asi que alla se pierden sin aviso: eslogistico. El contrato nuevo las publica."
+      ]
+    }
+  }
 }

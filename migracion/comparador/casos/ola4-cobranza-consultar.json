@@ -39,5 +39,20 @@
   "diferencias_intencionales": [
     "Legacy rellena con 0 / 0001-01-01 los campos que su DTO declara y el procedimiento no devuelve, y TIRA los que el procedimiento devuelve y su DTO no declara. El nuevo baja el renglon del procedimiento tal cual: donde dice NULL, dice null. Se comparan los campos que los dos lados entregan.",
     "Legacy entrega ademas FacturaParaPago y EsFacturaParaPago en 0/null: su DTO las declara y sp_n_ConsultarCobranzas no las devuelve."
-  ]
+  ],
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "La IDCobranza 208623 es de Tauro. En MacZ la tabla Cobranza tiene 11.638 renglones y la mas reciente es la 49334.",
+      "legacy": {
+        "body": {
+          "IDCobranza": 49334
+        }
+      },
+      "nuevo": {
+        "body": {
+          "idCobranza": 49334
+        }
+      }
+    }
+  }
 }

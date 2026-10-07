@@ -46,5 +46,18 @@
     "Legacy mete la tabla en un DTO tipado y lo que el DTO declara pero el SP no devuelve sale en 0/null (es relleno del DTO, no dato). El nuevo entrega los renglones crudos del SP. Se comparan las columnas que el SP si trae. En CREDITOS el DTO compartido deja en 0 las columnas de cargo.",
     "El nuevo agrega Tabla ('CREDITOS') y CostoCreditoConIva, las dos del mismo SP."
   ],
-  "ordenar_por": "IDTipoUsado"
+  "ordenar_por": "IDTipoUsado",
+  "por_empresa": {
+    "zaragoza": {
+      "_porque": "El IDPedido 195033 es de Tauro. En MacZ el 198678 tiene renglones en las tres tablas (detalle, cargo y credito), que es lo que este caso necesita.",
+      "legacy": {
+        "body": {
+          "IDPedido": 198678
+        }
+      },
+      "nuevo": {
+        "path": "/api/ventas/pedidos/captura/198678"
+      }
+    }
+  }
 }
