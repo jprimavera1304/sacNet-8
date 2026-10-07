@@ -6,7 +6,17 @@ public class DashboardVentasReporteRequest : DashboardVentasFiltroRequest
     public string? Modo { get; set; } = "current";
     public string? Tipo { get; set; } = "actual";
     public List<int>? Anios { get; set; }
+    /// <summary>
+    /// Agrega al reporte el detalle de ventas de cada ano. Cuesta una consulta
+    /// pesada por ano, asi que viene apagado.
+    /// </summary>
     public bool IncluirDetalle { get; set; }
+
+    /// <summary>
+    /// Tope de filas de detalle POR ANO. Sin valor, 500; el maximo que se
+    /// respeta son 5000 (ver DashboardVentasReportService). Si se recorta, el
+    /// reporte lo dice: DetalleTruncado y DetalleTotalRegistros.
+    /// </summary>
     public int? MaxDetalleFilas { get; set; }
 }
 

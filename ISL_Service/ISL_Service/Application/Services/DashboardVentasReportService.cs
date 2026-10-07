@@ -14,6 +14,19 @@ public class DashboardVentasReportService : IDashboardVentasReportService
     private static readonly TimeSpan ReportFileCacheTtl = TimeSpan.FromMinutes(2);
     private const int MaxYearParallelism = 3;
 
+    /*
+      EL TOPE DEL DETALLE.
+
+      El cliente pide cuantas filas quiere con MaxDetalleFilas. Si no manda
+      nada, 500: es lo que cabe en un reporte que alguien va a leer. El tope
+      duro son 5000 por ano y NO es un numero de adorno —es lo que separa
+      "reporte" de "volcado de la base por HTTP". El PDF de todos modos solo
+      imprime una muestra de 30 filas (ver DashboardVentasPdfReportRenderer);
+      el Excel si las escribe todas.
+    */
+    private const int DetalleFilasPorDefecto = 500;
+    private const int DetalleFilasMaximo = 5000;
+
     public DashboardVentasReportService(
         IDashboardVentasService dashboardService,
         IMemoryCache cache,
@@ -82,9 +95,38 @@ public class DashboardVentasReportService : IDashboardVentasReportService
             var serieTask = _dashboardService.ConsultarSerieMensualAsync(filtro, token);
             var topTask = _dashboardService.ConsultarTopProductosAsync(filtro, token);
 
-            // Detalle (muestra) desactivado temporalmente para reducir tiempo de generacion.
-            // Para reactivar: usar LoadDetalleAsync(...) como estaba antes.
-            var detalleTask = Task.FromResult((new List<DashboardVentasDetalleDto>(), false, 0));
+            /*
+              EL DETALLE YA SE GENERA DE VERDAD.
+
+              Aqui habia esto:
+
+                var detalleTask = Task.FromResult((new List<...>(), false, 0));
+
+              con una nota al lado que decia que el detalle estaba apagado para
+              reducir el tiempo de generacion.
+
+              Con lo cual IncluirDetalle y MaxDetalleFilas se recibian del
+              cliente y se tiraban: pedir IncluirDetalle=true devolvia 200 con
+              el detalle vacio y sin decir nada. Los dos renderizadores (PDF y
+              Excel) ya sabian pintarlo; el unico que no cooperaba era esto.
+
+              EL MOTIVO DE HABERLO APAGADO ERA REAL, Y ESTABA EN OTRO SITIO.
+              -------------------------------------------------------------
+              DashboardVentasService.ConsultarVentasDetalleAsync trae la
+              consulta COMPLETA del ano y pagina en memoria, asi que el costo
+              es una consulta pesada por ano, no una por pagina. Lo que si
+              costaba era pedirlo SIEMPRE: el reporte lo paga aunque nadie
+              haya pedido detalle.
+
+              Arreglo: solo se consulta si el cliente lo pidio
+              (IncluirDetalle), con el tope de filas acotado, y la decision
+              entra en la llave de cache (BuildRequestCacheKey) — si no
+              entrara, el primer reporte sin detalle se serviria tambien a
+              quien si lo pidio, y al contrario.
+            */
+            var detalleTask = request.IncluirDetalle
+                ? LoadDetalleAsync(filtro, ResolveMaxDetalleFilas(request), token)
+                : Task.FromResult((new List<DashboardVentasDetalleDto>(), false, 0));
 
             await Task.WhenAll(kpisTask, serieTask, topTask, detalleTask);
 
@@ -123,6 +165,17 @@ public class DashboardVentasReportService : IDashboardVentasReportService
             if (year < 2000 || year > 2100)
                 throw new ArgumentException("Los anos deben estar entre 2000 y 2100.");
         }
+    }
+
+    /// <summary>
+    /// Cuantas filas de detalle se traen por ano. Acota lo que pida el cliente:
+    /// un 0 o un negativo no es "sin limite", y un 50000 tampoco.
+    /// </summary>
+    private static int ResolveMaxDetalleFilas(DashboardVentasReporteRequest request)
+    {
+        var pedido = request.MaxDetalleFilas ?? DetalleFilasPorDefecto;
+        if (pedido <= 0) pedido = DetalleFilasPorDefecto;
+        return Math.Min(pedido, DetalleFilasMaximo);
     }
 
     private static string NormalizeFormato(string? formato)
@@ -302,6 +355,10 @@ public class DashboardVentasReportService : IDashboardVentasReportService
             (request.IDMarca ?? 0).ToString(CultureInfo.InvariantCulture),
             (request.IDTipoDocumento ?? 0).ToString(CultureInfo.InvariantCulture),
             (request.Top ?? 10).ToString(CultureInfo.InvariantCulture),
+            // El detalle entra en la llave: dos peticiones que piden distinto
+            // detalle son dos reportes distintos, no el mismo servido de cache.
+            request.IncluirDetalle ? "det1" : "det0",
+            request.IncluirDetalle ? ResolveMaxDetalleFilas(request).ToString(CultureInfo.InvariantCulture) : "0",
             request.FechaInicial == default ? "-" : request.FechaInicial.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             request.FechaFinal == default ? "-" : request.FechaFinal.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
         });
