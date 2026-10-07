@@ -39,9 +39,16 @@ public partial class CatalogosAdminRepository : ICatalogosAdminRepository
 
     private readonly IConfiguration _configuration;
 
-    public CatalogosAdminRepository(IConfiguration configuration)
+    /// <summary>
+    /// Para dejar constancia cuando el id de un alta NO se puede recuperar de
+    /// forma segura. Ver IdRecienInsertadoAsync.
+    /// </summary>
+    private readonly ILogger<CatalogosAdminRepository>? _logger;
+
+    public CatalogosAdminRepository(IConfiguration configuration, ILogger<CatalogosAdminRepository>? logger = null)
     {
         _configuration = configuration;
+        _logger = logger;
     }
 
     /// <summary>
@@ -114,15 +121,74 @@ public partial class CatalogosAdminRepository : ICatalogosAdminRepository
         return (resultado, id);
     }
 
-    /// <summary>
-    /// El ultimo id de una tabla. Se usa SOLO despues de un alta que salio bien
-    /// y cuyo SP no devuelve el id, para poder contestar 201 con la ubicacion
-    /// del renglon nuevo. No sirve para reservar nada.
-    /// </summary>
-    private async Task<int> UltimoIdAsync(string tabla, string columnaId, CancellationToken ct)
+    /*
+      EL `SELECT MAX(id)` DESPUES DEL INSERT LE DABA A UNO EL RENGLON DEL OTRO.
+
+      Lo que habia: se llamaba al sp_n_Insertar* en una conexion, se cerraba, se
+      abria OTRA y se preguntaba `SELECT ISNULL(MAX(id),0) FROM dbo.<tabla>`. Eso
+      no es "el renglon que acabo de crear": es el ultimo de la tabla, el de
+      cualquiera. Con dos capturistas dando de alta categorias, marcas, agentes o
+      clientes a la vez, a uno se le contesta el id del otro, y la pantalla sigue
+      trabajando sobre el renglon ajeno.
+
+      COMO SE ARREGLA SIN TOCAR LOS SP (prohibido editar un sp_n_):
+
+      Todas estas tablas tienen la llave como IDENTITY (comprobado en
+      sys.columns), asi que @@IDENTITY devuelve el id que genero ESTA SESION, y
+      @@IDENTITY es por sesion -no global, a diferencia de IDENT_CURRENT, que
+      tendria el mismo defecto que el MAX()-. La clave es que la lectura ocurra en
+      LA MISMA conexion que el EXEC, que es lo que hace este metodo.
+
+      No se usa SCOPE_IDENTITY() porque el INSERT ocurre DENTRO del procedimiento:
+      es otro ambito y desde aqui devolveria NULL.
+
+      SI ALGUNA TABLA NO FUERA IDENTITY (su SP calcula el id a mano), @@IDENTITY
+      sale NULL. En ese caso se cae al MAX() de antes y se DEJA CONSTANCIA en el
+      registro, porque ahi la carrera sigue existiendo y no se puede cerrar desde
+      el backend: haria falta que el procedimiento devolviera el id -o un
+      sp_w_ envolvente que lo hiciera-, y eso es cambio en la base.
+    */
+    private async Task<(ResultadoLegacy, int)> InsertarYLeerIdAsync(
+        string sp, string tabla, string columnaId,
+        Action<SqlCommand> parametros, CancellationToken ct)
     {
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
+
+        ResultadoLegacy resultado;
+        await using (var cmd = Sp(sp, conn))
+        {
+            parametros(cmd);
+            var dt = await FillAsync(cmd, ct);
+            resultado = LeerResultado(dt);
+        }
+
+        if (!resultado.Ok) return (resultado, 0);
+
+        var id = await IdRecienInsertadoAsync(conn, tabla, columnaId, ct);
+        return (resultado, id);
+    }
+
+    /// <summary>
+    /// El id del renglon que ESTA sesion acaba de insertar. Ver el bloque de
+    /// <see cref="InsertarYLeerIdAsync"/>.
+    /// </summary>
+    private async Task<int> IdRecienInsertadoAsync(
+        SqlConnection conn, string tabla, string columnaId, CancellationToken ct)
+    {
+        await using (var cmdIdentity = new SqlCommand("SELECT CONVERT(int, @@IDENTITY);", conn))
+        {
+            var identidad = await cmdIdentity.ExecuteScalarAsync(ct);
+            if (identidad is not null and not DBNull)
+            {
+                var id = Convert.ToInt32(identidad, CultureInfo.InvariantCulture);
+                if (id > 0) return id;
+            }
+        }
+
+        _logger?.LogWarning(
+            "dbo.{Tabla} no entrego @@IDENTITY tras {Sp}: su llave {Columna} no es IDENTITY, asi que el id se recupera con MAX() y dos altas simultaneas pueden cruzarse. Para cerrarlo haria falta que el procedimiento devolviera el id (cambio en la base).",
+            tabla, columnaId, columnaId);
 
         await using var cmd = new SqlCommand(
             $"SELECT ISNULL(MAX({Corchetes(columnaId)}), 0) FROM dbo.{tabla}", conn);

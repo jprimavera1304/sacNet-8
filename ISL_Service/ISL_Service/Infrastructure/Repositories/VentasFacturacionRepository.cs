@@ -92,9 +92,28 @@ FROM dbo.Constantes;", conn)
           entonces el reporte lee en la posicion equivocada: el sello donde deberia
           ir la direccion. Se mandan todas, vacias las que no se usan.
         */
+        /*
+          EL NOMBRE DE EQUIPO VA UNICO POR LLAMADA.
+
+          sp_n_ActualizarParametro recupera el id del renglon que acaba de
+          insertar con `MAX(IDParametros) WHERE NombreEquipo=@NombreEquipo AND
+          IDUsuario=@IDUsuario`. Con el nombre repetido, dos llamadas de la misma
+          pareja (equipo, usuario) se cruzan y una se lleva los parametros de la
+          otra: el papel sale con los filtros ajenos. Aqui el equipo era el
+          nombre de usuario del token, asi que bastaban dos pestanas de la misma
+          persona -riesgo que ya estaba escrito en VentasConsultaService.
+
+          Con el sufijo, el MAX() se calcula sobre un conjunto de un solo
+          renglon. Nadie lee Parametros por NombreEquipo (los reportes van por
+          IDParametros), y esto NO es el equipo que se escribe en Ventas como
+          "desde donde se imprimio": ese sigue siendo el del token y va por otro
+          parametro, en otro procedimiento.
+        */
+        var equipoUnico = $"{FiltrosLegacy.Texto(equipo, 60)}-{Guid.NewGuid():N}";
+
         var filas = await EjecutarFilasAsync(SpActualizarParametro, cmd =>
         {
-            cmd.Parameters.Add(Varchar("@NombreEquipo", LargoNombreEquipo, FiltrosLegacy.Texto(equipo, LargoNombreEquipo)));
+            cmd.Parameters.Add(Varchar("@NombreEquipo", LargoNombreEquipo, equipoUnico));
             cmd.Parameters.Add(Entero("@IDUsuario", idUsuario));
             cmd.Parameters.Add(Entero("@IDReporte", 0));
 

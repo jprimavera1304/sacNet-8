@@ -494,21 +494,12 @@ public partial class CatalogosAdminRepository
     // -----------------------------------------------------------------------
 
     /// <summary>
-    /// Alta cuyo SP no devuelve el id. Si legacy contesto exito se lee el MAX de
-    /// la llave para poder contestar con la ubicacion del renglon nuevo.
-    ///
-    /// Se lee DESPUES del exito y nunca antes: no reserva nada y no se usa para
-    /// decidir ningun valor. Es exactamente lo que ya hace
-    /// GET api/usuarios/siguiente-numero de la ola 3.
+    /// Alta cuyo SP no devuelve el id. El id se recupera con @@IDENTITY en la
+    /// MISMA conexion del INSERT, no con el MAX de la tabla. Ver
+    /// <see cref="InsertarYLeerIdAsync"/>.
     /// </summary>
-    private async Task<(ResultadoLegacy, int)> InsertarConUltimoIdAsync(
+    private Task<(ResultadoLegacy, int)> InsertarConUltimoIdAsync(
         string sp, string tabla, string columnaId,
         Action<Microsoft.Data.SqlClient.SqlCommand> parametros, CancellationToken ct)
-    {
-        var resultado = await EjecutarAsync(sp, parametros, ct);
-        if (!resultado.Ok) return (resultado, 0);
-
-        var id = await UltimoIdAsync(tabla, columnaId, ct);
-        return (resultado, id);
-    }
+        => InsertarYLeerIdAsync(sp, tabla, columnaId, parametros, ct);
 }

@@ -1472,6 +1472,49 @@ public partial class ReportesVentasRepository
         return $"{date.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture)}@23:59:59";
     }
 
+    /*
+      DOS PERSONAS PIDIENDO UN REPORTE A LA VEZ VEIAN EL REPORTE DE LA OTRA.
+
+      `sp_n_ActualizarParametro` inserta el renglon de parametros y despues
+      recupera su id asi (lo dice su propia definicion, leida en la base):
+
+          SELECT @IDParametros = MAX(IDParametros) FROM Parametros
+          WHERE  NombreEquipo = @NombreEquipo AND @IDUsuario = IDUsuario
+
+      O sea que el id que te devuelve es el ULTIMO renglon de esa pareja
+      (NombreEquipo, IDUsuario), no el tuyo. En Mac31 eso funciona porque
+      NombreEquipo es el nombre de la maquina y ahi hay una persona sentada
+      enfrente. En el web NO: el backend mandaba "WEB" para todos, y para los
+      usuarios solo-web, que no tienen id de legacy, IDUsuario es 0. Comprobado en
+      Produccion_svr: todos los renglones de Parametros dicen
+      NombreEquipo='WEB', IDUsuario=0. La llave era la MISMA para todo el mundo.
+
+      Consecuencia: dos usuarios pidiendo un reporte en el mismo instante, y el
+      MAX() le entrega a uno el renglon del otro -> abre el PDF con los filtros
+      del otro: su cliente, su agente, sus importes. El pase firmado se firma
+      sobre el id equivocado, asi que no salva nada. Y no hace falta mala
+      intencion: basta con dos pestanas.
+
+      COMO SE ARREGLA SIN TOCAR EL SP (prohibido editar un sp_n_): la llave la
+      elegimos nosotros. Se le pone a @NombreEquipo un sufijo unico por llamada,
+      asi que el MAX() se calcula sobre un conjunto de UN solo renglon: el propio.
+
+      Por que es seguro:
+      - Nadie lee Parametros por NombreEquipo. Los reportes reciben el
+        IDParametros y lo resuelven con sp_n_ConsultaParametros; la unica linea
+        que leia NombreEquipo en los sp_n_rpt* esta comentada.
+      - Cabe: la columna es varchar(1000) y el #ParamIds de los reportes la
+        declara varchar(400); "WEB-" + 32 hex son 36 caracteres.
+      - El texto que SI se imprime (Param1 = "WEB[<idUsuario>") no se toca: lo
+        sigue armando BuildLegacyUsuarioParam con el nombre limpio, sin sufijo.
+    */
+    private static string EquipoUnicoPorLlamada(string nombreEquipo)
+    {
+        var baseNombre = string.IsNullOrWhiteSpace(nombreEquipo) ? "WEB" : nombreEquipo.Trim();
+        if (baseNombre.Length > 60) baseNombre = baseNombre[..60];
+        return $"{baseNombre}-{Guid.NewGuid():N}";
+    }
+
     private static async Task<int> GuardarParametrosAsync(
         SqlConnection conn,
         int idReporte,
@@ -1484,7 +1527,7 @@ public partial class ReportesVentasRepository
             CommandTimeout = 500
         };
 
-        cmd.Parameters.AddWithValue("@NombreEquipo", legacyParams.NombreEquipo);
+        cmd.Parameters.AddWithValue("@NombreEquipo", EquipoUnicoPorLlamada(legacyParams.NombreEquipo));
         cmd.Parameters.AddWithValue("@IDUsuario", legacyParams.IDUsuario);
         cmd.Parameters.AddWithValue("@IDReporte", idReporte);
         cmd.Parameters.AddWithValue("@Param1", legacyParams.Param1);
