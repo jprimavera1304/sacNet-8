@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
@@ -106,7 +106,8 @@ public class CompanyKeyTests
             new FakeUserAdminService(),
             new FakeEmpresaRepository("tauro"),
             new FakePermissionService(),
-            new FakeCurrentUserAccessor());
+            new FakeCurrentUserAccessor(),
+            new FakeCapacidadesEmpresaService("TAU"));
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext
@@ -124,6 +125,15 @@ public class CompanyKeyTests
 
         Assert.Equal("tauro", payload.CompanyKey);
         Assert.Equal(1, payload.EmpresaId);
+
+        /*
+          /api/me TAMBIEN TRAE LAS CAPACIDADES DE LA EMPRESA.
+          Es el unico sitio por el que llegan al web y al movil: si alguien las quita
+          de aqui, los dos fronts vuelven a no saber en que empresa estan y una
+          pantalla nueva vuelve a implementar solo una de las dos.
+        */
+        Assert.NotNull(payload.Empresa);
+        Assert.Equal("TAU", payload.Empresa!.Discriminadores.Funcionalidad);
     }
 
     [Fact]
@@ -276,4 +286,21 @@ public class CompanyKeyTests
         public Task<bool> CreatePermissionAsync(int empresaId, string key, string name, string? description, CancellationToken ct)
             => Task.FromResult(false);
     }
+}
+
+/// <summary>
+/// Doble del servicio de capacidades de empresa. Devuelve lo minimo para que
+/// MeController pueda armar su respuesta sin base de datos.
+/// </summary>
+internal sealed class FakeCapacidadesEmpresaService : ISL_Service.Application.Interfaces.ICapacidadesEmpresaService
+{
+    private readonly string _funcionalidad;
+
+    public FakeCapacidadesEmpresaService(string funcionalidad) => _funcionalidad = funcionalidad;
+
+    public Task<ISL_Service.Application.DTOs.Empresa.CapacidadesEmpresaResponse> ConsultarAsync(
+        int idUsuarioLegacy, CancellationToken ct)
+        => Task.FromResult(ISL_Service.Application.Empresa.MapaDeCapacidades.Armar(
+            new ISL_Service.Application.Empresa.ConstantesDeEmpresa { Funcionalidad = _funcionalidad },
+            DateOnly.FromDateTime(DateTime.Today)));
 }

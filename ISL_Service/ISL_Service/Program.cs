@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
@@ -148,6 +148,10 @@ builder.Services.AddScoped<IMaestrosService, MaestrosService>();
 // -------------------- OPERACION DIARIA: COMPRAS, CORTES, TRANSFERENCIAS, VIGENCIAS --------------------
 builder.Services.AddScoped<IOperacionMacRepository, OperacionMacRepository>();
 builder.Services.AddScoped<IOperacionMacService, OperacionMacService>();
+
+// -------------------- CAPACIDADES DE LA EMPRESA (lo que el front necesita para no implementar solo una) --------------------
+builder.Services.AddScoped<ICapacidadesEmpresaRepository, CapacidadesEmpresaRepository>();
+builder.Services.AddScoped<ICapacidadesEmpresaService, CapacidadesEmpresaService>();
 
 // -------------------- USUARIOS DE MAC31, HUELLAS, CONSTANTES Y PARAMETROS --------------------
 builder.Services.AddScoped<ISeguridadMacRepository, SeguridadMacRepository>();
