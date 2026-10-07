@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.SeguridadMac;
+﻿using ISL_Service.Application.DTOs.SeguridadMac;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -41,6 +41,18 @@ public class ConfiguracionMacController : PermisoControllerBase
     // La fecha de operacion de pagos decide con que fecha entran los cobros.
     private static readonly string[] PermisosFechaPagos = { "constantes.fechapagos.editar" };
 
+    /*
+      AVANZAR LA FECHA DE VENTAS ES EL CIERRE DEL DIA: PERMISO APARTE.
+
+      No es la hermana simetrica de la fecha de pagos. Mover la de pagos cambia con
+      que fecha entran los cobros y se puede mover en los dos sentidos dentro de una
+      ventana. Avanzar la de ventas rehace el freeze de inventario del dia que se
+      cierra, apunta FechaOperacionLog y no tiene vuelta desde la aplicacion. En
+      Mac31 tampoco es el mismo boton (FechaOperacionVentas.btnGuardarFechaVentas
+      contra btnGuardarFechaPagos), asi que tampoco es el mismo permiso.
+    */
+    private static readonly string[] PermisosFechaVentas = { "constantes.fechaventas.editar" };
+
     private static readonly string[] PermisosHuellas = { "huellas.editar" };
     private static readonly string[] PermisosParametrosVer = { "reportes.parametros.ver" };
     private static readonly string[] PermisosParametrosGuardar = { "reportes.parametros.editar" };
@@ -50,14 +62,17 @@ public class ConfiguracionMacController : PermisoControllerBase
     private static readonly string[] PermisosBitacora = { "seguridad.bitacora.registrar" };
 
     private readonly ISeguridadMacService _service;
+    private readonly ICapacidadesEmpresaService _capacidades;
 
     public ConfiguracionMacController(
         ISeguridadMacService service,
+        ICapacidadesEmpresaService capacidades,
         ICurrentUserAccessor currentUser,
         IPermissionService permissionService)
         : base(currentUser, permissionService)
     {
         _service = service;
+        _capacidades = capacidades;
     }
 
     /// <summary>
@@ -109,8 +124,121 @@ public class ConfiguracionMacController : PermisoControllerBase
         var sinPermiso = await ExigirPermisoAsync(PermisosFechaPagos, ct);
         if (sinPermiso != null) return sinPermiso;
 
+        /*
+          LA FECHA ES OBLIGATORIA, Y NO ES UN CAPRICHO DE VALIDACION.
+          sp_n_ActualizarFechaOperacion usa la cadena vacia como "avanza la fecha de
+          VENTAS": un cuerpo sin fecha de pagos no era un no-op, era el cierre del
+          dia disparado por descuido, con su freeze de inventario incluido.
+        */
+        if (!request.FechaOperacionPagos.HasValue)
+            return BadRequest(new { ok = false, message = "La fecha de operacion de pagos es obligatoria." });
+
         var data = await _service.ActualizarFechaOperacionPagosAsync(request, IdUsuarioLegacy(), Equipo(), ct);
         return Ok(new { ok = true, message = "Fecha de operacion de pagos actualizada.", data });
+    }
+
+    /// <summary>
+    /// AVANZA UN DIA LA FECHA DE OPERACION DE VENTAS: el dia de negocio con el que
+    /// entra todo lo que se captura.
+    ///
+    /// Sin este endpoint el web solo podia trabajar "en hoy", y es de uso diario: en
+    /// Mac31 es la etiqueta de la fecha del encabezado, que abre
+    /// Forms/Catalogos/FechaOperacionVentas (Menu.cs:2007).
+    ///
+    /// NO RECIBE FECHA, y eso es fidelidad, no recorte. El procedimiento solo sabe
+    /// avanzar un dia (SET FechaOperacion = DATEADD(dd, 1, FechaOperacion)) y
+    /// rechaza el cambio si eso la dejaria mas de un dia adelante de hoy. Mac31 manda
+    /// lo mismo: un cuerpo sin fecha (FechaOperacionVentas.cs:49-52).
+    ///
+    /// LO QUE ARRASTRA, y que el front tiene que advertir ANTES de llamar:
+    ///   - borra AlmacenProductoHist del dia que se cierra y lo reescribe con las
+    ///     existencias de ahora (el freeze del inventario);
+    ///   - apunta el cambio en FechaOperacionLog con tipo 'V';
+    ///   - no es reversible desde la aplicacion.
+    ///
+    /// Para saber si el boton se puede ofrecer, el front mira
+    /// fechas.puedeAvanzarVentas de GET /api/empresa/capacidades (y
+    /// capacidades.puedeCambiarFechaDeOperacionDeVentas, que es 0 en las
+    /// instalaciones de obra). Al terminar, conviene volver a pedir las capacidades:
+    /// la fecha cambio.
+    ///
+    /// EL PROCEDIMIENTO NO LANZA RAISERROR: cuando no se puede, hace ROLLBACK y
+    /// devuelve un renglon con result = -1 y el mensaje. Aqui ESO SE TRADUCE A 400
+    /// con el texto del procedimiento, en vez de contestar 200 con
+    /// ok = true y "fecha avanzada" encima de un renglon que dice que no se avanzo.
+    /// La fecha de pagos todavia contesta 200 en ese caso y conviene alinearla, pero
+    /// se deja como estaba para no cambiarle el contrato a nadie en el mismo cambio.
+    /// </summary>
+    [HttpPost("constantes/fecha-operacion-ventas/avanzar")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> AvanzarFechaOperacionVentas(
+        [FromBody] AvanzarFechaOperacionVentasRequest? request, CancellationToken ct)
+    {
+        var sinPermiso = await ExigirPermisoAsync(PermisosFechaVentas, ct);
+        if (sinPermiso != null) return sinPermiso;
+
+        var capacidades = await _capacidades.ConsultarAsync(IdUsuarioLegacy(), ct);
+
+        // Legacy no abre siquiera la pantalla en las instalaciones de obra
+        // (Menu.cs:2007 hace return con EsAlcaldiaMC 1 o 2).
+        if (!capacidades.Capacidades.PuedeCambiarFechaDeOperacionDeVentas)
+            return BadRequest(new
+            {
+                ok = false,
+                message = "Esta instalacion no cambia la fecha de operacion de ventas."
+            });
+
+        /*
+          EL SEGURO CONTRA EL DOBLE AVANCE.
+          Dos pestanas abiertas, o un cierre automatico de sp_n_ConsultaConstantes
+          entre que se dibujo la pantalla y se pulso el boton, y el dia avanza dos
+          veces sin que nadie lo note. Si el cliente dice a que fecha cree que va a
+          quedar y no coincide, no se escribe y se devuelve la fecha real.
+        */
+        if (request?.FechaEsperada is DateOnly esperada
+            && esperada != capacidades.Fechas.SiguienteOperacionVentas)
+        {
+            return Conflict(new
+            {
+                ok = false,
+                message = "La fecha de operacion de ventas ya no es la que tenias en pantalla.",
+                data = capacidades.Fechas
+            });
+        }
+
+        var data = await _service.AvanzarFechaOperacionVentasAsync(IdUsuarioLegacy(), Equipo(), ct);
+        var despues = await _capacidades.ConsultarAsync(IdUsuarioLegacy(), ct);
+
+        var rechazo = ResultadoLegacyRechazado(data);
+        if (rechazo != null)
+            return BadRequest(new { ok = false, message = rechazo, data, fechas = despues.Fechas });
+
+        return Ok(new
+        {
+            ok = true,
+            message = "Fecha de operacion de ventas avanzada.",
+            data,
+            fechas = despues.Fechas
+        });
+    }
+
+    /// <summary>
+    /// El renglon que devuelve sp_n_ActualizarFechaOperacion cuando hizo ROLLBACK:
+    /// result = -1 y el texto en "mensaje". Devuelve null si todo fue bien.
+    /// </summary>
+    private static string? ResultadoLegacyRechazado(List<Dictionary<string, object?>> filas)
+    {
+        var fila = filas.FirstOrDefault();
+        if (fila is null) return "El procedimiento no devolvio resultado.";
+
+        var result = fila.FirstOrDefault(p => string.Equals(p.Key, "result", StringComparison.OrdinalIgnoreCase)).Value;
+        if (result is null || Convert.ToInt32(result) == 1) return null;
+
+        var mensaje = fila.FirstOrDefault(p => string.Equals(p.Key, "mensaje", StringComparison.OrdinalIgnoreCase)).Value;
+        var texto = (Convert.ToString(mensaje) ?? string.Empty).Trim();
+        return texto.Length == 0 ? "No se pudo avanzar la fecha de operacion de ventas." : texto;
     }
 
     /// <summary>

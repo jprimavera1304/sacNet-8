@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.SeguridadMac;
+﻿using ISL_Service.Application.DTOs.SeguridadMac;
 
 namespace ISL_Service.Application.Interfaces;
 
@@ -25,6 +25,7 @@ public interface ISeguridadMacService
 
     Task<List<Dictionary<string, object?>>> ActualizarConstantesAsync(ActualizarConstantesRequest r, CancellationToken ct);
     Task<List<Dictionary<string, object?>>> ActualizarFechaOperacionPagosAsync(ActualizarFechaOperacionPagosRequest r, int idUsuario, string equipo, CancellationToken ct);
+    Task<List<Dictionary<string, object?>>> AvanzarFechaOperacionVentasAsync(int idUsuario, string equipo, CancellationToken ct);
     Task<List<Dictionary<string, object?>>> RegistrarActividadAsync(int idUsuario, string equipo, CancellationToken ct);
 
     Task<List<Dictionary<string, object?>>> ConsultarParametrosAsync(int id, CancellationToken ct);
