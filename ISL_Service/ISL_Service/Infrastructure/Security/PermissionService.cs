@@ -439,7 +439,34 @@ public sealed class PermissionService : IPermissionService
 
         new("catalogos.autos.crear", "Catálogos - Alta de autos", "catalogos"),
         new("catalogos.autos.editar", "Catálogos - Modificar autos", "catalogos"),
-        new("catalogos.autos.baja", "Catálogos - Baja de autos", "catalogos")
+        new("catalogos.autos.baja", "Catálogos - Baja de autos", "catalogos"),
+
+        /*
+          LAS FICHAS MAESTRAS: CLIENTE Y PRODUCTO (ola 6).
+
+          Proveedores NO aparece aqui porque sus cuatro claves ya existian arriba
+          (proveedores.ver/crear/editar/estado.editar) y son las mismas: no hacia
+          falta inventar otras.
+
+          Clientes tiene tres claves de mas, y cada una tiene su razon:
+           - `clientes.bonificaciones.editar` es DINERO: es lo que se le abona al
+             cliente por cada casco que entrega.
+           - `clientes.facturacion.editar` es el RFC y el regimen con el que se le
+             factura. Quien captura un telefono no tiene por que poder cambiarlo.
+           - `clientes.centros.editar` decide en que centros se le surte.
+          Las claves de LECTURA (clientes.ver, clientes.facturacion.ver,
+          clientes.log.ver, productos.ver) las sembro la ola 3.
+        */
+        new("clientes.crear", "Clientes - Dar de alta", "clientes"),
+        new("clientes.editar", "Clientes - Modificar", "clientes"),
+        new("clientes.estado.editar", "Clientes - Dar de baja / reactivar", "clientes"),
+        new("clientes.bonificaciones.editar", "Clientes - Editar bonificaciones de usados", "clientes"),
+        new("clientes.facturacion.editar", "Clientes - Editar datos de facturación", "clientes"),
+        new("clientes.centros.editar", "Clientes - Editar centros de servicio permitidos", "clientes"),
+
+        new("productos.crear", "Productos - Dar de alta", "productos"),
+        new("productos.editar", "Productos - Modificar", "productos"),
+        new("productos.estado.editar", "Productos - Dar de baja / reactivar", "productos")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)

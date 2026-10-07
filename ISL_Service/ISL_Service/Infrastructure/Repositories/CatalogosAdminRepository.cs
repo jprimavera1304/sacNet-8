@@ -45,17 +45,12 @@ public partial class CatalogosAdminRepository : ICatalogosAdminRepository
     }
 
     /// <summary>
-    /// Que hace falta para cambiarle el estatus a un renglon de catalogo sin
-    /// perder sus datos: de que tabla se lee, con que llave, a que SP se le
-    /// devuelve y que columnas hay que acarrear.
+    /// Que hace falta para cambiarle el estatus a un renglon sin perder sus
+    /// datos. Es el descriptor de <see cref="BajaLogicaLegacy"/>: vive ahi
+    /// porque clientes, productos y proveedores tienen el mismo problema y la
+    /// misma solucion, y tenerla dos veces significa arreglarla una sola vez el
+    /// dia que haga falta.
     /// </summary>
-    /// <param name="Tabla">Nombre con corchetes si lleva espacios: "[Catalogo Bancos]".</param>
-    /// <param name="ColumnaId">La llave en la tabla.</param>
-    /// <param name="ParamId">Como se llama esa llave en el SP (no siempre coincide: IDCondicionesCredito -> @IDCondicionCredito).</param>
-    /// <param name="Sp">El sp_n_Actualizar* del catalogo.</param>
-    /// <param name="Conservar">Pares (parametro del SP, columna de la tabla) que se leen y se devuelven sin tocar.</param>
-    /// <param name="PideUsuario">El SP recibe @IDUsuario.</param>
-    /// <param name="PideEquipo">El SP recibe @Equipo.</param>
     private sealed record CatalogoStatus(
         string Tabla,
         string ColumnaId,
@@ -75,33 +70,12 @@ public partial class CatalogosAdminRepository : ICatalogosAdminRepository
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
 
-        // 1. Los valores actuales. Sin esto el UPDATE del SP los dejaria vacios.
-        var columnas = string.Join(", ", def.Conservar.Select(x => Corchetes(x.Columna)));
-        var valores = new Dictionary<string, object?>(StringComparer.Ordinal);
-
-        await using (var lectura = new SqlCommand(
-            $"SELECT {columnas} FROM dbo.{def.Tabla} WHERE {Corchetes(def.ColumnaId)} = @Id", conn))
-        {
-            lectura.Parameters.AddWithValue("@Id", id);
-            await using var reader = await lectura.ExecuteReaderAsync(ct);
-            if (!await reader.ReadAsync(ct))
-                return null;
-
-            for (var i = 0; i < def.Conservar.Length; i++)
-                valores[def.Conservar[i].Param] = reader.IsDBNull(i) ? null : reader.GetValue(i);
-        }
-
-        // 2. El mismo SP de siempre, con el estatus nuevo y lo demas igual.
-        await using var cmd = Sp(def.Sp, conn);
-        cmd.Parameters.AddWithValue(def.ParamId, id);
-        cmd.Parameters.AddWithValue("@IDStatus", idStatus);
-        foreach (var par in def.Conservar)
-            cmd.Parameters.AddWithValue(par.Param, valores[par.Param] ?? DBNull.Value);
-        if (def.PideUsuario) cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
-        if (def.PideEquipo) cmd.Parameters.AddWithValue("@Equipo", equipo);
-
-        var dt = await FillAsync(cmd, ct);
-        return LeerResultado(dt);
+        return await BajaLogicaLegacy.CambiarAsync(
+            conn,
+            new BajaLogicaLegacy.Descriptor(
+                def.Tabla, def.ColumnaId, def.ParamId, def.Sp, def.Conservar,
+                PideUsuario: def.PideUsuario, PideEquipo: def.PideEquipo),
+            id, idStatus, idUsuario, equipo, ct);
     }
 
     /// <summary>

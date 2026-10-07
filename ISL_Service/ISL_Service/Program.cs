@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
@@ -136,6 +136,10 @@ builder.Services.AddScoped<ICatalogosRepository, CatalogosRepository>();
 // -------------------- ESCRITURAS DE CATALOGOS DE MAC31 (ola 6) --------------------
 builder.Services.AddScoped<ICatalogosAdminRepository, CatalogosAdminRepository>();
 builder.Services.AddScoped<ICatalogosAdminService, CatalogosAdminService>();
+
+// -------------------- FICHAS MAESTRAS DE MAC31: CLIENTE, PRODUCTO, PROVEEDOR --------------------
+builder.Services.AddScoped<IMaestrosRepository, MaestrosRepository>();
+builder.Services.AddScoped<IMaestrosService, MaestrosService>();
 
 builder.Services.AddScoped<ICategoriasRepository, CategoriasRepository>();
 builder.Services.AddScoped<ICategoriasService, CategoriasService>();
