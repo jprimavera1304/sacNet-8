@@ -1,5 +1,6 @@
 using System.Reflection;
 using ISL_Service.Application.DTOs.Recaudacion;
+using System.Runtime.CompilerServices;
 
 namespace ISL_Service.Tests;
 
@@ -136,12 +137,20 @@ public class Ola10FallarCerradoTests
         => LeerFuente("Infrastructure/Repositories/VentasPedidoCapturaRepository.cs");
 
     /// <summary>
-    /// Sube desde el directorio de la prueba hasta encontrar el .csproj del
-    /// servicio. Asi no depende de cuantas carpetas tenga bin/Debug/netX.
+    /// Sube hasta encontrar el .csproj del servicio para leer un archivo fuente.
+    ///
+    /// Arranca en la ruta de ESTE archivo, no en AppContext.BaseDirectory. El
+    /// compilador incrusta CallerFilePath al compilar, asi que apunta al arbol
+    /// de fuentes pase lo que pase con la carpeta de salida. Con BaseDirectory
+    /// la busqueda se rompia en cuanto el ensamblado no caia debajo del
+    /// proyecto, y eso pasa siempre que se compila con BaseOutputPath propio
+    /// —que es justo lo que hace falta cuando varios agentes comparten el arbol
+    /// y se pelean por bin/Debug—. Costaba cuatro pruebas rojas que no tenian
+    /// nada que ver con el codigo que se estaba probando.
     /// </summary>
-    private static string LeerFuente(string relativa)
+    private static string LeerFuente(string relativa, [CallerFilePath] string estaPrueba = "")
     {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        var dir = new DirectoryInfo(Path.GetDirectoryName(estaPrueba)!);
         while (dir is not null)
         {
             var candidato = Path.Combine(dir.FullName, "ISL_Service.csproj");
