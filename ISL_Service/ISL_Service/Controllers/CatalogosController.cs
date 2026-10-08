@@ -1,4 +1,4 @@
-﻿using ISL_Service.Application.DTOs.Catalogos;
+using ISL_Service.Application.DTOs.Catalogos;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -106,8 +106,27 @@ public class CatalogosController : ControllerBase
       este controlador tampoco lo llevan, por lo mismo (ver el comentario de
       CatalogosGeneralesController).
     */
+    /*
+      LA PUERTA ES `clientes.ver_modulo`, NO `clientes.ver`.
+
+      `clientes.ver` se llama, literalmente, "Clientes - Ver bonificaciones y
+      centros de servicio": es la llave estrecha de las pestanas satelite.
+      Usarla para el catalogo entero mezcla dos permisos distintos, y encima la
+      tenian CERO de los 8 usuarios activos de MacZ, asi que exigirla dejaba en
+      403 a todo el que no fuera SuperAdmin. Este endpoint lo consume el front
+      viejo en una veintena de sitios: lo que se caia no era una pantalla nueva.
+
+      `clientes.ver_modulo` es la llave de "puede ver clientes", que es lo que
+      aqui toca. Se piden las dos con `|` -basta una- para no quitarle el
+      catalogo a quien ya tenga la estrecha. Y el handler trae un puente:
+      `CanUseLegacyVerAsModuleView` acepta tambien a quien tenga el `clientes.ver`
+      de legacy cuando se exige el `.ver_modulo`.
+
+      Esto NO sustituye al filtro por agente, que es el arreglo de verdad: antes
+      cualquier autenticado se llevaba los 887 clientes de los 15 agentes.
+    */
     [HttpGet("clientes")]
-    [Authorize(Policy = "perm:clientes.ver")]
+    [Authorize(Policy = "perm:clientes.ver_modulo|clientes.ver")]
     [ProducesResponseType(typeof(List<ClienteCatalogItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> GetClientes([FromQuery] int? status, CancellationToken ct)
