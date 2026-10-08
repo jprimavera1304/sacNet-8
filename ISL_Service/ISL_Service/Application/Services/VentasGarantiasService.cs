@@ -202,6 +202,14 @@ public class VentasGarantiasService : IVentasGarantiasService
     }
 
     /// <summary>
+    /// Los catalogos del formulario. No hay regla que aplicar encima: el filtro
+    /// por usuario de los almacenes lo hace el repositorio contra la bandera
+    /// `Acceso`, y el id del usuario viene del token.
+    /// </summary>
+    public Task<GarantiaCatalogosResponse> ConsultarCatalogosAsync(int idUsuarioActual, CancellationToken ct)
+        => _repository.ConsultarCatalogosAsync(idUsuarioActual, ct);
+
+    /// <summary>
     /// La cascada de filtros de las dos consultas de garantias: el primer campo
     /// de texto que venga gana y se queda solo. Es la prioridad de legacy, con
     /// nombre y en un solo lugar.
