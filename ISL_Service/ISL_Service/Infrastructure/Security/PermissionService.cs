@@ -698,6 +698,39 @@ public sealed class PermissionService : IPermissionService
         // `catalogos.*` porque el renglón trae precio de lista, precio anterior y
         // la diferencia entre los dos: es el margen de la empresa.
         new("productos.ver_modulo", "Productos - Ver módulo", "productos"),
+
+        /*
+          LAS LLAVES DE MODULO QUE FALTABAN, Y POR QUE SIN ELLAS NO EXISTE NADA.
+
+          `/api/modulos/disponibles` filtra por `{clave}.ver_modulo`. Si esa clave
+          no esta sembrada, el modulo NO SE PUEDE OFRECER por mucho que su
+          pantalla exista, su renglon este en `dbo.WModulo` y el permiso se le
+          asigne a un rol: la tarjeta nunca sale en el Inicio y a la pantalla solo
+          se llega escribiendo la direccion.
+
+          Se vio midiendo: tras dar de alta los quince modulos del front nuevo, el
+          API seguia publicando seis. Los otros diez no tenian esta llave.
+
+          Es la misma forma del fallo que dejo 68 capacidades contestando 403:
+          migradas y muertas a la vez porque su clave no existia.
+        */
+        new("inventario_ajustes.ver_modulo", "Inventario - Ajustes: ver módulo", "inventario"),
+        new("inventario_transito.ver_modulo", "Inventario - En tránsito: ver módulo", "inventario"),
+
+        new("cobros.ver_modulo", "Cobros - Ver módulo (hojas de cobro)", "cobros"),
+        new("dinero_usados.ver_modulo", "Cobros - Dinero de usados: ver módulo", "cobros"),
+
+        new("garantias.ver_modulo", "Garantías - Ver módulo", "garantias"),
+        new("cambios_vigencia.ver_modulo", "Cambios de vigencia - Ver módulo", "cambiosvigencia"),
+        new("liquidaciones.ver_modulo", "Liquidaciones de descuento - Ver módulo", "descuentos"),
+
+        /*
+          `venta` es VENDER y `ventas` es "Pendientes de autorizar": dos modulos
+          distintos cuyas claves se parecen. No se tocan.
+        */
+        new("venta.ver_modulo", "Vender - Ver módulo", "ventas"),
+        new("facturas.ver_modulo", "Facturas - Ver módulo (consulta)", "facturacion"),
+        new("reasignacion.ver_modulo", "Reasignación de remisiones - Ver módulo", "ventas"),
         new("productos.ver", "Productos - Ver catálogo con precios", "productos"),
 
         // Cortes de caja. `.cs` aparte: los de centro de servicio cruzan a las
