@@ -11,7 +11,7 @@ namespace ISL_Service.Tests;
 public class ReportesCatalogoTests
 {
     [Fact]
-    public void Catalogo_Tiene_Los_59_Reportes_Con_Clave_Unica()
+    public void Catalogo_Tiene_Los_60_Reportes_Con_Clave_Unica()
     {
         // 53 + los cuatro que la ola 7 saco del hueco: garantias_registradas (1236),
         // centros_pagos_entradas_salidas (1415), centros_garantias (1420) y
@@ -24,7 +24,10 @@ public class ReportesCatalogoTests
         //
         // + cambios_vigencia (1535), por lo mismo que autos: lo imprime el boton
         // IMPRIMIR de ConsultarCambiosVigencia y no un nodo del arbol.
-        Assert.Equal(59, ReportesCatalogo.Reportes.Count);
+        //
+        // + liquidaciones_descuentos (1030), por lo mismo: boton IMPRIMIR de
+        // ConsultarLiquidacionesDescuentos.
+        Assert.Equal(60, ReportesCatalogo.Reportes.Count);
         Assert.Equal(
             ReportesCatalogo.Reportes.Count,
             ReportesCatalogo.Reportes.Select(x => x.Clave).Distinct(StringComparer.OrdinalIgnoreCase).Count());
@@ -73,6 +76,7 @@ public class ReportesCatalogoTests
     // de la pantalla- y ninguna clave de reportes que lo mencione. No se le cuelga
     // cambiosvigencia.ver: exigiria los dos permisos a la vez.
     [InlineData("cambios_vigencia")]
+    [InlineData("liquidaciones_descuentos")]
     public void Reportes_Sin_Permiso_No_Se_Bloquean(string clave)
     {
         Assert.NotNull(ReportesCatalogo.Buscar(clave));

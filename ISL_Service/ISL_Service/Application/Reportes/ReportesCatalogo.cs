@@ -142,6 +142,22 @@ public static class ReportesCatalogo
           a quien tiene el modulo de reportes completo.
         */
         new("cambios_vigencia", "ventas", "Cambios de Vigencia", SinPermiso),
+        /*
+          LIQUIDACIONES DE DESCUENTO (1030): el papel de una liquidacion.
+
+          Mismo caso que autos y cambios_vigencia: lo imprime el boton IMPRIMIR de
+          ConsultarLiquidacionesDescuentos, no un nodo del arbol de Reportes, asi
+          que reportes.ventas.liquidaciones_descuentos.ver no existe en WPermiso
+          (comprobado en MacZ el 07-10-2026; las claves que si existen son
+          descuentos.{ver, editar, eliminar, simular} y
+          descuentos.ajustes.{ver, crear, autorizar}, que son las de la pantalla).
+
+          NO se le cuelga descuentos.ajustes.ver por la misma razon que a los
+          otros dos: este endpoint ya exige reportes.ver_modulo por politica, y
+          sumarle una segunda clave le quitaria el papel a quien tiene el modulo
+          de reportes completo.
+        */
+        new("liquidaciones_descuentos", "ventas", "Liquidaciones Descuentos", SinPermiso),
 
         // ----- COMPRAS -----
         new("compras_acumuladores_y_productos", "compras", "Acumuladores y Productos", "reportes.compras.acumuladores_y_productos.ver"),

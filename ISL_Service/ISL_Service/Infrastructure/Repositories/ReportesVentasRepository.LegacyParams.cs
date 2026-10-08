@@ -230,6 +230,9 @@ public partial class ReportesVentasRepository
             // El documento de UN cambio de vigencia, el que imprime
             // ConsultarCambiosVigencia de Mac31. No es un listado: pide el id.
             "cambios_vigencia" => ReporteCambiosVigencia,
+            // Las liquidaciones de descuento SELECCIONADAS, lo que imprime
+            // ConsultarLiquidacionesDescuentos de Mac31.
+            "liquidaciones_descuentos" => ReporteVentasDescuentosAjustes,
             _ => throw new InvalidOperationException("Reporte de ventas no soportado.")
         };
     }
@@ -1259,6 +1262,63 @@ public partial class ReportesVentasRepository
                 legacy.Param3 = presentacion;
                 break;
 
+            /*
+              LIQUIDACIONES DE DESCUENTO (1030): LOS FOLIOS SELECCIONADOS.
+
+              Los once parametros, enumerados por el propio
+              sp_n_rptVentasDescuentosAjustes arriba de su #ParamIds (leido de
+              MacZ), que ademas nombra cada posicion en vez de decir ParamN:
+
+                Param2 IDVentasDescuentosAjustes   Param3 IDTiposLiquidaciones
+                Param4 IDsVenta                    Param5 IDsCliente
+                Param6 IDsAgente                   Param7 FolioInicial
+                Param8 FolioFinal                  Param9 FechaInicial
+                Param10 FechaFinal                 Param11 Presentacion
+
+              EL BOTON IMPRIMIR DE MAC31 MANDA SOLO EL PARAM2 Y PARAM11; los otros
+              nueve van vacios o en 0 (ConsultarLiquidacionesDescuentos.cs:498-531,
+              donde IDTiposLiquidaciones, IDVentas, IDClientes, IDAgentes,
+              FechaInicial y FechaFinal se declaran "" y los folios 0, y nada se
+              les asigna despues). Se copia eso: el reporte es de lo marcado en la
+              rejilla, no del filtro de la busqueda. Sus fechas NO son el rango del
+              reporte y mandarlas CAMBIARIA el papel, asi que no se mandan aunque
+              el DTO generico las pida.
+
+              LA LISTA SE UNE CON '[' Y NO CON '~', Y ESO NO ES UN DESCUIDO.
+              Mac31 la junta con DELIMITADOR_PARAM_CORCHETE_SP ('[',
+              ConsultarLiquidacionesDescuentos.cs:470) y el procedimiento hace
+              REPLACE(IDVentasDescuentosAjustes, '[', '~') antes de pasarla a
+              fn_DevuelveCadenaEnTabla. Si se manda con '~' directamente, el
+              REPLACE no encuentra nada y la cadena llega igual, asi que esta
+              funciona por casualidad -- pero el '[' es lo que esta escrito en los
+              dos lados, y con el la cadena guardada en Parametros es la misma que
+              deja Mac31, que es lo que se puede comparar renglon por renglon.
+
+              SI NO HAY FOLIOS SELECCIONADOS NO SE IMPRIME, igual que Mac31, que
+              dice "SELECCIONE UN FOLIO" y no llama al reporte. Con la lista vacia
+              el procedimiento no filtra por folio y el papel saldria con TODAS las
+              liquidaciones de la base.
+            */
+            case ReporteVentasDescuentosAjustes:
+                var folios = (request.IDLiquidacionesDescuento ?? new List<int>())
+                    .Where(x => x > 0)
+                    .Distinct()
+                    .Select(x => x.ToString(CultureInfo.InvariantCulture))
+                    .ToList();
+                if (folios.Count == 0)
+                    throw new ArgumentException("El reporte de liquidaciones de descuento se imprime de los folios seleccionados: manda al menos uno en idLiquidacionesDescuento.");
+                legacy.Param2 = string.Join("[", folios);
+                legacy.Param3 = "";
+                legacy.Param4 = "";
+                legacy.Param5 = "";
+                legacy.Param6 = "";
+                legacy.Param7 = "0";
+                legacy.Param8 = "0";
+                legacy.Param9 = "";
+                legacy.Param10 = "";
+                legacy.Param11 = presentacion;
+                break;
+
             default:
                 throw new InvalidOperationException("Reporte de ventas no soportado.");
         }
@@ -1998,6 +2058,9 @@ public partial class ReportesVentasRepository
             ReporteControlAcumuladoEstimaciones => "Param4",
             // 1535: Param2 es el IDCambioVigencia y la presentacion queda en Param3.
             ReporteCambiosVigencia => "Param3",
+            // 1030: diez parametros antes de la presentacion (su #ParamIds la
+            // nombra `Presentacion` en la posicion de Param11).
+            ReporteVentasDescuentosAjustes => "Param11",
             ReporteVentasLiquidaciones => "Param6",
             ReporteHojaCobroTotalCobradoDetallado or ReporteHojaCobroTotalCobradoTotalizado or ReporteHojaCobroTotalCascos or ReporteHojaCobroCheques => "Param9",
             ReporteGarantias => "Param9",

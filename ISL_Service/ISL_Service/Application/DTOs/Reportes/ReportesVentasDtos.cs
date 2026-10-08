@@ -147,6 +147,17 @@ public class ReportesVentasLegacyRequest : ReportesVentasAcumuladoresProductosRe
     /// haber intentado sellar la impresion del documento 0.
     /// </summary>
     public int IDCambioVigencia { get; set; }
+
+    /// <summary>
+    /// Liquidaciones de Descuento (1030): los folios SELECCIONADOS a imprimir.
+    ///
+    /// Es obligatorio y no hay "todos": el boton IMPRIMIR de
+    /// ConsultarLiquidacionesDescuentos recorre la rejilla, junta los marcados y
+    /// si no hay ninguno dice "SELECCIONE UN FOLIO" y no imprime
+    /// (ConsultarLiquidacionesDescuentos.cs:468-484). El reporte es de lo
+    /// seleccionado, no del resultado de la busqueda.
+    /// </summary>
+    public List<int> IDLiquidacionesDescuento { get; set; } = new();
 }
 
 public class ReportesVentasPreviewResponse
