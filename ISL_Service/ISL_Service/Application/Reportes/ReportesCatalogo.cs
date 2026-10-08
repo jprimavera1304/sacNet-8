@@ -122,6 +122,26 @@ public static class ReportesCatalogo
         Ventas("hoja_de_cobro_total_cobrado", "Hoja de Cobro Total Cobrado"),
         Ventas("hoja_de_cobro_total_cascos", "Hoja de Cobro Total Cascos"),
         Ventas("hoja_de_cobro_cheques", "Hoja de Cobro Cheques"),
+        /*
+          CAMBIOS DE VIGENCIA (1535): el documento de UN cambio de vigencia.
+
+          Lo imprime el boton IMPRIMIR de ConsultarCambiosVigencia de Mac31, no un
+          nodo del arbol de Reportes -- el mismo caso que `autos`, que sale del
+          boton de ConsultarAutos. Por eso su permiso por la regla seria
+          reportes.ventas.cambios_vigencia.ver y NO existe en WPermiso: comprobado
+          en MacZ el 07-10-2026, ahi solo hay cambiosvigencia.{ver_modulo, ver,
+          crear, editar, cancelar}, que son los de la pantalla, y ninguna clave de
+          reportes que lo mencione. El script del catalogo legacy no lo genero
+          porque el nodo no vive en el arbol.
+
+          Entra ABIERTO a quien tenga reportes.ver_modulo, como los otros siete sin
+          permiso, y no se le inventa uno: bloquear por una duda deja a alguien sin
+          su documento sin poder explicarle por que. Lo que NO se hace es colgarle
+          `cambiosvigencia.ver`: eso exigiria los dos permisos a la vez (este
+          endpoint ya pide reportes.ver_modulo por politica) y dejaria sin imprimir
+          a quien tiene el modulo de reportes completo.
+        */
+        new("cambios_vigencia", "ventas", "Cambios de Vigencia", SinPermiso),
 
         // ----- COMPRAS -----
         new("compras_acumuladores_y_productos", "compras", "Acumuladores y Productos", "reportes.compras.acumuladores_y_productos.ver"),

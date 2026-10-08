@@ -11,7 +11,7 @@ namespace ISL_Service.Tests;
 public class ReportesCatalogoTests
 {
     [Fact]
-    public void Catalogo_Tiene_Los_58_Reportes_Con_Clave_Unica()
+    public void Catalogo_Tiene_Los_59_Reportes_Con_Clave_Unica()
     {
         // 53 + los cuatro que la ola 7 saco del hueco: garantias_registradas (1236),
         // centros_pagos_entradas_salidas (1415), centros_garantias (1420) y
@@ -21,7 +21,10 @@ public class ReportesCatalogoTests
         // boton IMPRIMIR de la pantalla de catalogo ConsultarAutos. Es el mismo
         // camino -sp_ConsultaReportes da el SP y la plantilla- asi que entra aqui y
         // no en un segundo catalogo.
-        Assert.Equal(58, ReportesCatalogo.Reportes.Count);
+        //
+        // + cambios_vigencia (1535), por lo mismo que autos: lo imprime el boton
+        // IMPRIMIR de ConsultarCambiosVigencia y no un nodo del arbol.
+        Assert.Equal(59, ReportesCatalogo.Reportes.Count);
         Assert.Equal(
             ReportesCatalogo.Reportes.Count,
             ReportesCatalogo.Reportes.Select(x => x.Clave).Distinct(StringComparer.OrdinalIgnoreCase).Count());
@@ -65,6 +68,11 @@ public class ReportesCatalogoTests
     // Y el sexto, que entro con la ola 7: su permiso por regla seria
     // reportes.administracion.control_acumulado_de_estimaciones.ver y tampoco esta.
     [InlineData("control_acumulado_de_estimaciones")]
+    // Y cambios_vigencia (1535): comprobado en MacZ el 07-10-2026, en WPermiso
+    // solo existen cambiosvigencia.{ver_modulo, ver, crear, editar, cancelar} -los
+    // de la pantalla- y ninguna clave de reportes que lo mencione. No se le cuelga
+    // cambiosvigencia.ver: exigiria los dos permisos a la vez.
+    [InlineData("cambios_vigencia")]
     public void Reportes_Sin_Permiso_No_Se_Bloquean(string clave)
     {
         Assert.NotNull(ReportesCatalogo.Buscar(clave));

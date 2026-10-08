@@ -139,6 +139,14 @@ public class ReportesVentasLegacyRequest : ReportesVentasAcumuladoresProductosRe
 
     /// <summary>Registro de Garantias (1236): filtro de productos, vacio = todos.</summary>
     public List<int> IDProductos { get; set; } = new();
+
+    /// <summary>
+    /// Cambios de Vigencia (1535): el documento a imprimir. Es OBLIGATORIO y no
+    /// tiene valor por omision util: el reporte imprime UN cambio de vigencia, no
+    /// un listado, y con 0 el procedimiento devuelve cero renglones despues de
+    /// haber intentado sellar la impresion del documento 0.
+    /// </summary>
+    public int IDCambioVigencia { get; set; }
 }
 
 public class ReportesVentasPreviewResponse

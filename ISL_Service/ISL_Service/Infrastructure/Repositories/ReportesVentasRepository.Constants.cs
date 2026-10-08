@@ -64,6 +64,12 @@ public partial class ReportesVentasRepository
     /// <summary>Reporte de Autos (la flotilla). Lo imprime ConsultarAutos de Mac31.</summary>
     private const int ReporteAutos = 1300;
     private const int ReporteVentasDescuentosAjustes = 1030;
+    /// <summary>
+    /// Cambios de Vigencia. Imprime UN documento, el que este seleccionado en
+    /// ConsultarCambiosVigencia de Mac31: su `sp_n_rptCambiosVigencia` recibe el
+    /// IDCambioVigencia en Param2 y la presentacion en Param3, y nada mas.
+    /// </summary>
+    private const int ReporteCambiosVigencia = 1535;
     /*
       1160 ES EL QUE USA EL NODO REAL DEL MENU DE MAC31.
 

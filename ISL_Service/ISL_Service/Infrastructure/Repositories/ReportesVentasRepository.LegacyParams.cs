@@ -227,6 +227,9 @@ public partial class ReportesVentasRepository
             // El reporte de la flotilla, que imprime ConsultarAutos de Mac31. No
             // lleva filtros: su sp_n_rptAutos recibe el @Params generico y ya.
             "autos" => ReporteAutos,
+            // El documento de UN cambio de vigencia, el que imprime
+            // ConsultarCambiosVigencia de Mac31. No es un listado: pide el id.
+            "cambios_vigencia" => ReporteCambiosVigencia,
             _ => throw new InvalidOperationException("Reporte de ventas no soportado.")
         };
     }
@@ -460,6 +463,9 @@ public partial class ReportesVentasRepository
             // El de la flotilla: mismo camino generico que los otros, su SP recibe
             // el @Params y devuelve la tabla que pinta la plantilla rptTemplate.
             ReporteAutos or
+            // Cambios de Vigencia: su plantilla es rptTemplate y su SP recibe el
+            // @Params generico, igual que los otros cincuenta y tres.
+            ReporteCambiosVigencia or
             ReporteClientesFacturasRFC or
             ReporteVentasUtilidadAcumuladores or
             ReporteVentasUtilidadProductos or
@@ -1223,6 +1229,36 @@ public partial class ReportesVentasRepository
                 legacy.Param2 = presentacion;
                 break;
 
+            /*
+              CAMBIOS DE VIGENCIA (1535): UN DOCUMENTO, DOS PARAMETROS.
+
+              El propio sp_n_rptCambiosVigencia los enumera arriba del CREATE
+              TABLE #ParamIds, leido de la base:
+
+                  -- Param 1 =  Equipo ~ IDUsuario
+                  -- Param 2 =  IDCambioVigencia
+                  -- Param 3 =  Presentacion
+
+              y su #ParamIds nombra esas dos posiciones `IDCambioVigencia` y
+              `Presentacion` en vez de Param2 y Param3, asi que el orden no es
+              una suposicion.
+
+              SI EL ID VIENE EN 0, EL PROCEDIMIENTO NO DICE "SIN INFORMACION":
+              hace `IF @IDCambioVigencia IS NULL` y si no es nulo sigue adelante,
+              de modo que con 0 corre el JOIN completo, no encuentra nada y
+              devuelve cero renglones; peor, antes de eso ya intento sellar la
+              impresion del cambio de vigencia 0. Se rechaza aqui, con mensaje.
+
+              Las fechas que pide el DTO generico se ignoran, igual que en Autos:
+              este reporte no tiene rango.
+            */
+            case ReporteCambiosVigencia:
+                if (request.IDCambioVigencia <= 0)
+                    throw new ArgumentException("El reporte de cambios de vigencia necesita el idCambioVigencia del documento a imprimir.");
+                legacy.Param2 = request.IDCambioVigencia.ToString(CultureInfo.InvariantCulture);
+                legacy.Param3 = presentacion;
+                break;
+
             default:
                 throw new InvalidOperationException("Reporte de ventas no soportado.");
         }
@@ -1960,6 +1996,8 @@ public partial class ReportesVentasRepository
             ReporteCentrosRemisiones or ReporteCentrosPagosEntradasSalidas or ReporteCentrosGarantias => "Param4",
             ReporteGarantiasRegistradas => "Param5",
             ReporteControlAcumuladoEstimaciones => "Param4",
+            // 1535: Param2 es el IDCambioVigencia y la presentacion queda en Param3.
+            ReporteCambiosVigencia => "Param3",
             ReporteVentasLiquidaciones => "Param6",
             ReporteHojaCobroTotalCobradoDetallado or ReporteHojaCobroTotalCobradoTotalizado or ReporteHojaCobroTotalCascos or ReporteHojaCobroCheques => "Param9",
             ReporteGarantias => "Param9",
