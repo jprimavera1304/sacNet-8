@@ -1,9 +1,25 @@
 # Antes de desplegar el backend nuevo: lo que hay que hacer en la base
 
-No es codigo. Son cosas que, si se suben sin hacerlas, dejan pantallas en 403 o
-en blanco **sin nada en la consola que lo explique**.
+> **En LOCAL ya esta todo corrido** (07-oct-2026, `MacZ` y `Produccion_svr`).
+> Lo de abajo es la receta para PRODUCCION.
 
-## 1. `clientes.ver` no la tiene nadie
+## UN MODULO NUEVO NECESITA TRES COSAS, NO DOS
+
+Esto costo una tarde y conviene que sea lo primero que se lee:
+
+1. **La pantalla**, y su clave en `MODULOS_EN_DOCS2` de `docs2/src/nucleo/rutas.ts`.
+   Sin eso, el Inicio manda al front VIEJO.
+2. **El renglon** en `dbo.WModulo` + `dbo.WModuloEmpresa` (`Querrys/34`).
+   Sin eso, el Inicio ni lo ofrece.
+3. **La llave `{clave}.ver_modulo`** en `PermissionCatalogSeeds`.
+   Sin eso, `/api/modulos/disponibles` lo filtra y **tampoco sale**, por mucho
+   que existan las otras dos.
+
+Las tres fallan igual de silenciosas: la pantalla funciona y nadie puede llegar.
+Con los quince modulos del front nuevo fallaron las tres a la vez.
+
+
+## 1. `clientes.ver` no la tiene nadie  — HECHO EN LOCAL (`Querrys/33`)
 
 `GET /api/catalogos/clientes` ya **exige** `perm:clientes.ver`. El cambio es
 correcto —antes no pedia ningun permiso y cualquier autenticado se llevaba los
@@ -38,7 +54,7 @@ que lo que se cae no es una pantalla nueva: es una que hoy funciona.
 clientes.** Y de paso es el momento de decidir si `User`, `CHECADOR` y
 `EMPLEADO` deben verlos.
 
-## 2. Las claves de modulo que el API todavia no publica
+## 2. Las claves de modulo que el API todavia no publica  — HECHO EN LOCAL (`Querrys/34` + las diez llaves en el codigo)
 
 `GET api/modulos/disponibles` no devuelve para Zaragoza las claves de los
 modulos nuevos, asi que **sus tarjetas no salen en el Inicio** aunque la
@@ -57,7 +73,7 @@ local funcione. Catalogos ya lo tiene (un solo renglon para los veinte, por eso
 se hizo asi). Faltan las de cobranza, clientes, productos, proveedores e
 inventario.
 
-## 4. Los dos procedimientos nuevos, sin instalar
+## 4. Los dos procedimientos nuevos  — INSTALADOS EN LOCAL
 
 Los dos **crean** un objeto nuevo y no modifican ninguno existente:
 
@@ -67,7 +83,13 @@ Los dos **crean** un objeto nuevo y no modifican ninguno existente:
 - `Querrys/32 Reporte Autos Columna Mala/` — sin esto el reporte de Autos no
   sale, igual que no sale hoy desde Mac31.
 
-## 5. Lo que NO esta decidido
+## 5. Los permisos de reportes  — HECHO EN LOCAL (`Querrys/35`)
+
+De las 65 claves `reportes.*` que existen, las 65 tenian CERO tenedores: solo un
+SuperAdmin alcanzaba el modulo. El guion asigna `reportes.ver_modulo` al rol
+ADMIN; los reportes uno a uno se reparten desde la pantalla de Roles.
+
+## 6. Lo que NO esta decidido
 
 - **La contraseña en mayusculas del web.** Parte el padron de usuarios web en
   dos. Esta en `seguridad-hallazgos.md` con los numeros.
