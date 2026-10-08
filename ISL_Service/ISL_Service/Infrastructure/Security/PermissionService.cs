@@ -1260,7 +1260,33 @@ public sealed class PermissionService : IPermissionService
         new("app_movil.prestamos.ver", "App mÃ³vil - PrÃ©stamos: Ver", "app_movil"),
         new("app_movil.prestamos.crear", "App mÃ³vil - PrÃ©stamos: Crear", "app_movil"),
         new("app_movil.prestamos.editar", "App mÃ³vil - PrÃ©stamos: Editar", "app_movil"),
-        new("app_movil.prestamos.cancelar", "App mÃ³vil - PrÃ©stamos: Cancelar", "app_movil")
+        new("app_movil.prestamos.cancelar", "App mÃ³vil - PrÃ©stamos: Cancelar", "app_movil"),
+
+        /*
+          LOS CINCO MODULOS NUEVOS DEL TELEFONO.
+
+          Sus pantallas ya existen y ya estan dadas de alta en el registro
+          de la app, pero sin su llave aqui el mosaico no le sale a NADIE
+          salvo a un SuperAdmin: la lista de modulos del telefono se filtra
+          por permiso, y un permiso que no esta en este catalogo no lo tiene
+          nadie. Era el candado que faltaba, no un olvido de los modulos.
+
+          Van en el canal app_movil. y no reusan el permiso del web A
+          PROPOSITO: asi se puede dar el acceso en la computadora y negarlo
+          en el telefono, que es justo lo que hace falta con un repartidor.
+
+          OJO: esto solo los pone en el CATALOGO. Los endpoints siguen
+          pidiendo sus permisos de siempre -ventas.consultar, clientes.ver,
+          cortes.ver...- asi que a quien reciba uno de estos hay que darle
+          tambien el del backend, o entrara a la pantalla y recibira un 403.
+        */
+        new("app_movil.ventas.consulta.ver", "App móvil - Consulta de ventas", "app_movil"),
+        new("app_movil.clientes", "App móvil - Clientes", "app_movil"),
+        new("app_movil.facturacion.ver", "App móvil - Facturas: Ver", "app_movil"),
+        new("app_movil.facturacion.enviar", "App móvil - Facturas: Enviar por correo", "app_movil"),
+        new("app_movil.productos", "App móvil - Productos", "app_movil"),
+        new("app_movil.cortes.ver", "App móvil - Cortes: Ver", "app_movil"),
+        new("app_movil.cortes.cancelar", "App móvil - Cortes: Cancelar", "app_movil")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)
