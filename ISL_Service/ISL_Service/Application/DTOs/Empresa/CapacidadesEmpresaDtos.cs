@@ -127,6 +127,26 @@ public class CapacidadesDeNegocio
     public bool GarantiaExigeEnvioAProveedorPrimero { get; set; }
 
     /// <summary>
+    /// Al EDITAR una garantia ya registrada se puede cambiar el PRODUCTO: la
+    /// clave, el buscador de producto, el almacen del producto y la casilla de
+    /// "clave otra" vuelven a quedar habilitados. Donde esta capacidad es
+    /// <c>false</c>, abrir una garantia para editarla deja esos cuatro controles
+    /// apagados y solo se puede tocar el diagnostico, el ajuste y el motivo.
+    /// Legacy: Garantia.cs:213 (<c>funcionalidad == "ZARA" &amp;&amp;
+    /// EsCentroServicio == 0</c>) y :217-220, los cuatro controles que reabre.
+    ///
+    /// ES CAPACIDAD PROPIA Y NO SE CUELGA DE
+    /// <see cref="GarantiaEnvioAProveedorEsElUltimoPaso"/>: esa dice en que ORDEN
+    /// van los pasos del flujo y esta dice quien puede CAMBIAR el producto al
+    /// editar. Hoy las dos valen true en Zaragoza y eso las hace parecer la
+    /// misma; no lo son, y amarrarlas rompe en silencio a la tercera empresa que
+    /// herede el orden de Zaragoza sin heredar el permiso de edicion -o a un
+    /// centro de servicio de Zaragoza, donde el orden sigue siendo el de ZARA y
+    /// este permiso ya es false.
+    /// </summary>
+    public bool GarantiaPermiteCambiarProductoAlEditar { get; set; }
+
+    /// <summary>
     /// Al facturar, el importe de la partida se PRORRATEA
     /// (ImportePartida / cantidadOriginal * Cantidad) y el precio sale de
     /// precioLista: VentasFacturacion.cs:1414-1418 (rama TAU). Con false se usan

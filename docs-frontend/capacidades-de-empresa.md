@@ -135,6 +135,7 @@ orden del proceso.** `ConsultarGarantias.cs` tiene dos bloques espejados.
 |---|---|---|
 | `garantiaEnvioAProveedorEsElUltimoPaso` | **`true`** | `false` |
 | `garantiaExigeEnvioAProveedorPrimero` | `false` | **`true`** |
+| `garantiaPermiteCambiarProductoAlEditar` | **`true`** | `false` |
 
 ```csharp
 // ConsultarGarantias.cs:1836-1851  (ZARA)
@@ -166,6 +167,18 @@ Leído junto:
 **Qué hace el front:** el orden de los pasos del asistente, qué botones están vivos en cada estatus y
 el texto del bloqueo salen de estas dos capacidades. Si implementas una sola de las dos reglas, rompes
 la otra empresa **en silencio**, y el síntoma que llega es "el botón no me deja" sin ninguna pista.
+
+**La tercera, `garantiaPermiteCambiarProductoAlEditar`, es otro eje y no el mismo.** Las dos de arriba
+hablan del **orden** de los pasos; ésta del **permiso de edición**: al abrir una garantía ya
+registrada, si es `true` vuelven a quedar habilitados la clave, el buscador de producto, el almacén
+del producto y la casilla de "clave otra" (`Garantia.cs:213` y `:217-220`); si es `false`, esos cuatro
+controles se quedan apagados y sólo se puede tocar diagnóstico, ajuste y motivo.
+
+Y se compara con **igualdad exacta**: `Garantia.cs:213` dice `Variables.funcionalidad == "ZARA"`, no
+`.Contains("ZARA")` como las otras diez ramas del mismo archivo. Por eso no se cuelga de
+`garantiaEnvioAProveedorEsElUltimoPaso` aunque hoy las dos valgan `true` en Zaragoza: un **centro de
+servicio de Zaragoza** mantiene el orden de ZARA (`true`) y ya **no** puede cambiar el producto
+(`false`), y amarrarlas le daría permiso de reescribir qué pieza se garantizó después de recibirla.
 
 > Extra que no es capacidad: `ConsultarGarantias.cs:1887` — en Tauro los usuarios **22, 40, 1 y 3** se
 > saltan la validación de monto < 300. Son cuatro ids escritos en el código; el backend no los publica
