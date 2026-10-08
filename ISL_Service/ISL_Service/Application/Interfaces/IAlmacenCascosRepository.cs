@@ -40,6 +40,13 @@ public interface IAlmacenCascosRepository
     Task<List<MovimientoCascoTarimaKilosDto>> GetMovimientoTarimasKilosAsync(int idMovimiento, CancellationToken ct = default);
 
     /// <summary>
+    /// La existencia de cascos por tipo: el panel "CASCOS ACTUAL" de Mac31.
+    /// Llama a sp_n_ConsultaTiposUsados, que es una lectura pura (ver
+    /// ExistenciaDeCascoDto).
+    /// </summary>
+    Task<List<ExistenciaDeCascoDto>> ConsultarExistenciasAsync(CancellationToken ct = default);
+
+    /// <summary>
     /// Ejecuta sp_w_CancelarMovimientoCasco.
     /// </summary>
     Task CancelarMovimientoAsync(int idMovimiento, string motivoCancelacion, string usuario, CancellationToken ct = default);

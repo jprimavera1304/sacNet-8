@@ -13,6 +13,11 @@ public interface IAlmacenCascosService
 
     Task<List<MovimientoCascoTarimaKilosDto>> GetMovimientoTarimasKilosAsync(int idMovimiento, CancellationToken ct = default);
 
+    /// <summary>
+    /// La existencia por tipo de casco: lo que Mac31 pinta en "CASCOS ACTUAL".
+    /// </summary>
+    Task<List<ExistenciaDeCascoDto>> ConsultarExistenciasAsync(CancellationToken ct = default);
+
     Task<int> CrearSalidaAsync(CreateSalidaRequest request, string usuario, CancellationToken ct = default);
 
     Task AceptarEntradaAsync(CreateEntradaRequest request, string usuario, CancellationToken ct = default);

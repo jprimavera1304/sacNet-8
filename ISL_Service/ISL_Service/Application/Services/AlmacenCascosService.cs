@@ -34,6 +34,28 @@ public class AlmacenCascosService : IAlmacenCascosService
         return await _repository.GetMovimientoTarimasKilosAsync(idMovimiento, ct);
     }
 
+    /// <summary>
+    /// La existencia por tipo de casco. Sin validacion que hacer: no recibe nada.
+    /// </summary>
+    /// <remarks>
+    /// Se ORDENA AQUI y no se confia en el procedimiento. El `ORDER BY Orden,
+    /// TipoUsado` del SP ordena por el nombre LARGO, y Mac31 pinta el corto
+    /// cuando la empresa es Tauro: dos cascos con el mismo `Orden` saldrian en un
+    /// orden que no se corresponde con lo que se lee en pantalla. Ordenar por el
+    /// id al final deja el resultado estable —sin eso, dos cascos con el mismo
+    /// Orden y el mismo nombre pueden intercambiarse entre dos consultas y la
+    /// lista "se mueve sola" sin que nada haya cambiado.
+    /// </remarks>
+    public async Task<List<ExistenciaDeCascoDto>> ConsultarExistenciasAsync(CancellationToken ct = default)
+    {
+        var lista = await _repository.ConsultarExistenciasAsync(ct);
+        return lista
+            .OrderBy(x => x.Orden)
+            .ThenBy(x => x.Descripcion, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => x.IdTipoCasco)
+            .ToList();
+    }
+
     public async Task<int> CrearSalidaAsync(CreateSalidaRequest request, string usuario, CancellationToken ct = default)
     {
         await ValidarSalidaAsync(request, ct);

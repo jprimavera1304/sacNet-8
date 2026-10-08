@@ -22,6 +22,14 @@ public class AlmacenCascosRepository : IAlmacenCascosRepository
     private const string SpInsertarTarimaKilos = "dbo.sp_w_InsertarMovimientoCascoTarima";
     private const string SpConsultarTarimasKilos = "dbo.sp_w_ConsultarMovimientoCascoTarimas";
 
+    /*
+      EL UNICO `sp_n_` DE ESTE REPOSITORIO, y va con su nombre a la vista para
+      que se note. Es el que pinta "CASCOS ACTUAL" en Mac31 y es una lectura
+      pura; el porque de no reescribirlo como `sp_w_` esta en
+      ConsultarExistenciasAsync.
+    */
+    private const string SpExistencias = "dbo.sp_n_ConsultaTiposUsados";
+
     public AlmacenCascosRepository(IConfiguration configuration)
     {
         _configuration = configuration;
@@ -454,6 +462,70 @@ WHERE IdMovimiento = @IdMovimiento", conn, tran))
             adapter.Fill(dt);
         }
         return Funciones.DataTableToList<MovimientoCascoTarimaKilosDto>(dt);
+    }
+
+    /// <summary>
+    /// La existencia por tipo de casco, para el panel "CASCOS ACTUAL".
+    /// </summary>
+    /// <remarks>
+    /// SE LLAMA A UN `sp_n_` Y NO SE TOCA, y eso tiene su motivo escrito en
+    /// ExistenciaDeCascoDto: la existencia no esta en `[Catalogo TiposUsados]`
+    /// sino en el JOIN con `EmpresaUsado` de la empresa en curso, y ese JOIN —con
+    /// su eleccion de empresa (9 para TAU, la minima activa para el resto)— lo
+    /// hace el procedimiento. Replicarlo aqui seria una segunda copia de una
+    /// regla de empresa que ya existe, y las dos copias se separan.
+    ///
+    /// Los cinco parametros van en su valor neutro (0 / cadena vacia), que es
+    /// exactamente lo que manda Mac31: trae TODOS los tipos de casco. El
+    /// `@IDStatus = 0` no quiere decir "ninguno": el procedimiento lo pasa por
+    /// `fn_RegresaTablaStatus(0)`, que devuelve todos los status.
+    ///
+    /// NO SE FILTRAN LOS INACTIVOS, y es deliberado. Un casco dado de baja con
+    /// existencia en 300 es justo lo que hay que poder ver: esconderlo deja 300
+    /// piezas fuera del total sin que nada lo diga. Mac31 tampoco los esconde.
+    /// </remarks>
+    public async Task<List<ExistenciaDeCascoDto>> ConsultarExistenciasAsync(CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(SpExistencias, conn);
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.Parameters.AddWithValue("@IDTipoUsado", 0);
+        cmd.Parameters.AddWithValue("@IDStatus", 0);
+        cmd.Parameters.AddWithValue("@TipoUsado", string.Empty);
+        cmd.Parameters.AddWithValue("@Formato", 0);
+        cmd.Parameters.AddWithValue("@Identico", 0);
+
+        var lista = new List<ExistenciaDeCascoDto>();
+        await using var lector = await cmd.ExecuteReaderAsync(ct);
+
+        /*
+          Se leen las columnas POR NOMBRE y no por posicion. El procedimiento
+          devuelve diecisiete columnas de una tabla temporal y la posicion de
+          `Existencia` depende del orden en que esa tabla se declaro: cualquier
+          columna que se agregue en medio correria todos los indices, y el sintoma
+          seria una existencia que de pronto ensena el peso en kilos.
+        */
+        var iId = lector.GetOrdinal("IDTipoUsado");
+        var iDesc = lector.GetOrdinal("TipoUsado");
+        var iCorta = lector.GetOrdinal("TipoUsadoCorto");
+        var iExistencia = lector.GetOrdinal("Existencia");
+        var iOrden = lector.GetOrdinal("Orden");
+
+        while (await lector.ReadAsync(ct))
+        {
+            lista.Add(new ExistenciaDeCascoDto
+            {
+                IdTipoCasco = lector.IsDBNull(iId) ? 0 : Convert.ToInt32(lector.GetValue(iId)),
+                Descripcion = lector.IsDBNull(iDesc) ? string.Empty : lector.GetString(iDesc).Trim(),
+                DescripcionCorta = lector.IsDBNull(iCorta) ? string.Empty : lector.GetString(iCorta).Trim(),
+                Existencia = lector.IsDBNull(iExistencia) ? 0 : Convert.ToInt32(lector.GetValue(iExistencia)),
+                Orden = lector.IsDBNull(iOrden) ? 0 : Convert.ToInt32(lector.GetValue(iOrden))
+            });
+        }
+
+        return lista;
     }
 
     public async Task CancelarMovimientoAsync(int idMovimiento, string motivoCancelacion, string usuario, CancellationToken ct = default)

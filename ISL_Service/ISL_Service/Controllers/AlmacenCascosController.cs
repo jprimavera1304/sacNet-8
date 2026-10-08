@@ -115,6 +115,37 @@ public class AlmacenCascosController : ControllerBase
     }
 
     /// <summary>
+    /// La existencia de cascos por tipo: el panel "CASCOS ACTUAL" de Mac31.
+    /// </summary>
+    /// <remarks>
+    /// POR QUE ESTE SI PIDE PERMISO Y LAS OTRAS LECTURAS NO.
+    ///
+    /// Las cuatro lecturas de arriba se quedan con solo token porque ya las
+    /// consumen el front viejo y el movil, y apretarles el permiso hoy les
+    /// contestaria 403 a usuarios que llevan meses entrando. Esta nace nueva y
+    /// no tiene consumidores que romper, asi que nace bien: con
+    /// `almacen_cascos.ver`, que es el permiso que el catalogo ya declara para
+    /// mirar este modulo y que la pantalla web exige para dibujarse.
+    ///
+    /// NO ENVUELVE EN `{ok, data}`, y tampoco es un descuido: las otras cuatro
+    /// lecturas de este controlador devuelven la lista DESNUDA, y los dos
+    /// clientes que ya existen (el front viejo de /almacen-cascos y
+    /// `almacen_cascos.dart`) la leen asi. Un endpoint nuevo con otra forma
+    /// obligaria a cada pantalla a saber cual de las dos le toca segun la ruta,
+    /// que es exactamente la clase de detalle que se olvida. La forma de este
+    /// modulo es la lista pelada; se respeta.
+    /// </remarks>
+    /// <response code="200">Existencia por tipo de casco</response>
+    [HttpGet("existencias")]
+    [Authorize(Policy = "perm:almacen_cascos.ver")]
+    [ProducesResponseType(typeof(List<ExistenciaDeCascoDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetExistencias(CancellationToken ct)
+    {
+        var list = await _service.ConsultarExistenciasAsync(ct);
+        return Ok(list);
+    }
+
+    /// <summary>
     /// Crea una SALIDA (cabecera + detalle). TotalTarimas/TotalPiezas se calculan en backend; TotalKilos = 0.
     /// </summary>
     /// <response code="201">Salida creada (devuelve idMovimiento)</response>
