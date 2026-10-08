@@ -139,6 +139,25 @@ public class ReportesVentasLegacyRequest : ReportesVentasAcumuladoresProductosRe
 
     /// <summary>Registro de Garantias (1236): filtro de productos, vacio = todos.</summary>
     public List<int> IDProductos { get; set; } = new();
+
+    /// <summary>
+    /// Cambios de Vigencia (1535): el documento a imprimir. Es OBLIGATORIO y no
+    /// tiene valor por omision util: el reporte imprime UN cambio de vigencia, no
+    /// un listado, y con 0 el procedimiento devuelve cero renglones despues de
+    /// haber intentado sellar la impresion del documento 0.
+    /// </summary>
+    public int IDCambioVigencia { get; set; }
+
+    /// <summary>
+    /// Liquidaciones de Descuento (1030): los folios SELECCIONADOS a imprimir.
+    ///
+    /// Es obligatorio y no hay "todos": el boton IMPRIMIR de
+    /// ConsultarLiquidacionesDescuentos recorre la rejilla, junta los marcados y
+    /// si no hay ninguno dice "SELECCIONE UN FOLIO" y no imprime
+    /// (ConsultarLiquidacionesDescuentos.cs:468-484). El reporte es de lo
+    /// seleccionado, no del resultado de la busqueda.
+    /// </summary>
+    public List<int> IDLiquidacionesDescuento { get; set; } = new();
 }
 
 public class ReportesVentasPreviewResponse

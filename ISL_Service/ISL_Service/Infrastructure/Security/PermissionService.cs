@@ -1117,6 +1117,7 @@ public sealed class PermissionService : IPermissionService
         new("descuentos.ajustes.ver", "Descuentos - Ajustes de venta: consultar", "descuentos"),
         new("descuentos.ajustes.crear", "Descuentos - Ajustes de venta: solicitar", "descuentos"),
         new("descuentos.ajustes.autorizar", "Descuentos - Ajustes de venta: autorizar o rechazar", "descuentos"),
+        new("descuentos.ajustes.aplicar", "Descuentos - Ajustes de venta: aplicar el descuento", "descuentos"),
 
         new("inventario.ajustes.ver", "Inventario - Ajustes: consultar", "inventario"),
         new("inventario.ajustes.crear", "Inventario - Ajustes: capturar", "inventario"),

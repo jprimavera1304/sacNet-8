@@ -188,4 +188,52 @@ public class VentasEscriturasReglasTests
         var expirada = VentasFacturacionService.MensajeDeCancelacion(5, 0);
         Assert.Contains("EXPIRO", expirada);
     }
+
+    /* ------- El tipo de pago con el que se abona un descuento ------- */
+
+    /*
+      6 GLOBAL / 8 POR LINEA / 4 ADICIONAL, Y EL ORDEN IMPORTA.
+
+      Son los valores de enumTipoPagos de Mac31 (Enums.cs:152 Adicional = 4, :158
+      Global = 6, :164 PorLinea = 8). Mac31 los elige por el radio marcado
+      (LiquidacionesDescuento.cs:1054-1059), y el radio lo deduce su Load de las
+      TRES columnas del ajuste guardado con tres `if` seguidos (:116 DescuentoGlobal,
+      :162 DescuentoAdicional, :198 IDVentasDetalle). Como cada uno hace
+      `.Checked = true`, GANA EL ULTIMO que se cumple.
+
+      Esto no es un detalle: el tipo de pago es la columna por la que despues se
+      separan los descuentos en el corte del dia y en el reporte de pagos. Si un
+      descuento por linea entra como global, el dinero esta bien y el renglon
+      aparece en el grupo equivocado, que es la clase de error que nadie ve hasta
+      que no cuadra un total.
+    */
+    [Theory]
+    [InlineData("40.00", "", "", 6)]
+    [InlineData("", "", "5", 4)]
+    [InlineData("", "732926~732927", "", 8)]
+    // Las dos columnas llenas: gana por linea, porque es el ultimo `if` de Legacy.
+    [InlineData("40.00", "732926", "", 8)]
+    [InlineData("", "732926", "5", 8)]
+    // "0" NO es un descuento adicional: es la comprobacion literal de :162,
+    // `!= "" && != "0"`. Con un "0" suelto no hay de donde deducir el tipo.
+    [InlineData("", "", "0", 0)]
+    // Nada que deducir: no se inventa un tipo de pago.
+    [InlineData("", "", "", 0)]
+    [InlineData("   ", "  ", "   ", 0)]
+    public void El_tipo_de_pago_del_descuento_sale_de_las_tres_columnas_del_ajuste(
+        string descuentoGlobal, string idsVentaDetalle, string descuentoAdicional, int esperado)
+    {
+        Assert.Equal(
+            esperado,
+            VentasDescuentosService.ResolverTipoDePagoDelDescuento(
+                descuentoGlobal, idsVentaDetalle, descuentoAdicional));
+    }
+
+    [Fact]
+    public void El_tipo_de_pago_del_descuento_aguanta_nulos()
+    {
+        // Las tres columnas son varchar que legacy deja en NULL cuando no aplican.
+        Assert.Equal(0, VentasDescuentosService.ResolverTipoDePagoDelDescuento(null, null, null));
+        Assert.Equal(6, VentasDescuentosService.ResolverTipoDePagoDelDescuento("38", null, null));
+    }
 }

@@ -379,6 +379,49 @@ public class CapacidadesDeEmpresaTests
     }
 
     // =====================================================================
+    // GARANTIAS: CAMBIAR EL PRODUCTO AL EDITAR
+    // =====================================================================
+
+    [Fact]
+    public void Cambiar_El_Producto_Al_Editar_Es_De_Zaragoza_Y_Fuera_De_Centro_De_Servicio()
+    {
+        // Garantia.cs:213: ZARA y EsCentroServicio == 0, las dos condiciones.
+        Assert.True(MapaDeCapacidades.Armar(Zaragoza(), Hoy).Capacidades.GarantiaPermiteCambiarProductoAlEditar);
+        Assert.False(MapaDeCapacidades.Armar(Tauro(), Hoy).Capacidades.GarantiaPermiteCambiarProductoAlEditar);
+
+        var centro = Zaragoza();
+        centro.EsCentroServicio = 1;
+        var cap = MapaDeCapacidades.Armar(centro, Hoy).Capacidades;
+        Assert.False(cap.GarantiaPermiteCambiarProductoAlEditar);
+
+        /*
+          Y EN EL MISMO CENTRO EL ORDEN DE LOS PASOS SIGUE SIENDO EL DE ZARAGOZA.
+          Esta es la pareja que prueba que las dos capacidades NO son la misma: si
+          "cambiar el producto" se hubiera colgado de
+          GarantiaEnvioAProveedorEsElUltimoPaso, aqui las dos dirian true y el
+          centro de servicio podria reescribir el producto de una garantia.
+        */
+        Assert.True(cap.GarantiaEnvioAProveedorEsElUltimoPaso);
+    }
+
+    [Fact]
+    public void Cambiar_El_Producto_Al_Editar_Exige_ZARA_EXACTO()
+    {
+        /*
+          Garantia.cs:213 compara con `==`, a diferencia de las otras diez ramas
+          de funcionalidad del mismo archivo, que usan .Contains("ZARA"). Una
+          tercera empresa "ZARA2" hereda el orden de los pasos pero NO el permiso
+          de cambiarle el producto a una garantia ya registrada.
+        */
+        var otra = Zaragoza();
+        otra.Funcionalidad = "ZARA2";
+        var cap = MapaDeCapacidades.Armar(otra, Hoy).Capacidades;
+
+        Assert.False(cap.GarantiaPermiteCambiarProductoAlEditar);
+        Assert.True(cap.GarantiaEnvioAProveedorEsElUltimoPaso);
+    }
+
+    // =====================================================================
     // COMO SE COMPARA LA FUNCIONALIDAD
     // =====================================================================
 

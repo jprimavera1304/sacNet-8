@@ -198,6 +198,81 @@ public class GarantiaRegistroCancelarRequest
     public List<GarantiaPartida> Partidas { get; set; } = new();
 }
 
+/*
+  LOS CUATRO CATALOGOS DE LAS PANTALLAS DE GARANTIAS, EN UNA SOLA LLAMADA.
+
+  POR QUE EXISTEN AQUI Y NO SE PIDEN A LOS MODULOS DE CADA UNO
+  ------------------------------------------------------------
+  La pantalla necesita empresas, almacenes, repartidores y productos de carga.
+  Pedirlos donde ya viven significaba exigir tres permisos de OTRAS pantallas:
+
+      empresas            GET api/empresas               -> empresas.ver
+      almacenes           GET api/catalogos/almacenes     -> catalogos.ver
+      productos de carga  GET api/productos?esCarga=true  -> productos.ver
+
+  O sea: quien captura garantias y nada mas no podia trabajar. Y no es un detalle
+  de permisos: `empresas.ver` abre la ficha de empresas con sus datos fiscales y
+  `productos.ver` abre el catalogo con precios, precio anterior y margen. Para
+  llenar cuatro desplegables se estaban pidiendo tres pantallas enteras.
+
+  Aqui van detras de `garantias.ver`, que es el permiso de quien los usa, y en
+  UNA llamada: son los mismos cuatro que llena Mac31 al abrir la forma
+  (Garantia.cs:55-85 y ConsultarGarantias.cs:133-166), y el formulario necesita
+  los cuatro o ninguno.
+
+  LOS ALMACENES SON LOS DEL USUARIO, NO TODOS
+  -------------------------------------------
+  Mac31 llama a Funciones.ConsultarUsuarioAlmacenes (Funciones.cs:453-506) con el
+  IDUsuario del que entro y se queda SOLO con los renglones que traen
+  `Acceso = 1`; si no le queda ninguno, la forma escribe "NO TIENE NINGUN ALMACEN
+  ASIGNADO" y se cierra (Garantia.cs:58-67). GET api/catalogos/almacenes devuelve
+  el catalogo completo: con el, un capturista podria registrar una garantia en un
+  almacen al que no tiene acceso. El id de usuario sale del TOKEN.
+
+  Y a diferencia del bootstrap de captura de pedidos, aqui NO se cae al catalogo
+  completo cuando el usuario no tiene almacenes: eso convertiria "no tienes
+  acceso a ninguno" en "tienes acceso a todos". La lista llega vacia y el
+  formulario lo dice, como lo dice Mac31.
+*/
+
+/// <summary>Un renglon de desplegable: el id que se guarda y el texto que se lee.</summary>
+public class GarantiaCatalogoItemDto
+{
+    public int Id { get; set; }
+    public string Nombre { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Un producto de carga: el cargo del diagnostico que se cobra al aplicar una
+/// garantia, un ajuste o una devolucion al cliente. Lleva el precio porque la
+/// pantalla de Mac31 tiene DOS desplegables atados al mismo renglon -uno muestra
+/// la clave y el otro el precio de lista (ConsultarGarantias.cs:153-161)-, asi
+/// que el precio tiene que venir con la clave y no en otra llamada.
+/// </summary>
+public class GarantiaProductoDeCargaDto
+{
+    public int IdProducto { get; set; }
+    public string Clave { get; set; } = string.Empty;
+    public string Descripcion { get; set; } = string.Empty;
+    public decimal PrecioLista { get; set; }
+}
+
+/// <summary>Los cuatro catalogos que abren las pantallas de garantias.</summary>
+public class GarantiaCatalogosResponse
+{
+    /// <summary>Empresas activas, como las carga Mac31 al iniciar sesion (Login.cs:638-651).</summary>
+    public List<GarantiaCatalogoItemDto> Empresas { get; set; } = new();
+
+    /// <summary>Los almacenes a los que ESTE usuario tiene acceso. Vacio = ninguno.</summary>
+    public List<GarantiaCatalogoItemDto> Almacenes { get; set; } = new();
+
+    /// <summary>Repartidores activos.</summary>
+    public List<GarantiaCatalogoItemDto> Repartidores { get; set; } = new();
+
+    /// <summary>Productos de carga, con su precio de lista.</summary>
+    public List<GarantiaProductoDeCargaDto> ProductosDeCarga { get; set; } = new();
+}
+
 /// <summary>Filtros de la pantalla de registros previos de garantia.</summary>
 public class GarantiaRegistroConsultaRequest
 {

@@ -78,6 +78,23 @@ public static class MapaDeCapacidades
                 GarantiaEnvioAProveedorEsElUltimoPaso = esZara,
                 GarantiaExigeEnvioAProveedorPrimero = esTau,
 
+                /*
+                  IGUALDAD EXACTA, Y NO ES UN DESCUIDO DE LEGACY.
+
+                  Garantia.cs:213 es
+                      if ((Variables.funcionalidad == "ZARA") && (Variables.EsCentroServicio == 0))
+                  con `==`, mientras que las otras diez ramas de funcionalidad del
+                  MISMO archivo (y las nueve de ConsultarGarantias.cs) usan
+                  .ToUpper().Contains("ZARA"). Se copia el `==` que esta escrito:
+                  con un Contains, una tercera empresa llamada "ZARA2" podria
+                  cambiarle el producto a una garantia ya registrada -o sea
+                  cambiar QUE pieza se garantizo despues de haberla recibido-, y
+                  Legacy no la deja. Cuando la diferencia entre los dos estilos
+                  cambia quien puede reescribir un documento, gana lo que dice el
+                  archivo.
+                */
+                GarantiaPermiteCambiarProductoAlEditar = esZaraExacto && !esCentroServicio,
+
                 // Facturacion: otra aritmetica.
                 FacturacionProrrateaImporte = !esZara,
                 FacturacionMuestraPreciosConIva = esZara,

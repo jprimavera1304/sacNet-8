@@ -190,6 +190,55 @@ public class VentaDescuentoAjusteSimularRequest
 }
 
 /// <summary>Filtros de la consulta de ajustes de descuento.</summary>
+/*
+  APLICAR UNA LIQUIDACION DE DESCUENTO: EL PASO QUE MUEVE EL DINERO.
+
+  Es la tercera y ultima etapa del ajuste: alguien lo PIDE (crear), alguien lo
+  AUTORIZA (status), y aqui se APLICA — se mete el abono en [Ventas Pagos] y la
+  remision baja de saldo. Hasta ahora el backend nuevo tenia las dos primeras y
+  no la tercera, asi que un ajuste autorizado se quedaba en el aire: el papel
+  decia que el cliente tenia un descuento y su saldo seguia igual.
+
+  EL CUERPO LLEVA SOLO EL ID, A PROPOSITO
+  ---------------------------------------
+  El monto NO viaja. Lo calcula sp_n_SimulaVentasDescuentosAjustes
+  (`DescuentoAplicarReal`, su linea 920-930: si la diferencia contra el saldo es
+  negativa se recorta al saldo, y si cabe dentro de
+  Constantes.MontoMaxDiferenciaDescuento se liquida el saldo completo). En Mac31
+  ese numero tampoco lo escribe nadie: el formulario lo lee del simulador y lo
+  manda tal cual (LiquidacionesDescuento.cs:759 y :1016). Aceptarlo del cuerpo
+  convertiria este endpoint en "abona lo que me digas a esta remision", que es
+  otra cosa y no lleva autorizacion.
+
+  Lo mismo el IDVenta, el tipo de pago y el texto del concepto: los tres salen
+  del ajuste guardado. Y el usuario y el equipo, del token.
+*/
+public class VentaDescuentoAjusteAplicarRequest
+{
+    /// <summary>El ajuste autorizado que se va a aplicar.</summary>
+    public int IdVentasDescuentosAjustes { get; set; }
+}
+
+/// <summary>Lo que quedo al aplicar: el abono que entro y a que remision.</summary>
+public class VentaDescuentoAjusteAplicarResponse
+{
+    public bool Hecho { get; set; }
+    public string Mensaje { get; set; } = string.Empty;
+
+    public int IdVentasDescuentosAjustes { get; set; }
+    public int IdVenta { get; set; }
+
+    /// <summary>6 descuento global, 8 por linea, 4 adicional.</summary>
+    public int IdTipoPago { get; set; }
+
+    /// <summary>El `DescuentoAplicarReal` del simulador, que es lo que se abono.</summary>
+    public decimal Abono { get; set; }
+
+    /// <summary>El saldo a favor del cliente que reporto el procedimiento.</summary>
+    public decimal SaldoFavorDinero { get; set; }
+    public decimal SaldoFavorCascos { get; set; }
+}
+
 public class VentaDescuentoAjusteConsultaRequest
 {
     public List<int> IdsVentasDescuentosAjustes { get; set; } = new();

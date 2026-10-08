@@ -46,6 +46,42 @@ public class VentasGarantiasController : PermisoControllerBase
         _service = service;
     }
 
+    /// <summary>
+    /// Los cuatro catalogos que abren las pantallas de garantias: empresas, los
+    /// almacenes DEL USUARIO, repartidores y productos de carga.
+    /// </summary>
+    /*
+      UNA LLAMADA, UN PERMISO: EL DE ESTA PANTALLA.
+
+      Antes de esto, el formulario tenia que pedir tres endpoints de otros
+      modulos y por eso exigia `empresas.ver`, `catalogos.ver` y `productos.ver`
+      ademas de `garantias.ver`. Quien captura garantias y nada mas no podia
+      trabajar: le salian tres desplegables vacios, o tres 403.
+
+      Y lo que se pedia prestado no era poco: `empresas.ver` abre la ficha de
+      empresas con sus datos fiscales y `productos.ver` el catalogo con precios,
+      precio anterior y margen. Para llenar cuatro combos se estaban concediendo
+      tres pantallas enteras -- el camino corto a que alguien acabe con el permiso
+      de todo.
+
+      LOS ALMACENES SON LOS DEL USUARIO. Es la otra mitad del arreglo y no es
+      comodidad: GET api/catalogos/almacenes entrega el catalogo completo, y con
+      el se puede registrar una garantia en un almacen al que el capturista no
+      tiene acceso. Mac31 pide los del usuario (Garantia.cs:58-67) y se cierra si
+      no tiene ninguno. El id de usuario sale del TOKEN, nunca del query.
+    */
+    [HttpGet("catalogos")]
+    [ProducesResponseType(typeof(GarantiaCatalogosResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ConsultarCatalogosAsync(CancellationToken ct)
+    {
+        var veto = await ExigirPermisoAsync(PermisoVer, ct);
+        if (veto is not null) return veto;
+
+        var data = await _service.ConsultarCatalogosAsync(IdUsuarioLegacy(), ct);
+        return Ok(new { ok = true, message = "Catalogos de garantias.", data });
+    }
+
     /// <summary>Registra una garantia.</summary>
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status200OK)]

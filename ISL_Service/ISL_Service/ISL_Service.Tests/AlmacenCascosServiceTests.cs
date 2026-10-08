@@ -163,5 +163,8 @@ public class AlmacenCascosServiceTests
 
         public Task<List<BancoCatalogItemDto>> ListBancosAsync(int? idStatus, string? texto, CancellationToken ct = default)
             => Task.FromResult(new List<BancoCatalogItemDto>());
+
+        public Task<List<UsuarioMacItemDto>> ListUsuariosMac31Async(int? idStatus, string? texto, CancellationToken ct = default)
+            => Task.FromResult(new List<UsuarioMacItemDto>());
     }
 }

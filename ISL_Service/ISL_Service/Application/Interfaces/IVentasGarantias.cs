@@ -17,6 +17,12 @@ public interface IVentasGarantiasRepository
     Task<ResultadoLegacyDto> CrearRegistroAsync(GarantiaRegistroCrearRequest request, int idUsuario, string equipo, CancellationToken ct);
     Task<ResultadoLegacyDto> CancelarRegistroAsync(GarantiaRegistroCancelarRequest request, int idUsuario, string equipo, CancellationToken ct);
     Task<FilasLegacyDto> ConsultarRegistroAsync(GarantiaRegistroConsultaRequest request, CancellationToken ct);
+
+    /// <summary>
+    /// Los cuatro catalogos del formulario: empresas, los almacenes DEL USUARIO,
+    /// repartidores y productos de carga. El id de usuario sale del token.
+    /// </summary>
+    Task<GarantiaCatalogosResponse> ConsultarCatalogosAsync(int idUsuarioActual, CancellationToken ct);
 }
 
 /// <summary>Las reglas de garantias que no son del procedimiento.</summary>
@@ -33,4 +39,10 @@ public interface IVentasGarantiasService
     Task<ResultadoLegacyDto> CrearRegistroAsync(GarantiaRegistroCrearRequest request, int idUsuario, string equipo, CancellationToken ct);
     Task<ResultadoLegacyDto> CancelarRegistroAsync(GarantiaRegistroCancelarRequest request, int idUsuario, string equipo, CancellationToken ct);
     Task<FilasLegacyDto> ConsultarRegistroAsync(GarantiaRegistroConsultaRequest request, CancellationToken ct);
+
+    /// <summary>
+    /// Los cuatro catalogos del formulario: empresas, los almacenes DEL USUARIO,
+    /// repartidores y productos de carga. El id de usuario sale del token.
+    /// </summary>
+    Task<GarantiaCatalogosResponse> ConsultarCatalogosAsync(int idUsuarioActual, CancellationToken ct);
 }

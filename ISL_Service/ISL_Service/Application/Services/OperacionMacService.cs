@@ -110,6 +110,9 @@ public class OperacionMacService : IOperacionMacService
     public Task<List<Dictionary<string, object?>>> ConsultarCambiosVigenciaAsync(CambiosVigenciaFiltro filtro, CancellationToken ct)
         => _repo.ConsultarCambiosVigenciaAsync(filtro, ct);
 
+    public Task<List<Dictionary<string, object?>>> ConsultarCambiosVigenciaDetalleAsync(int idCambioVigencia, CancellationToken ct)
+        => _repo.ConsultarCambiosVigenciaDetalleAsync(idCambioVigencia, ct);
+
     public async Task<OperacionEscrituraResponse> CrearCambioVigenciaAsync(CrearCambioVigenciaRequest r, int idUsuario, string equipo, CancellationToken ct)
     {
         var (resultado, id) = await _repo.InsertarCambioVigenciaAsync(r, idUsuario, equipo, ct);

@@ -136,6 +136,56 @@ public class CatalogosController : ControllerBase
     }
 
     /// <summary>
+    /// Lista usuarios de MAC31 (<c>dbo.Usuarios</c>) con id, clave y nombre. Es el
+    /// desplegable de "QUIEN RECIBE" de un cambio de vigencia.
+    /// </summary>
+    /// <param name="idStatus">IDStatus (1 activos, 2 inactivos, 3 bloqueados). 0 o nulo = todos.</param>
+    /// <param name="usuario">Filtro por clave de usuario, parcial (LIKE %texto%). Nulo = todos.</param>
+    /// <response code="200">Lista obtenida</response>
+    /*
+      NO ES GET api/usuarios, Y LA DIFERENCIA ES EL IDENTIFICADOR
+      ==========================================================
+      `api/usuarios` devuelve `dbo.UsuarioWeb`: los usuarios del WEB, con un Guid.
+      Esta lista es `dbo.Usuarios`, los de Mac31, con un `IDUsuario` entero. La
+      columna `CambiosVigencia.IDUsuarioRecibe` guarda el SEGUNDO. Llenar el
+      desplegable con los del web pondria en el documento el id de otra tabla y
+      apuntaria a una persona equivocada sin que nada fallara.
+
+      EL PERMISO ES `cambiosvigencia.crear` Y NO `catalogos.ver`
+      ---------------------------------------------------------
+      Hoy esta lista solo se publica dentro de
+      GET api/reportes/ventas/remisiones/catalogos, que exige
+      `reportes.ver_modulo`. O sea que para dar de alta un cambio de vigencia
+      habia que tener ademas el permiso del modulo de REPORTES, que son 53
+      reportes de ventas, compras, inventario y administracion: un permiso enorme
+      para llenar un combo de tres letras.
+
+      Se le pone el permiso de quien lo necesita. `catalogos.ver` tampoco sirve:
+      es el permiso de las pantallas de catalogo (almacenes, agentes, marcas), y
+      exigirlo volveria a pedirle a un capturista de cambios de vigencia un
+      permiso de otra pantalla -- que es exactamente el problema que esto corrige.
+      Si manana otro modulo necesita la misma lista, se le agrega su clave al
+      OR de la politica (`perm:a|b`), que ya lo soporta.
+
+      LA LISTA NO LLEVA CONTRASENAS. El procedimiento devuelve tres en claro y el
+      DTO declara tres campos; ver UsuarioMacItemDto.
+
+      SIN SOBRE { ok, message, data }, como los otros GET de este controlador y
+      por la misma razon que explica GetClientes: la forma de estas listas ya la
+      consume el front viejo.
+    */
+    [HttpGet("usuarios")]
+    [Authorize(Policy = "perm:cambiosvigencia.crear")]
+    [ProducesResponseType(typeof(List<UsuarioMacItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetUsuariosMac31(
+        [FromQuery] int? idStatus, [FromQuery] string? usuario, CancellationToken ct)
+    {
+        var list = await _repository.ListUsuariosMac31Async(idStatus, usuario, ct);
+        return Ok(list);
+    }
+
+    /// <summary>
     /// Lista bancos (Catalogo Bancos). Para dropdowns de módulos administrativos.
     /// </summary>
     /// <param name="status">Filtro por IDStatus (1 activo, 2 inactivo). NULL = todos</param>

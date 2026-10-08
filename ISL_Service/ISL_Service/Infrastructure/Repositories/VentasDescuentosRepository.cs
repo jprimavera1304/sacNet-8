@@ -37,6 +37,12 @@ public class VentasDescuentosRepository : SpLegacyRepositoryBase, IVentasDescuen
     private const string SpStatusAjuste = "sp_n_ActualizaStatusVentasDescuentosAjustes";
     private const string SpSimularAjuste = "sp_n_SimulaVentasDescuentosAjustes";
     private const string SpConsultarAjustes = "sp_n_ConsultaVentasDescuentosAjustes";
+    /// <summary>
+    /// El mismo procedimiento con el que se cobra una remision. Aqui se llama con
+    /// su `@IDVentasDescuentosAjustes` de verdad, que es lo que marca la
+    /// liquidacion como aplicada; ver InsertarPagoDeDescuentoAsync.
+    /// </summary>
+    private const string SpInsertarVentasPagos = "sp_n_InsertarVentasPagos";
 
     private const int LargoLista = 4000;
     private const int LargoListaCorta = 500;
@@ -310,6 +316,101 @@ public class VentasDescuentosRepository : SpLegacyRepositoryBase, IVentasDescuen
         }, ct);
 
         return new FilasLegacyDto { Rows = filas };
+    }
+
+    /*
+      EL ABONO DE UN DESCUENTO: sp_n_InsertarVentasPagos CON SU
+      @IDVentasDescuentosAjustes DE VERDAD.
+
+      POR QUE HACIA FALTA ESTE METODO
+      -------------------------------
+      sp_n_InsertarVentasPagos se llamaba en UN solo sitio del backend nuevo,
+      VentasMultiPagoRepository, que es el de cobrar remisiones, y ahi manda
+      `@IDVentasDescuentosAjustes = 0` FIJO (su linea 455). Con 0 el
+      procedimiento se salta este bloque, leido en la base:
+
+          IF @IDVentasDescuentosAjustes > 0
+          BEGIN
+            UPDATE VentasDescuentosAjustes
+            SET IDPagoVenta = @IDPagoVenta,
+                [IDUsuario Aplicacion] = @IDUsuario,
+                [Fecha Aplicacion] = @FechaOperacionPagos
+            WHERE IDVentasDescuentosAjustes = @IDVentasDescuentosAjustes
+          END
+
+      O sea: con 0 el abono entra pero la liquidacion NUNCA queda marcada como
+      aplicada ni apuntada al pago que la aplico. Dos consecuencias, y las dos
+      son dinero: la misma liquidacion se puede aplicar otra vez (nada dice que
+      ya se aplico), y si hay que cancelar el abono no hay forma de saber cual
+      pago vino de cual descuento.
+
+      LOS TREINTA Y CINCO PARAMETROS VAN TODOS, en el mismo orden y con los
+      mismos nombres que Mac3Servicios, VentasPagosRepository lineas 126-163. El
+      procedimiento tiene valores por omision con datos de prueba, asi que los
+      que no aplican van en 0 o cadena vacia, no se omiten.
+
+      LO QUE MANDA EL BOTON APLICAR DE MAC31 Y LO QUE NO
+      (LiquidacionesDescuento.cs:1050-1062): manda IDVentasDescuentosAjustes,
+      IDVenta, IDTipoPago, IDUsuario, Abono y Observaciones. NO manda IDCliente
+      ni MontoTotal -quedan en 0-, y el procedimiento resuelve el cliente desde
+      la remision. Se copia tal cual: mandar un IDCliente desde aqui seria
+      inventar un dato que legacy no manda.
+
+      LA TRANSACCION ES DEL PROCEDIMIENTO. Abre y cierra su propia transaccion y
+      hace COMMIT dentro; no se envuelve en otra desde aqui, igual que en
+      VentasMultiPagoRepository.
+    */
+    public async Task<ResultadoLegacyDto> InsertarPagoDeDescuentoAsync(
+        int idVentasDescuentosAjustes,
+        int idVenta,
+        int idTipoPago,
+        decimal abono,
+        string? observaciones,
+        int idUsuario,
+        string equipo,
+        CancellationToken ct)
+    {
+        var tablas = await EjecutarTablasAsync(SpInsertarVentasPagos, cmd =>
+        {
+            cmd.Parameters.Add(Entero("@IDCobro", 0));
+            cmd.Parameters.Add(Entero("@IDVentasDescuentosAjustes", idVentasDescuentosAjustes));
+            cmd.Parameters.Add(Entero("@IDVenta", idVenta));
+            cmd.Parameters.Add(Entero("@IDCliente", 0));
+            cmd.Parameters.Add(Entero("@IDTipoPago", idTipoPago));
+            cmd.Parameters.Add(Entero("@IDUsuario", idUsuario));
+            cmd.Parameters.Add(Decimal18("@Abono", abono));
+            cmd.Parameters.Add(Decimal18("@MontoTotal", 0m));
+            cmd.Parameters.Add(Varchar("@Observaciones", LargoTexto, FiltrosLegacy.Texto(observaciones)));
+            cmd.Parameters.Add(Entero("@IDBancoCheque", 0));
+            cmd.Parameters.Add(Entero("@IDBancoTransfer", 0));
+            cmd.Parameters.Add(Entero("@IDBancoTarjeta", 0));
+            cmd.Parameters.Add(Varchar("@Transferencia", LargoListaCorta, string.Empty));
+            cmd.Parameters.Add(Varchar("@Cheque", LargoListaCorta, string.Empty));
+            cmd.Parameters.Add(Varchar("@Tarjeta", LargoListaCorta, string.Empty));
+            cmd.Parameters.Add(Entero("@DiffUsados", 0));
+            cmd.Parameters.Add(Varchar("@DepositoEfectivoNumero", LargoListaCorta, string.Empty));
+            cmd.Parameters.Add(Entero("@IDBancoDepositoEfe", 0));
+            cmd.Parameters.Add(Varchar("@ExcedenteUsadosMotivo", LargoTexto, string.Empty));
+            cmd.Parameters.Add(Decimal18("@Cargo", 0m));
+            cmd.Parameters.Add(Varchar("@CargoMotivo", LargoTexto, string.Empty));
+            cmd.Parameters.Add(Varchar("@IDsTipoUsado", LargoListaCorta, string.Empty));
+            cmd.Parameters.Add(Varchar("@CantidadesUsado", LargoListaCorta, string.Empty));
+            cmd.Parameters.Add(Varchar("@CostosConIvaUsado", LargoListaCorta, string.Empty));
+            cmd.Parameters.Add(Entero("@IDAgenteLiquidacion", 0));
+            cmd.Parameters.Add(Entero("@IDRepartidorLiquidacion", 0));
+            cmd.Parameters.Add(Entero("@TipoTarjeta", 0));
+            cmd.Parameters.Add(Entero("@IDPedido", 0));
+            cmd.Parameters.Add(Entero("@IDGarantia", 0));
+            cmd.Parameters.Add(Entero("@PedidoNumeroPago", 0));
+            cmd.Parameters.Add(Entero("@IDBancoTransferenciaMovimiento", 0));
+            cmd.Parameters.Add(Decimal18("@CascoKiloCantidad", 0m));
+            cmd.Parameters.Add(Decimal18("@CascoKiloTotal", 0m));
+            cmd.Parameters.Add(Decimal18("@CascoKiloPrecio", 0m));
+            cmd.Parameters.Add(Varchar("@CascoKiloMotivo", LargoTexto, string.Empty));
+            cmd.Parameters.Add(Varchar("@Equipo", LargoListaCorta, FiltrosLegacy.Texto(equipo, LargoListaCorta)));
+        }, ct);
+
+        return Resultado(tablas, "IDPagoVenta");
     }
 
     /* ---------------------------------------------------------------- */
