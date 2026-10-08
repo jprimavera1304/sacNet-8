@@ -19,6 +19,7 @@
 #   ./instantanea.sh crear
 #   ./instantanea.sh volver
 #   ./instantanea.sh soltar
+#   ./instantanea.sh reponer   # vuelve a poner nuestros sp_w_ (lo hace 'volver' solo)
 #   ./instantanea.sh estado
 #
 # OJO: volver atrás necesita la base en exclusiva, así que tira las conexiones
@@ -111,6 +112,64 @@ volver() {
   }
   sql "ALTER DATABASE [$BASE] SET MULTI_USER;" || return 1
   echo "Restaurada."
+  reponer_procedimientos_nuestros
+}
+
+# ---------------------------------------------------------------------------
+# RESTAURAR SE LLEVA LOS PROCEDIMIENTOS QUE HEMOS DESPLEGADO
+#
+# Una instantánea es un punto en el tiempo de la base ENTERA, esquema incluido.
+# Así que `volver` no solo deshace los datos de una prueba: también borra los
+# `sp_w_` que se instalaron DESPUÉS de crearla.
+#
+# No es teórico, pasó dos veces en una tarde con el mismo procedimiento. El
+# síntoma no se parece a la causa: el backend empieza a contestar
+#
+#     500  Could not find stored procedure 'sp_w_ConsultaConstantesSoloLectura'
+#
+# y el agente que lo ve se va a buscar el error a su código, cuando lo que pasó
+# es que otro restauró la base. Peor: ese procedimiento es el que evita que
+# leer las constantes CIERRE EL DÍA del negocio, así que mientras falta, la
+# consulta de ventas de Zaragoza está caída.
+#
+# Por eso se reponen aquí y no "cuando alguien se acuerde": son nuestros,
+# `CREATE OR ALTER` y lectura pura, así que volver a aplicarlos es gratis y
+# nunca es incorrecto.
+# ---------------------------------------------------------------------------
+reponer_procedimientos_nuestros() {
+  local raiz="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../Querrys" 2>/dev/null && pwd)"
+  if [ -z "$raiz" ] || [ ! -d "$raiz" ]; then
+    echo "AVISO: no encontré la carpeta Querrys; revisa a mano los sp_w_ de $BASE."
+    return 0
+  fi
+
+  # LISTA EXPLÍCITA, y no un `find` de todos los sp_w_ del repo.
+  #
+  # Querrys tiene más de 180 guiones de sp_w_, y la mayoría son de OTROS
+  # proyectos (SL, Wahub, el dashboard) que no viven en estas bases: aplicarlos
+  # todos crearía objetos ajenos en MacZ y tardaría una eternidad.
+  #
+  # Aquí van solo los que ESTA migración desplegó y que `volver` se lleva. Si
+  # despliegas uno nuevo, agrégalo a esta lista — es la única forma de que
+  # sobreviva a la siguiente restauración.
+  local nuestros=(
+    "31 Constantes Solo Lectura/01_sp_w_ConsultaConstantesSoloLectura.sql"
+    "32 Reporte Autos Columna Mala/01_sp_w_rptAutos.sql"
+  )
+
+  local puestos=0
+  local guion
+  for relativo in "${nuestros[@]}"; do
+    guion="$raiz/$relativo"
+    [ -f "$guion" ] || { echo "AVISO: no está $relativo"; continue; }
+    # Se aplica con USE explícito: fiarse de -d ya hizo que un procedimiento
+    # acabara en la base equivocada y el error saliera media hora después.
+    { printf 'USE [%s];
+GO
+' "$BASE"; cat "$guion"; } |       MSYS_NO_PATHCONV=1 sqlcmd -S "$SERVIDOR" -U "$USUARIO" -P "$CLAVE" -C -I -b >/dev/null 2>&1       && puestos=$((puestos+1))       || echo "AVISO: no se pudo reponer $(basename "$guion")"
+  done
+
+  echo "Procedimientos nuestros repuestos en $BASE: $puestos de ${#nuestros[@]}"
 }
 
 soltar() {
@@ -128,6 +187,7 @@ case "${1:-}" in
   volver) volver ;;
   soltar) soltar ;;
   estado) estado ;;
+  reponer) reponer_procedimientos_nuestros ;;
   tomar)  mkdir -p "$CANDADOS"; : > "$CANDADOS/instantanea-en-uso-${MI_CANDADO:-anonimo}"; echo "candado tomado" ;;
   soltar-candado) rm -f "$CANDADOS/instantanea-en-uso-${MI_CANDADO:-anonimo}"; echo "candado soltado" ;;
   *) sed -n '2,40p' "$0" ; exit 2 ;;
