@@ -75,6 +75,58 @@ siguen expuestas aunque se borren del archivo.
 
 ---
 
+## MAYUSCULAS EN TODO: es la regla, no un defecto
+
+Medido el 07-oct-2026, y rectificado el mismo dia despues de probarlo con una
+cuenta de verdad.
+
+**Lo que primero parecio un defecto.** El web sube usuario y contrasena a
+MAYUSCULAS en cuatro sitios: al entrar (`nucleo/api.ts`), al crear un usuario,
+al modificarlo y al fijarle la contrasena (`nucleo/usuarios.ts`). El backend
+compara con `BCrypt.Verify`, que distingue mayusculas. De ahi la lectura de que
+habia dos padrones incompatibles: las cuentas nacidas en el web entraban y las
+nacidas desde el movil, por SQL o llamando al API no entraban nunca.
+
+**Lo que resulto ser al medirlo.** Esa lectura era incorrecta en lo que importa:
+los dos grupos no pesan igual. Quitar la conversion deja fuera a TODAS las
+cuentas que de verdad se usan:
+
+    JUAN / AB123456  -> 200
+    JUAN / ab123456  -> 401
+    JUAN / Ab123456  -> 401
+
+El hash de `JUAN` -SuperAdmin, activo, 1 de las 8 cuentas web de `MacZ`- es el
+de la version en MAYUSCULAS, porque asi se fijo desde la propia pantalla. Lo
+mismo todas las demas.
+
+**Por que es la regla y no una casualidad.** MAC guarda todo en mayusculas por
+dentro, teclee lo que teclee la persona. **El movil hace lo mismo**
+(`shared_mobile/lib/core/auth/auth_service.dart:25-26` sube usuario y contrasena
+antes de mandarlos), y el front viejo lleva haciendolo desde siempre. Las dos
+puntas dicen lo mismo; el unico que se salio un rato fue el web.
+
+### Lo que SI hay que saber
+
+Una cuenta creada **fuera** del web -desde SQL o llamando al API- tiene que
+crearse con la contrasena **en mayusculas**, o no va a poder entrar por la
+pantalla de login. Es el caso de `BancoPruebas` / `Banco2026`, el usuario de
+pruebas de la migracion: entra por API y no por la pantalla. No es un defecto
+del login; es que se creo saltandose la regla.
+
+### Lo que NO se hizo, y por que
+
+Reintentar la contrasena en mayusculas tras un 401 arreglaria los dos grupos de
+golpe, pero son **dos intentos de contrasena donde habia uno**: debilitar la
+autenticacion para comprar comodidad. El guardia de la sesion lo rechazo y no se
+rodeo.
+
+---
+
+## (historico) El web sube la contrasena a MAYUSCULAS, y eso parte el padron de usuarios
+
+> Lo de abajo quedo **rectificado** por la seccion de arriba: la conclusion era
+> incorrecta. Se conserva porque explica como se llego a ella.
+
 ## El web sube la contrasena a MAYUSCULAS, y eso parte el padron de usuarios
 
 Medido el 07-oct-2026.
