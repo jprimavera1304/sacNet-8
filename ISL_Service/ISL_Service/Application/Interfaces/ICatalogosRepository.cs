@@ -17,4 +17,15 @@ public interface ICatalogosRepository
     /// </summary>
     Task<List<ClienteCatalogItemDto>> ListClientesAsync(int? idStatus, int idUsuario, CancellationToken ct = default);
     Task<List<BancoCatalogItemDto>> ListBancosAsync(int? idStatus, string? texto, CancellationToken ct = default);
+
+    /// <summary>
+    /// Desplegable de usuarios de MAC31 (`dbo.Usuarios`), para los campos que
+    /// guardan un `IDUsuario` de legacy -- el "QUIEN RECIBE" de un cambio de
+    /// vigencia es el caso que lo pide. NO son los de `dbo.UsuarioWeb`, que es lo
+    /// que devuelve GET api/usuarios y lleva otro identificador.
+    ///
+    /// Devuelve id, clave y nombre. El procedimiento devuelve ADEMAS tres
+    /// contrasenas en claro y aqui no salen: ver UsuarioMacItemDto.
+    /// </summary>
+    Task<List<UsuarioMacItemDto>> ListUsuariosMac31Async(int? idStatus, string? texto, CancellationToken ct = default);
 }

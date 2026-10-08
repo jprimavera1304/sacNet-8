@@ -254,4 +254,83 @@ ORDER BY B.Banco";
         }
         return list;
     }
+
+    /*
+      LOS USUARIOS DE MAC31, PARA ELEGIR UNA PERSONA.
+
+      VA POR EL PROCEDIMIENTO Y NO POR SQL PROPIO. sp_n_ConsultaUsuarios es el que
+      usa Mac31 y el que ya se llama en ReportesVentasRepository.Catalogos.cs:88;
+      escribir aqui un SELECT contra dbo.Usuarios seria una segunda definicion de
+      "quien sale en la lista" (hoy: el filtro de estatus pasa por
+      fn_RegresaTablaStatus, no por un IDStatus = n), y el dia que cambie una de
+      las dos habria dos verdades.
+
+      LAS COLUMNAS SE LEEN POR NOMBRE Y SON SOLO TRES. El procedimiento arma su
+      SELECT con SQL dinamico, asi que el orden de las columnas no es un contrato;
+      y de las quince que devuelve, tres son contrasenas en claro (`Contrasena`,
+      `ContrasenaDesc`, `ContrasenaAutorizacion`). Se piden las tres que hacen
+      falta por su nombre: lo que no se nombra no puede salir ni por accidente, ni
+      ahora ni cuando alguien le agregue una columna al procedimiento.
+
+      @IDStatus = 0 ES "TODOS" y no "ninguno": es lo que hace
+      fn_RegresaTablaStatus dentro del procedimiento, igual que en el resto de los
+      sp_n_Consulta*. Por eso un idStatus nulo entra como 0 y no se traduce a
+      nada mas.
+    */
+    public async Task<List<UsuarioMacItemDto>> ListUsuariosMac31Async(
+        int? idStatus, string? texto, CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand("dbo.sp_n_ConsultaUsuarios", conn)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        cmd.Parameters.AddWithValue("@IDUsuario", 0);
+        cmd.Parameters.AddWithValue("@IDPerfil", 0);
+        cmd.Parameters.AddWithValue("@IDStatus", idStatus ?? 0);
+        cmd.Parameters.AddWithValue("@Usuario", (texto ?? string.Empty).Trim());
+        cmd.Parameters.AddWithValue("@Identico", 0);
+        // 1 esta ROTO en la base: con @Formato = 1 el procedimiento concatena un
+        // segundo SELECT sin cerrar el primero. 0 es el unico que se puede pedir.
+        cmd.Parameters.AddWithValue("@Formato", 0);
+
+        var tabla = new DataTable();
+        await using (var reader = await cmd.ExecuteReaderAsync(ct))
+        {
+            tabla.Load(reader);
+        }
+
+        var list = new List<UsuarioMacItemDto>();
+        foreach (DataRow fila in tabla.Rows)
+        {
+            var item = new UsuarioMacItemDto
+            {
+                IdUsuario = Entero(fila, "IDUsuario"),
+                Usuario = Celda(fila, "Usuario"),
+                Nombre = Celda(fila, "Nombre")
+            };
+
+            // Un usuario sin id o sin clave no se puede elegir: seria un renglon
+            // que al guardarse deja IDUsuarioRecibe en 0, que es justo lo que este
+            // endpoint existe para evitar.
+            if (item.IdUsuario > 0 && item.Usuario.Length > 0)
+                list.Add(item);
+        }
+
+        return list;
+    }
+
+    private static int Entero(DataRow fila, string columna)
+    {
+        if (!fila.Table.Columns.Contains(columna) || fila[columna] == DBNull.Value) return 0;
+        return int.TryParse(Convert.ToString(fila[columna]), out var valor) ? valor : 0;
+    }
+
+    private static string Celda(DataRow fila, string columna)
+    {
+        if (!fila.Table.Columns.Contains(columna) || fila[columna] == DBNull.Value) return string.Empty;
+        return (Convert.ToString(fila[columna]) ?? string.Empty).Trim();
+    }
 }
