@@ -260,4 +260,87 @@ public partial class CatalogosAdminController
 
         return Ok(new { ok = true, message = "Constantes de operacion consultadas.", data });
     }
+
+    /// <summary>
+    /// Consulta de empresas de Mac31, con su ficha fiscal completa.
+    ///
+    /// NO ES `GET api/empresas`. Aquella devuelve { empresaId, nombre } y es la
+    /// lista de inquilinos para el selector de empresa; esta devuelve lo que la
+    /// pantalla edita: razon social, RFC, regimen fiscal, banco, cuenta, CLABE, el
+    /// domicilio ya resuelto por el procedimiento y el Id de Facturama. Dos cosas
+    /// distintas con el mismo nombre, y por eso esta cuelga de api/catalogos.
+    ///
+    /// Permiso `catalogos.ver`: la ficha trae el RFC y la cuenta bancaria, pero no
+    /// una contrasena ni un token. Para ESCRIBIRLA hace falta
+    /// `catalogos.empresas.editar`, que es donde esta el candado que importa.
+    /// </summary>
+    [HttpGet("empresas")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ConsultarEmpresasMac(
+        [FromQuery] int idEmpresa = 0,
+        [FromQuery] int idStatus = 0,
+        [FromQuery] string? razonSocial = null,
+        [FromQuery] bool identico = false,
+        CancellationToken ct = default)
+    {
+        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        if (sinPermiso != null) return sinPermiso;
+
+        return Listado(await _service.ConsultarEmpresasMacAsync(
+            new EmpresasMacFiltro
+            {
+                IdEmpresa = idEmpresa,
+                IdStatus = idStatus,
+                RazonSocial = razonSocial,
+                Identico = identico
+            }, ct),
+            "Empresas");
+    }
+
+    /// <summary>
+    /// Guarda de un golpe TODA la relacion de una subcategoria con las marcas.
+    ///
+    /// POR QUE NO BASTA CON EL DE A UNO (`PUT categorias-mac/marcas`).
+    /// La pantalla de relacion tiene una casilla por marca —133 en esta base—, asi
+    /// que guardar un cambio con el endpoint de a uno son 133 peticiones. Es lo que
+    /// hace Mac31, y de ahi salen sus dos defectos: si la numero 70 falla, las 69
+    /// primeras ya se escribieron y nadie sabe cuales; y su bucle recorre
+    /// `dataGridView1.Rows`, que es solo LA PAGINA VISIBLE del grid paginado, asi
+    /// que guardar estando en la pagina 2 no guarda la 1.
+    ///
+    /// Este recibe el conjunto completo y lo escribe en UNA transaccion: o queda
+    /// como se dejo en pantalla, o no queda nada. Sigue siendo idempotente.
+    ///
+    /// El de a uno se queda donde esta: sirve para mover una sola marca y hay quien
+    /// ya lo llama.
+    /// </summary>
+    [HttpPut("categorias-mac/{idCategoria:int}/marcas")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> RelacionarCategoriaMarcasEnLote(
+        [FromRoute] int idCategoria,
+        [FromBody] RelacionCategoriaMarcasLoteRequest? request,
+        CancellationToken ct)
+    {
+        if (request is null) return BadRequest(new { ok = false, message = "Body requerido." });
+        if (idCategoria <= 0) return BadRequest(new { ok = false, message = "La categoria es requerida." });
+        if (request.Marcas.Count == 0)
+            return BadRequest(new { ok = false, message = "No viene ninguna marca." });
+        if (request.Marcas.Any(m => m.IdMarca <= 0))
+            return BadRequest(new { ok = false, message = "Hay una marca sin clave." });
+
+        /*
+          UN TOPE, porque esto escribe en bucle dentro de una transaccion. 2,000 es
+          holgado -la base tiene 133 marcas- y evita que un cuerpo armado a mano
+          deje la tabla bloqueada un rato largo.
+        */
+        if (request.Marcas.Count > 2000)
+            return BadRequest(new { ok = false, message = "Son demasiadas marcas en una sola llamada." });
+
+        var sinPermiso = await ExigirPermisoAsync(PermisosMarcasEditar, ct);
+        if (sinPermiso != null) return sinPermiso;
+
+        var data = await _service.RelacionarCategoriaMarcasAsync(idCategoria, request.Marcas, ct);
+        return Ok(new { ok = data.Guardo, message = "Relacion guardada.", data });
+    }
 }

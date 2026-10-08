@@ -224,6 +224,9 @@ public partial class ReportesVentasRepository
             "impuestos" => ReporteVentasRemisionesImpuestos,
             "accesos" => ReporteAccesosMac,
             "asistencias" => ReporteAsistenciasZaragoza,
+            // El reporte de la flotilla, que imprime ConsultarAutos de Mac31. No
+            // lleva filtros: su sp_n_rptAutos recibe el @Params generico y ya.
+            "autos" => ReporteAutos,
             _ => throw new InvalidOperationException("Reporte de ventas no soportado.")
         };
     }
@@ -454,6 +457,9 @@ public partial class ReportesVentasRepository
             ReporteGastosTotalizado or
             ReporteAccesosMac or
             ReporteAsistenciasZaragoza or
+            // El de la flotilla: mismo camino generico que los otros, su SP recibe
+            // el @Params y devuelve la tabla que pinta la plantilla rptTemplate.
+            ReporteAutos or
             ReporteClientesFacturasRFC or
             ReporteVentasUtilidadAcumuladores or
             ReporteVentasUtilidadProductos or
@@ -1198,6 +1204,23 @@ public partial class ReportesVentasRepository
                 // los datos de "todas".
                 legacy.Param17 = Math.Clamp(request.TipoLista <= 0 ? 1 : request.TipoLista, 1, 4)
                     .ToString(CultureInfo.InvariantCulture);
+                break;
+
+            /*
+              AUTOS: EL UNICO REPORTE SIN FILTROS, Y POR ESO NO HACE FALTA NADA MAS.
+
+              Mac31 lo dispara desde el boton IMPRIMIR de ConsultarAutos con dos
+              parametros y nada mas: Param1 es el usuario y el equipo -que lo pone
+              BuildLegacyUsuarioParam, igual que en los otros cincuenta y tres- y
+              Param2 es la presentacion (pantalla o Excel). No hay fechas, ni
+              empresa, ni almacen: el reporte es la flotilla entera.
+
+              Las fechas que exige el endpoint generico se ignoran aqui a
+              proposito; se piden arriba porque el DTO es el de ventas, y se
+              mandan por no inventar un segundo contrato para un solo reporte.
+            */
+            case ReporteAutos:
+                legacy.Param2 = presentacion;
                 break;
 
             default:

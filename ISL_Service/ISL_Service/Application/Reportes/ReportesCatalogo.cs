@@ -1,4 +1,4 @@
-namespace ISL_Service.Application.Reportes;
+﻿namespace ISL_Service.Application.Reportes;
 
 /// <summary>
 /// Un reporte del modulo Reportes y el permiso que lo enciende.
@@ -141,6 +141,20 @@ public static class ReportesCatalogo
         Grupo("administracion", "gastos", "Gastos"),
         Grupo("administracion", "impuestos", "Impuestos"),
         Grupo("administracion", "accesos", "Accesos"),
+        /*
+          AUTOS: el unico documento del modulo de Catalogos.
+
+          Es el reporte que imprime `ConsultarAutos` de Mac31 (enumReportes.Autos =
+          1300). Entra en "administracion" porque es la flotilla de la empresa, no
+          una venta. Su permiso por la regla seria
+          reportes.administracion.autos.ver y NO esta en WPermiso -el script del
+          catalogo legacy no lo genero, porque el nodo no vive en el arbol de
+          Reportes sino en el boton de una pantalla de catalogo-, asi que entra
+          abierto a quien tenga reportes.ver_modulo, como los otros seis sin
+          permiso. No se invento uno: bloquear por una duda deja a alguien sin su
+          reporte sin poder explicarle por que.
+        */
+        new("autos", "administracion", "Autos", SinPermiso),
         Grupo("administracion", "asistencias", "Asistencias"),
         // Nodo del arbol del modulo MC (ReportesMenu.cs:966). Su permiso seria
         // reportes.administracion.control_acumulado_de_estimaciones.ver y NO esta

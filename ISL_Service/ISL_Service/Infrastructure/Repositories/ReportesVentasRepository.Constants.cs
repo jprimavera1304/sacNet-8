@@ -61,6 +61,8 @@ public partial class ReportesVentasRepository
     private const int ReportePedidoProductos = 240;
     private const int ReporteVentasPagosComparativo = 493;
     private const int ReporteAsistenciasZaragoza = 1026;
+    /// <summary>Reporte de Autos (la flotilla). Lo imprime ConsultarAutos de Mac31.</summary>
+    private const int ReporteAutos = 1300;
     private const int ReporteVentasDescuentosAjustes = 1030;
     /*
       1160 ES EL QUE USA EL NODO REAL DEL MENU DE MAC31.

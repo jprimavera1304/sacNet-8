@@ -33,4 +33,14 @@ public partial class CatalogosAdminService
 
     public Task<Dictionary<string, object?>?> ConsultarConstantesOperacionAsync(CancellationToken ct)
         => _repo.ConsultarConstantesOperacionAsync(ct);
+
+    public Task<List<Dictionary<string, object?>>> ConsultarEmpresasMacAsync(EmpresasMacFiltro f, CancellationToken ct)
+        => _repo.ConsultarEmpresasMacAsync(f, ct);
+
+    public async Task<CatalogoEscrituraResponse> RelacionarCategoriaMarcasAsync(
+        int idCategoria, IReadOnlyList<MarcaDeLaCategoria> marcas, CancellationToken ct)
+    {
+        var r = await _repo.RelacionarCategoriaMarcasAsync(idCategoria, marcas, ct);
+        return new CatalogoEscrituraResponse { Guardo = r.Ok, Mensaje = r.Mensaje, Id = idCategoria };
+    }
 }

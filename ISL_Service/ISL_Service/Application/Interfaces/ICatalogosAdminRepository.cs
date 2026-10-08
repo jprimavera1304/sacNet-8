@@ -137,4 +137,12 @@ public interface ICatalogosAdminRepository
     /// consulta, es el cierre del dia.
     /// </summary>
     Task<Dictionary<string, object?>?> ConsultarConstantesOperacionAsync(CancellationToken ct);
+
+    /// <summary>La ficha fiscal de las empresas de Mac31. No es GET api/empresas,
+    /// que devuelve solo id y nombre para el selector de inquilino.</summary>
+    Task<List<Dictionary<string, object?>>> ConsultarEmpresasMacAsync(EmpresasMacFiltro f, CancellationToken ct);
+
+    /// <summary>Guarda la relacion COMPLETA de una subcategoria con las marcas,
+    /// en una sola transaccion. Ver el comentario del repositorio.</summary>
+    Task<ResultadoLegacy> RelacionarCategoriaMarcasAsync(int idCategoria, IReadOnlyList<MarcaDeLaCategoria> marcas, CancellationToken ct);
 }

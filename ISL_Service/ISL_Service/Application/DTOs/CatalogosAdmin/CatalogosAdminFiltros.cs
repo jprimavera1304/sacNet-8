@@ -96,3 +96,28 @@ public class TiposUsadoFiltro
     public string? TipoUsado { get; set; }
     public bool Identico { get; set; }
 }
+
+/// <summary>Filtro de la consulta de empresas de Mac31. sp_n_ConsultaEmpresas.</summary>
+public class EmpresasMacFiltro
+{
+    public int IdEmpresa { get; set; }
+    public int IdStatus { get; set; }
+    public string? RazonSocial { get; set; }
+    public bool Identico { get; set; }
+}
+
+/// <summary>Una marca y si entra o no en la subcategoria.</summary>
+public class MarcaDeLaCategoria
+{
+    public int IdMarca { get; set; }
+    public bool Marcado { get; set; }
+}
+
+/// <summary>
+/// La relacion COMPLETA de una subcategoria con las marcas, para guardarla de un
+/// golpe. Ver el comentario del endpoint.
+/// </summary>
+public class RelacionCategoriaMarcasLoteRequest
+{
+    public List<MarcaDeLaCategoria> Marcas { get; set; } = new();
+}

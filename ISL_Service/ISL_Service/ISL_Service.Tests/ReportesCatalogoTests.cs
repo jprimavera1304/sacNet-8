@@ -1,4 +1,4 @@
-using ISL_Service.Application.Reportes;
+﻿using ISL_Service.Application.Reportes;
 using Xunit;
 
 namespace ISL_Service.Tests;
@@ -11,12 +11,17 @@ namespace ISL_Service.Tests;
 public class ReportesCatalogoTests
 {
     [Fact]
-    public void Catalogo_Tiene_Los_57_Reportes_Con_Clave_Unica()
+    public void Catalogo_Tiene_Los_58_Reportes_Con_Clave_Unica()
     {
         // 53 + los cuatro que la ola 7 saco del hueco: garantias_registradas (1236),
         // centros_pagos_entradas_salidas (1415), centros_garantias (1420) y
         // control_acumulado_de_estimaciones (1250).
-        Assert.Equal(57, ReportesCatalogo.Reportes.Count);
+        //
+        // + autos (1300), que no vive en el arbol de Reportes de Mac31 sino en el
+        // boton IMPRIMIR de la pantalla de catalogo ConsultarAutos. Es el mismo
+        // camino -sp_ConsultaReportes da el SP y la plantilla- asi que entra aqui y
+        // no en un segundo catalogo.
+        Assert.Equal(58, ReportesCatalogo.Reportes.Count);
         Assert.Equal(
             ReportesCatalogo.Reportes.Count,
             ReportesCatalogo.Reportes.Select(x => x.Clave).Distinct(StringComparer.OrdinalIgnoreCase).Count());

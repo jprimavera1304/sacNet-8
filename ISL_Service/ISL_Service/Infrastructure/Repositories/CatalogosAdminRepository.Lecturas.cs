@@ -1,4 +1,5 @@
 using ISL_Service.Application.DTOs.CatalogosAdmin;
+using ISL_Service.Application.DTOs.Empleados;
 using ISL_Service.Utils;
 using Microsoft.Data.SqlClient;
 
@@ -221,5 +222,73 @@ public partial class CatalogosAdminRepository
         var dt = await FillAsync(cmd, ct);
         var filas = Funciones.DataTableToRows(dt);
         return filas.Count > 0 ? filas[0] : null;
+    }
+
+    // -----------------------------------------------------------------------
+    // Empresas de Mac31
+    //
+    // No se confunda con GET api/empresas, que es otra cosa: aquella devuelve
+    // { empresaId, nombre } para el selector de inquilino. Esta devuelve la FICHA
+    // FISCAL -RFC, regimen, banco, CLABE, domicilio resuelto y el Id de Facturama-,
+    // que es lo que la pantalla de Empresas edita.
+    // -----------------------------------------------------------------------
+
+    public Task<List<Dictionary<string, object?>>> ConsultarEmpresasMacAsync(EmpresasMacFiltro f, CancellationToken ct)
+        => ConsultarAsync("dbo.sp_n_ConsultaEmpresas", cmd =>
+        {
+            cmd.Parameters.AddWithValue("@IDEmpresa", f.IdEmpresa);
+            cmd.Parameters.AddWithValue("@IDStatus", f.IdStatus);
+            cmd.Parameters.AddWithValue("@RazonSocial", Texto(f.RazonSocial));
+            cmd.Parameters.AddWithValue("@Formato", FormatoTodosLosCampos);
+            cmd.Parameters.AddWithValue("@Identico", Bandera(f.Identico));
+        }, ct);
+
+    // -----------------------------------------------------------------------
+    // La relacion categoria-marca, completa
+    // -----------------------------------------------------------------------
+
+    /*
+      TODO EN UNA TRANSACCION, Y POR ESO NO USA EjecutarAsync.
+
+      `EjecutarAsync` abre su propia conexion por llamada, que es lo correcto para
+      una escritura suelta. Aqui son hasta 133 EXEC del mismo procedimiento y lo
+      que importa es que valgan como uno: o queda toda la relacion de la
+      subcategoria como se dejo en pantalla, o no queda nada. A medias es peor que
+      no guardar, porque nadie sabe cuales entraron — es justo lo que le pasa a
+      Mac31, que manda una peticion HTTP por renglon.
+
+      Se reusa el mismo `sp_n_InsertarGrupoCategoriasMarcasRelacion` de siempre
+      (inserta el par si falta y lo borra si Marcado = 0): no hace falta un sp_w_
+      para esto, lo unico que cambia es que las llamadas comparten transaccion.
+    */
+    public async Task<ResultadoLegacy> RelacionarCategoriaMarcasAsync(
+        int idCategoria, IReadOnlyList<MarcaDeLaCategoria> marcas, CancellationToken ct)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+        await using var tx = (SqlTransaction)await conn.BeginTransactionAsync(ct);
+
+        try
+        {
+            foreach (var m in marcas)
+            {
+                await using var cmd = new SqlCommand("dbo.sp_n_InsertarGrupoCategoriasMarcasRelacion", conn, tx)
+                {
+                    CommandType = System.Data.CommandType.StoredProcedure
+                };
+                cmd.Parameters.AddWithValue("@IDCategoria", idCategoria);
+                cmd.Parameters.AddWithValue("@IDMarca", m.IdMarca);
+                cmd.Parameters.AddWithValue("@Marcado", m.Marcado ? 1 : 0);
+                await cmd.ExecuteNonQueryAsync(ct);
+            }
+
+            await tx.CommitAsync(ct);
+            return new ResultadoLegacy { Result = 1, Mensaje = string.Empty };
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
     }
 }
