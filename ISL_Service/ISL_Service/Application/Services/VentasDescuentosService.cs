@@ -1,3 +1,4 @@
+using System.Globalization;
 using ISL_Service.Application.DTOs.VentasDescuentos;
 using ISL_Service.Application.DTOs.VentasEscrituras;
 using ISL_Service.Application.Exceptions;
@@ -236,6 +237,197 @@ public class VentasDescuentosService : IVentasDescuentosService
             throw new ArgumentException("Para rechazar hace falta el motivo.");
 
         return await _repository.CambiarStatusAjusteAsync(request, idUsuario, ct);
+    }
+
+    /*
+      APLICAR UNA LIQUIDACION DE DESCUENTO. ES EL PASO QUE MUEVE EL DINERO.
+
+      TODO SALE DEL AJUSTE GUARDADO Y DEL SIMULADOR, NADA DEL CUERPO
+      -------------------------------------------------------------
+      El cuerpo trae el id y nada mas. Con el:
+
+        1) se lee el ajuste (sp_n_ConsultaVentasDescuentosAjustes) para saber su
+           remision, de que TIPO de descuento es y en que estado esta;
+        2) se simula (sp_n_SimulaVentasDescuentosAjustes) para que la BASE calcule
+           `DescuentoAplicarReal`, que es el importe que se abona;
+        3) se abona (sp_n_InsertarVentasPagos) con el @IDVentasDescuentosAjustes
+           de verdad, que es lo que marca la liquidacion como aplicada.
+
+      Es el mismo orden de Mac31: su formulario vuelve a correr el Load -que
+      simula- antes de aplicar (LiquidacionesDescuento.cs:1008-1012 y :1050-1062).
+
+      LOS TRES ESTADOS QUE LO BLOQUEAN, con el mensaje de Mac31
+      (ConsultarLiquidacionesDescuentos.cs:1043-1066), son los MISMOS que decide
+      si el boton se ve (LiquidacionesDescuento.cs:304-375):
+
+        ya aplicada  -> "EL FOLIO n YA ESTA APLICADO."
+        rechazada    -> "EL FOLIO n ESTA RECHAZADO."
+        sin autorizar-> "EL FOLIO n NO ESTA AUTORIZADO."
+
+      El de "ya aplicada" es el que importa de verdad: sin el, aplicar dos veces
+      mete el abono dos veces y la remision baja de saldo el doble. Y en Mac31 es
+      un freno del CLIENTE, no del procedimiento: el boton se queda visible
+      incluso ya aplicada (:1363-1370) y lo unico que lo evita es el `continue`
+      de la pantalla de consulta. Un endpoint no tiene pantalla, asi que el freno
+      va aqui.
+
+      DE QUE TIPO ES EL DESCUENTO: 6 GLOBAL / 8 POR LINEA / 4 ADICIONAL
+      ----------------------------------------------------------------
+      Son los valores de enumTipoPagos de Mac31 (Enums.cs:152 Adicional = 4,
+      :158 Global = 6, :164 PorLinea = 8), elegidos en
+      LiquidacionesDescuento.cs:1054-1059 segun el radio marcado. Y el radio no lo
+      elige el usuario cuando se edita: lo deduce el Load de las tres columnas del
+      ajuste guardado (:116 DescuentoGlobal, :162 DescuentoAdicional, :198
+      IDVentasDetalle). Aqui se deduce de las mismas tres.
+
+      EL ORDEN DE LA DEDUCCION ES EL DE LEGACY, QUE NO ES EL OBVIO. Alla son tres
+      `if` seguidos, cada uno con su `.Checked = true`, asi que GANA EL ULTIMO que
+      se cumpla: por linea, luego adicional, luego global. Se respeta, porque si
+      una fila vieja trae dos columnas llenas el tipo de pago que escribiria Mac31
+      es el de por linea, y el tipo de pago es lo que despues se lee en el corte.
+      Ademas "0" NO cuenta como descuento adicional, que es la comprobacion
+      literal de :162 (`!= "" && != "0"`).
+    */
+    public async Task<VentaDescuentoAjusteAplicarResponse> AplicarAjusteAsync(
+        VentaDescuentoAjusteAplicarRequest request, int idUsuario, string equipo, CancellationToken ct)
+    {
+        if (request.IdVentasDescuentosAjustes <= 0)
+            throw new ArgumentException("El ajuste a aplicar es obligatorio.");
+
+        var consulta = await _repository.ConsultarAjustesAsync(
+            new VentaDescuentoAjusteConsultaRequest
+            {
+                IdsVentasDescuentosAjustes = new List<int> { request.IdVentasDescuentosAjustes }
+            },
+            idUsuario,
+            ct);
+
+        var ajuste = consulta.Rows.Count > 0 ? consulta.Rows[0] : null;
+        if (ajuste is null)
+            throw new NotFoundException("El ajuste de descuento no existe o no es visible para este usuario.");
+
+        var folio = Numero(ajuste, "Folio");
+
+        if (Numero(ajuste, "IDUsuarioAplicacion") != 0)
+            throw new ConflictException($"El folio {folio} ya esta aplicado.");
+        if (Numero(ajuste, "IDUsuarioRechazo") != 0)
+            throw new ConflictException($"El folio {folio} esta rechazado.");
+        if (Numero(ajuste, "IDUsuarioAutorizacion") == 0)
+            throw new ConflictException($"El folio {folio} no esta autorizado.");
+
+        var idVenta = Numero(ajuste, "IDVenta");
+        if (idVenta <= 0)
+            throw new ConflictException($"El folio {folio} no tiene remision: no hay a que abonarle el descuento.");
+
+        var descuentoGlobal = Cadena(ajuste, "DescuentoGlobal");
+        var idsVentaDetalle = Cadena(ajuste, "IDVentasDetalle");
+        var descuentoAdicional = Cadena(ajuste, "DescuentoAdicional");
+
+        var idTipoPago = ResolverTipoDePagoDelDescuento(descuentoGlobal, idsVentaDetalle, descuentoAdicional);
+        if (idTipoPago == 0)
+            throw new ConflictException(
+                $"El folio {folio} no dice de que tipo es el descuento (sin descuento global, sin renglones y sin adicional), asi que no se puede saber con que tipo de pago abonarlo.");
+
+        /*
+          LA SIMULACION VA CON EL ID Y NADA MAS, como la de Mac31 cuando edita un
+          ajuste que ya existe: el procedimiento rearma los porcentajes desde el
+          renglon guardado. Mandarle los porcentajes desde aqui seria darle la
+          oportunidad de aplicar un importe distinto del que se autorizo.
+        */
+        var simulacion = await _repository.SimularAjusteAsync(
+            new VentaDescuentoAjusteSimularRequest
+            {
+                IdVentasDescuentosAjustes = request.IdVentasDescuentosAjustes
+            },
+            idUsuario,
+            ct);
+
+        var fila = simulacion.Rows.Count > 0 ? simulacion.Rows[0] : null;
+        if (fila is null)
+            throw new ConflictException(
+                $"El folio {folio} no se pudo simular, asi que no se conoce el importe a abonar. No se aplica nada.");
+
+        var abono = Importe(fila, "DescuentoAplicarReal");
+        if (abono <= 0m)
+            throw new ConflictException(
+                $"El folio {folio} simula un descuento de {abono:0.00}: no hay nada que abonar.");
+
+        /* El concepto que se guarda en el pago es el texto que armo la base, el
+           mismo que manda Mac31 (LiquidacionesDescuento.cs:1062). */
+        var observaciones = Cadena(fila, "TextoDescuentosPorLinea");
+
+        var resultado = await _repository.InsertarPagoDeDescuentoAsync(
+            request.IdVentasDescuentosAjustes,
+            idVenta,
+            idTipoPago,
+            abono,
+            observaciones,
+            idUsuario,
+            equipo,
+            ct);
+
+        var primera = resultado.Filas.Count > 0 ? resultado.Filas[0] : null;
+
+        return new VentaDescuentoAjusteAplicarResponse
+        {
+            /* El procedimiento contesta result = 0 cuando guardo y -1 con ROLLBACK
+               cuando no; el texto de `mensaje` es el suyo y se publica tal cual. */
+            Hecho = resultado.Resultado == 0,
+            Mensaje = resultado.Mensaje,
+            IdVentasDescuentosAjustes = request.IdVentasDescuentosAjustes,
+            IdVenta = idVenta,
+            IdTipoPago = idTipoPago,
+            Abono = abono,
+            SaldoFavorDinero = Importe(primera, "SaldoFavorDineroCliente"),
+            SaldoFavorCascos = Importe(primera, "SaldoFavorCascosCliente")
+        };
+    }
+
+    /// <summary>
+    /// 8 por linea, 4 adicional, 6 global, 0 si no se puede saber. El orden es el
+    /// de los tres `if` de LiquidacionesDescuento.cs:116, :162 y :198, donde gana
+    /// el ultimo que se cumple.
+    /// </summary>
+    public static int ResolverTipoDePagoDelDescuento(
+        string? descuentoGlobal, string? idsVentaDetalle, string? descuentoAdicional)
+    {
+        const int TipoPagoDescuentoAdicional = 4;
+        const int TipoPagoDescuentoGlobal = 6;
+        const int TipoPagoDescuentoPorLinea = 8;
+
+        if (!string.IsNullOrWhiteSpace(idsVentaDetalle))
+            return TipoPagoDescuentoPorLinea;
+
+        var adicional = (descuentoAdicional ?? string.Empty).Trim();
+        if (adicional.Length > 0 && adicional != "0")
+            return TipoPagoDescuentoAdicional;
+
+        if (!string.IsNullOrWhiteSpace(descuentoGlobal))
+            return TipoPagoDescuentoGlobal;
+
+        return 0;
+    }
+
+    private static int Numero(Dictionary<string, object?> fila, string columna)
+    {
+        if (!fila.TryGetValue(columna, out var valor) || valor is null) return 0;
+        return int.TryParse(Convert.ToString(valor, CultureInfo.InvariantCulture), out var n) ? n : 0;
+    }
+
+    private static string Cadena(Dictionary<string, object?> fila, string columna)
+    {
+        if (!fila.TryGetValue(columna, out var valor) || valor is null) return string.Empty;
+        return (Convert.ToString(valor, CultureInfo.InvariantCulture) ?? string.Empty).Trim();
+    }
+
+    private static decimal Importe(Dictionary<string, object?>? fila, string columna)
+    {
+        if (fila is null || !fila.TryGetValue(columna, out var valor) || valor is null) return 0m;
+        return decimal.TryParse(
+            Convert.ToString(valor, CultureInfo.InvariantCulture),
+            NumberStyles.Any,
+            CultureInfo.InvariantCulture,
+            out var n) ? n : 0m;
     }
 
     public async Task<FilasLegacyDto> SimularAjusteAsync(

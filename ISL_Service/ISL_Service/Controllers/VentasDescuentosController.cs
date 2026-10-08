@@ -32,6 +32,7 @@ public class VentasDescuentosController : PermisoControllerBase
     private static readonly string[] PermisoAjusteVer = { "descuentos.ajustes.ver", "descuentos.ver" };
     private static readonly string[] PermisoAjusteCrear = { "descuentos.ajustes.crear" };
     private static readonly string[] PermisoAjusteAutorizar = { "descuentos.ajustes.autorizar" };
+    private static readonly string[] PermisoAjusteAplicar = { "descuentos.ajustes.aplicar" };
 
     private readonly IVentasDescuentosService _service;
 
@@ -228,6 +229,45 @@ public class VentasDescuentosController : PermisoControllerBase
         var data = await _service.CambiarStatusAjusteAsync(request, IdUsuarioLegacy(), ct);
         var hecho = request.Autorizar ? "Ajuste autorizado." : "Ajuste rechazado.";
         return Ok(new { ok = true, message = Mensaje(data.Hecho, hecho), data });
+    }
+
+    /// <summary>
+    /// Aplica una liquidacion de descuento ya autorizada: mete el abono en la
+    /// remision y la deja marcada como aplicada.
+    /// </summary>
+    /// <response code="200">Se aplico, o el procedimiento lo rechazo y lo dice en `data.mensaje`</response>
+    /// <response code="404">El ajuste no existe o no es visible para este usuario</response>
+    /// <response code="409">Ya estaba aplicado, esta rechazado, no esta autorizado, o no hay importe que abonar</response>
+    /*
+      ESTE ES EL PASO QUE MUEVE EL DINERO, Y LLEVA SU PROPIO PERMISO.
+
+      En Mac31 el boton APLICAR tiene su propia fila de permisos, separada de
+      AUTORIZAR y de RECHAZAR: la forma lo pregunta con
+      `Globales.ValidaPermisos(this, btnAplicar)`
+      (LiquidacionesDescuento.cs:341 y :372). Aqui es
+      `descuentos.ajustes.aplicar`, clave nueva, y NO se reusa
+      `descuentos.ajustes.autorizar`: autorizar es decir que el descuento procede
+      y aplicar es moverlo a la cuenta del cliente. Juntarlas dejaria que quien
+      autoriza aplique su propia autorizacion, que es exactamente lo que la
+      separacion de los dos botones evita.
+
+      EL CUERPO LLEVA SOLO EL ID. El importe no se acepta de fuera: lo calcula el
+      simulador en la base. Ver VentaDescuentoAjusteAplicarRequest.
+    */
+    [HttpPost("ajustes/aplicar")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> AplicarAjusteAsync([FromBody] VentaDescuentoAjusteAplicarRequest? request, CancellationToken ct)
+    {
+        var veto = await ExigirPermisoAsync(PermisoAjusteAplicar, ct);
+        if (veto is not null) return veto;
+        if (request is null) return BadRequest(new { message = "Body requerido." });
+
+        var data = await _service.AplicarAjusteAsync(request, IdUsuarioLegacy(), Equipo(), ct);
+        return Ok(new { ok = true, message = Mensaje(data.Hecho, "Descuento aplicado."), data });
     }
 
     /// <summary>Simula el ajuste sin guardarlo.</summary>
