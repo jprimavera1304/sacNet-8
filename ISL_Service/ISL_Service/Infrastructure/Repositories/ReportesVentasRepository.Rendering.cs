@@ -2,6 +2,7 @@ using System.Data;
 using System.Text.RegularExpressions;
 using ISL_Service.Application.DTOs.Reportes;
 using ISL_Service.Application.Interfaces;
+using ISL_Service.Application.Reportes;
 using ISL_Service.Infrastructure.Data;
 using ISL_Service.Infrastructure.Reports;
 using Microsoft.Data.SqlClient;
@@ -24,6 +25,18 @@ public partial class ReportesVentasRepository
         var sp = Convert.ToString(row["SPV2"]) ?? "";
         if (string.IsNullOrWhiteSpace(sp))
             throw new InvalidOperationException("El reporte no tiene SPV2 configurado.");
+
+        /*
+          Algunos `sp_n_` de reporte estan ROTOS EN LA BASE y no sacan el papel
+          en ninguna empresa —el de Autos pide una columna que no existe—, asi
+          que tampoco sale desde Mac31. Cuando hay un gemelo `sp_w_` con el
+          defecto corregido, se usa el gemelo.
+
+          No se cambia el `spV2` de la fila de `Reportes` a proposito: esa fila
+          la lee tambien Mac31, y cambiarla le cambia el comportamiento a un
+          programa que no estamos migrando. Ver ProcedimientosRotosEnLaBase.
+        */
+        sp = ProcedimientosRotosEnLaBase.Bueno(sp);
 
         return new LegacyReportConfig
         {
