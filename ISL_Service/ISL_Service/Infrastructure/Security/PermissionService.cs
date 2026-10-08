@@ -917,6 +917,22 @@ public sealed class PermissionService : IPermissionService
 
         /*
           `facturacion.ver_modulo` ES LO QUE HACE QUE EL MODULO APAREZCA.
+
+          `/api/modulos/disponibles` filtra los modulos por `{clave}.ver_modulo`
+          (PermissionService:1675), asi que sin esta clave la familia
+          `facturacion` existe en los permisos pero su tarjeta nunca se puede
+          enseñar: la pantalla queda solo alcanzable escribiendo la direccion.
+
+          No existe en Mac31 —alli la consulta de facturas cuelga del menu de
+          VENTAS— y es de las que el inventario llama "capacidad del web": se
+          siembra aqui y no se deriva de ningun boton.
+
+          Falta ademas el renglon en `dbo.WModulo` y `dbo.WModuloEmpresa`, que es
+          dato y no codigo. El script esta en
+          `migracion/sql/alta-modulo-facturacion.sql`.
+        */
+        new("facturacion.ver_modulo", "Facturacion - Ver el modulo", "facturacion"),
+
         new("huellas.editar", "Huellas - Registrar y cancelar", "huellas"),
         new("seguridad.bitacora.registrar", "Seguridad - Registrar intentos de contraseña", "seguridad"),
 
