@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Text.RegularExpressions;
 using ISL_Service.Application.DTOs.Reportes;
 using ISL_Service.Application.Interfaces;
@@ -38,14 +38,12 @@ public partial class ReportesVentasRepository
         SqlConnection conn,
         CancellationToken ct)
     {
-        await using var cmd = new SqlCommand("sp_n_ConsultaConstantes", conn)
+        await using var cmd = new SqlCommand("sp_w_ConsultaConstantesSoloLectura", conn)
         {
             CommandType = CommandType.StoredProcedure,
             CommandTimeout = 500
         };
-        cmd.Parameters.AddWithValue("@ValidaActividad", 0);
         cmd.Parameters.AddWithValue("@IDUsuario", 0);
-        cmd.Parameters.AddWithValue("@Equipo", "");
 
         var ds = await FillDataSetAsync(cmd, ct);
         if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)

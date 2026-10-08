@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using ISL_Service.Application.DTOs.VentasConsulta;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Data;
@@ -365,14 +365,12 @@ public class VentasConsultaRepository : IVentasConsultaRepository
 
     private static async Task<ConstantesDeVentas> ConsultarConstantesDeVentasAsync(SqlConnection conn, CancellationToken ct)
     {
-        await using var cmd = new SqlCommand("sp_n_ConsultaConstantes", conn)
+        await using var cmd = new SqlCommand("sp_w_ConsultaConstantesSoloLectura", conn)
         {
             CommandType = CommandType.StoredProcedure,
             CommandTimeout = CommandTimeoutSeconds
         };
-        cmd.Parameters.AddWithValue("@ValidaActividad", 0);
         cmd.Parameters.AddWithValue("@IDUsuario", 0);
-        cmd.Parameters.AddWithValue("@Equipo", "");
 
         var table = await ExecuteFirstTableAsync(cmd, ct);
         if (table.Rows.Count == 0)

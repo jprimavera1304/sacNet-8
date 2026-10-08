@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Data;
 using ISL_Service.Infrastructure.Reports;
@@ -381,12 +381,10 @@ public class RemisionImpresionRepository : IRemisionImpresionRepository
         */
         return await LlenarAsync(
             conn,
-            "sp_n_ConsultaConstantes",
+            "sp_w_ConsultaConstantesSoloLectura",
             new Dictionary<string, object>
             {
-                ["@ValidaActividad"] = 0,
                 ["@IDUsuario"] = 0,
-                ["@Equipo"] = ""
             },
             ct);
     }

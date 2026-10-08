@@ -180,14 +180,12 @@ public class VentasMultiPagoRepository : IVentasMultiPagoRepository
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
 
-        await using var cmd = new SqlCommand("sp_n_ConsultaConstantes", conn)
+        await using var cmd = new SqlCommand("sp_w_ConsultaConstantesSoloLectura", conn)
         {
             CommandType = CommandType.StoredProcedure,
             CommandTimeout = CommandTimeoutSeconds
         };
-        cmd.Parameters.AddWithValue("@ValidaActividad", 0);
         cmd.Parameters.AddWithValue("@IDUsuario", 0);
-        cmd.Parameters.AddWithValue("@Equipo", string.Empty);
 
         var t = await PrimeraTablaAsync(cmd, ct);
         if (t.Rows.Count == 0) return new MultiPagoConstantes();

@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Globalization;
 using System.Text;
 using ISL_Service.Application.DTOs.VentasPedidoCaptura;
@@ -1171,10 +1171,8 @@ ORDER BY Fecha;";
 
     private static async Task<decimal> ConsultarPorcentajeIvaAsync(SqlConnection conn, CancellationToken ct)
     {
-        await using var cmd = CreateStoredProcedureCommand("sp_n_ConsultaConstantes", conn);
-        cmd.Parameters.AddWithValue("@ValidaActividad", 0);
+        await using var cmd = CreateStoredProcedureCommand("sp_w_ConsultaConstantesSoloLectura", conn);
         cmd.Parameters.AddWithValue("@IDUsuario", 0);
-        cmd.Parameters.AddWithValue("@Equipo", string.Empty);
 
         var table = await ExecuteFirstTableAsync(cmd, ct);
         if (table.Rows.Count == 0) return 0m;
@@ -1497,10 +1495,8 @@ ORDER BY Fecha;";
 
     private static async Task<PedidoFechaOperacionDto> ConsultarFechaOperacionAsync(SqlConnection conn, CancellationToken ct)
     {
-        await using var cmd = CreateStoredProcedureCommand("sp_n_ConsultaConstantes", conn);
-        cmd.Parameters.AddWithValue("@ValidaActividad", 0);
+        await using var cmd = CreateStoredProcedureCommand("sp_w_ConsultaConstantesSoloLectura", conn);
         cmd.Parameters.AddWithValue("@IDUsuario", 0);
-        cmd.Parameters.AddWithValue("@Equipo", string.Empty);
         var table = await ExecuteFirstTableAsync(cmd, ct);
         if (table.Rows.Count == 0) return new PedidoFechaOperacionDto();
 
