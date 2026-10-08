@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Text.RegularExpressions;
 using ISL_Service.Application.DTOs.Reportes;
 using ISL_Service.Application.Interfaces;
@@ -171,7 +171,7 @@ public partial class ReportesVentasRepository
         if (table.Rows.Count == 0)
             return GenerateEmptyFormatoNormalHtml(logo, templates, reporteNombre, request);
 
-        var cuerpoTemplate = ReadTemplateHtml(templates, "cuerpo_n");
+        var cuerpoTemplate = LeerCuerpoDeLaPlantilla(templates);
         var detalleTemplate = ReadTemplateHtml(templates, "detalle");
         var totalesTemplate = ReadTemplateHtml(templates, "totales");
         var htmlFinal = "";
@@ -259,7 +259,7 @@ public partial class ReportesVentasRepository
         if (table.Rows.Count == 0)
             return GenerateEmptyColumnas3Html(logo, templates, reporteNombre, request);
 
-        var cuerpoTemplate = ReadTemplateHtml(templates, "cuerpo_n");
+        var cuerpoTemplate = LeerCuerpoDeLaPlantilla(templates);
         var detalle1Template = ReadTemplateHtml(templates, "detalle1");
         var detalle2Template = ReadTemplateHtml(templates, "detalle2");
         var detalle3Template = ReadTemplateHtml(templates, "detalle3");
@@ -356,7 +356,7 @@ public partial class ReportesVentasRepository
         if (table.Rows.Count == 0)
             return GenerateEmptyFormatoNormalHtml(logo, templates, reporteNombre, request);
 
-        var cuerpoTemplate = ReadTemplateHtml(templates, "cuerpo_n");
+        var cuerpoTemplate = LeerCuerpoDeLaPlantilla(templates);
         var detalleTemplate = ReadTemplateHtml(templates, "detalle");
         var detalleMotoTemplate = ReadTemplateHtml(templates, "detalleMoto");
 
@@ -408,7 +408,7 @@ public partial class ReportesVentasRepository
         string reporteNombre,
         ReportesVentasAcumuladoresProductosRequest request)
     {
-        var html = BuildColumnas3Header(ReadTemplateHtml(templates, "cuerpo_n"), logo, reporteNombre, 1, 1, null, null, request);
+        var html = BuildColumnas3Header(LeerCuerpoDeLaPlantilla(templates), logo, reporteNombre, 1, 1, null, null, request);
         var mensaje = "<tr><td colspan='16' align='center'><br /><br /> <u> <h1>No se encontro informacion</h1> </u></td></tr>";
         html = html.Replace("#Detalle1#", mensaje);
         html = html.Replace("#Detalle2#", "");
@@ -459,7 +459,7 @@ public partial class ReportesVentasRepository
         string reporteNombre,
         ReportesVentasAcumuladoresProductosRequest request)
     {
-        var html = BuildEmptyHeader(ReadTemplateHtml(templates, "cuerpo_n"), logo, reporteNombre, request);
+        var html = BuildEmptyHeader(LeerCuerpoDeLaPlantilla(templates), logo, reporteNombre, request);
         var mensaje = "<tr><td colspan='16' align='center'><br /><br /> <u> <h1>No se encontro informacion</h1> </u></td></tr>";
         html = html.Replace("#Detalle1#", mensaje);
         html = html.Replace("#Detalle#", mensaje);
@@ -474,7 +474,7 @@ public partial class ReportesVentasRepository
         ReportesVentasAcumuladoresProductosRequest request,
         string mensaje)
     {
-        var html = BuildEmptyHeader(ReadTemplateHtml(templates, "cuerpo_n"), logo, reporteNombre, request);
+        var html = BuildEmptyHeader(LeerCuerpoDeLaPlantilla(templates), logo, reporteNombre, request);
         var detail = "<tr><td colspan='16' align='center'><br /><br /> <u> <h1>" + mensaje + "</h1> </u></td></tr>";
         html = html.Replace("#Detalle1#", detail);
         html = html.Replace("#Detalle#", detail);
@@ -546,6 +546,37 @@ public partial class ReportesVentasRepository
         html = ReplaceAgentHeader(html, table, row, request);
         html = ReplaceClientHeader(html, table, row);
         return ReplaceValues(table, row, html);
+    }
+
+    /*
+      EL CUERPO SE LLAMA "cuerpo_n" EN CASI TODOS Y "cuerpo" EN DOS.
+
+      `Template_Html` guarda tres piezas por reporte -el cuerpo, el detalle y los
+      totales- y el cuerpo se llama `cuerpo_n` en toda la tabla menos en dos
+      filas. Contado en MacZ:
+
+          1024  cuerpo | detalle | totales
+          1025  cuerpo | detalle | totales
+          1190  cuerpo_n | detalle | totales      <- como todos los demas
+
+      Los dos de la excepcion son los reportes de asistencias que salen de
+      `ReporteEmpleadoAsistenciaRecibos`, y es justo por eso que Legacy los trata
+      aparte en ReporteV2Service.cs:860 en vez de mandarlos por el camino comun.
+
+      Pidiendo solo `cuerpo_n` el motor moria con "Template HTML 'cuerpo_n' no
+      encontrado", que es un 500 mudo y suena a que falta una fila cuando lo que
+      cambia es el nombre. Se busca el alternativo y SOLO ese: si no esta ninguno
+      de los dos, se sigue fallando con el mensaje de siempre, porque entonces el
+      reporte de verdad no tiene plantilla y callarlo imprimiria un papel en
+      blanco.
+    */
+    private static string LeerCuerpoDeLaPlantilla(DataTable templates)
+    {
+        var rows = templates.Select("descripcion = 'cuerpo_n'");
+        if (rows.Length > 0)
+            return Convert.ToString(rows[0]["html"]) ?? "";
+
+        return ReadTemplateHtml(templates, "cuerpo");
     }
 
     private static string ReadTemplateHtml(DataTable templates, string descripcion)

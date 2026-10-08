@@ -76,30 +76,42 @@ public static class ReportesCatalogo
         Ventas("remisiones", "Remisiones"),
         Ventas("facturas", "Facturas"),
         /*
-          EL PDF DE UN COMPROBANTE TIMBRADO (1003), QUE NO ES EL LISTADO DE
-          FACTURAS DE ARRIBA.
+          EL 1003 NO ESTA AQUI, Y NO SE DEBE AGREGAR. MEDIDO.
 
-          `facturas` es el reporte de la lista (24). Este imprime UN comprobante:
-          el que se le diga en `idVentaFactura`. Hacia falta porque una nota de
-          credito timbrada desde el web no tenia papel — el 1003 no estaba aqui y
-          el motor rechaza un IDReporte crudo, asi que no habia por donde pedirlo.
+          El 1003 ("Factura", sp_n_rptFacturaElectronica) es el PDF de un
+          comprobante timbrado. Parece que le toca entrar al catalogo —una nota
+          de credito timbrada desde el web no tenia papel— y se probo. NO
+          FUNCIONA, y la razon no es un permiso ni un parametro:
 
-          SU PERMISO ES `facturacion.ver` Y NO UNO NUEVO.
+          `sp_n_rptFacturaElectronica` NO DEVUELVE LOS DATOS DEL CFDI. Devuelve
+          la RUTA del fichero que ya existe en disco, y los datos del correo con
+          el que se manda. Comprobado en MacZ con el comprobante 71875, con las
+          dos presentaciones que acepta:
 
-          No se le invento una clave `reportes.ventas.comprobante_timbrado.ver`:
-          eso lo dejaria contestando 403 a todo el que no fuera SuperAdmin, que es
-          lo que ya paso una vez con 68 capacidades. `facturacion.ver` SI existe en
-          WPermiso y es exactamente quien debe poder ver el papel de una factura.
+              Param3 = 2 (PDF) -> IssueDate | FolioFtm | Presentacion |
+                                  Archivo = C:\macZ\Facturas\07-2026\
+                                            ComplementoPago 0 71875 .pdf | ...
+              Param3 = 0        -> lo mismo, con .zip en Archivo
 
-          Contado en MacZ antes de elegirla: `facturacion.ver` tiene CERO tenedores
-          (ni un rol en WRolPermiso ni un usuario en WUsuarioPermiso) — igual que
-          las 65 claves `reportes.*`, que tambien tienen cero. O sea que hoy, en
-          esta base, solo un SuperAdmin alcanza cualquier reporte, y eso no se
-          arregla con un INSERT a mano: se arregla con el script de siembra de
-          `Querrys/`. Queda dicho aqui para que nadie lea este 403 como un defecto
-          de este reporte en particular.
+          Ni una columna de emisor, receptor, conceptos o sellos. Su plantilla
+          `rptTemplate` pide 42 tags (#IssuerRfc#, #Uuid#, #OriginalString#,
+          #SatSign#...) y el motor los deja TAL CUAL: el PDF que sale son 44 KB
+          de una pagina con los nombres de los tags impresos. Un papel roto en el
+          catalogo es peor que un reporte que no esta, porque alguien lo manda a
+          un cliente.
+
+          EL CAMINO BUENO YA EXISTE Y ES OTRO: el comprobante no se vuelve a
+          dibujar, se sirve el fichero que genero el timbrado.
+
+              GET /api/ventas/facturas/{id}/documento?formato=pdf
+
+          Ese endpoint resuelve la misma ruta y entrega el fichero. Medido con el
+          71875 en esta maquina: contesta 409 con la ruta exacta
+          ("NO SE ENCONTRO EL ARCHIVO PDF. (C:\macZ\Facturas\07-2026\...)")
+          porque los PDF viven en el servidor que timbro, no en el equipo de
+          desarrollo. O sea que el endpoint esta bien y lo que falta no es un
+          reporte: es que el fichero exista donde el timbrado lo deja.
         */
-        new("comprobante_timbrado", "ventas", "Comprobante timbrado (PDF)", "facturacion.ver"),
         Ventas("concentrados", "Concentrados"),
         Ventas("cobranza", "Cobranza"),
         Ventas("cobranza_detallado", "Cobranza Detallado"),
@@ -239,8 +251,34 @@ public static class ReportesCatalogo
           quien tenga reportes.ver_modulo, como los otros siete sin permiso, y el
           dia que se siembren las claves solo hay que cambiar el null.
         */
-        new("nomina_asistencias", "administracion", "Asistencias por periodo", SinPermiso),
-        new("nomina_asistencias_corto", "administracion", "Asistencias (formato corto)", SinPermiso),
+        /*
+          LOS 1024 Y 1025 (las dos asistencias por dia) NO ESTAN, Y ES MEDIDO.
+
+          Se dieron de alta, se generaron y se abrio el PDF: salen 58 KB con los
+          empleados, su sueldo y sus totales BIEN, y las siete columnas de dias
+          en crudo:
+
+              #fechaNombreDia1#..7  #fechaDia1#..7  #asistenciaDia1#..7
+              #minsRetardo#  #totalPagado#
+
+          La razon no es la plantilla —ya se arreglo que su cuerpo se llame
+          `cuerpo` y no `cuerpo_n`, ver LeerCuerpoDeLaPlantilla— sino que esos
+          tags NO ESTAN EN LO QUE DEVUELVE EL PROCEDIMIENTO. Ejecutado a mano en
+          MacZ (`sp_n_ConsultaEmpleadosTipoSueldoRecibo '274904', 12551`) trae UNA
+          tabla de 54 columnas con el empleado, su sueldo y sus percepciones, y
+          ni una de los siete dias. Legacy los arma aparte: por eso tiene una rama
+          dedicada para estos dos ids en ReporteV2Service.cs:860 en vez de
+          mandarlos por el camino comun.
+
+          Dejarlos dados de alta significaba entregar un papel de nomina con
+          "#asistenciaDia1#" donde va la hora de entrada, y eso es peor que no
+          tenerlos: alguien lo imprime y lo entrega. Entran el dia que se porte
+          esa rama —leer los dias del periodo y rellenar las siete columnas por
+          empleado— que es trabajo acotado y esta medido aqui para no repetirlo.
+
+          Los otros dos del mismo formulario SI salen enteros y por eso si estan:
+          1190 (Inasistencias) y 1027 (Vacaciones).
+        */
         new("nomina_inasistencias", "administracion", "Inasistencias", SinPermiso),
         new("nomina_vacaciones", "administracion", "Vacaciones", SinPermiso),
         Grupo("administracion", "asistencias", "Asistencias"),

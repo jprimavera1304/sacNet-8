@@ -158,13 +158,6 @@ public class ReportesVentasLegacyRequest : ReportesVentasAcumuladoresProductosRe
     /// seleccionado, no del resultado de la busqueda.
     /// </summary>
     /// <summary>
-    /// 1003: el comprobante timbrado cuyo PDF se quiere (factura, nota de credito
-    /// o complemento de pago). Es OBLIGATORIO: el reporte imprime UNO, no un
-    /// listado, y con 0 el procedimiento devuelve cero renglones.
-    /// </summary>
-    public int IDVentaFactura { get; set; }
-
-    /// <summary>
     /// Los reportes de nomina (1024, 1025, 1027, 1190): los empleados marcados.
     ///
     /// Es obligatorio y no hay "todos": el formulario de Mac31 recorre la rejilla,

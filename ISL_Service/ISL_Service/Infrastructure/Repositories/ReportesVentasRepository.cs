@@ -342,7 +342,11 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
 
         var idReporte = legacy.IDReporte;
         var config = await ConsultarConfiguracionAsync(conn, idReporte, ct);
-        var data = await ExecuteLegacySpAsync(conn, config.StoredProcedure, parametrosLegacy.ToString(), ct);
+        /* El renglon de parametros se vuelve a leer porque hay dos reportes cuyo
+           procedimiento recibe DOS argumentos y el segundo vive ahi. Ver
+           ArgumentosDelProcedimiento. */
+        var renglon = await ConsultarParametrosRowAsync(conn, parametrosLegacy, ct);
+        var data = await ExecuteLegacySpAsync(conn, config.StoredProcedure, ArgumentosDelProcedimiento(idReporte, parametrosLegacy, renglon), ct);
         var source = data.Tables.Count > 0 ? data.Tables[0] : new DataTable();
         var errorParams = source.Columns.Contains("ErrorParams") && source.Rows.Count > 0
             ? Convert.ToString(source.Rows[0]["ErrorParams"]) ?? "Error de parametros legacy."
@@ -453,7 +457,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
 
         var request = BuildStoredExcelRequest(idReporte, row);
         var config = await ConsultarConfiguracionAsync(conn, idReporte, ct);
-        var data = await ExecuteLegacySpAsync(conn, config.StoredProcedure, parametrosLegacy.ToString(), ct);
+        var data = await ExecuteLegacySpAsync(conn, config.StoredProcedure, ArgumentosDelProcedimiento(idReporte, parametrosLegacy, row), ct);
         var source = data.Tables.Count > 0 ? data.Tables[0] : new DataTable();
         var errorParams = source.Columns.Contains("ErrorParams") && source.Rows.Count > 0
             ? Convert.ToString(source.Rows[0]["ErrorParams"]) ?? "Error de parametros legacy."
@@ -499,7 +503,10 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         CancellationToken ct)
     {
         var config = await ConsultarConfiguracionAsync(conn, idReporte, ct);
-        var data = await ExecuteLegacySpAsync(conn, config.StoredProcedure, parametroId.ToString(), ct);
+        /* Idem: el segundo argumento de los dos reportes de recibos vive en el
+           renglon de parametros. Ver ArgumentosDelProcedimiento. */
+        var renglon = await ConsultarParametrosRowAsync(conn, parametroId, ct);
+        var data = await ExecuteLegacySpAsync(conn, config.StoredProcedure, ArgumentosDelProcedimiento(idReporte, parametroId, renglon), ct);
 
         var table = data.Tables.Count > 0 ? data.Tables[0] : new DataTable();
         var errorParams = table.Columns.Contains("ErrorParams") && table.Rows.Count > 0

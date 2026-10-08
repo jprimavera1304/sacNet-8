@@ -173,8 +173,6 @@ public partial class ReportesVentasRepository
             "folios" => ResolveReporteFoliosLegacy(request),
             "remisiones" => ResolveStatusFolio(request.EstatusFolio) == 4 ? ReporteVentasRemisionesSaldoFavor : ReporteVentasRemisiones,
             "facturas" => ReporteVentasFacturas,
-            // 1003: el PDF de UN comprobante, no el listado. Ver las constantes.
-            "comprobante_timbrado" => ReporteFacturaElectronica,
             "concentrados" => ReporteVentasConcentradosDetalle,
             // "cobranza" NO esta aqui: depende de la empresa y se resuelve arriba,
             // con las constantes en la mano.
@@ -227,8 +225,6 @@ public partial class ReportesVentasRepository
             "accesos" => ReporteAccesosMac,
             "asistencias" => ReporteAsistenciasZaragoza,
             // Los cuatro de ReporteEmpleadoAsistenciaRecibos. Ver las constantes.
-            "nomina_asistencias" => ReporteNominaAsistencias,
-            "nomina_asistencias_corto" => ReporteNominaAsistenciasCorto,
             "nomina_inasistencias" => ReporteNominaInasistencias,
             "nomina_vacaciones" => ReporteNominaVacaciones,
             // El reporte de la flotilla, que imprime ConsultarAutos de Mac31. No
@@ -415,6 +411,43 @@ public partial class ReportesVentasRepository
         };
     }
 
+    /*
+      LOS ARGUMENTOS QUE RECIBE EL PROCEDIMIENTO DEL REPORTE.
+
+      Casi todos los `sp_n_rpt*` reciben UNO: el numero de renglon de
+      `dbo.Parametros`. `ExecuteLegacySpAsync` ya sabe pasar varios -los separa
+      por "|" y los reparte en el orden en que los declara el procedimiento,
+      igual que hace Legacy- pero hasta ahora todos los llamadores pasaban uno
+      solo.
+
+      HAY DOS QUE RECIBEN DOS, y no es un capricho suyo: lo dice sys.parameters.
+
+          sp_n_ConsultaEmpleadosTipoSueldoRecibo
+              @Params               varchar   (sin valor por omision)
+              @IDPeriodoTipoSueldo  int       (sin valor por omision)
+
+      Son los reportes 1024 y 1025. Con un solo argumento, el segundo le llegaba
+      como cadena VACIA y reventaba antes de entrar al procedimiento:
+
+          FormatException: Failed to convert parameter value from a String to
+          an Int32. The input string '' was not in a correct format.
+
+      Que es un 500 "Error interno" que no dice nada y que parece del motor
+      cuando en realidad es una firma distinta. El periodo YA esta guardado en el
+      renglon de parametros (Param3), asi que se vuelve a leer de ahi: no hace
+      falta arrastrarlo por toda la pila.
+    */
+    private static string ArgumentosDelProcedimiento(int idReporte, int parametroId, DataRow? row)
+    {
+        if (idReporte is not (ReporteNominaAsistencias or ReporteNominaAsistenciasCorto))
+            return parametroId.ToString(CultureInfo.InvariantCulture);
+
+        var periodo = row is null ? 0 : ReadInt(row, "Param3");
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"{parametroId}|{periodo}");
+    }
+
     private static bool IsGenericVentasReporte(int idReporte)
     {
         return idReporte is
@@ -470,8 +503,6 @@ public partial class ReportesVentasRepository
             ReporteGastosTotalizado or
             ReporteAccesosMac or
             ReporteAsistenciasZaragoza or
-            // 1003: parametros propios (abajo), render generico.
-            ReporteFacturaElectronica or
             // Los cuatro de nomina: su juego de parametros es propio (se arma
             // abajo) pero el camino de render y de Excel es el mismo generico.
             ReporteNominaAsistencias or
@@ -705,25 +736,6 @@ public partial class ReportesVentasRepository
         switch (idReporte)
         {
             /*
-              1003: TRES PARAMETROS Y LA PRESENTACION NO ES LA GENERICA.
-
-              Su #ParamIds, leido en MacZ:
-
-                  Param1 = Equipo[IDUsuario
-                  Param2 = IDVentaFactura
-                  Param3 = Presentacion   2 - PDF   5 - ZIP
-
-              Se manda 2 SIEMPRE. Los valores genericos -0 pantalla, 3 excel- no
-              significan nada para este procedimiento: con 0 no entra en su rama
-              de PDF y devuelve una tabla que la plantilla no sabe pintar. Por eso
-              este reporte no tiene salida a Excel y la pantalla no la ofrece.
-            */
-            case ReporteFacturaElectronica:
-                legacy.Param2 = request.IDVentaFactura.ToString(CultureInfo.InvariantCulture);
-                legacy.Param3 = "2";
-                break;
-
-            /*
               LOS CUATRO DE NOMINA. Su juego de parametros es PROPIO y no se
               parece al generico de ventas: no lleva empresas, ni almacenes, ni
               agentes, ni cliente. Lo dice su #ParamIds, leido en MacZ:
@@ -745,7 +757,7 @@ public partial class ReportesVentasRepository
             case ReporteNominaAsistenciasCorto:
             case ReporteNominaInasistencias:
             case ReporteNominaVacaciones:
-                legacy.Param2 = JoinIds(request.IDEmpleados);
+                legacy.Param2 = JoinIdsPorComa(request.IDEmpleados);
                 legacy.Param3 = request.IDPeriodoTipoSueldo > 0
                     ? request.IDPeriodoTipoSueldo.ToString(CultureInfo.InvariantCulture)
                     : "0";
@@ -1561,6 +1573,36 @@ public partial class ReportesVentasRepository
         return clean.Count == 0 ? "" : string.Join("~", clean);
     }
 
+    /*
+      LA LISTA DE EMPLEADOS DE NOMINA VA POR COMA, NO POR TILDE.
+
+      Todos los demas reportes separan sus ids con "~" y por eso existe JoinIds.
+      Los de nomina NO, y no es una suposicion: su procedimiento lo parte con una
+      coma —`fn_DevuelveCadenaEnTabla(@IDsEmpleado, ',')`, linea 306 de
+      sp_n_rptAsistenciasGlobales— y Mac31 los arma igual: su propio
+      `delimitadorParamValores` vale "," en ESE formulario y solo en ese
+      (ReporteEmpleadoAsistenciaRecibos.cs:321).
+
+      Con "~" el procedimiento no se queja de un formato raro: intenta convertir
+      la cadena entera a int y revienta con
+
+          Conversion failed when converting the varchar value '34~28~88~91~4'
+          to data type int
+
+      que es un 500 "Error de base de datos" y parece un defecto de la base
+      cuando lo que esta mal es el separador que mandamos.
+    */
+    private static string JoinIdsPorComa(IEnumerable<int>? ids)
+    {
+        var limpios = (ids ?? Enumerable.Empty<int>())
+            .Where(x => x > 0)
+            .Distinct()
+            .Select(x => x.ToString(CultureInfo.InvariantCulture))
+            .ToList();
+
+        return limpios.Count == 0 ? "" : string.Join(",", limpios);
+    }
+
     private static string JoinIdsPreserveOrder(IEnumerable<int>? ids)
     {
         var clean = (ids ?? Enumerable.Empty<int>())
@@ -2147,8 +2189,6 @@ public partial class ReportesVentasRepository
             ReporteGastosDetallado or ReporteGastosTotalizado => "Param4",
             ReporteCortes or ReporteAccesosMac => "Param4",
             ReporteAsistenciasZaragoza => "Param5",
-            // 1003: la presentacion es Param3, y vale 2 (PDF) o 5 (ZIP), no 0/3.
-            ReporteFacturaElectronica => "Param3",
             // Nomina: la presentacion es Param6 en los cuatro.
             ReporteNominaAsistencias or ReporteNominaAsistenciasCorto
                 or ReporteNominaInasistencias or ReporteNominaVacaciones => "Param6",

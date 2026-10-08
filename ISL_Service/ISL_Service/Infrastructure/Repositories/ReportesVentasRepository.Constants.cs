@@ -9,34 +9,6 @@ namespace ISL_Service.Infrastructure.Repositories;
 
 public partial class ReportesVentasRepository
 {
-    /*
-      1003: EL PDF DE UN COMPROBANTE TIMBRADO (factura, nota de credito o
-      complemento de pago).
-
-      NO es un listado: imprime UN comprobante, el que se le diga en Param2. Su
-      `spV2` es `sp_n_rptFacturaElectronica` y su plantilla `rptTemplate`.
-
-      Entro al motor porque sin el una nota de credito timbrada DESDE EL WEB no
-      tenia papel: el 1003 no estaba en ReportesCatalogo y el motor rechaza a
-      proposito un `IDReporte` crudo (es lo que cerro el agujero de ver reportes
-      ajenos adivinando un numero), asi que no habia ninguna forma de pedirlo.
-
-      SU PRESENTACION NO ES 0 NI 3. Lo dice su propio #ParamIds, leido en MacZ:
-
-          -- Param  3 =  Presentacion   2 - PDF  5 - ZIP
-
-      El 2 es el PDF y el 5 es el ZIP con el XML dentro. El `ResolvePresentacion`
-      generico mapea "pantalla" a 0 y "excel" a 3, y ninguno de los dos significa
-      nada aqui: con 0 el procedimiento no entra en su rama de PDF. Se manda 2
-      siempre, y por eso este reporte NO ofrece salida a Excel.
-
-      Y ojo con la otra puerta de entrada del mismo SP: si `@Params` trae una
-      arroba, `sp_n_rptFacturaElectronica` lo interpreta como el IDVentaFactura
-      directo en vez de como el numero de renglon de `Parametros`. Ese atajo NO
-      se usa aqui -se guarda el renglon como todos los demas- porque el pase
-      firmado se emite sobre el numero de renglon.
-    */
-    private const int ReporteFacturaElectronica = 1003;
     private const int ReporteVentaAcumuladores = 10;
     private const int ReporteVentaProductos = 15;
     private const int ReporteVentasRemisionesSaldoFavor = 19;
