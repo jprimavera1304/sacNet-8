@@ -111,6 +111,28 @@ public class CobroDineroUsadoCancelarRequest
     public int IdCobroDineroUsado { get; set; }
 }
 
+/// <summary>
+/// LOS CLIENTES DE LA HOJA, que son el renglonaje del reparto.
+///
+/// POR QUE HACE FALTA ESTE REQUEST Y NO SE PODIA REUSAR OTRO
+/// ---------------------------------------------------------
+/// El reparto (`cobros-dinero/reparto` y `/aplicar`) recibe listas paralelas de
+/// clientes, cascos por grupo y pagos — pero no habia ninguna forma de AVERIGUAR
+/// cuales son esos clientes: eso lo da `sp_n_ConsultarCobroClientes`, que no
+/// tenia endpoint. Sin el, el reparto solo se puede mandar si el cliente ya sabe
+/// de memoria los IDCliente de la hoja, que es tanto como decir que no se puede
+/// mandar. Es la forma `DineroUsadosCobroCliente` de Mac31, que arranca llamando
+/// a ese procedimiento con el IDCobro de la fila marcada
+/// (`Forms/Cobros/DineroUsadosCobroCliente.cs:515-538`).
+///
+/// El procedimiento recibe UN solo parametro, el cobro. La cobranza y el
+/// concentrado los deduce el mismo de la tabla Cobros, asi que no viajan.
+/// </summary>
+public class CobroDineroUsadoClientesConsultaRequest
+{
+    public int IdCobro { get; set; }
+}
+
 /// <summary>Los filtros de la pantalla de cobros de dinero por cascos.</summary>
 public class CobroDineroUsadoConsultaRequest
 {

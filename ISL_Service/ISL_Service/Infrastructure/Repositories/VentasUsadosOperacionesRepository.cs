@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.VentasEscrituras;
+﻿using ISL_Service.Application.DTOs.VentasEscrituras;
 using ISL_Service.Application.DTOs.VentasUsadosOperaciones;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Data;
@@ -52,6 +52,7 @@ public class VentasUsadosOperacionesRepository : SpLegacyRepositoryBase, IVentas
     private const string SpAplicarCobroDinero = "sp_n_AplicarCobroDineroUsado";
     private const string SpCancelarCobroDinero = "sp_n_CancelarAplicacionCobroDineroCasco";
     private const string SpConsultarCobrosDinero = "sp_n_ConsultarCobrosDineroUsados";
+    private const string SpConsultarClientesDelCobro = "sp_n_ConsultarCobroClientes";
     private const string SpCrearCheque = "sp_n_InsertarCobroDineroUsadoCheques";
     private const string SpActualizarCheque = "sp_n_ActualizarCobroDineroUsadoCheques";
     private const string SpConsultarCheques = "sp_n_ConsultarCobrosDineroUsadosCheques";
@@ -191,6 +192,19 @@ public class VentasUsadosOperacionesRepository : SpLegacyRepositoryBase, IVentas
             cmd.Parameters.Add(Varchar("@FechaFinal", LargoFecha, FiltrosLegacy.FechaHasta(request.FechaFinal)));
             cmd.Parameters.Add(Varchar("@FechaModificacionInicial", LargoFecha, FiltrosLegacy.Fecha(request.FechaModificacionInicial)));
             cmd.Parameters.Add(Varchar("@FechaModificacionFinal", LargoFecha, FiltrosLegacy.Fecha(request.FechaModificacionFinal)));
+        }, ct);
+
+        return new FilasLegacyDto { Rows = filas };
+    }
+
+    public async Task<FilasLegacyDto> ConsultarClientesDelCobroAsync(
+        CobroDineroUsadoClientesConsultaRequest request, CancellationToken ct)
+    {
+        /* Un solo parametro: la cobranza y el concentrado los deduce el propio
+           procedimiento de la tabla Cobros. */
+        var filas = await EjecutarFilasAsync(SpConsultarClientesDelCobro, cmd =>
+        {
+            cmd.Parameters.Add(Entero("@IDCobro", request.IdCobro));
         }, ct);
 
         return new FilasLegacyDto { Rows = filas };

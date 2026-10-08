@@ -152,6 +152,36 @@ public class VentasUsadosOperacionesController : PermisoControllerBase
         return Ok(new { ok = true, message = "Cobros de dinero.", data });
     }
 
+    /// <summary>
+    /// Los clientes de la hoja de cobro: sobre quienes se reparte el dinero y
+    /// los cascos.
+    /// </summary>
+    /// <remarks>
+    /// Es lo primero que carga la forma TRABAJAR DINERO Y CASCOS de Mac31
+    /// (`DineroUsadosCobroCliente`). Sin esto, `cobros-dinero/reparto` es un
+    /// contrato que nadie puede llenar: pide listas de IDCliente y no habia
+    /// manera de averiguar cuales son los de la hoja.
+    ///
+    /// Lleva el permiso de VER y no el de editar: es una lectura, y quien va a
+    /// repartir necesita verla antes de que el permiso de escritura entre en
+    /// juego — el reparto ya exige el suyo en su propia ruta.
+    /// </remarks>
+    [HttpPost("cobros-dinero/clientes/consultar")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ConsultarClientesDelCobroAsync(
+        [FromBody] CobroDineroUsadoClientesConsultaRequest? request, CancellationToken ct)
+    {
+        var veto = await ExigirPermisoAsync(PermisoVer, ct);
+        if (veto is not null) return veto;
+        if (request is null) return BadRequest(new { message = "Body requerido." });
+
+        var data = await _service.ConsultarClientesDelCobroAsync(request, ct);
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(new { ok = true, message = "Clientes de la hoja de cobro.", data });
+    }
+
     /// <summary>Registra un cheque dentro de un cobro de dinero.</summary>
     [HttpPost("cobros-dinero/cheques")]
     [ProducesResponseType(StatusCodes.Status200OK)]

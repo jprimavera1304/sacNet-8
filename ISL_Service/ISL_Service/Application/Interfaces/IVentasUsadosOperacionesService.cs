@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.VentasEscrituras;
+﻿using ISL_Service.Application.DTOs.VentasEscrituras;
 using ISL_Service.Application.DTOs.VentasUsadosOperaciones;
 
 namespace ISL_Service.Application.Interfaces;
@@ -29,6 +29,10 @@ public interface IVentasUsadosOperacionesService
 
     Task<FilasLegacyDto> ConsultarCobrosDineroAsync(
         CobroDineroUsadoConsultaRequest request, CancellationToken ct);
+
+    /// <summary>Los clientes de la hoja de cobro, para poder repartir sobre ellos.</summary>
+    Task<FilasLegacyDto> ConsultarClientesDelCobroAsync(
+        CobroDineroUsadoClientesConsultaRequest request, CancellationToken ct);
 
     Task<ResultadoLegacyDto> CrearChequeAsync(
         CobroDineroUsadoChequeCrearRequest request, int idUsuario, string equipo, CancellationToken ct);

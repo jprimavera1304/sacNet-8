@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.VentasEscrituras;
+﻿using ISL_Service.Application.DTOs.VentasEscrituras;
 using ISL_Service.Application.DTOs.VentasUsadosOperaciones;
 using ISL_Service.Application.Exceptions;
 using ISL_Service.Application.Interfaces;
@@ -119,6 +119,23 @@ public class VentasUsadosOperacionesService : IVentasUsadosOperacionesService
         var filtro = Acotar(request);
         ExigirAlgunFiltro(filtro);
         return await _repository.ConsultarCobrosDineroAsync(filtro, ct);
+    }
+
+    public async Task<FilasLegacyDto> ConsultarClientesDelCobroAsync(
+        CobroDineroUsadoClientesConsultaRequest request, CancellationToken ct)
+    {
+        /*
+          EL COBRO ES OBLIGATORIO, Y SE EXIGE AQUI.
+
+          El procedimiento tiene un valor por omision en la firma
+          (`@IDCobro int = 38884`, un cobro real de alguien), asi que llamarlo
+          sin parametro NO falla: devuelve los clientes de OTRA hoja. Un reparto
+          armado sobre esa lista cargaria dinero a clientes que no son.
+        */
+        if (request.IdCobro <= 0)
+            throw new ArgumentException("El cobro es obligatorio.");
+
+        return await _repository.ConsultarClientesDelCobroAsync(request, ct);
     }
 
     private static CobroDineroUsadoConsultaRequest Acotar(CobroDineroUsadoConsultaRequest request)
