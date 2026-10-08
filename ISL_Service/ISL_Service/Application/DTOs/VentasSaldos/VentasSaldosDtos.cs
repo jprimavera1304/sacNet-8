@@ -33,7 +33,27 @@ public class VentasSaldoRenglon
     /// renglon de rojo o de azul, y la que aqui decide el color tambien.
     public string EstatusMostrar { get; set; } = string.Empty;
     /// Dias vencidos. Es la columna VENC de Mac31.
+    ///
+    /// Sale de `DiasVencimiento`, que en el procedimiento es un `int`. NO sale de
+    /// `DiasVencimientoMostrar`, que es texto: ver el campo de abajo.
     public int DiasVencimiento { get; set; }
+
+    /// <summary>
+    /// LOS DIAS VENCIDOS DE CADA CONCEPTO, COMO TEXTO. "91/91/0".
+    ///
+    /// En Zaragoza un cliente tiene credito de acumuladores, de aceites y de
+    /// cascos por separado (la capacidad `creditoPorTresConceptos`), y el
+    /// procedimiento junta los tres en una cadena separada por `/`. Es el par de
+    /// `EstatusMostrar`, que trae "VENCIDA/VENCIDA/-".
+    ///
+    /// En Tauro hay un solo concepto, asi que esto sale como un numero suelto, y
+    /// por eso el defecto que destapo este campo solo se veia en Zaragoza: se
+    /// estaba leyendo con Convert.ToInt32 y "91/91/0" no es un entero.
+    ///
+    /// El procedimiento tambien devuelve los tres por separado como `int`
+    /// (`DiasVencimientoAcumuladores`, `...Aceites`, `...Cascos`) si algun dia
+    /// una pantalla los necesita en columnas en vez de en una cadena.
+    public string DiasVencimientoMostrar { get; set; } = string.Empty;
 }
 
 public class VentasSaldosResponse

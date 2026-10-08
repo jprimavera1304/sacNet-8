@@ -77,7 +77,22 @@ public class VentasSaldosRepository : IVentasSaldosRepository
                 Descuentos = Numero(reader, "Descuentos"),
                 Saldo = Numero(reader, "Saldo"),
                 EstatusMostrar = Texto(reader, "EstatusMostrar"),
-                DiasVencimiento = Entero(reader, "DiasVencimientoMostrar")
+                /*
+                  `DiasVencimiento` ES EL ENTERO. `DiasVencimientoMostrar` ES TEXTO.
+
+                  Aqui se leia el entero DE la columna de texto, y en Zaragoza eso
+                  es un 500: con `creditoPorTresConceptos` el procedimiento junta
+                  los dias de acumuladores, aceites y cascos en una cadena -"91/91/0"-
+                  y Convert.ToInt32 revienta con "The input string '91/91/0' was not
+                  in a correct format". Cualquier cliente que deba algo tiraba la
+                  peticion entera.
+
+                  En Tauro no se veia porque hay un solo concepto y la cadena sale
+                  como un numero suelto. Su par `EstatusMostrar` ya se leia con
+                  Texto(), que es por lo que ese no fallaba.
+                */
+                DiasVencimiento = Entero(reader, "DiasVencimiento"),
+                DiasVencimientoMostrar = Texto(reader, "DiasVencimientoMostrar")
             };
 
             respuesta.Renglones.Add(renglon);
