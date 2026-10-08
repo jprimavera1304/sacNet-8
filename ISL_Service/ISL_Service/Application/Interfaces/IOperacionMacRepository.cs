@@ -41,6 +41,7 @@ public interface IOperacionMacRepository
 
     // --- Cambios de vigencia
     Task<List<Dictionary<string, object?>>> ConsultarCambiosVigenciaAsync(CambiosVigenciaFiltro filtro, CancellationToken ct);
+    Task<List<Dictionary<string, object?>>> ConsultarCambiosVigenciaDetalleAsync(int idCambioVigencia, CancellationToken ct);
     Task<(ResultadoLegacy Resultado, int Id)> InsertarCambioVigenciaAsync(CrearCambioVigenciaRequest r, int idUsuario, string equipo, CancellationToken ct);
     Task<ResultadoLegacy> ActualizarCambioVigenciaAsync(int id, ActualizarCambioVigenciaRequest r, int idUsuario, string equipo, CancellationToken ct);
     Task<ResultadoLegacy> CancelarCambioVigenciaAsync(int id, int idUsuario, string equipo, CancellationToken ct);

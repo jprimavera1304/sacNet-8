@@ -54,6 +54,41 @@ public class CambiosVigenciaController : PermisoControllerBase
     }
 
     /// <summary>
+    /// Los PRODUCTOS de un cambio de vigencia: un renglon por producto, con su
+    /// marca, su clave, su vale, su vigencia y su garantia.
+    ///
+    /// Mismo permiso que la consulta de cabeceras (`cambiosvigencia.ver`): es el
+    /// mismo documento visto de cerca, no otro dato.
+    ///
+    /// LA CABECERA SE REPITE EN CADA RENGLON y no se recorta a proposito: el
+    /// procedimiento devuelve un JOIN plano (cliente, folio, estatus y los
+    /// bloques de cancelacion, impresion y entrega junto a cada producto), y
+    /// partirlo aqui en dos objetos obligaria a elegir cual de las dos copias es
+    /// la buena cuando el renglon trae su propio IDUsuarioEntregada -que lo trae,
+    /// porque la entrega se registra POR PRODUCTO-.
+    ///
+    /// Si el cambio de vigencia no existe, o no tiene renglones, la lista viene
+    /// vacia: no es un 404. El documento pudo existir y quedarse sin productos, y
+    /// esa diferencia la contesta la consulta de cabeceras, que es quien sabe si
+    /// el folio existe.
+    /// </summary>
+    [HttpGet("{id:int}/detalle")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ConsultarDetalle([FromRoute] int id, CancellationToken ct)
+    {
+        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        if (sinPermiso != null) return sinPermiso;
+
+        if (id <= 0)
+            return BadRequest(new { ok = false, message = "El cambio de vigencia es requerido." });
+
+        var data = await _service.ConsultarCambiosVigenciaDetalleAsync(id, ct);
+        return Ok(new { ok = true, message = "Detalle del cambio de vigencia.", data, total = data.Count });
+    }
+
+    /// <summary>
     /// Alta de un cambio de vigencia con sus productos.
     ///
     /// Los productos viajan como lista de objetos. En legacy eran TRES cadenas

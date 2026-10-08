@@ -473,6 +473,40 @@ public partial class OperacionMacRepository
         }, ct);
     }
 
+    /*
+      EL DETALLE: UN RENGLON POR PRODUCTO.
+
+      ES LECTURA PURA, Y SE COMPROBO LEYENDO EL PROCEDIMIENTO EN LA BASE
+      -----------------------------------------------------------------
+      sp_n_ConsultarCambiosVigenciaDetalle, leido de sys.sql_modules en MacZ el
+      07-10-2026: lo unico que escribe es la tabla temporal
+      #ConsultarCambiosVigenciaTemp (un CREATE TABLE y un INSERT ... EXEC(@Sql)),
+      y despues un SELECT de esa temporal. Cero INSERT/UPDATE/DELETE contra
+      tablas reales. El nombre dice "Consultar" y esta vez es verdad -- que es
+      exactamente lo que hay que comprobar antes de exponer cualquier sp_n_, y no
+      dar por bueno (sp_n_ConsultaConstantes se llama "Consulta" y hace el cierre
+      del dia).
+
+      LO QUE DEVUELVE QUE LA CABECERA NO TIENE: IDProducto, Marca, Clave (el
+      Codigo del producto), Ticket (el VALE), Vigencia y Garantia por renglon, mas
+      el bloque de entregada POR RENGLON (UsuEnt sale de
+      cvDetalle.IDUsuarioEntregada, no de la cabecera).
+
+      NO SE FILTRA NADA MAS QUE EL ID porque el procedimiento solo declara
+      @IDCambioVigencia. La cabecera se repite en cada renglon: es un JOIN plano,
+      no dos tablas, y asi lo manda la base.
+
+      Mac31 llama a este mismo procedimiento y NO pinta sus renglones (carga la
+      cabecera de la primera fila y nunca llena la rejilla de detalle). Aqui si se
+      publican: el dato existe y el documento tiene ocho productos.
+    */
+    public Task<List<Dictionary<string, object?>>> ConsultarCambiosVigenciaDetalleAsync(
+        int idCambioVigencia, CancellationToken ct)
+        => ConsultarAsync("dbo.sp_n_ConsultarCambiosVigenciaDetalle", cmd =>
+        {
+            cmd.Parameters.AddWithValue("@IDCambioVigencia", idCambioVigencia);
+        }, ct);
+
     /// <summary>
     /// Alta de un cambio de vigencia.
     ///
