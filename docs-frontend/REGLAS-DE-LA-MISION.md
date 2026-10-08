@@ -82,6 +82,27 @@ mirarlo, no solo que se toco. **Sin coautoria y sin linea de sesion.**
 Pon en escena solo tus rutas (`git add <tus-archivos>`), nunca `git add -A`:
 hay otros agentes en el mismo arbol.
 
+**Y comprueba que no te dejaste un archivo NUEVO fuera.** Poner en escena solo
+algunas rutas tiene una trampa, y ya costo dos veces: los archivos que CREAS no
+los conoce nadie, asi que si no los nombras se quedan sueltos. El consumidor si
+se commitea y lo consumido no, y entonces **la rama no compila desde un clon
+limpio aunque en tu arbol compile**. Peor: el error apunta al consumidor, no al
+archivo que falta (`CS0246: no se encontro 'IClientesConsultaService'`), asi que
+no se parece a su causa.
+
+Antes de cada commit:
+
+```bash
+git status --porcelain | grep '^??'     # ninguno tuyo deberia salir aqui
+```
+
+Y antes de entregar, comprueba que compila de verdad lo que subiste, no lo que
+tienes:
+
+```bash
+git worktree add --detach /tmp/limpio HEAD && cd /tmp/limpio && <compila>
+```
+
 ## Si encuentras un error
 
 **Encontrar un error es trabajo, no un hallazgo que reportar.** Arreglalo. Si
