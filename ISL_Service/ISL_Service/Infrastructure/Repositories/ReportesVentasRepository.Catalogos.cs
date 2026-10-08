@@ -194,6 +194,52 @@ public partial class ReportesVentasRepository
             .ToList();
     }
 
+    /*
+      LOS TIPOS DE PAGO DEL REPORTE DE PAGOS (71/75/77), Y POR QUE SE LEEN AQUI.
+
+      El filtro existe: es `gridTiposPago` de Mac31, que se llena con
+      `Consultas.ConsultarTiposPago` pasando `EsPago = 1`
+      (ReportesMenu.cs:474-489) y arranca con TODOS marcados. Sus ids viajan al
+      SP en `Param3`, separados por "|".
+
+      Ya habia un endpoint que los sabe dar -`GET /api/catalogos/tipos-pago`-
+      pero exige la politica `perm:catalogos.ver`, y quien tiene reportes NO
+      tiene por que tener catalogos: el filtro contestaria 403 y el campo se
+      quedaria vacio sin explicar nada. Es la misma forma del fallo que dejo 68
+      capacidades contestando 403 a todo el que no fuera SuperAdmin. Asi que se
+      leen con el MISMO procedimiento desde aqui, donde el candado es
+      `reportes.ver_modulo`, que es el que ya hace falta para pedir el reporte.
+
+      `@EsPago = 1` es el filtro de Mac31 y no es cosmetico: la tabla
+      `[Catalogo Tipos Pagos]` trae dieciocho renglones y seis de ellos son
+      DESCUENTOS (3, 4, 6, 8, 12) e INCOBRABLE (18), que no son formas de pago y
+      no pertenecen a este filtro.
+    */
+    private static async Task<List<ReportesVentasCatalogoItem>> ConsultarTiposPagoAsync(SqlConnection conn, CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("sp_n_ConsultaTiposPagos", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = 500
+        };
+        cmd.Parameters.AddWithValue("@IDTipoPago", 0);
+        cmd.Parameters.AddWithValue("@IDStatus", 1);
+        cmd.Parameters.AddWithValue("@TipoPago", "");
+        cmd.Parameters.AddWithValue("@Identico", 0);
+        cmd.Parameters.AddWithValue("@EsPago", 1);
+
+        var table = await ExecuteFirstTableAsync(cmd, ct);
+        return table.AsEnumerable()
+            .Select(row => new ReportesVentasCatalogoItem
+            {
+                Id = ReadInt(row, "IDTipoPago"),
+                Nombre = ReadString(row, "TipoPago"),
+                Clave = ReadString(row, "TipoPagoCorto", "TipoPago")
+            })
+            .Where(x => x.Id > 0 && !string.IsNullOrWhiteSpace(x.Nombre))
+            .ToList();
+    }
+
     private static async Task<List<ReportesVentasCatalogoItem>> ConsultarTiposGastoAsync(SqlConnection conn, CancellationToken ct)
     {
         await using var cmd = new SqlCommand("sp_n_ConsultaTiposGastos", conn)

@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.VentasEscrituras;
+﻿using ISL_Service.Application.DTOs.VentasEscrituras;
 using ISL_Service.Application.DTOs.VentasFacturacion;
 
 namespace ISL_Service.Application.Interfaces;
@@ -108,6 +108,20 @@ public interface IVentasFacturacionRepository
     Task<CorreoFactura?> LeerDatosCorreoAsync(int idVentaFactura, CancellationToken ct);
 }
 
+/// <summary>
+/// El PDF o el XML de un comprobante ya timbrado, leido del disco donde lo dejo
+/// el proceso de timbrado.
+/// </summary>
+public class DocumentoDeFactura
+{
+    public byte[] Contenido { get; set; } = Array.Empty<byte>();
+
+    /// <summary>El nombre con el que se baja: el del archivo en disco.</summary>
+    public string NombreArchivo { get; set; } = string.Empty;
+
+    public string TipoContenido { get; set; } = string.Empty;
+}
+
 /// <summary>Las reglas de facturacion que no son del procedimiento.</summary>
 public interface IVentasFacturacionService
 {
@@ -122,4 +136,15 @@ public interface IVentasFacturacionService
 
     /// <summary>Manda la factura por correo. Devuelve a quien se mando.</summary>
     Task<string> EnviarCorreoAsync(FacturaEnviarCorreoRequest request, CancellationToken ct);
+
+    /// <summary>
+    /// El PDF o el XML del comprobante. `formato` es "pdf" o "xml".
+    ///
+    /// Existe porque NO habia forma de bajar la factura: lo unico que servia el
+    /// comprobante era el correo, asi que para releer una factura habia que
+    /// mandarsela a alguien. En Mac31 son dos botones (IMPRIMIR PDF F7 y
+    /// DESCARGAR XML F8) y los dos salen del mismo sitio: el `Archivo` que
+    /// devuelve sp_n_rptFacturaElectronica.
+    /// </summary>
+    Task<DocumentoDeFactura> LeerDocumentoAsync(int idVentaFactura, string formato, CancellationToken ct);
 }

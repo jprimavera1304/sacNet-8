@@ -351,6 +351,25 @@ builder.Services.AddScoped<IClientesAnexosService, ClientesAnexosService>();
 builder.Services.AddScoped<IProveedoresAnexosRepository, ProveedoresAnexosRepository>();
 builder.Services.AddScoped<IProveedoresAnexosService, ProveedoresAnexosService>();
 
+// -------------------- CONSULTA DE CLIENTES Y DE PROVEEDORES --------------------
+// Los dos GET raiz que faltaban: api/clientes y api/proveedores. Son las
+// pantallas ConsultarClientes y de proveedores de Mac31, con sus sp_n_ de
+// siempre.
+//
+// El de CLIENTES acota el resultado al agente del usuario (FiltroDeAgente), y si
+// no puede resolverlo NO contesta: 409. El repositorio toma IMemoryCache del
+// contenedor para eso, igual que CatalogosRepository.
+builder.Services.AddScoped<IClientesConsultaRepository, ClientesConsultaRepository>();
+builder.Services.AddScoped<IClientesConsultaService, ClientesConsultaService>();
+builder.Services.AddScoped<IProveedoresConsultaRepository, ProveedoresConsultaRepository>();
+builder.Services.AddScoped<IProveedoresConsultaService, ProveedoresConsultaService>();
+
+// -------------------- CONSULTA DE INVENTARIO EN TRANSITO --------------------
+// La lectura que le faltaba al POST api/inventario/transito: lo que va en camino
+// a los centros de servicio y nadie ha aceptado.
+builder.Services.AddScoped<IInventarioTransitoConsultaRepository, InventarioTransitoConsultaRepository>();
+builder.Services.AddScoped<IInventarioTransitoConsultaService, InventarioTransitoConsultaService>();
+
 // -------------------- PRODUCTOS (catalogo con precios y existencias) --------------------
 // No es un desplegable: trae precio de lista, stock y la lista de descuentos
 // Roshfrans. Por eso tiene su propio permiso y no cae en catalogos.*.

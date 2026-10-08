@@ -173,6 +173,8 @@ public partial class ReportesVentasRepository
             "folios" => ResolveReporteFoliosLegacy(request),
             "remisiones" => ResolveStatusFolio(request.EstatusFolio) == 4 ? ReporteVentasRemisionesSaldoFavor : ReporteVentasRemisiones,
             "facturas" => ReporteVentasFacturas,
+            // 1003: el PDF de UN comprobante, no el listado. Ver las constantes.
+            "comprobante_timbrado" => ReporteFacturaElectronica,
             "concentrados" => ReporteVentasConcentradosDetalle,
             // "cobranza" NO esta aqui: depende de la empresa y se resuelve arriba,
             // con las constantes en la mano.
@@ -224,6 +226,11 @@ public partial class ReportesVentasRepository
             "impuestos" => ReporteVentasRemisionesImpuestos,
             "accesos" => ReporteAccesosMac,
             "asistencias" => ReporteAsistenciasZaragoza,
+            // Los cuatro de ReporteEmpleadoAsistenciaRecibos. Ver las constantes.
+            "nomina_asistencias" => ReporteNominaAsistencias,
+            "nomina_asistencias_corto" => ReporteNominaAsistenciasCorto,
+            "nomina_inasistencias" => ReporteNominaInasistencias,
+            "nomina_vacaciones" => ReporteNominaVacaciones,
             // El reporte de la flotilla, que imprime ConsultarAutos de Mac31. No
             // lleva filtros: su sp_n_rptAutos recibe el @Params generico y ya.
             "autos" => ReporteAutos,
@@ -463,6 +470,14 @@ public partial class ReportesVentasRepository
             ReporteGastosTotalizado or
             ReporteAccesosMac or
             ReporteAsistenciasZaragoza or
+            // 1003: parametros propios (abajo), render generico.
+            ReporteFacturaElectronica or
+            // Los cuatro de nomina: su juego de parametros es propio (se arma
+            // abajo) pero el camino de render y de Excel es el mismo generico.
+            ReporteNominaAsistencias or
+            ReporteNominaAsistenciasCorto or
+            ReporteNominaInasistencias or
+            ReporteNominaVacaciones or
             // El de la flotilla: mismo camino generico que los otros, su SP recibe
             // el @Params y devuelve la tabla que pinta la plantilla rptTemplate.
             ReporteAutos or
@@ -689,6 +704,65 @@ public partial class ReportesVentasRepository
 
         switch (idReporte)
         {
+            /*
+              1003: TRES PARAMETROS Y LA PRESENTACION NO ES LA GENERICA.
+
+              Su #ParamIds, leido en MacZ:
+
+                  Param1 = Equipo[IDUsuario
+                  Param2 = IDVentaFactura
+                  Param3 = Presentacion   2 - PDF   5 - ZIP
+
+              Se manda 2 SIEMPRE. Los valores genericos -0 pantalla, 3 excel- no
+              significan nada para este procedimiento: con 0 no entra en su rama
+              de PDF y devuelve una tabla que la plantilla no sabe pintar. Por eso
+              este reporte no tiene salida a Excel y la pantalla no la ofrece.
+            */
+            case ReporteFacturaElectronica:
+                legacy.Param2 = request.IDVentaFactura.ToString(CultureInfo.InvariantCulture);
+                legacy.Param3 = "2";
+                break;
+
+            /*
+              LOS CUATRO DE NOMINA. Su juego de parametros es PROPIO y no se
+              parece al generico de ventas: no lleva empresas, ni almacenes, ni
+              agentes, ni cliente. Lo dice su #ParamIds, leido en MacZ:
+
+                  Param1 = Equipo[IDUsuario
+                  Param2 = IDsEmpleado
+                  Param3 = IDPeriodoTipoSueldo
+                  Param4 = FechaInicial@00:00:00
+                  Param5 = FechaFinal@23:59:59
+                  Param6 = Presentacion
+
+              Las fechas van con la hora pegada con arroba, como las manda Mac31
+              (ReporteEmpleadoAsistenciaRecibos.cs:234-238): el SP hace
+              REPLACE(FechaInicial,'@',' ') para volverlas datetime. Sin la hora,
+              el BETWEEN se come el ultimo dia a las 00:00 y falta un dia de
+              asistencias — que es el error que no se ve hasta que alguien cuenta.
+            */
+            case ReporteNominaAsistencias:
+            case ReporteNominaAsistenciasCorto:
+            case ReporteNominaInasistencias:
+            case ReporteNominaVacaciones:
+                legacy.Param2 = JoinIds(request.IDEmpleados);
+                legacy.Param3 = request.IDPeriodoTipoSueldo > 0
+                    ? request.IDPeriodoTipoSueldo.ToString(CultureInfo.InvariantCulture)
+                    : "0";
+                legacy.Param4 = FormatLegacyStartDateTime(request.FechaInicial);
+                legacy.Param5 = FormatLegacyEndDateTime(request.FechaFinal);
+                /*
+                  VACACIONES ES SOLO EXCEL Y SE PIDE ASI.
+
+                  No es una decision de presentacion: `sp_n_rptEmpleadosVacaciones`
+                  hace `SELECT @Presentacion = 3` pisando lo que reciba, y lo que
+                  devuelve es la tabla #VacacionesExcel. Mac31 tambien lo fuerza
+                  (:285). Pedirle "pantalla" daria un PDF con la tabla de Excel
+                  dentro, que no es lo que nadie espera.
+                */
+                legacy.Param6 = idReporte == ReporteNominaVacaciones ? "3" : presentacion;
+                break;
+
             case ReporteVentasMotoBateriasPorCliente:
             case ReporteVentasMotoBateriasPorFolio:
             case ReporteVentasMotoBateriasPorCodigo:
@@ -1837,6 +1911,9 @@ public partial class ReportesVentasRepository
             ReporteGastosDetallado or ReporteGastosTotalizado => "Param2",
             ReporteCortes or ReporteAccesosMac => "Param2",
             ReporteAsistenciasZaragoza => "Param3",
+            // Nomina: Param4 y Param5, como dice su #ParamIds.
+            ReporteNominaAsistencias or ReporteNominaAsistenciasCorto
+                or ReporteNominaInasistencias or ReporteNominaVacaciones => "Param4",
             ReporteVentasRemisionesImpuestos => "Param8",
             _ => "Param3"
         };
@@ -1859,6 +1936,8 @@ public partial class ReportesVentasRepository
             ReporteGastosDetallado or ReporteGastosTotalizado => "Param3",
             ReporteCortes or ReporteAccesosMac => "Param3",
             ReporteAsistenciasZaragoza => "Param4",
+            ReporteNominaAsistencias or ReporteNominaAsistenciasCorto
+                or ReporteNominaInasistencias or ReporteNominaVacaciones => "Param5",
             ReporteVentasRemisionesImpuestos => "Param9",
             _ => "Param4"
         };
@@ -2068,6 +2147,11 @@ public partial class ReportesVentasRepository
             ReporteGastosDetallado or ReporteGastosTotalizado => "Param4",
             ReporteCortes or ReporteAccesosMac => "Param4",
             ReporteAsistenciasZaragoza => "Param5",
+            // 1003: la presentacion es Param3, y vale 2 (PDF) o 5 (ZIP), no 0/3.
+            ReporteFacturaElectronica => "Param3",
+            // Nomina: la presentacion es Param6 en los cuatro.
+            ReporteNominaAsistencias or ReporteNominaAsistenciasCorto
+                or ReporteNominaInasistencias or ReporteNominaVacaciones => "Param6",
             ReporteVentasRemisionesImpuestos => "Param10",
             ReporteListasPreciosZaragoza or ReporteListasPreciosProductosZaragoza
                 or ReporteListasPreciosTauroTodas or ReporteListasPreciosTauroTodasMenosTauro

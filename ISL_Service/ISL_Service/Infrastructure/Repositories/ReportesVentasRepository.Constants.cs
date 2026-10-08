@@ -9,6 +9,34 @@ namespace ISL_Service.Infrastructure.Repositories;
 
 public partial class ReportesVentasRepository
 {
+    /*
+      1003: EL PDF DE UN COMPROBANTE TIMBRADO (factura, nota de credito o
+      complemento de pago).
+
+      NO es un listado: imprime UN comprobante, el que se le diga en Param2. Su
+      `spV2` es `sp_n_rptFacturaElectronica` y su plantilla `rptTemplate`.
+
+      Entro al motor porque sin el una nota de credito timbrada DESDE EL WEB no
+      tenia papel: el 1003 no estaba en ReportesCatalogo y el motor rechaza a
+      proposito un `IDReporte` crudo (es lo que cerro el agujero de ver reportes
+      ajenos adivinando un numero), asi que no habia ninguna forma de pedirlo.
+
+      SU PRESENTACION NO ES 0 NI 3. Lo dice su propio #ParamIds, leido en MacZ:
+
+          -- Param  3 =  Presentacion   2 - PDF  5 - ZIP
+
+      El 2 es el PDF y el 5 es el ZIP con el XML dentro. El `ResolvePresentacion`
+      generico mapea "pantalla" a 0 y "excel" a 3, y ninguno de los dos significa
+      nada aqui: con 0 el procedimiento no entra en su rama de PDF. Se manda 2
+      siempre, y por eso este reporte NO ofrece salida a Excel.
+
+      Y ojo con la otra puerta de entrada del mismo SP: si `@Params` trae una
+      arroba, `sp_n_rptFacturaElectronica` lo interpreta como el IDVentaFactura
+      directo en vez de como el numero de renglon de `Parametros`. Ese atajo NO
+      se usa aqui -se guarda el renglon como todos los demas- porque el pase
+      firmado se emite sobre el numero de renglon.
+    */
+    private const int ReporteFacturaElectronica = 1003;
     private const int ReporteVentaAcumuladores = 10;
     private const int ReporteVentaProductos = 15;
     private const int ReporteVentasRemisionesSaldoFavor = 19;
@@ -60,6 +88,42 @@ public partial class ReportesVentasRepository
     private const int ReportePedidoAcumuladores = 235;
     private const int ReportePedidoProductos = 240;
     private const int ReporteVentasPagosComparativo = 493;
+    /*
+      LOS CUATRO REPORTES DE `ReporteEmpleadoAsistenciaRecibos`, QUE NO ES EL
+      MENU DE REPORTES.
+
+      Es otro formulario de Mac31 (Forms/Reportes/ReporteEmpleadoAsistenciaRecibos.cs)
+      con dos rejillas -periodos de tipo de sueldo y empleados- y cinco botones.
+      Cuatro de los cinco son reportes de `dbo.Reportes` y entran aqui; el quinto
+      (RECIBOS) NO: Mac31 lo manda a otra direccion
+      (`Variables.URL_REPORTES_RECIBOS` -> /EmpleadosTipoSueldoRecibos/Index de
+      MacReportes, :286) y NO tiene renglon en `dbo.Reportes`, asi que este motor
+      no lo puede alcanzar. Comprobado en MacZ: 1020 no existe en la tabla.
+
+      LOS CUATRO COMPARTEN UN JUEGO DE PARAMETROS PROPIO, distinto del generico
+      de ventas. Lo dice su `#ParamIds`, leido en MacZ:
+
+          Param1 = Equipo[IDUsuario
+          Param2 = IDsEmpleado        (separados por ~)
+          Param3 = IDPeriodoTipoSueldo
+          Param4 = FechaInicial@00:00:00
+          Param5 = FechaFinal@23:59:59
+          Param6 = Presentacion
+
+      Y dos cosas medidas que cambian lo que la pantalla puede ofrecer:
+
+      - 1027 VACACIONES ES SOLO EXCEL, y no por decision nuestra: el propio
+        `sp_n_rptEmpleadosVacaciones` hace `SELECT @Presentacion = 3` pisando lo
+        que le llegue. Pedirlo "en pantalla" devuelve la tabla de Excel igual.
+      - 1024 y 1025 tienen `Aspx` VACIO en `dbo.Reportes`. No es un problema para
+        este motor -el motor solo lee `spV2` y las plantillas de `Template_Html`,
+        y las tres filas de cada uno SI existen- pero explica por que Legacy los
+        trata aparte en ReporteV2Service.cs:860.
+    */
+    private const int ReporteNominaAsistenciasCorto = 1024;
+    private const int ReporteNominaAsistencias = 1025;
+    private const int ReporteNominaVacaciones = 1027;
+    private const int ReporteNominaInasistencias = 1190;
     private const int ReporteAsistenciasZaragoza = 1026;
     /// <summary>Reporte de Autos (la flotilla). Lo imprime ConsultarAutos de Mac31.</summary>
     private const int ReporteAutos = 1300;

@@ -137,6 +137,44 @@ public class VentasFacturacionController : PermisoControllerBase
     }
 
     /// <summary>
+    /// Baja el PDF o el XML de un comprobante ya timbrado.
+    ///
+    /// Son los dos botones de Mac31 (IMPRIMIR PDF F7 y DESCARGAR XML F8) que no
+    /// tenian endpoint: hasta ahora lo UNICO que servia un comprobante timbrado era
+    /// el correo, asi que para releer una factura habia que mandarsela a alguien.
+    ///
+    /// Lleva el permiso de ver y no uno nuevo: quien puede consultar la factura
+    /// puede leer su propio comprobante. Mandarlo por correo es otra cosa y por eso
+    /// tiene su clave aparte.
+    /// </summary>
+    /// <response code="200">El archivo.</response>
+    /// <response code="404">La factura no existe.</response>
+    /// <response code="409">El archivo no esta en disco; el mensaje trae la ruta.</response>
+    [HttpGet("{idVentaFactura:int}/documento")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DocumentoAsync(
+        int idVentaFactura,
+        [FromQuery] string formato,
+        CancellationToken ct)
+    {
+        var veto = await ExigirPermisoAsync(PermisoVer, ct);
+        if (veto is not null) return veto;
+
+        var documento = await _service.LeerDocumentoAsync(idVentaFactura, formato, ct);
+
+        /*
+          Cache-Control no-store: un CFDI puede cancelarse, y un PDF guardado en
+          la cache del navegador seguiria diciendo que la factura esta vigente.
+        */
+        Response.Headers["Cache-Control"] = "no-store";
+        return File(documento.Contenido, documento.TipoContenido, documento.NombreArchivo);
+    }
+
+    /// <summary>
     /// Manda la factura por correo con su PDF y su XML.
     ///
     /// Lleva permiso propio: en legacy este era el unico endpoint del sistema que

@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace ISL_Service.Application.DTOs.Reportes;
 
@@ -157,6 +157,29 @@ public class ReportesVentasLegacyRequest : ReportesVentasAcumuladoresProductosRe
     /// (ConsultarLiquidacionesDescuentos.cs:468-484). El reporte es de lo
     /// seleccionado, no del resultado de la busqueda.
     /// </summary>
+    /// <summary>
+    /// 1003: el comprobante timbrado cuyo PDF se quiere (factura, nota de credito
+    /// o complemento de pago). Es OBLIGATORIO: el reporte imprime UNO, no un
+    /// listado, y con 0 el procedimiento devuelve cero renglones.
+    /// </summary>
+    public int IDVentaFactura { get; set; }
+
+    /// <summary>
+    /// Los reportes de nomina (1024, 1025, 1027, 1190): los empleados marcados.
+    ///
+    /// Es obligatorio y no hay "todos": el formulario de Mac31 recorre la rejilla,
+    /// junta los marcados y si no hay ninguno dice "SELECCIONE UN EMPLEADO." y no
+    /// imprime (ReporteEmpleadoAsistenciaRecibos.cs:328-340).
+    /// </summary>
+    public List<int> IDEmpleados { get; set; } = new();
+
+    /// <summary>
+    /// Los reportes de nomina: el periodo de tipo de sueldo elegido en la rejilla
+    /// de arriba. Mac31 lo exige para ASISTENCIAS y para RECIBOS
+    /// ("SELECCIONE UN PERIODO.", :299) y lo manda igual en los otros dos.
+    /// </summary>
+    public int IDPeriodoTipoSueldo { get; set; }
+
     public List<int> IDLiquidacionesDescuento { get; set; } = new();
 }
 
@@ -218,6 +241,15 @@ public class ReportesVentasCatalogosResponse
     public List<ReportesVentasCatalogoItem> Repartidores { get; set; } = new();
     public List<ReportesVentasCatalogoItem> Proveedores { get; set; } = new();
     public List<ReportesVentasCatalogoItem> Autos { get; set; } = new();
+    /// <summary>
+    /// Las formas de pago del filtro del reporte de Pagos (gridTiposPago de
+    /// Mac31, con EsPago = 1). Se publican aqui y no en
+    /// /api/catalogos/tipos-pago porque ese endpoint exige catalogos.ver, y
+    /// quien tiene reportes no tiene por que tenerlo: el filtro contestaria 403
+    /// y el campo se quedaria vacio sin explicar nada.
+    /// </summary>
+    public List<ReportesVentasCatalogoItem> TiposPago { get; set; } = new();
+
     public List<ReportesVentasCatalogoItem> TiposGasto { get; set; } = new();
 }
 

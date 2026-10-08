@@ -86,6 +86,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         var proveedores = await ConsultarProveedoresAsync(conn, ct);
         var autos = await ConsultarAutosAsync(conn, ct);
         var tiposGasto = await ConsultarTiposGastoAsync(conn, ct);
+        var tiposPago = await ConsultarTiposPagoAsync(conn, ct);
 
         return new ReportesVentasCatalogosResponse
         {
@@ -96,6 +97,7 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
             Repartidores = repartidores,
             Autos = autos,
             TiposGasto = tiposGasto,
+            TiposPago = tiposPago,
             Documentos = BuildDocumentosConTodos(),
             StatusFolios = BuildStatusFolios(),
             Proveedores = proveedores

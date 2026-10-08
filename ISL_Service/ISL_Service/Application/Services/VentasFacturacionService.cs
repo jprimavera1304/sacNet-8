@@ -463,6 +463,58 @@ public class VentasFacturacionService : IVentasFacturacionService
         return string.Join(", ", mensaje.To.Select(x => x.Address));
     }
 
+    /*
+      BAJAR EL PDF O EL XML DE UN COMPROBANTE
+
+      Lo que faltaba. Hasta ahora el unico modo de volver a ver una factura
+      timbrada era mandarsela por correo a alguien, porque los dos botones de
+      Mac31 (IMPRIMIR PDF F7 y DESCARGAR XML F8) no tenian endpoint.
+
+      Los dos archivos los deja en disco el proceso de timbrado y
+      sp_n_rptFacturaElectronica dice donde: devuelve la ruta del .zip, y el PDF
+      y el XML son el mismo nombre con otra extension. Eso ya lo resuelve el
+      repositorio para el correo; aqui se reusa en vez de repetir la regla de
+      las extensiones en dos sitios.
+
+      Y NO se hace el Thread.Sleep(4000) de legacy. Si el archivo no esta, se
+      dice que no esta con su ruta, que es lo que hace falta para arreglarlo.
+      Esperar cuatro segundos a ver si aparece bloquea un hilo del servidor y, si
+      no aparece, igual falla.
+    */
+    public async Task<DocumentoDeFactura> LeerDocumentoAsync(
+        int idVentaFactura, string formato, CancellationToken ct)
+    {
+        if (idVentaFactura <= 0)
+            throw new ArgumentException("La factura es obligatoria.");
+
+        var tipo = (formato ?? string.Empty).Trim().ToLowerInvariant();
+        if (tipo is not ("pdf" or "xml"))
+            throw new ArgumentException("El formato tiene que ser pdf o xml.");
+
+        var datos = await _repository.LeerDatosCorreoAsync(idVentaFactura, ct)
+            ?? throw new NotFoundException("No se encontro la factura.");
+
+        /* `Archivo` ya viene como .pdf (el repositorio cambia la extension del
+           .zip que guarda el reporte). El XML es el mismo nombre. */
+        var ruta = tipo == "pdf"
+            ? datos.Archivo
+            : datos.Archivo.Replace(".pdf", ".xml", StringComparison.OrdinalIgnoreCase);
+
+        if (string.IsNullOrWhiteSpace(ruta))
+            throw new ConflictException("El comprobante no tiene archivo registrado.");
+
+        if (!File.Exists(ruta))
+            throw new ConflictException(
+                $"NO SE ENCONTRO EL ARCHIVO {tipo.ToUpperInvariant()}.{Environment.NewLine}({ruta})");
+
+        return new DocumentoDeFactura
+        {
+            Contenido = await File.ReadAllBytesAsync(ruta, ct),
+            NombreArchivo = Path.GetFileName(ruta),
+            TipoContenido = tipo == "pdf" ? "application/pdf" : "application/xml"
+        };
+    }
+
     /* ---------------------------------------------------------------- */
 
     private async Task GuardarAsync(

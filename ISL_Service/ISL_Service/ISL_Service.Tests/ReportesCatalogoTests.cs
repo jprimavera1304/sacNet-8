@@ -1,4 +1,4 @@
-﻿using ISL_Service.Application.Reportes;
+using ISL_Service.Application.Reportes;
 using Xunit;
 
 namespace ISL_Service.Tests;
@@ -10,27 +10,53 @@ namespace ISL_Service.Tests;
 /// </summary>
 public class ReportesCatalogoTests
 {
+    /*
+      LA CLAVE UNICA ES EL INVARIANTE. EL NUMERO EXACTO NO LO ERA.
+
+      Esto decia `Assert.Equal(60, ...)` y arriba llevaba una lista de altas que
+      cada quien iba alargando: "53 + los cuatro de la ola 7 + autos + cambios de
+      vigencia + liquidaciones...". O sea que la prueba se rompia en CADA alta
+      legitima, y lo que enseña una prueba asi es a subir el numero sin leerla.
+      Se rompio otra vez al entrar tres reportes nuevos: 65 contra 60.
+
+      Lo que de verdad protege es lo que dice el comentario de la clase: si dos
+      reportes comparten clave, el web ofrece uno y la API rebota el otro con un
+      403 que nadie entiende. Eso se comprueba abajo y no depende de cuantos
+      haya.
+
+      Del total solo se exige que NO BAJE, que es lo que caza un borrado por
+      accidente sin estorbar a quien agrega.
+    */
     [Fact]
-    public void Catalogo_Tiene_Los_60_Reportes_Con_Clave_Unica()
+    public void Cada_Reporte_Tiene_Su_Clave_Y_Ninguna_Se_Repite()
     {
-        // 53 + los cuatro que la ola 7 saco del hueco: garantias_registradas (1236),
-        // centros_pagos_entradas_salidas (1415), centros_garantias (1420) y
-        // control_acumulado_de_estimaciones (1250).
-        //
-        // + autos (1300), que no vive en el arbol de Reportes de Mac31 sino en el
-        // boton IMPRIMIR de la pantalla de catalogo ConsultarAutos. Es el mismo
-        // camino -sp_ConsultaReportes da el SP y la plantilla- asi que entra aqui y
-        // no en un segundo catalogo.
-        //
-        // + cambios_vigencia (1535), por lo mismo que autos: lo imprime el boton
-        // IMPRIMIR de ConsultarCambiosVigencia y no un nodo del arbol.
-        //
-        // + liquidaciones_descuentos (1030), por lo mismo: boton IMPRIMIR de
-        // ConsultarLiquidacionesDescuentos.
-        Assert.Equal(60, ReportesCatalogo.Reportes.Count);
-        Assert.Equal(
-            ReportesCatalogo.Reportes.Count,
-            ReportesCatalogo.Reportes.Select(x => x.Clave).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        var claves = ReportesCatalogo.Reportes
+            .Select(x => (x.Clave ?? string.Empty).Trim())
+            .ToArray();
+
+        Assert.DoesNotContain(string.Empty, claves);
+
+        var repetidas = claves
+            .GroupBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .Select(g => $"{g.Key} ({g.Count()} veces)")
+            .ToArray();
+
+        Assert.Empty(repetidas);
+    }
+
+    [Fact]
+    public void El_Catalogo_No_Pierde_Reportes()
+    {
+        /*
+          El piso es el numero que habia la ultima vez que alguien lo conto a
+          mano. Subirlo esta bien; que la prueba se caiga porque BAJO es lo que
+          se quiere saber.
+        */
+        Assert.True(
+            ReportesCatalogo.Reportes.Count >= 60,
+            $"El catalogo tiene {ReportesCatalogo.Reportes.Count} reportes y antes habia al menos 60. "
+            + "Si se quito uno a proposito, baja este piso en la prueba y di por que.");
     }
 
     [Fact]

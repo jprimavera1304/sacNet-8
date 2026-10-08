@@ -75,6 +75,31 @@ public static class ReportesCatalogo
         Ventas("folios", "Folios"),
         Ventas("remisiones", "Remisiones"),
         Ventas("facturas", "Facturas"),
+        /*
+          EL PDF DE UN COMPROBANTE TIMBRADO (1003), QUE NO ES EL LISTADO DE
+          FACTURAS DE ARRIBA.
+
+          `facturas` es el reporte de la lista (24). Este imprime UN comprobante:
+          el que se le diga en `idVentaFactura`. Hacia falta porque una nota de
+          credito timbrada desde el web no tenia papel — el 1003 no estaba aqui y
+          el motor rechaza un IDReporte crudo, asi que no habia por donde pedirlo.
+
+          SU PERMISO ES `facturacion.ver` Y NO UNO NUEVO.
+
+          No se le invento una clave `reportes.ventas.comprobante_timbrado.ver`:
+          eso lo dejaria contestando 403 a todo el que no fuera SuperAdmin, que es
+          lo que ya paso una vez con 68 capacidades. `facturacion.ver` SI existe en
+          WPermiso y es exactamente quien debe poder ver el papel de una factura.
+
+          Contado en MacZ antes de elegirla: `facturacion.ver` tiene CERO tenedores
+          (ni un rol en WRolPermiso ni un usuario en WUsuarioPermiso) — igual que
+          las 65 claves `reportes.*`, que tambien tienen cero. O sea que hoy, en
+          esta base, solo un SuperAdmin alcanza cualquier reporte, y eso no se
+          arregla con un INSERT a mano: se arregla con el script de siembra de
+          `Querrys/`. Queda dicho aqui para que nadie lea este 403 como un defecto
+          de este reporte en particular.
+        */
+        new("comprobante_timbrado", "ventas", "Comprobante timbrado (PDF)", "facturacion.ver"),
         Ventas("concentrados", "Concentrados"),
         Ventas("cobranza", "Cobranza"),
         Ventas("cobranza_detallado", "Cobranza Detallado"),
@@ -191,6 +216,33 @@ public static class ReportesCatalogo
           reporte sin poder explicarle por que.
         */
         new("autos", "administracion", "Autos", SinPermiso),
+        /*
+          LOS CUATRO DE `ReporteEmpleadoAsistenciaRecibos`.
+
+          Entran en "administracion" porque es donde Mac31 cuelga el nodo
+          Asistencias (y Zaragoza lo agrega a ese grupo, ReportesMenu.cs:929),
+          pero NO salen del arbol de ReportesMenu: salen de otro formulario, con
+          sus dos rejillas y sus propios parametros.
+
+          LOS CUATRO ENTRAN SIN PERMISO PROPIO, y es una decision medida, no un
+          olvido. El permiso de legacy es `ReporteEmpleadoAsistenciaRecibos.acceso`
+          y NO hay ninguna clave `reportes.nomina.*` ni
+          `reportes.administracion.*asistencia*` en WPermiso mas que
+          `reportes.administracion.asistencias.ver`, que es la del nodo del arbol
+          (el 1026) y no la de este formulario.
+
+          Inventarles una clave nueva los dejaria a los cuatro contestando 403 a
+          todo el que no fuera SuperAdmin, que es exactamente lo que ya paso una
+          vez con 68 capacidades. Contado en MacZ: de las 65 claves `reportes.*`
+          que existen en WPermiso, las 65 tienen CERO tenedores -ni un rol en
+          WRolPermiso ni un usuario en WUsuarioPermiso-. Asi que entran abiertos a
+          quien tenga reportes.ver_modulo, como los otros siete sin permiso, y el
+          dia que se siembren las claves solo hay que cambiar el null.
+        */
+        new("nomina_asistencias", "administracion", "Asistencias por periodo", SinPermiso),
+        new("nomina_asistencias_corto", "administracion", "Asistencias (formato corto)", SinPermiso),
+        new("nomina_inasistencias", "administracion", "Inasistencias", SinPermiso),
+        new("nomina_vacaciones", "administracion", "Vacaciones", SinPermiso),
         Grupo("administracion", "asistencias", "Asistencias"),
         // Nodo del arbol del modulo MC (ReportesMenu.cs:966). Su permiso seria
         // reportes.administracion.control_acumulado_de_estimaciones.ver y NO esta
