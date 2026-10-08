@@ -915,6 +915,8 @@ public sealed class PermissionService : IPermissionService
 
         new("constantes.fechaventas.editar", "Constantes - Avanzar la fecha de operación de ventas", "constantes"),
 
+        /*
+          `facturacion.ver_modulo` ES LO QUE HACE QUE EL MODULO APAREZCA.
         new("huellas.editar", "Huellas - Registrar y cancelar", "huellas"),
         new("seguridad.bitacora.registrar", "Seguridad - Registrar intentos de contraseña", "seguridad"),
 
