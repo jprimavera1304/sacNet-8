@@ -588,6 +588,73 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
                 if (string.IsNullOrWhiteSpace(reportHtml))
                     throw new InvalidOperationException("No se encontro el concentrado que se pidio.");
             }
+            /*
+              LOS DOS REPORTES DE ASISTENCIAS POR DIA (1025 y 1024) Y EL RECIBO
+              DE NOMINA (1020) SE ARMAN APARTE.
+
+              Los tres tienen `Aspx` que no es "3columnas" y caerian en el
+              formato normal, que pinta UN renglon por fila de un SOLO
+              procedimiento. Estos tres necesitan mas de uno:
+
+              · 1025/1024 cruzan los recibos con las siete columnas de dias de
+                `sp_n_ConsultaEmpleadosPeriodoAsistencia` y los encabezados de
+                `sp_n_ConsultaPeriodosTipoSueldoDias`. Sin ese cruce el papel
+                salia con "#asistenciaDia1#" escrito donde va la hora de
+                entrada, que es lo que tenia a estos dos reportes sin dar de
+                alta.
+              · 1020 no tiene renglon en `dbo.Reportes` y su papel son recibos
+                individuales con salto de pagina, no un listado.
+
+              Se desvia AQUI, igual que la hoja de cobro y el concentrado, porque
+              es el punto donde ya estan las plantillas, el logo y las
+              constantes (que dicen si esta empresa es Tauro o Zaragoza).
+            */
+            else if (idReporte is ReporteNominaAsistencias or ReporteNominaAsistenciasCorto)
+            {
+                var periodoDelRenglon = ReadInt(renglon, "Param3");
+                var recibosNomina = await ConsultarRecibosAsync(
+                    conn, SpDeRecibos(EsTauro(constants)), parametroId, 0, ct);
+
+                /* El periodo gemelo de comision es el siguiente id, y legacy lo
+                   lee del propio recibo, no del renglon de parametros
+                   (ReporteAsistenciaService.cs:168). Si no vino ni un recibo se
+                   cae al periodo del renglon para no perder los encabezados. */
+                var periodoNomina = recibosNomina.Rows.Count > 0
+                    ? ReadInt(recibosNomina.Rows[0], "IDPeriodoTipoSueldo")
+                    : periodoDelRenglon;
+
+                var recibosComision = await ConsultarRecibosAsync(
+                    conn, SpDeRecibos(EsTauro(constants)), parametroId, periodoNomina + 1, ct);
+
+                reportHtml = NominaAsistenciasHtmlBuilder.Construir(
+                    logo,
+                    config.NombreReporte,
+                    recibosNomina,
+                    recibosComision,
+                    await ConsultarAsistenciasDelPeriodoAsync(conn, periodoNomina, ct),
+                    await ConsultarDiasDelPeriodoAsync(conn, periodoNomina, ct),
+                    templates,
+                    template.MaxLineas);
+            }
+            else if (idReporte == ReporteNominaRecibos)
+            {
+                var esTauro = EsTauro(constants);
+                var sp = SpDeRecibos(esTauro);
+
+                var recibosNomina = await ConsultarRecibosAsync(conn, sp, parametroId, 0, ct);
+                var periodoNomina = recibosNomina.Rows.Count > 0
+                    ? ReadInt(recibosNomina.Rows[0], "IDPeriodoTipoSueldo")
+                    : ReadInt(renglon, "Param3");
+
+                reportHtml = ReciboNominaHtmlBuilder.Construir(
+                    logo,
+                    templates,
+                    await ConsultarPeriodoAsync(conn, periodoNomina, ct),
+                    recibosNomina,
+                    await ConsultarPeriodoAsync(conn, periodoNomina + 1, ct),
+                    await ConsultarRecibosAsync(conn, sp, parametroId, periodoNomina + 1, ct),
+                    esTauro);
+            }
             else if (idReporte == ReporteListasPreciosZaragoza)
             {
                 reportHtml = GenerateListasPreciosZaragozaHtml(logo, config.NombreReporte, data, templates, request);
@@ -608,6 +675,24 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
 
         if (!string.IsNullOrWhiteSpace(errorParams) && string.IsNullOrWhiteSpace(reportHtml))
             throw new InvalidOperationException(errorParams);
+
+        /*
+          EL RECIBO SE IMPRIME COMO LO IMPRIME MACREPORTES, NO COMO DICE SU
+          PLANTILLA.
+
+          Las cuatro filas 1020 de `Template_Html` dicen Landscape y margenes
+          3/8/8/15, y MacReportes las IGNORA: fija Portrait y 4/6/2/8 en el
+          controlador (EmpleadosTipoSueldoRecibosController.cs:71-74). El papel
+          que la gente conoce es el del controlador, asi que se copia ese.
+        */
+        if (idReporte == ReporteNominaRecibos)
+        {
+            template.Orientacion = "Portrait";
+            template.MarginTop = 4;
+            template.MarginBottom = 6;
+            template.MarginLeft = 2;
+            template.MarginRight = 8;
+        }
 
         return new ReportesVentasPreviewResponse
         {

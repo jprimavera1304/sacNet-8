@@ -395,35 +395,57 @@ public static class ReportesCatalogo
           dia que se siembren las claves solo hay que cambiar el null.
         */
         /*
-          LOS 1024 Y 1025 (las dos asistencias por dia) NO ESTAN, Y ES MEDIDO.
+          LOS CINCO BOTONES DE `ReporteEmpleadoAsistenciaRecibos`, COMPLETOS.
 
-          Se dieron de alta, se generaron y se abrio el PDF: salen 58 KB con los
-          empleados, su sueldo y sus totales BIEN, y las siete columnas de dias
-          en crudo:
+          Son los cinco que tiene Mac31, con su nombre y su tecla:
 
-              #fechaNombreDia1#..7  #fechaDia1#..7  #asistenciaDia1#..7
-              #minsRetardo#  #totalPagado#
+              ASISTENCIAS F5          1025   nomina_asistencias
+              RECIBOS DE NOMINA F6    1020   nomina_recibos
+              INASISTENCIAS F7        1190   nomina_inasistencias
+              VACACIONES F8           1027   nomina_vacaciones
+              SOLO ASISTENCIAS F9     1024   nomina_solo_asistencias
 
-          La razon no es la plantilla —ya se arreglo que su cuerpo se llame
-          `cuerpo` y no `cuerpo_n`, ver LeerCuerpoDeLaPlantilla— sino que esos
-          tags NO ESTAN EN LO QUE DEVUELVE EL PROCEDIMIENTO. Ejecutado a mano en
-          MacZ (`sp_n_ConsultaEmpleadosTipoSueldoRecibo '274904', 12551`) trae UNA
-          tabla de 54 columnas con el empleado, su sueldo y sus percepciones, y
-          ni una de los siete dias. Legacy los arma aparte: por eso tiene una rama
-          dedicada para estos dos ids en ReporteV2Service.cs:860 en vez de
-          mandarlos por el camino comun.
+          LOS TRES QUE FALTABAN YA ESTAN, y lo que los tenia fuera era una
+          conclusion equivocada, no una dependencia perdida:
 
-          Dejarlos dados de alta significaba entregar un papel de nomina con
-          "#asistenciaDia1#" donde va la hora de entrada, y eso es peor que no
-          tenerlos: alguien lo imprime y lo entrega. Entran el dia que se porte
-          esa rama —leer los dias del periodo y rellenar las siete columnas por
-          empleado— que es trabajo acotado y esta medido aqui para no repetirlo.
+          · 1025 y 1024 salian con las siete columnas de dias en crudo
+            (#asistenciaDia1#..7, #fechaDia1#..7, #minsRetardo#, #totalPagado#)
+            porque esos tags no los devuelve `sp_n_ConsultaEmpleadosTipoSueldoRecibo`.
+            Pero SI los devuelve `sp_n_ConsultaEmpleadosPeriodoAsistencia`, que
+            existe en MacZ y en Produccion_svr y que ya usa la rejilla del modulo
+            de Asistencias; los encabezados salen de
+            `sp_n_ConsultaPeriodosTipoSueldoDias`. La "rama dedicada" de legacy
+            esta portada en NominaAsistenciasHtmlBuilder.
+          · 1020 sigue sin renglon en `dbo.Reportes`, y resulta que no lo
+            necesita: MacReportes no arma el recibo, solo pasa a PDF un HTML que
+            arma MacServicios con las plantillas 1020 de `Template_Html` —las
+            cuatro estan en las dos bases— y estos mismos procedimientos. Ese
+            armador esta portado en ReciboNominaHtmlBuilder.
 
-          Los otros dos del mismo formulario SI salen enteros y por eso si estan:
-          1190 (Inasistencias) y 1027 (Vacaciones).
+          LOS CINCO ENTRAN SIN PERMISO PROPIO, por lo dicho arriba: el permiso de
+          legacy es `ReporteEmpleadoAsistenciaRecibos.acceso` y no hay ninguna
+          clave `reportes.nomina.*` en WPermiso.
+
+          NO SALEN DEL ARBOL (EnArbol = false): salen de la pantalla ASISTENCIAS
+          Y RECIBOS, que tiene su rejilla de periodos y su rejilla de empleados.
+          Colgarlos del arbol dibujaria cinco nodos que al pulsarlos no sabrian
+          pedir ni el periodo ni los empleados marcados.
         */
-        new("nomina_inasistencias", "administracion", "Inasistencias", SinPermiso),
-        new("nomina_vacaciones", "administracion", "Vacaciones", SinPermiso),
+        new("nomina_asistencias", "administracion", "Asistencias", SinPermiso, EnArbol: false),
+        new("nomina_recibos", "administracion", "Recibos de nómina", SinPermiso, EnArbol: false),
+        new("nomina_inasistencias", "administracion", "Inasistencias", SinPermiso, EnArbol: false),
+        new("nomina_vacaciones", "administracion", "Vacaciones", SinPermiso, EnArbol: false),
+        new("nomina_solo_asistencias", "administracion", "Solo asistencias", SinPermiso, EnArbol: false),
+        /*
+          Y EL SEXTO, QUE NO ES UN BOTON: el reporte que Zaragoza lanza SOLA
+          detras de los recibos (ReporteEmpleadoAsistenciaRecibos.cs:145). Es el
+          1162 con las fechas de comisiones de `dbo.Constantes` y los empleados
+          marcados; su juego de parametros esta en
+          BuildReciboDetalleZaraLegacyParamsAsync. No sale del arbol ni tiene
+          boton propio: lo dispara el de RECIBOS DE NOMINA cuando la empresa es
+          Zaragoza, igual que en Mac31.
+        */
+        new("nomina_recibos_detalle_zara", "administracion", "Cobranza pagadas de los recibos", SinPermiso, EnArbol: false),
         Grupo("administracion", "asistencias", "Asistencias"),
         // Nodo del arbol del modulo MC (ReportesMenu.cs:966). Su permiso seria
         // reportes.administracion.control_acumulado_de_estimaciones.ver y NO esta

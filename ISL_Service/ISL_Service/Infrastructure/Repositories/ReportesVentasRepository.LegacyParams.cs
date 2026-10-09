@@ -217,6 +217,9 @@ public partial class ReportesVentasRepository
             "motobaterias" => ResolveReporteMotobaterias(request.FormatoMotobaterias),
             "cobranza_detallado" => ReporteVentasCobranzaZaragoza,
             "cobranza_pagadas" => ResolveFormatoDetallado(request.Formato) ? ReporteVentasCobranzaPagadasDetalladoZara : ReporteVentasCobranzaPagadasTotalizadoZara,
+            // El MISMO 1162, con los parametros que le arma a mano Mac31 detras
+            // de los recibos de Zaragoza. Ver BuildReciboDetalleZaraLegacyParamsAsync.
+            "nomina_recibos_detalle_zara" => ReporteVentasCobranzaPagadasDetalladoZara,
             "estado_de_cuenta" => ResolveReporteEstadoCuenta(request.FormatoEstadoCuenta),
             "rutas_de_agentes" => ReporteVentasCobranzaDesglosado,
             "descuentos" => ReporteVentasPagosDescuentos,
@@ -273,9 +276,13 @@ public partial class ReportesVentasRepository
             "impuestos" => ReporteVentasRemisionesImpuestos,
             "accesos" => ReporteAccesosMac,
             "asistencias" => ReporteAsistenciasZaragoza,
-            // Los cuatro de ReporteEmpleadoAsistenciaRecibos. Ver las constantes.
-            "nomina_inasistencias" => ReporteNominaInasistencias,
-            "nomina_vacaciones" => ReporteNominaVacaciones,
+            // Los CINCO botones de ReporteEmpleadoAsistenciaRecibos, con la
+            // tecla que les pone Mac31. Ver las constantes y ReportesCatalogo.
+            "nomina_asistencias" => ReporteNominaAsistencias,              // F5
+            "nomina_recibos" => ReporteNominaRecibos,                      // F6
+            "nomina_inasistencias" => ReporteNominaInasistencias,          // F7
+            "nomina_vacaciones" => ReporteNominaVacaciones,                // F8
+            "nomina_solo_asistencias" => ReporteNominaAsistenciasCorto,    // F9
             // El reporte de la flotilla, que imprime ConsultarAutos de Mac31. No
             // lleva filtros: su sp_n_rptAutos recibe el @Params generico y ya.
             "autos" => ReporteAutos,
@@ -553,7 +560,7 @@ public partial class ReportesVentasRepository
     */
     private static string ArgumentosDelProcedimiento(int idReporte, int parametroId, DataRow? row)
     {
-        if (idReporte is not (ReporteNominaAsistencias or ReporteNominaAsistenciasCorto))
+        if (idReporte is not (ReporteNominaAsistencias or ReporteNominaAsistenciasCorto or ReporteNominaRecibos))
             return parametroId.ToString(CultureInfo.InvariantCulture);
 
         var periodo = row is null ? 0 : ReadInt(row, "Param3");
@@ -622,12 +629,13 @@ public partial class ReportesVentasRepository
             ReporteGastosTotalizado or
             ReporteAccesosMac or
             ReporteAsistenciasZaragoza or
-            // Los cuatro de nomina: su juego de parametros es propio (se arma
+            // Los CINCO de nomina: su juego de parametros es propio (se arma
             // abajo) pero el camino de render y de Excel es el mismo generico.
             ReporteNominaAsistencias or
             ReporteNominaAsistenciasCorto or
             ReporteNominaInasistencias or
             ReporteNominaVacaciones or
+            ReporteNominaRecibos or
             // El de la flotilla: mismo camino generico que los otros, su SP recibe
             // el @Params y devuelve la tabla que pinta la plantilla rptTemplate.
             ReporteAutos or
@@ -943,6 +951,21 @@ public partial class ReportesVentasRepository
           constructores que usa su endpoint propio: un solo juego de parametros,
           no dos que puedan separarse.
         */
+        /*
+          EL SEGUNDO REPORTE QUE ZARAGOZA LANZA DETRAS DE LOS RECIBOS.
+
+          Es el 1162 otra vez, pero NO con los parametros del nodo "Cobranza
+          Pagadas" del arbol: Mac31 lo arma a mano en VerReporteDetalle
+          (ReporteEmpleadoAsistenciaRecibos.cs:152-218) con otras fechas —las dos
+          de `dbo.Constantes`, no las de la pantalla— y con los empleados
+          marcados en Param13, que el nodo del arbol deja vacio.
+
+          Por eso tiene clave propia y se desvia por la CLAVE y no por el id: el
+          id es el mismo reporte, el juego de parametros no.
+        */
+        if (string.Equals(request.ReporteKey?.Trim(), "nomina_recibos_detalle_zara", StringComparison.OrdinalIgnoreCase))
+            return await BuildReciboDetalleZaraLegacyParamsAsync(conn, request, ct);
+
         switch (idReporte)
         {
             case ReporteVentaAcumuladores:
@@ -1018,6 +1041,7 @@ public partial class ReportesVentasRepository
             case ReporteNominaAsistenciasCorto:
             case ReporteNominaInasistencias:
             case ReporteNominaVacaciones:
+            case ReporteNominaRecibos:
                 legacy.Param2 = JoinIdsPorComa(request.IDEmpleados);
                 legacy.Param3 = request.IDPeriodoTipoSueldo > 0
                     ? request.IDPeriodoTipoSueldo.ToString(CultureInfo.InvariantCulture)
@@ -2159,6 +2183,79 @@ public partial class ReportesVentasRepository
         return $"{baseNombre}-{Guid.NewGuid():N}";
     }
 
+    /*
+      LOS PARAMETROS DEL REPORTE ENCADENADO DE ZARAGOZA, UNO POR UNO.
+
+      Copiados de VerReporteDetalle (ReporteEmpleadoAsistenciaRecibos.cs:159-194),
+      que los comenta en el propio codigo:
+
+          Param1  = Equipo[IDUsuario
+          Param2  = IDsEmpresa          ("")
+          Param3  = IDCliente           ("0")
+          Param4  = IDsAgente           ("")
+          Param5  = DiasVencimiento     ("0")
+          Param6  = SaldosStatus        (Pagadas)
+          Param7  = Formato             ("1" = Detallado)
+          Param8  = FechaComisionesZaraInicialMMDDYY  <- de dbo.Constantes
+          Param9  = FechaComisionesZaraFinalMMDDYY    <- de dbo.Constantes
+          Param10 = Presentacion
+          Param11 = IDsCliente          ("0")
+          Param12 = FiltrarFechas       ("0")
+          Param13 = IDsEmpleado         <- los marcados en la rejilla
+
+      LAS DOS FECHAS NO SON LAS DE LA PANTALLA. Son las dos columnas de
+      `dbo.Constantes` que Mac31 lee al arrancar (Globales.cs:532) y que mandan
+      el periodo de comisiones de Zaragoza. Pasarle las del periodo de nomina
+      daria otro papel, parecido y equivocado.
+    */
+    private static async Task<LegacyReportParams> BuildReciboDetalleZaraLegacyParamsAsync(
+        SqlConnection conn,
+        ReportesVentasLegacyRequest request,
+        CancellationToken ct)
+    {
+        var (fechaInicial, fechaFinal) = await ConsultarFechasComisionesZaraAsync(conn, ct);
+
+        return new LegacyReportParams
+        {
+            NombreEquipo = ResolveLegacyNombreEquipo(request),
+            IDUsuario = ResolveLegacyIDUsuario(request),
+            Param1 = BuildLegacyUsuarioParam(request),
+            Param2 = "",
+            Param3 = "0",
+            Param4 = "",
+            Param5 = "0",
+            // El mismo valor que ya usa el nodo del arbol para "pagadas".
+            Param6 = "2",
+            Param7 = "1",
+            Param8 = fechaInicial,
+            Param9 = fechaFinal,
+            Param10 = ResolvePresentacion(request.Salida).ToString(CultureInfo.InvariantCulture),
+            Param11 = "0",
+            Param12 = "0",
+            Param13 = JoinIdsPorComa(request.IDEmpleados)
+        };
+    }
+
+    private static async Task<(string Inicial, string Final)> ConsultarFechasComisionesZaraAsync(
+        SqlConnection conn,
+        CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand(
+            "SELECT TOP 1 ISNULL(FechaComisionesZaraInicialMMDDYY,'') AS Inicial, " +
+            "ISNULL(FechaComisionesZaraFinalMMDDYY,'') AS Final FROM dbo.Constantes",
+            conn)
+        {
+            CommandType = CommandType.Text,
+            CommandTimeout = 120
+        };
+
+        var tabla = await ExecuteFirstTableAsync(cmd, ct);
+        if (tabla.Rows.Count == 0)
+            throw new InvalidOperationException("dbo.Constantes no tiene las fechas de comisiones de Zaragoza.");
+
+        return (ReadString(tabla.Rows[0], "Inicial"), ReadString(tabla.Rows[0], "Final"));
+    }
+
     private static async Task<int> GuardarParametrosAsync(
         SqlConnection conn,
         int idReporte,
@@ -2309,6 +2406,7 @@ public partial class ReportesVentasRepository
         };
     }
 
+
     private static ReportesVentasAcumuladoresProductosRequest BuildGenericVentasStoredRequest(DataRow row)
     {
         var idReporte = ReadInt(row, "IDReporte");
@@ -2333,7 +2431,8 @@ public partial class ReportesVentasRepository
             ReporteAsistenciasZaragoza => "Param3",
             // Nomina: Param4 y Param5, como dice su #ParamIds.
             ReporteNominaAsistencias or ReporteNominaAsistenciasCorto
-                or ReporteNominaInasistencias or ReporteNominaVacaciones => "Param4",
+                or ReporteNominaInasistencias or ReporteNominaVacaciones
+                or ReporteNominaRecibos => "Param4",
             ReporteVentasRemisionesImpuestos => "Param8",
             _ => "Param3"
         };
@@ -2357,7 +2456,8 @@ public partial class ReportesVentasRepository
             ReporteCortes or ReporteAccesosMac => "Param3",
             ReporteAsistenciasZaragoza => "Param4",
             ReporteNominaAsistencias or ReporteNominaAsistenciasCorto
-                or ReporteNominaInasistencias or ReporteNominaVacaciones => "Param5",
+                or ReporteNominaInasistencias or ReporteNominaVacaciones
+                or ReporteNominaRecibos => "Param5",
             ReporteVentasRemisionesImpuestos => "Param9",
             _ => "Param4"
         };
@@ -2582,7 +2682,8 @@ public partial class ReportesVentasRepository
             ReporteAsistenciasZaragoza => "Param5",
             // Nomina: la presentacion es Param6 en los cuatro.
             ReporteNominaAsistencias or ReporteNominaAsistenciasCorto
-                or ReporteNominaInasistencias or ReporteNominaVacaciones => "Param6",
+                or ReporteNominaInasistencias or ReporteNominaVacaciones
+                or ReporteNominaRecibos => "Param6",
             ReporteVentasRemisionesImpuestos => "Param10",
             ReporteListasPreciosZaragoza or ReporteListasPreciosProductosZaragoza
                 or ReporteListasPreciosTauroTodas or ReporteListasPreciosTauroTodasMenosTauro
