@@ -109,8 +109,20 @@ public class ReportesVentasService : IReportesVentasService
       Es una LISTA y no un `if` suelto para que el siguiente que llegue se
       agregue aqui, con su porque al lado, en vez de volver a eximirse por otro
       camino.
+
+      Y EL SIGUIENTE LLEGO: `concentrado`, el documento del repartidor (1005).
+
+      Es el mismo caso exacto que la hoja de cobro -imprime LOS CONCENTRADOS
+      MARCADOS en la rejilla, y `BuildConcentradoLegacyParams` solo usa Param2,
+      la lista de IDConcentrado- y se habia quedado fuera de esta lista cuando se
+      implemento su armador. El efecto era que el reporte estaba COMPLETO y
+      MUERTO a la vez: catalogo, parametros, plantillas y
+      `ConcentradoHtmlBuilder` listos, y la peticion rebotaba aqui con
+      "fechaInicial es requerida." antes de llegar a ninguno. Medido al abrir el
+      boton IMPRIMIR de la pantalla de concentrados: 400 contra
+      /api/reportes/ventas/legacy/generar.
     */
-    private static readonly string[] ReportesSinPeriodo = { "hoja_de_cobro" };
+    private static readonly string[] ReportesSinPeriodo = { "hoja_de_cobro", "concentrado" };
 
     public Task<ReportesVentasGenerateResponse> GenerarLegacyVentasAsync(
         ReportesVentasLegacyRequest request,

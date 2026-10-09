@@ -42,6 +42,9 @@ public class VentasCobranzaConsultaService : IVentasCobranzaConsultaService
     public Task<ConsultaFilasResponse> ValidarFolioConcentradoAsync(ConcentradoFolioRequest request, int idUsuarioActual, CancellationToken ct)
         => _repository.ValidarFolioConcentradoAsync(request, idUsuarioActual, ct);
 
+    public Task<ConsultaFilasResponse> ConsultarConcentradosAsync(ConcentradosConsultaRequest request, int idUsuarioActual, CancellationToken ct)
+        => _repository.ConsultarConcentradosAsync(request, idUsuarioActual, ct);
+
     public Task<ConsultaFilasResponse> ConsultarConcentradoDetalleAsync(int idConcentrado, CancellationToken ct)
         => _repository.ConsultarConcentradoDetalleAsync(idConcentrado, ct);
 

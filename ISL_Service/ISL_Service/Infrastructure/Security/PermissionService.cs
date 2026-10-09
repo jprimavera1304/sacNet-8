@@ -719,6 +719,21 @@ public sealed class PermissionService : IPermissionService
 
         new("cobros.ver_modulo", "Cobros - Ver módulo (hojas de cobro)", "cobros"),
         new("dinero_usados.ver_modulo", "Cobros - Dinero de usados: ver módulo", "cobros"),
+        /*
+          CONCENTRADOS ES UN MODULO APARTE, Y NO UNA VISTA DE COBROS.
+
+          En Mac31 son dos botones distintos del menu —`btnConcentrados`
+          (`Menu.cs:1785`, abre ConsultarConcentrados) y `btnCobrosDineroCascos`
+          (`Menu.cs:2690`, abre ConsultarDineroUsadosCobros)— y dos formas
+          distintas, asi que llevan dos llaves de mosaico.
+
+          LA FAMILIA ES "cobros" Y NO "concentrados": el modulo de permisos
+          agrupa las pantallas de la cobranza, y los permisos de ACCION de esta
+          pantalla ya existen y viven en `cobranza.concentrados.{editar,
+          cancelar}`. Inventar una familia `concentrados.*` partiria en dos lo
+          que en la pantalla de Permisos se reparte junto.
+        */
+        new("concentrados.ver_modulo", "Concentrados - Ver módulo", "cobros"),
 
         new("garantias.ver_modulo", "Garantías - Ver módulo", "garantias"),
         new("cambios_vigencia.ver_modulo", "Cambios de vigencia - Ver módulo", "cambiosvigencia"),

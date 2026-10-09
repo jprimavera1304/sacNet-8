@@ -138,6 +138,38 @@ public class VentasCobranzaConsultaController : PermisoControllerBase
         return Ok(new { ok = true, message = "Folio validado.", data });
     }
 
+    /// <summary>La rejilla de la pantalla CONCENTRADOS.</summary>
+    /// <remarks>
+    /// Va por POST y no por GET porque son cinco filtros y porque es lo que ya
+    /// hacen las otras consultas de esta familia.
+    ///
+    /// SIN FILTROS NO SE BARRE TODO. El procedimiento con los cinco en cero
+    /// devuelve el historico entero (36,371 concentrados en Tauro, medido), y la
+    /// pantalla de Mac31 nunca lo pide: arranca con la fecha de operacion en las
+    /// dos cajas. Se exige al menos un filtro para que un cuerpo vacio por
+    /// descuido no se lleve la base por delante.
+    /// </remarks>
+    [HttpPost("concentrados/buscar")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ConsultarConcentrados([FromBody] ConcentradosConsultaRequest? body, CancellationToken ct)
+    {
+        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        if (sinPermiso is not null) return sinPermiso;
+
+        if (body is null)
+            return BadRequest(new { ok = false, message = "Body requerido." });
+
+        var sinFechas = string.IsNullOrWhiteSpace(body.FechaInicial) || string.IsNullOrWhiteSpace(body.FechaFinal);
+        if (sinFechas && body.FolioConcentrado <= 0 && body.FolioVenta <= 0)
+            return BadRequest(new { ok = false, message = "Indica un rango de fechas o un folio." });
+
+        var data = await _service.ConsultarConcentradosAsync(body, IdUsuarioLegacy(), ct);
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(new { ok = true, message = "Concentrados consultados.", data });
+    }
+
     /// <summary>Las notas que trae un concentrado.</summary>
     [HttpGet("concentrados/{idConcentrado:int}/detalle")]
     [ProducesResponseType(StatusCodes.Status200OK)]

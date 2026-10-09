@@ -40,6 +40,44 @@ public class CobranzaFolioRequest
 }
 
 /// <summary>
+/// La rejilla de la pantalla CONCENTRADOS: el listado por fechas, repartidor,
+/// folio de concentrado o folio de nota.
+/// </summary>
+/// <remarks>
+/// Es <c>sp_n_ConsultarConcentrados</c>, el que llena dataGridView1 de
+/// ConsultarConcentrados.cs (ConsultaConcentrados(), linea 593).
+///
+/// LOS FOLIOS SON UNO, NO UN RANGO, Y LA PANTALLA NO TIENE DONDE PEDIR DOS.
+/// El procedimiento declara @FolioInicial y @FolioFinal, pero legacy mete el
+/// MISMO valor en los dos desde una sola caja de texto
+/// (ConsultarConcentrados.cs:600-610). Aqui se expone un campo por folio y el
+/// repositorio lo duplica: dos campos que siempre valen lo mismo solo invitan a
+/// mandarlos distintos y descubrir que el BETWEEN hace algo que la pantalla no
+/// sabe ensenar.
+///
+/// LA PRECEDENCIA ES DEL PROCEDIMIENTO Y NO SE TOCA: folio de concentrado gana
+/// sobre folio de nota, y el rango de fechas solo entra si no hay ninguno de los
+/// dos (es un IF/ELSE IF/ELSE en el cuerpo del sp). Por eso teclear un folio
+/// ignora las fechas, igual que en Mac31.
+/// </remarks>
+public class ConcentradosConsultaRequest
+{
+    /// 0 = sin filtro.
+    public int IDRepartidor { get; set; }
+
+    /// El folio del CONCENTRADO. 0 = sin filtro, y gana sobre todo lo demas.
+    public int FolioConcentrado { get; set; }
+
+    /// El folio de la NOTA (venta). 0 = sin filtro; solo manda si no hay folio
+    /// de concentrado.
+    public int FolioVenta { get; set; }
+
+    /// El rango de fechas del concentrado. Solo se usa cuando no hay folios.
+    public string? FechaInicial { get; set; }
+    public string? FechaFinal { get; set; }
+}
+
+/// <summary>
 /// La misma pregunta, pero para el Concentrado.
 /// </summary>
 public class ConcentradoFolioRequest
