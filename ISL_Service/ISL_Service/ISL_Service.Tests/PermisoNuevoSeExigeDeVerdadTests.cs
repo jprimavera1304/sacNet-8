@@ -45,12 +45,39 @@ public class PermisoNuevoSeExigeDeVerdadTests
         Assert.False(resultado);
     }
 
+    /// <summary>
+    /// Con el permiso fino Y la entrada al modulo pasa.
+    /// </summary>
+    /// <remarks>
+    /// La entrada se agrego cuando el backend empezo a exigirla de verdad (ver
+    /// <see cref="EntradaAlModuloSeExigeTests"/>). Antes esta prueba pasaba con
+    /// el permiso fino a secas, y eso era justo el agujero: con la clave suelta
+    /// y sin el modulo concedido, el endpoint contestaba 200.
+    /// </remarks>
     [Theory]
     [MemberData(nameof(ClavesNuevas))]
-    public async Task ConElPermisoPasa(string clave)
+    public async Task ConElPermisoYLaEntradaPasa(string clave)
+    {
+        var resultado = await Autorizar(clave, permisosDelUsuario: new[] { clave, EntradaDe(clave) });
+        Assert.True(resultado);
+    }
+
+    /// <summary>
+    /// Y con el permiso fino SOLO, no. Sin entrada no se puede, aunque tenga
+    /// los especificos.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(ClavesNuevas))]
+    public async Task SinLaEntradaNoPasaAunqueTengaElFino(string clave)
     {
         var resultado = await Autorizar(clave, permisosDelUsuario: new[] { clave });
-        Assert.True(resultado);
+        Assert.False(resultado);
+    }
+
+    private static string EntradaDe(string clave)
+    {
+        var entradas = ISL_Service.Application.Security.EntradasDeModulo.Requeridas(clave);
+        return entradas.Count > 0 ? entradas[0] : clave;
     }
 
     /// <summary>

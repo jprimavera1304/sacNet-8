@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using ISL_Service.Application.DTOs.ProveedoresPagos;
 using ISL_Service.Application.DTOs.Persona;
 using ISL_Service.Application.DTOs.Responses;
@@ -44,7 +44,7 @@ public class Ola12IdentidadDelTokenTests
     public async Task IDUsuarioActual_Sale_Del_Token_Aunque_El_Cuerpo_Mande_Otro()
     {
         var servicio = new VentasConsultaEspia();
-        var controller = Consulta(servicio, permisos: new[] { "ventas.consultar" });
+        var controller = Consulta(servicio, permisos: new[] { "ventas.ver_modulo", "ventas.consultar" });
 
         await controller.Remisiones(new VentasConsultaRequest { IDUsuarioActual = IdDeOtro }, default);
 
@@ -58,7 +58,7 @@ public class Ola12IdentidadDelTokenTests
     public async Task IDUsuarioActual_No_Se_Puede_Apagar_Mandando_Cero()
     {
         var servicio = new VentasConsultaEspia();
-        var controller = Consulta(servicio, permisos: new[] { "ventas.consultar" });
+        var controller = Consulta(servicio, permisos: new[] { "ventas.ver_modulo", "ventas.consultar" });
 
         await controller.Pedidos(new VentasConsultaRequest { IDUsuarioActual = 0 }, default);
 
@@ -73,7 +73,7 @@ public class Ola12IdentidadDelTokenTests
     public async Task Con_Permiso_El_Filtro_Por_Usuario_Se_Respeta_Tal_Cual()
     {
         var servicio = new VentasConsultaEspia();
-        var controller = Consulta(servicio, permisos: new[] { "ventas.consultar" });
+        var controller = Consulta(servicio, permisos: new[] { "ventas.ver_modulo", "ventas.consultar" });
 
         var respuesta = await controller.Remisiones(new VentasConsultaRequest { IDUsuario = IdDeOtro }, default);
 
