@@ -45,10 +45,21 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
         // Con cualquiera de los permisos aceptados alcanza (ver PermissionRequirement).
         if (snapshot.PermissionsEnabled)
         {
+            bool Tiene(string clave) =>
+                snapshot.Permissions.Any(p => string.Equals(p, clave, StringComparison.OrdinalIgnoreCase));
+
             foreach (var required in requirement.Permissions)
             {
-                if (snapshot.Permissions.Any(p => string.Equals(p, required, StringComparison.OrdinalIgnoreCase))
-                    || CanUseLegacyVerAsModuleView(snapshot.Permissions, required))
+                var tieneLaClave = Tiene(required) || CanUseLegacyVerAsModuleView(snapshot.Permissions, required);
+
+                // ADEMAS del permiso fino, la ENTRADA al modulo.
+                //
+                // La regla es "entrada al modulo + permiso de la operacion", y
+                // hasta ahora esta mitad solo la aplicaba el front. Se pone
+                // aqui Y en PermisoControllerBase porque la API tiene dos
+                // caminos para decidir lo mismo: si solo se cerrara uno, el
+                // modulo quedaria abierto por el otro y nadie lo notaria.
+                if (tieneLaClave && EntradasDeModulo.PuedeEntrar(required, Tiene))
                 {
                     context.Succeed(requirement);
                     return;

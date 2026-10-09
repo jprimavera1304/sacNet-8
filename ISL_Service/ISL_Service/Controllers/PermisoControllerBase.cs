@@ -59,16 +59,40 @@ public abstract class PermisoControllerBase : ControllerBase
         IReadOnlyCollection<string> Permisos)
     {
         /// <summary>Si tiene ALGUNO de esos permisos.</summary>
+        /// <remarks>
+        /// ADEMAS del permiso fino se exige la ENTRADA al modulo.
+        ///
+        /// La regla es "entrada al modulo + permiso de la operacion": sin la
+        /// entrada no se puede, aunque tenga los especificos. Hasta ahora esa
+        /// mitad vivia SOLO en el front (cada tarjeta del inicio se enciende
+        /// con su ".ver_modulo") y el backend no la miraba, asi que quien
+        /// conociera la URL entraba a un modulo que no tenia concedido.
+        ///
+        /// Se comprueba POR CLAVE y no una sola vez al principio porque un
+        /// endpoint acepta varias claves de modulos distintos (la del web y la
+        /// del movil): cada una trae su propia puerta, y la del movil no tiene.
+        /// Ver <see cref="EntradasDeModulo"/> para que familias se gatean y
+        /// cuales no.
+        /// </remarks>
         public bool Tiene(params string[] permisos)
         {
             if (TodoPermitido) return true;
             if (!TokenValido) return false;
 
-            return Permisos.Any(
-                x => permisos.Any(p =>
-                    string.Equals(x, p, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(SinSeparadores(x), SinSeparadores(p), StringComparison.OrdinalIgnoreCase)));
+            return permisos.Any(p => TieneLaClave(p) && TieneLaEntradaDe(p));
         }
+
+        private bool TieneLaClave(string permiso) =>
+            Permisos.Any(x =>
+                string.Equals(x, permiso, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(SinSeparadores(x), SinSeparadores(permiso), StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>
+        /// Si la puerta del modulo esta abierta para esa clave. Sin puerta
+        /// declarada pasa: lo que no se pudo comprobar no se cierra.
+        /// </summary>
+        private bool TieneLaEntradaDe(string permiso) =>
+            EntradasDeModulo.PuedeEntrar(permiso, TieneLaClave);
     }
 
     /// <summary>
@@ -146,20 +170,16 @@ public abstract class PermisoControllerBase : ControllerBase
     /// </summary>
     protected async Task<bool> TienePermisoAsync(string[] permisos, CancellationToken ct)
     {
-        var userId = CurrentUser.GetUserId(User);
-        if (userId is null) return false;
+        // Pasa por LeerPermisosAsync y por el mismo Tiene que usa
+        // ExigirPermisoAsync. Antes tenia su propia comparacion, y por eso NO
+        // reconocia al SuperAdmin ni normalizaba separadores: el mismo usuario
+        // podia pasar el candado del endpoint y aun asi ver el DTO con los
+        // sueldos borrados. Dos formas de responder la misma pregunta siempre
+        // acaban respondiendo distinto.
+        var puede = await LeerPermisosAsync(ct);
+        if (!puede.TokenValido) return false;
 
-        var empresaId = CurrentUser.GetCompanyId(User) ?? 0;
-        var rol = CurrentUser.GetRole(User);
-        var snapshot = await PermissionService.GetPermissionsAsync(userId.Value, empresaId, rol, ct);
-
-        // Sin modelo de permisos se muestra todo, por la misma razon de arriba:
-        // esas bases funcionan hoy sin este control y apagarles los sueldos
-        // seria romperlas.
-        if (!snapshot.PermissionsEnabled) return true;
-
-        return snapshot.Permissions.Any(
-            x => permisos.Any(p => string.Equals(x, p, StringComparison.OrdinalIgnoreCase)));
+        return puede.Tiene(permisos);
     }
 
     /// <summary>

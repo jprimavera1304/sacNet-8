@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Models;
@@ -16,13 +16,38 @@ using ISL_Service.Application.Security;
 
 namespace ISL_Service.Infrastructure.Security;
 
-public sealed class PermissionService : IPermissionService
+public sealed partial class PermissionService : IPermissionService
 {
     private const string FeatureKey = "autorizacion.capacidades";
     private const string SchemaCacheKey = "permissions:schema:v2";
     private const string OverrideTypeCacheKey = "permissions:override-type:v1";
     private const string UserPermColumnsCacheKey = "permissions:userperm-columns:v1";
     private const string ReportesModuleKey = "reportes";
+
+    /*
+      HAY DOS FORMAS LLAMADAS "REPORTES" EN n_Formas, Y FILTRAR POR EL NOMBRE
+      VISIBLE EMPATABA CON LAS DOS.
+
+      Medido el 2026-10-09 en las dos empresas, identico en MacZ y en
+      Produccion_svr:
+
+        IDForma 4030  Forma "ReportesMenu"      Descripcion "REPORTES"  -> 51 / 50 procesos
+        IDForma 4081  Forma "ReportesAviacion"  Descripcion "REPORTES"  ->  0 procesos
+
+      El catalogo de reportes se buscaba por `f.Descripcion = 'REPORTES'`, asi
+      que leia las DOS. Hoy no se nota porque la de aviacion esta vacia, y por
+      eso llevaba tiempo ahi sin molestar. Pero el dia que alguien de alta un
+      proceso en ReportesAviacion, ese boton se colaria en el modulo
+      "reportes" del web sin que nadie lo hubiera decidido —y, ahora que
+      reportes tambien se ESCRIBE hacia Mac31, se volveria escribible desde la
+      pantalla de permisos del web.
+
+      Se filtra por `Forma` y no por `IDForma` a secas para no clavar un numero
+      en el codigo: el nombre interno de la forma es el mismo en las dos
+      empresas, los IDProceso NO (ver PermissionService.FamiliasLegacy.cs), y
+      quien resuelve es siempre la conexion de la empresa en curso.
+    */
+    private const string ReportesLegacyForm = "ReportesMenu";
     private const string ReportesViewPermission = "reportes.ver_modulo";
 
     /*
@@ -1375,6 +1400,8 @@ public sealed class PermissionService : IPermissionService
         var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
         var prestamosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
         await EnsureCentrosPermissionsSyncedAsync(conn, empresaId, ct);
+        var catalogosDeFamilias = await EnsureFamiliasLegacySyncedAsync(conn, empresaId, ct);
+        var familiasCatalog = JuntarCatalogosDeFamilias(catalogosDeFamilias);
 
         var response = new PermisosWebBootstrapResponse { PermissionsEnabled = true };
         var activeModules = await GetActiveModulesAsync(conn, empresaId, ct);
@@ -1409,7 +1436,7 @@ ORDER BY Clave;", conn))
             {
                 var code = reader.GetString(reader.GetOrdinal("Clave"));
                 if (!IsPermissionInActiveModule(code, activeModules)) continue;
-                response.Permissions.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog, ventasCatalog, empleadosCatalog, prestamosCatalog));
+                response.Permissions.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog, ventasCatalog, empleadosCatalog, prestamosCatalog, familiasCatalog));
             }
         }
 
@@ -1512,7 +1539,18 @@ WHERE up.EmpresaId = @EmpresaId;";
             var legacyVentas = await LoadVentasPermissionsForUserAsync(conn, empresaId, user.UserId, ventasCatalog, ct);
             var legacyEmpleados = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, user.UserId, EmpleadosBinding, empleadosCatalog, ct);
             var legacyPrestamos = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, user.UserId, PrestamosBinding, prestamosCatalog, ct);
-            if (legacyReports.Allow.Count == 0 && legacyReports.Deny.Count == 0
+            // Las familias nuevas se leen ANTES de decidir si el usuario se
+            // salta: alguien que en Mac31 solo tenga Compras no dice nada en
+            // las cuatro viejas, y con la condicion de abajo intacta su fila
+            // nunca se habria tocado — el puente existiria y no se veria.
+            var hayDeFamilias = false;
+            foreach (var catalogo in catalogosDeFamilias.Values)
+            {
+                if (catalogo.Count > 0) { hayDeFamilias = true; break; }
+            }
+
+            if (!hayDeFamilias
+                && legacyReports.Allow.Count == 0 && legacyReports.Deny.Count == 0
                 && legacyVentas.Allow.Count == 0 && legacyVentas.Deny.Count == 0
                 && legacyEmpleados.Allow.Count == 0 && legacyEmpleados.Deny.Count == 0
                 && legacyPrestamos.Allow.Count == 0 && legacyPrestamos.Deny.Count == 0)
@@ -1540,6 +1578,7 @@ WHERE up.EmpresaId = @EmpresaId;";
             row.Deny.RemoveAll(x => x.StartsWith($"{PrestamosModuleKey}.", StringComparison.OrdinalIgnoreCase) && !PrestamosWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
             row.Allow.AddRange(legacyPrestamos.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
             row.Deny.AddRange(legacyPrestamos.Deny.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+            await AplicarFamiliasLegacyEnOverridesAsync(conn, empresaId, user.UserId, row, catalogosDeFamilias, ct);
         }
 
         response.UserOverrides = overrides.Values.OrderBy(x => x.UserId).ToList();
@@ -1559,6 +1598,7 @@ WHERE up.EmpresaId = @EmpresaId;";
         var ventasCatalog = await EnsureVentasPermissionsSyncedAsync(conn, empresaId, ct);
         var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
         var prestamosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
+        var familiasCatalog = JuntarCatalogosDeFamilias(await EnsureFamiliasLegacySyncedAsync(conn, empresaId, ct));
         var response = new PermisosWebRolesBootstrapResponse { PermissionsEnabled = true };
         var activeModules = await GetActiveModulesAsync(conn, empresaId, ct);
 
@@ -1592,7 +1632,7 @@ ORDER BY Clave;", conn))
             {
                 var code = reader.GetString(reader.GetOrdinal("Clave"));
                 if (!IsPermissionInActiveModule(code, activeModules)) continue;
-                response.Permissions.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog, ventasCatalog, empleadosCatalog, prestamosCatalog));
+                response.Permissions.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog, ventasCatalog, empleadosCatalog, prestamosCatalog, familiasCatalog));
             }
         }
 
@@ -1641,6 +1681,7 @@ ORDER BY r.Codigo, p.Clave;";
         var ventasCatalog = await EnsureVentasPermissionsSyncedAsync(conn, empresaId, ct);
         var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
         var prestamosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
+        var familiasCatalog = JuntarCatalogosDeFamilias(await EnsureFamiliasLegacySyncedAsync(conn, empresaId, ct));
         var response = new List<PermisosWebPermissionItem>();
         await using var permsCmd = new SqlCommand(@"
 SELECT Clave, Nombre
@@ -1652,7 +1693,7 @@ ORDER BY Clave;", conn);
         while (await reader.ReadAsync(ct))
         {
             var code = reader.GetString(reader.GetOrdinal("Clave"));
-            response.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog, ventasCatalog, empleadosCatalog, prestamosCatalog));
+            response.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog, ventasCatalog, empleadosCatalog, prestamosCatalog, familiasCatalog));
         }
 
         return response;
@@ -2228,6 +2269,13 @@ WHERE t.name = 'WUsuarioPermiso';";
         await EnsureVentasPermissionsSyncedAsync(conn, empresaId, ct);
         await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
         await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
+
+        // Las familias nuevas tambien se siembran en el arranque. Si no, sus
+        // claves solo aparecerian en WPermiso la primera vez que alguien
+        // abriera la pantalla de permisos, y hasta entonces el modulo
+        // contestaria 403 a todos menos al SuperAdmin — exactamente el agujero
+        // invisible que describe ClavesDePermisoSembradasTests.
+        await EnsureFamiliasLegacySyncedAsync(conn, empresaId, ct);
     }
 
     public async Task<PermisosWebSyncCatalogResponse> SyncPermissionCatalogAsync(int empresaId, IReadOnlyCollection<string>? modules, CancellationToken ct)
@@ -2418,6 +2466,15 @@ WHERE t.name = 'WUsuarioPermiso';";
                 permissions.Add(PrestamosViewPermission);
             }
         }
+
+        // Las familias que se agregaron despues (compras, garantias, cortes,
+        // cambios de vigencia, inventario, constantes y asistencias). Van al
+        // FINAL a proposito: si alguna llegara a compartir prefijo con las
+        // cuatro de arriba, lo de Mac31 de esta vuelta tiene que ser lo
+        // ultimo que se escriba, no lo primero que otro bloque borre.
+        var catalogosDeFamilias = await EnsureFamiliasLegacySyncedAsync(conn, empresaId, ct);
+        await AplicarFamiliasLegacyAsync(conn, empresaId, userId, permissions, catalogosDeFamilias, ct);
+
         return new PermissionSnapshot
         {
             UserId = userId,
@@ -3141,9 +3198,10 @@ SELECT
 FROM dbo.n_Formas f
 INNER JOIN dbo.n_Procesos p
     ON p.IDForma = f.IDForma
-WHERE f.Descripcion = 'REPORTES'
+WHERE LTRIM(RTRIM(f.Forma)) = @FormaReportes
   AND ISNULL(p.IDStatus, 1) = 1
 ORDER BY COALESCE(f.Orden, 0), COALESCE(p.Orden, 0), p.IDProceso;", conn);
+        cmd.Parameters.Add(new SqlParameter("@FormaReportes", SqlDbType.NVarChar, 200) { Value = ReportesLegacyForm });
 
         var list = new List<ReportPermissionInfo>();
         await using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -3201,9 +3259,10 @@ INNER JOIN dbo.n_Procesos p
 LEFT JOIN dbo.[Usuario Forma Procesos] ufp
     ON ufp.IDProceso = p.IDProceso
    AND ufp.IDUsuario = @IDUsuario
-WHERE f.Descripcion = 'REPORTES'
+WHERE LTRIM(RTRIM(f.Forma)) = @FormaReportes
   AND ISNULL(p.IDStatus, 1) = 1;", conn);
         cmd.Parameters.Add(new SqlParameter("@IDUsuario", SqlDbType.Int) { Value = legacyUserId.Value });
+        cmd.Parameters.Add(new SqlParameter("@FormaReportes", SqlDbType.NVarChar, 200) { Value = ReportesLegacyForm });
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct))
         {
@@ -3675,7 +3734,8 @@ WHERE t.name = @TableName
         IReadOnlyDictionary<string, ReportPermissionInfo> reportCatalog,
         IReadOnlyDictionary<string, VentasPermissionInfo> ventasCatalog,
         IReadOnlyDictionary<string, VentasPermissionInfo> empleadosCatalog,
-        IReadOnlyDictionary<string, VentasPermissionInfo> prestamosCatalog)
+        IReadOnlyDictionary<string, VentasPermissionInfo> prestamosCatalog,
+        IReadOnlyDictionary<string, VentasPermissionInfo> familiasCatalog)
     {
         if (reportCatalog.TryGetValue(code, out var report))
         {
@@ -3740,6 +3800,27 @@ WHERE t.name = @TableName
                 CategoryName = prestamo.CategoryName,
                 LegacyFormId = prestamo.LegacyFormId,
                 LegacyProcessId = prestamo.LegacyProcessId
+            };
+        }
+
+        // Las familias que se agregaron despues. Se marcan con su
+        // IDForma/IDProceso de Mac31 igual que empleados y prestamos, para que
+        // la pantalla de permisos ensene de donde sale el permiso y no parezca
+        // que se puede dar desde el web: darlo aqui no sirve de nada, se borra
+        // en la siguiente lectura.
+        if (familiasCatalog.TryGetValue(code, out var deFamilia))
+        {
+            var (moduleKey, moduleName) = ModuloDeFamilia(code);
+            return new PermisosWebPermissionItem
+            {
+                Code = deFamilia.Key,
+                Name = deFamilia.Name,
+                ModuleKey = string.IsNullOrEmpty(moduleKey) ? ExtractModuleFromPermissionKey(code) : moduleKey,
+                ModuleName = moduleName,
+                CategoryKey = deFamilia.CategoryKey,
+                CategoryName = deFamilia.CategoryName,
+                LegacyFormId = deFamilia.LegacyFormId,
+                LegacyProcessId = deFamilia.LegacyProcessId
             };
         }
 
