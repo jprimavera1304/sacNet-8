@@ -1771,19 +1771,6 @@ public partial class ReportesVentasRepository
         return (request.TipoReporte ?? "").Trim().Equals("agente", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string? ResolveAgentGroupColumn(DataTable table, ReportesVentasAcumuladoresProductosRequest request)
-    {
-        if (!IsAgentReport(request))
-            return null;
-
-        if (table.Columns.Contains("IDAgente"))
-            return "IDAgente";
-        if (table.Columns.Contains("Agente"))
-            return "Agente";
-
-        return null;
-    }
-
     private static string ReplaceAgentHeader(string html, DataTable? table, DataRow? row, ReportesVentasAcumuladoresProductosRequest request)
     {
         if (!IsAgentReport(request) || table is null || row is null)

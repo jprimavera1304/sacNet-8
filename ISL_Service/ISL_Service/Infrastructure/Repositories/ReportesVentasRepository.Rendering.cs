@@ -1,5 +1,4 @@
 ﻿using System.Data;
-using System.Globalization;
 using System.Text.RegularExpressions;
 using ISL_Service.Application.DTOs.Reportes;
 using ISL_Service.Application.Interfaces;
@@ -159,6 +158,71 @@ public partial class ReportesVentasRepository
         };
     }
 
+    /*
+      EN CUANTOS JUEGOS DE PAGINAS SE PARTE EL REPORTE, COMO LO PARTE MAC31.
+
+      Legacy no pregunta si el reporte "es por agente": RepFormatoNormalService y
+      RepFormatoColumnas3Service agrupan SIEMPRE por la columna `Agente`
+      (RepFormatoNormalService.cs:47, RepFormatoColumnas3Service.cs:58) y sacan un
+      juego de paginas COMPLETO por cada valor distinto, con su propia numeracion
+      de pagina y sus propios totales. Aqui se agrupaba solo cuando el front
+      mandaba tipoReporte = "agente", y ademas por `IDAgente` si esa columna
+      existia, que es OTRA columna: dos maneras de partir el papel distintas de
+      la de Mac31.
+
+      Medido en MacZ con marzo de 2026: los 17 procedimientos de ventas y
+      cobranza que se generaron devuelven `Agente` = '0' en todas las filas
+      cuando no se filtra por agente, asi que hoy sale UN solo juego y el papel
+      no cambia. Lo que cambia es el dia que el SP devuelva varios agentes:
+      entonces se parte como Mac31 y no como una regla nuestra.
+
+      EL ORDEN DENTRO DEL GRUPO ES EL DEL PROCEDIMIENTO, y eso tambien es lo que
+      hace legacy aunque use `DataTable.Select`. Ese Select NO conserva el orden
+      de la tabla -construye un indice por la columna del filtro-, pero aqui el
+      filtro es una IGUALDAD sobre `Agente`: todas las claves del resultado son
+      iguales y el desempate de ADO.NET es la posicion original del renglon, o
+      sea el orden del SP. Donde eso NO vale es en un filtro que casa valores
+      DISTINTOS -el `NOT LIKE` sobre `FolioVentaFtm` de la hoja de cobro 1006, que
+      por eso sale alfabetico-, y en este motor no hay ninguno. Comprobado
+      renglon por renglon contra el `sp_n_` pelado en 7 reportes (1172, 21, 71,
+      1360, 1465, 24 y 1185).
+
+      El orden de los GRUPOS es el de primera aparicion, como el GroupBy de LINQ
+      que usa legacy.
+    */
+    private static IEnumerable<DataRow[]> AgruparComoLegacy(DataTable table)
+    {
+        if (!table.Columns.Contains("Agente"))
+        {
+            /* Sin columna `Agente` legacy reventaria -`r["Agente"]` lanza y su
+               catch devuelve el mensaje de la excepcion en vez del reporte-. No
+               se porta el crash: se saca un solo juego de paginas, que es el
+               papel que legacy habria sacado con la columna presente y un valor
+               unico. Comprobado en MacZ: los 17 procedimientos de ventas y
+               cobranza que se probaron SI la devuelven. */
+            yield return table.AsEnumerable().ToArray();
+            yield break;
+        }
+
+        var grupos = new List<string>();
+        var porGrupo = new Dictionary<string, List<DataRow>>(StringComparer.Ordinal);
+
+        foreach (var row in table.AsEnumerable())
+        {
+            var clave = FormatoFechaLegacy.Celda(row["Agente"]);
+            if (!porGrupo.TryGetValue(clave, out var lista))
+            {
+                lista = new List<DataRow>();
+                porGrupo.Add(clave, lista);
+                grupos.Add(clave);
+            }
+            lista.Add(row);
+        }
+
+        foreach (var clave in grupos)
+            yield return porGrupo[clave].ToArray();
+    }
+
     private static string GenerateFormatoNormalHtml(
         string logo,
         string logoWatermark,
@@ -177,23 +241,8 @@ public partial class ReportesVentasRepository
         var totalesTemplate = ReadTemplateHtml(templates, "totales");
         var htmlFinal = "";
 
-        var groupColumn = ResolveAgentGroupColumn(table, request);
-        var groups = groupColumn is null
-            ? new[] { "" }
-            : table.AsEnumerable()
-                .Select(row => Convert.ToString(row[groupColumn]) ?? "")
-                .Distinct()
-                .ToArray();
-
-        foreach (var group in groups)
+        foreach (var rows in AgruparComoLegacy(table))
         {
-            var rows = groupColumn is null
-                ? table.AsEnumerable().ToArray()
-                : table.AsEnumerable()
-                    .Where(row => string.Equals(Convert.ToString(row[groupColumn]) ?? "", group, StringComparison.Ordinal))
-                    .ToArray();
-            if (rows.Length == 0) continue;
-
             var totalPaginas = rows.Length / template.MaxLineas;
             if (rows.Length % template.MaxLineas != 0) totalPaginas++;
 
@@ -284,23 +333,8 @@ public partial class ReportesVentasRepository
         var totalesTemplate = ReadTemplateHtml(templates, "totales");
         var htmlFinal = "";
 
-        var groupColumn = ResolveAgentGroupColumn(table, request);
-        var groups = groupColumn is null
-            ? new[] { "" }
-            : table.AsEnumerable()
-                .Select(row => Convert.ToString(row[groupColumn]) ?? "")
-                .Distinct()
-                .ToArray();
-
-        foreach (var group in groups)
+        foreach (var rows in AgruparComoLegacy(table))
         {
-            var rows = groupColumn is null
-                ? table.AsEnumerable().ToArray()
-                : table.AsEnumerable()
-                    .Where(row => string.Equals(Convert.ToString(row[groupColumn]) ?? "", group, StringComparison.Ordinal))
-                    .ToArray();
-            if (rows.Length == 0) continue;
-
             var totalPaginas = rows.Length / template.MaxLineas;
             if (rows.Length % template.MaxLineas != 0) totalPaginas++;
 
@@ -459,8 +493,9 @@ public partial class ReportesVentasRepository
             html = html.Replace("#agente#", "");
             html = html.Replace("#Cliente#", "");
             html = html.Replace("#cliente#", "");
-            html = html.Replace("#fechaInicial#", request.FechaInicial.ToString("dd/MM/yyyy"));
-            html = html.Replace("#fechaFinal#", request.FechaFinal.ToString("dd/MM/yyyy"));
+            /* "----", como legacy: ver la nota de BuildEmptyHeader. */
+            html = html.Replace("#fechaInicial#", "----");
+            html = html.Replace("#fechaFinal#", "----");
             html = html.Replace("#ParametrosTexto#", "");
             html = html.Replace("#fechaImpresion#", DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"));
             return html;
@@ -520,10 +555,22 @@ public partial class ReportesVentasRepository
         html = html.Replace("#Totales#", "");
         html = html.Replace("#FormatoTexto#", "");
         html = html.Replace("#ParametrosTexto#", "");
-        html = html.Replace("#fechaInicial#", request.FechaInicial.ToString("dd/MM/yyyy"));
-        html = html.Replace("#fechaFinal#", request.FechaFinal.ToString("dd/MM/yyyy"));
-        html = html.Replace("#FechaInicial#", request.FechaInicial.ToString("dd/MM/yyyy"));
-        html = html.Replace("#FechaFinal#", request.FechaFinal.ToString("dd/MM/yyyy"));
+        /*
+          EN EL PAPEL VACIO LAS FECHAS NO SE ESCRIBEN, Y ES A PROPOSITO.
+
+          El encabezado sin datos de legacy (RepFormatoNormalService.cs:160-175)
+          reemplaza a mano siete tags y manda TODO lo demas al barrido que los
+          convierte en "----"; las lineas que pondrian las fechas estan ahi
+          COMENTADAS. O sea que el "no se encontro informacion" de Mac31 dice
+          "DEL: ---- AL ----" aunque el usuario si haya pedido un rango. Lo
+          mismo en el de 3 columnas, que ahi si las pone a rayas de forma
+          explicita (RepFormatoColumnas3Service.cs:170-171).
+
+          Aqui se escribian las fechas pedidas. Se lee mejor, pero es un papel
+          distinto del de Mac31 y lo que se pidio es que salga igual. Si algun
+          dia se decide mejorarlo, se mejora en los dos sitios: estas cuatro
+          lineas y las dos de BuildColumnas3Header.
+        */
         html = html.Replace("#fechaImpresion#", DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"));
         return html;
     }
@@ -732,34 +779,37 @@ public partial class ReportesVentasRepository
         return html.Replace("@@@@", "#ccc");
     }
 
+    /*
+      EL FORMATO DE LOS NUMEROS ES EL DE LEGACY, Y VIVE EN UN SOLO SITIO.
+
+      `RemisionFormatoLegacy.FormateaNumero` ya es la copia literal de
+      `Funciones.FormateaNumero` (Utils/Funciones.cs:231-276) y es la que imprime
+      la remision. Esta era una SEGUNDA copia, y le quedaba una diferencia que
+      cambia el papel: formateaba los `Double` -lo que ADO.NET hace de un `float`
+      de SQL- como "###,##0.00". Legacy compara el NOMBRE del tipo y solo conoce
+      "Int32", "Single" y "Decimal"; un "Double" cae en su `else` y sale TAL
+      CUAL, sin separador de miles ni dos decimales. Donde Mac31 escribe
+      "1234.5" aqui salia "1,234.50".
+
+      Se delega para que no vuelva a haber dos verdades que se arreglan por
+      separado. El try/catch es lo unico que se añade: legacy usa `int.Parse` y
+      `decimal.Parse`, que LANZAN, y un listado de miles de renglones no puede
+      convertirse en un 500 por una celda rara; con el valor crudo sale lo mismo
+      que el `else` de legacy.
+    */
     private static string FormatLegacyNumber(Type dataType, string value, bool esTotales)
     {
-        if (dataType == typeof(int) && value == "") return "0";
-        if (dataType == typeof(decimal) && value == "") return "0.00";
-        if (value == "-99999") return "0";
-        if (value == "-99999.00") return "0.00";
-        if (value == "0") return esTotales ? value : "";
-        if (value is "0.00" or "0.0000") return esTotales ? value : "";
-
-        var cultura = FormatoFechaLegacy.Cultura;
-
-        if (dataType == typeof(int) && int.TryParse(value, NumberStyles.Any, cultura, out var intValue))
-            return intValue.ToString("###,##0", cultura);
-        if ((dataType == typeof(float) || dataType == typeof(double))
-            && double.TryParse(value, NumberStyles.Any, cultura, out var doubleValue))
-            return doubleValue.ToString("###,##0.00", cultura);
-        /*
-          EL DECIMAL SE TRUNCA A DOS, NO SE REDONDEA.
-
-          Legacy hace `TruncateDecimal(valor, 2)` y luego lo formatea
-          (Funciones.cs). Aqui habia un caso aparte para cuando el truncado daba
-          cero, y en ese caso formateaba el valor ORIGINAL, que redondea: 0.009
-          salia "0.01" donde el papel de Mac31 dice "0.00". Se deja el truncado
-          a secas, que es lo que hace legacy para todos los valores.
-        */
-        if (dataType == typeof(decimal) && decimal.TryParse(value, NumberStyles.Any, cultura, out var decimalValue))
-            return (Math.Truncate(decimalValue * 100m) / 100m).ToString("###,##0.00", cultura);
-
-        return value;
+        try
+        {
+            return RemisionFormatoLegacy.FormateaNumero(dataType.Name, value, esTotales);
+        }
+        catch (FormatException)
+        {
+            return value;
+        }
+        catch (OverflowException)
+        {
+            return value;
+        }
     }
 }
