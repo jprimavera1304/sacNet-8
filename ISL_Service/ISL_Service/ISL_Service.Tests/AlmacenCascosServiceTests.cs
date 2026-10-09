@@ -115,6 +115,13 @@ public class AlmacenCascosServiceTests
         public Task<List<MovimientoCascoDetalleDto>> GetDetalleMovimientoAsync(int idMovimiento, CancellationToken ct = default)
             => throw new NotImplementedException();
 
+        /* Estos casos no consultan existencias; se declara para cumplir el
+           contrato, igual que el resto de lo que aqui no se ejercita. Sin esto
+           el PROYECTO DE PRUEBAS ENTERO no compila (CS0535) y no se puede
+           correr ninguna prueba, ni las que no tienen que ver con cascos. */
+        public Task<List<ExistenciaDeCascoDto>> ConsultarExistenciasAsync(CancellationToken ct = default)
+            => throw new NotImplementedException();
+
         public Task<MovimientoCascoDto?> GetMovimientoAsync(int idMovimiento, CancellationToken ct = default)
             => Task.FromResult(Movimiento);
 
