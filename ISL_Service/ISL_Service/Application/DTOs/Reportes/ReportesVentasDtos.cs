@@ -151,6 +151,35 @@ public class ReportesVentasLegacyRequest : ReportesVentasAcumuladoresProductosRe
     /// <summary>Clientes Acum Moto Lub: el acumulado mensual (118 / 119).</summary>
     public bool VentasMensual { get; set; }
 
+    /// <summary>
+    /// LA CATEGORIA CORTA DE LOS REPORTES 118 / 119 / 121, Y SU PROPIO CAMPO.
+    ///
+    /// Valores: "" (mira IDGrupoCategoria, como antes), "todas", "acumuladores",
+    /// "motobaterias", "lubricantes".
+    ///
+    /// Esto NO es la lista de grupos de categoria del resto del modulo. Es el
+    /// combo `cboCategoriasCorto` de Mac31, que tiene CUATRO renglones fijos
+    /// -TODOS (SOLO EXCEL) / ACUMULADORES / MOTOBATERIAS / LUBRICANTES- y viaja
+    /// al SP como su INDICE (0..3), no como un IDGrupoCategoria.
+    ///
+    /// Se lee asi dentro de `sp_n_rptClienteCompraAcumMotoLubMensual`, que es
+    /// quien decide:
+    ///
+    ///     1 -> GC.IDGrupoCategoria = 1 AND Cat.IDCategoria = 1     (ACUMULADOR)
+    ///     2 -> GC.IDGrupoCategoria = 1 AND Cat.IDCategoria = 105   (MOTO-BATERIA)
+    ///     3 -> GC.IDGrupoCategoria = 4                             (LUBRICANTES)
+    ///     0 -> los tres a la vez
+    ///
+    /// Por eso mandar el IDGrupoCategoria crudo estaba MAL, y callado: en MacZ
+    /// FILTROS es el grupo 2, asi que pedir filtros salia como MOTOBATERIAS; y
+    /// LUBRICANTES es el grupo 4, que no cae en ninguna rama -el SP se queda sin
+    /// filtro de categoria y el papel trae todo-. Medido leyendo el SP en MacZ.
+    ///
+    /// Vacio sigue mirando IDGrupoCategoria con la traduccion correcta, para no
+    /// romper al web ni al movil que ya mandan ese campo.
+    /// </summary>
+    public string CategoriaCorta { get; set; } = "";
+
     /// <summary>Control Acumulado de Estimaciones (1250): la estimacion a imprimir.</summary>
     public int IDContratoEstimacion { get; set; }
 

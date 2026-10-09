@@ -9,7 +9,16 @@ public static class LegacyPlainXlsxReportRenderer
 {
     public const string ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-    private static readonly CultureInfo EsMx = CultureInfo.GetCultureInfo("es-MX");
+    /*
+      LA CULTURA DE LOS REPORTES, LA COMPARTIDA.
+
+      Antes era `CultureInfo.GetCultureInfo("es-MX")` a secas. Para los numeros
+      y para `dd/MM/yyyy` da exactamente lo mismo, pero el es-MX de .NET 8
+      (ICU/CLDR) tiene la hora de VEINTICUATRO horas y el de legacy (.NET
+      Framework/NLS) la tiene de doce. Usando la cultura compartida no hay dos
+      verdades sobre la hora dentro del mismo papel. Ver FormatoFechaLegacy.
+    */
+    private static readonly CultureInfo EsMx = FormatoFechaLegacy.Cultura;
     private static readonly XLColor BrandBlue = XLColor.FromHtml("#08158A");
     private static readonly XLColor HeaderBlue = XLColor.FromHtml("#101C9A");
     private static readonly XLColor SoftBlue = XLColor.FromHtml("#EAF1FF");
@@ -206,8 +215,29 @@ public static class LegacyPlainXlsxReportRenderer
                 if (value == DBNull.Value)
                     continue;
 
-                worksheet.Cell(rowIndex + headerRow + 1, columnIndex + 1).Value =
-                    XLCellValue.FromObject(value, CultureInfo.InvariantCulture);
+                /*
+                  UNA FECHA SE ESCRIBE COMO LA ESCRIBE MAC31, NO COMO LA PINTE EXCEL.
+
+                  Legacy no manda un DateTime a la hoja: manda el TEXTO
+                  (`Convert.ToString(row[col])`, MacReportes/Utils/OfficeOpenXML.cs),
+                  y en su servidor ese texto es `02/09/2026 05:21:53 p. m.`
+                  -es-MX de .NET Framework, doce horas-.
+
+                  Nosotros metiamos el DateTime como celda de fecha de verdad, asi
+                  que lo que se leia dependia del formato que Excel le pusiera y de
+                  la configuracion regional de quien abriera el fichero: en la misma
+                  columna, una maquina mostraba `02/09/2026 17:21` y otra
+                  `9/2/2026 5:21 PM`. El reporte de Clientes Facturas RFC y el de
+                  Ajustes al Inventario traen columnas datetime en crudo, asi que se
+                  veia de verdad.
+
+                  Con el texto formateado aqui, el xlsx dice lo mismo que el de
+                  Mac31 en cualquier equipo. Los numeros siguen entrando como
+                  numeros: sumar en la hoja tiene que seguir funcionando.
+                */
+                worksheet.Cell(rowIndex + headerRow + 1, columnIndex + 1).Value = value is DateTime
+                    ? FormatoFechaLegacy.Celda(value)
+                    : XLCellValue.FromObject(value, CultureInfo.InvariantCulture);
             }
         }
 

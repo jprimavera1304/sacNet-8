@@ -336,9 +336,53 @@ public partial class ReportesVentasRepository
         if (!request.VentasMensual)
             return ReporteClientesAcumMotoLub;
 
-        return request.IDGrupoCategoria > 0
-            ? ReporteClientesAcumMotoLubMensualCategoria
-            : ReporteClientesAcumMotoLubMensual;
+        /* Igual que Mac31: el indice 0 ("TODOS (SOLO EXCEL)") es el 118 y
+           cualquier otro es el 119. Ver ReportesMenu.cs, el case
+           ClientesAcumMotoLub. */
+        return ResolveCategoriaCortaLegacy(request) == 0
+            ? ReporteClientesAcumMotoLubMensual
+            : ReporteClientesAcumMotoLubMensualCategoria;
+    }
+
+    /// <summary>
+    /// EL INDICE DEL COMBO CORTO DE CATEGORIAS (0..3) QUE ESPERAN EL 118, EL 119
+    /// Y EL 121.
+    ///
+    /// 0 = todas, 1 = acumuladores, 2 = motobaterias, 3 = lubricantes. No es un
+    /// IDGrupoCategoria: el porque, y el trozo del SP que lo demuestra, estan en
+    /// <see cref="ReportesVentasLegacyRequest.CategoriaCorta"/>.
+    ///
+    /// Cuando `categoriaCorta` viene vacio se PASA `IDGrupoCategoria` TAL CUAL,
+    /// que es lo que hacia este codigo desde el principio y lo que los dos
+    /// clientes ya esperan: comprobado leyendolos. Para el 121, el web manda
+    /// `OPTIONS.categoriasCortoClarios = [1 ACUMULADORES, 2 MOTOBATERIAS,
+    /// 3 LUBRICANTES]` dentro de `idGrupoCategoria`
+    /// (reportes-generation.js, buildLegacyVentasRequest) y el movil hace lo
+    /// mismo (constructor_peticion.dart). O sea que ese numero YA es el indice
+    /// del combo, no un id de grupo, y traducirlo lo estropearia.
+    ///
+    /// LA TRAMPA QUE SE QUEDA APUNTADA. Si algun dia un cliente manda aqui un
+    /// IDGrupoCategoria de verdad -de la lista general de grupos, donde en MacZ
+    /// FILTROS es el 2 y LUBRICANTES el 4- el reporte saldria mal y callado:
+    /// el 2 se leeria como MOTOBATERIAS y el 4 no cae en NINGUNA rama del SP, o
+    /// sea que el papel saldria sin filtro de categoria. Para eso esta
+    /// `categoriaCorta`: pidiendolo por nombre no hay forma de equivocarse.
+    /// </summary>
+    private static int ResolveCategoriaCortaLegacy(ReportesVentasLegacyRequest request)
+    {
+        var elegida = (request.CategoriaCorta ?? "").Trim().ToLowerInvariant();
+        if (elegida.Length > 0)
+        {
+            return elegida switch
+            {
+                "acumuladores" => 1,
+                "motobaterias" or "moto" => 2,
+                "lubricantes" => 3,
+                _ => 0
+            };
+        }
+
+        return request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria : 0;
     }
 
     /// <summary>La misma eleccion que el endpoint propio de folios.</summary>
@@ -1044,9 +1088,19 @@ public partial class ReportesVentasRepository
                 legacy.Param5 = idsAgente;
                 legacy.Param6 = idCliente.ToString();
                 legacy.Param7 = presentacion;
+                /*
+                  LA CATEGORIA DE ESTOS TRES ES UN INDICE DE COMBO (0..3), NO UN
+                  IDGrupoCategoria: lo decide el propio SP, que solo tiene ramas
+                  para 0, 1, 2 y 3. Ver ResolveCategoriaCortaLegacy, que es
+                  quien lo resuelve y donde esta apuntada la trampa.
+                */
                 if (idReporte == ReporteClientesAcumMotoLubClarios)
                 {
-                    legacy.Param8 = request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria.ToString() : "1";
+                    /* El 121 no tiene renglon "todas": su combo arranca en
+                       ACUMULADORES y Mac31 manda SelectedIndex + 1, o sea 1..3.
+                       Por eso el 0 se trata como 1 y no se deja pasar. */
+                    var cortaClarios = ResolveCategoriaCortaLegacy(request);
+                    legacy.Param8 = (cortaClarios == 0 ? 1 : cortaClarios).ToString(CultureInfo.InvariantCulture);
                     legacy.Param9 = "2025";
                 }
                 // El mensual pide la categoria en Param8: 0 = todas (reporte 118),
@@ -1054,7 +1108,7 @@ public partial class ReportesVentasRepository
                 if (idReporte == ReporteClientesAcumMotoLubMensual)
                     legacy.Param8 = "0";
                 if (idReporte == ReporteClientesAcumMotoLubMensualCategoria)
-                    legacy.Param8 = (request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria : GrupoCategoriaAcumuladores).ToString();
+                    legacy.Param8 = ResolveCategoriaCortaLegacy(request).ToString(CultureInfo.InvariantCulture);
                 break;
 
             case ReporteClientesGlobal:
@@ -2457,6 +2511,28 @@ public partial class ReportesVentasRepository
                 or ReporteListasPreciosTauroCroGonXtLthClAmFpDy or ReporteListasPreciosTauroFpAmLth => "Param6",
             ReporteClientesGlobal => "Param5",
             ReporteClientesDescuentos or ReporteClientesDescuentosSin => "Param7",
+            /*
+              1300 (Autos): LA PRESENTACION ES Param2, Y SIN ESTA LINEA EL EXCEL
+              NO EXISTIA.
+
+              Autos es el reporte mas corto del catalogo: su unico parametro
+              ademas del equipo es la presentacion, asi que va en Param2
+              -lo arma asi Mac31 (ConsultarAutos.cs, Imprimir): "Param 2 =
+              Presentacion"- y asi lo guarda BuildLegacyVentasParamsAsync.
+
+              Al faltar aqui caia en el `_ => "Param7"`, que en este reporte
+              viene vacio, o sea "pantalla". Consecuencia medida: pedir el
+              reporte con salida = excel devolvia un PDF. No fallaba ni avisaba
+              -ReportesV3W intenta primero el Excel, ve "pantalla", y se cae al
+              PDF por la rama de respaldo-, asi que el fichero llegaba con
+              nombre .xlsx y un PDF dentro.
+
+              En Mac31 ese boton SI funciona: ConsultarAutos tiene btnExcel con
+              cuerpo (llama Imprimir(enumPresentacion.Excel)), y
+              sp_w_rptAutos con Presentacion = 3 devuelve la tabla plana de 12
+              columnas. Comprobado en MacZ.
+            */
+            ReporteAutos => "Param2",
             _ => "Param7"
         };
 
