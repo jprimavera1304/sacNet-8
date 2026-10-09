@@ -2302,11 +2302,45 @@ public partial class ReportesVentasRepository
             CobranzaStatus = ResolveCobranzaStatusKey(ReadString(row, "Param6")),
             FechaInicial = ReadLegacyDate(row, "Param8"),
             FechaFinal = ReadLegacyDate(row, "Param9"),
-            Salida = ResolveSalida(ReadString(row, "Param10")),
+            Salida = ResolveCobranzaSalida(ReadInt(row, "IDReporte"), row),
             IDEmpresas = SplitLegacyIds(ReadString(row, "Param2")),
             IDAgentes = SplitLegacyIds(ReadString(row, "Param4")),
             IDClientes = SplitLegacyIds(ReadString(row, "Param11"))
         };
+    }
+
+    /*
+      LA PRESENTACION DE LA FAMILIA DE COBRANZA: Param10, SALVO EL 1170.
+
+      Cinco de los seis reportes de cobranza comparten el juego largo de trece
+      parametros y su presentacion cae en Param10. El 1170 (Rutas de Agentes)
+      NO: solo tiene seis parametros y la presentacion es el ultimo. Lo arma asi
+      Mac31 en el case VentasCobranzaDesglosado (ReportesMenu.cs:3264-3281):
+
+          // Param 2 = IDsEmpresa      // Param 5 = Formato
+          // Param 3 = IDCliente       // Param 6 = Presentacion
+          // Param 4 = IDsAgente
+
+      y `BuildLegacyVentasParamsAsync` lo GUARDA bien (su case pone Param5 = "1"
+      y Param6 = presentacion). Lo que estaba mal era LEERLO de vuelta: al leer
+      Param10 —que en este reporte viene VACIO— salia "pantalla" siempre.
+
+      DEFECTO MEDIDO (2026-10-09, en MacZ y en Produccion_svr): pedir el 1170
+      con salida = excel devolvia un PDF. No fallaba ni avisaba, porque
+      ReportesV3W intenta primero el Excel, ve "pantalla", y se cae al PDF por
+      su rama de respaldo. Es el mismo defecto que ya estaba contado para el
+      1300 (Autos) en ResolveGenericVentasSalida, y con el mismo sintoma: un
+      fichero con nombre .xlsx y un PDF dentro.
+
+      Las columnas de Excel de este reporte ya estaban dadas de alta
+      (DataHelpers.cs:202, que lo manda al mismo juego que el 1172), asi que no
+      faltaba nada mas que leer el parametro correcto. Comprobado despues del
+      arreglo: 7 910 B de xlsx en Zaragoza y 155 708 B en Tauro.
+    */
+    private static string ResolveCobranzaSalida(int idReporte, DataRow row)
+    {
+        return ResolveSalida(
+            ReadString(row, idReporte == ReporteVentasCobranzaDesglosado ? "Param6" : "Param10"));
     }
 
     private static ReportesVentasAcumuladoresProductosRequest BuildGenericVentasStoredRequest(DataRow row)

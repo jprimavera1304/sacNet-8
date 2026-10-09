@@ -454,6 +454,14 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
             salida = ResolveSalida(ReadString(row, "Param12"));
         if (IsConcentradosReporte(idReporte))
             salida = ResolveSalida(ReadString(row, "Param5"));
+        /*
+          La familia de cobranza lee la presentacion en Param10 menos el 1170,
+          que solo tiene seis parametros y la lleva en Param6. Sin este renglon
+          el Excel de "Rutas de Agentes" devolvia un PDF en silencio; el porque
+          esta en ResolveCobranzaSalida.
+        */
+        if (IsCobranzaReporte(idReporte))
+            salida = ResolveCobranzaSalida(idReporte, row);
         if (IsGenericVentasReporte(idReporte))
             salida = ResolveGenericVentasSalida(idReporte, row);
 
