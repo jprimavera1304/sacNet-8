@@ -37,6 +37,12 @@ public interface IOperacionMacRepository
     Task<(ResultadoLegacy Resultado, int IdBancoTransferencia, int Cargados)> CargarTransferenciasAsync(CargarTransferenciasRequest r, int idUsuario, string equipo, CancellationToken ct);
     Task<ResultadoLegacy> IdentificarTransferenciasAsync(IdentificarTransferenciasRequest r, int idUsuario, string equipo, CancellationToken ct);
     Task<ResultadoLegacy> AplicarTransferenciaAsync(AplicarTransferenciaRequest r, string sp, int idUsuario, string equipo, CancellationToken ct);
+
+    /// <summary>
+    /// El estado real de UN movimiento, para la guarda del servidor. Lo lee
+    /// sp_w_EstadoBancoTransferenciaMovimiento (solo lectura).
+    /// </summary>
+    Task<EstadoMovimientoTransferencia> LeerEstadoMovimientoTransferenciaAsync(int idMovimiento, CancellationToken ct);
     Task<ResultadoLegacy> CancelarMovimientoTransferenciaAsync(int idMovimiento, int idUsuario, string equipo, CancellationToken ct);
 
     // --- Cambios de vigencia

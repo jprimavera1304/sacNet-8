@@ -37,6 +37,13 @@ public interface IOperacionMacService
     /// </summary>
     Task<OperacionEscrituraResponse?> AplicarTransferenciaAsync(AplicarTransferenciaRequest r, int idUsuario, string equipo, CancellationToken ct);
 
+    /// <summary>
+    /// El estado real de un movimiento bancario, leido de la base. Es lo que
+    /// alimenta la guarda de `movimientos/aplicar` y de `movimientos/cancelar`:
+    /// el controlador NO le cree al cuerpo de la peticion, pregunta.
+    /// </summary>
+    Task<EstadoMovimientoTransferencia> LeerEstadoMovimientoTransferenciaAsync(int idMovimiento, CancellationToken ct);
+
     Task<OperacionEscrituraResponse> CancelarMovimientoTransferenciaAsync(int idMovimiento, int idUsuario, string equipo, CancellationToken ct);
 
     // Cambios de vigencia

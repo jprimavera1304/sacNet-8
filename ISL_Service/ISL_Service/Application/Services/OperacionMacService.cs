@@ -102,6 +102,11 @@ public class OperacionMacService : IOperacionMacService
         return Traducir(await _repo.AplicarTransferenciaAsync(r, sp, idUsuario, equipo, ct), r.IdMovimiento);
     }
 
+    /* Pasa la lectura tal cual: la guarda la aplica el controlador, que es quien
+       tiene que contestar con el codigo y el mensaje. */
+    public Task<EstadoMovimientoTransferencia> LeerEstadoMovimientoTransferenciaAsync(int idMovimiento, CancellationToken ct)
+        => _repo.LeerEstadoMovimientoTransferenciaAsync(idMovimiento, ct);
+
     public async Task<OperacionEscrituraResponse> CancelarMovimientoTransferenciaAsync(int idMovimiento, int idUsuario, string equipo, CancellationToken ct)
         => Traducir(await _repo.CancelarMovimientoTransferenciaAsync(idMovimiento, idUsuario, equipo, ct), idMovimiento);
 

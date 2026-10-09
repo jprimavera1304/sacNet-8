@@ -221,6 +221,41 @@ public class BancosTransferenciasController : PermisoControllerBase
         var sinPermiso = await ExigirPermisoAsync(PermisosAplicar, ct);
         if (sinPermiso != null) return sinPermiso;
 
+        // ===================================================================
+        // LA GUARDA DEL SERVIDOR. ESTO ES LO QUE FALTABA.
+        // ===================================================================
+        //
+        // Los CUATRO estados que impiden aplicar un deposito —Rechazado,
+        // Aplicado, EsRetiro y Duplicado— estaban escritos CINCO veces en el
+        // cliente de Mac31 y CERO veces aqui:
+        //
+        //   Legacy/.../BancosTransferencias/VerBancosTransferencias.cs
+        //     :600   chkSeleccionar_CheckedChanged  (los cuatro, no marca)
+        //     :1006  gridCobros_CellDoubleClick     (los cuatro, `return` seco)
+        //     :1043  gridCobros_CellClick           (los cuatro, desmarca)
+        //     :1063  gridCobros_CellContentClick    (los cuatro, desmarca)
+        //     :1083  gridCobros_CellEndEdit         (los cuatro, desmarca)
+        //     :1103  gridCobros_CellBeginEdit       (los cuatro, e.Cancel = true)
+        //
+        // Consecuencia de que solo vivieran ahi: cualquier cliente que no
+        // replicara las cinco podia aplicar un deposito YA APLICADO o RECHAZADO
+        // y el servidor lo aceptaba. Y aqui se mueve dinero: aplicar dos veces
+        // el mismo deposito abona dos veces al cliente y descuadra la
+        // conciliacion del estado de cuenta.
+        //
+        // SE PREGUNTA A LA BASE, NO AL CUERPO DE LA PETICION. El estado del
+        // movimiento no viaja en el request —y si viajara no habria que
+        // creerle—: se lee con sp_w_EstadoBancoTransferenciaMovimiento, que es
+        // un gemelo de solo lectura (nunca se edita un sp_n_).
+        //
+        // SE COMPRUEBA AUNQUE EL CLIENTE YA LO IMPIDA. La pantalla nueva
+        // tampoco deja marcar esos renglones, pero eso no es la regla: es una
+        // comodidad. La regla es esta.
+        var estado = await _service.LeerEstadoMovimientoTransferenciaAsync(request.IdMovimiento, ct);
+        var noSePuede = GuardaDeTransferencias.MotivoParaNoAplicar(estado);
+        if (noSePuede != null)
+            return BadRequest(new { ok = false, message = noSePuede, data = estado });
+
         var data = await _service.AplicarTransferenciaAsync(request, IdUsuarioLegacy(), Equipo(), ct);
         if (data is null)
             return BadRequest(new
@@ -247,8 +282,26 @@ public class BancosTransferenciasController : PermisoControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> CancelarMovimiento([FromRoute] int idMovimiento, CancellationToken ct)
     {
+        if (idMovimiento <= 0)
+            return BadRequest(new { ok = false, message = "El movimiento es requerido." });
+
         var sinPermiso = await ExigirPermisoAsync(PermisosCancelar, ct);
         if (sinPermiso != null) return sinPermiso;
+
+        // CANCELAR TAMBIEN NECESITA SU GUARDA, Y AQUI NO HAY NADA QUE COPIAR.
+        //
+        // El boton CANCELAR de Mac31 tiene el cuerpo VACIO
+        // (ConsultarBancosTransferencias.cs:805: `btnCancelar_Click` con dos
+        // llaves y nada dentro), asi que alla no hay ni funcion ni guarda que
+        // reproducir. Y cancelar REVIERTE un pago: un movimiento que no se
+        // aplico no tiene pago que revertir, de modo que sin esto
+        // sp_n_CancelarBancoTransferencia correria contra un movimiento sin
+        // aplicacion y lo que pasara dependeria de lo que ese procedimiento
+        // haga con un cero. Ver GuardaDeTransferencias.MotivoParaNoCancelar.
+        var estado = await _service.LeerEstadoMovimientoTransferenciaAsync(idMovimiento, ct);
+        var noSePuede = GuardaDeTransferencias.MotivoParaNoCancelar(estado);
+        if (noSePuede != null)
+            return BadRequest(new { ok = false, message = noSePuede, data = estado });
 
         return Responder(
             await _service.CancelarMovimientoTransferenciaAsync(idMovimiento, IdUsuarioLegacy(), Equipo(), ct),

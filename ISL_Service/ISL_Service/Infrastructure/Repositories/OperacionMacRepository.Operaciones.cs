@@ -430,6 +430,104 @@ public partial class OperacionMacRepository
         }, ct);
 
     /// <summary>
+    /// EL ESTADO REAL DE UN MOVIMIENTO, PARA LA GUARDA DEL SERVIDOR.
+    ///
+    /// Llama a `sp_w_EstadoBancoTransferenciaMovimiento`, que es un gemelo NUEVO
+    /// y de SOLO LECTURA (guion en `Querrys/38 Bancos Transferencias`). No se
+    /// reusa `sp_n_ConsultaBancoTranferenciasMovimientos` por dos razones
+    /// medidas: su unico filtro de identidad es @IDBancoTransferencia —el ESTADO
+    /// DE CUENTA, no el movimiento, asi que habria que traer los 40 o 50
+    /// renglones del archivo y buscar el bueno aqui— y ese id lo manda el
+    /// cliente, que es exactamente a quien no se le puede creer en una guarda.
+    ///
+    /// SIN RENGLON, `Existe = false`. No se lanza: "no existe" es una respuesta
+    /// legitima y el controlador la traduce a su propio mensaje.
+    /// </summary>
+    public async Task<EstadoMovimientoTransferencia> LeerEstadoMovimientoTransferenciaAsync(
+        int idMovimiento, CancellationToken ct)
+    {
+        var filas = await ConsultarAsync("dbo.sp_w_EstadoBancoTransferenciaMovimiento", cmd =>
+        {
+            cmd.Parameters.AddWithValue("@IDBancoTransferenciaMovimiento", idMovimiento);
+        }, ct);
+
+        if (filas.Count == 0)
+            return new EstadoMovimientoTransferencia { Existe = false, IdMovimiento = idMovimiento };
+
+        var f = filas[0];
+
+        return new EstadoMovimientoTransferencia
+        {
+            Existe = true,
+            IdMovimiento = Ent(f, "IDBancoTransferenciaMovimiento"),
+            IdBancoTransferencia = Ent(f, "IDBancoTransferencia"),
+            Num = Ent(f, "Num"),
+            IdEmpresa = Ent(f, "IDEmpresa"),
+            IdCliente = Ent(f, "IDCliente"),
+            Aplicado = Bandera(f, "Aplicado"),
+            Rechazado = Bandera(f, "Rechazado"),
+            Duplicado = Bandera(f, "Duplicado"),
+            Identificado = Bandera(f, "Identificado"),
+            EsRetiro = Bandera(f, "EsRetiro"),
+            Deposito = Dec(f, "Deposito"),
+            DepositoAplicado = Dec(f, "DepositoAplicado"),
+            DepositoSaldo = Dec(f, "DepositoSaldo"),
+            Retiro = Dec(f, "Retiro"),
+            ArchivoCancelado = Bandera(f, "ArchivoCancelado"),
+            Archivo = Cad(f, "Archivo")
+        };
+    }
+
+    /*
+      LOS CUATRO LECTORES DE ABAJO BUSCAN LA COLUMNA SIN DISTINGUIR MAYUSCULAS.
+
+      `Funciones.DataTableToRows` deja las llaves tal como las nombro el SELECT
+      del procedimiento, y ahi el nombre va a gusto de quien lo escribio
+      (`IDCliente`, `idCliente`). Buscar por la llave exacta funciona hasta que
+      alguien reescribe el SELECT; buscar sin distinguir no se rompe nunca, y en
+      una guarda una columna que no se encontro se leeria como `false` — o sea
+      como "se puede aplicar". Ese es el fallo que esto evita.
+    */
+    private static object? Valor(Dictionary<string, object?> f, string columna)
+    {
+        if (f.TryGetValue(columna, out var directo)) return directo;
+        foreach (var par in f)
+        {
+            if (string.Equals(par.Key, columna, StringComparison.OrdinalIgnoreCase))
+                return par.Value;
+        }
+        return null;
+    }
+
+    private static int Ent(Dictionary<string, object?> f, string columna)
+        => Valor(f, columna) is { } v && v != DBNull.Value
+            ? Convert.ToInt32(v, CultureInfo.InvariantCulture)
+            : 0;
+
+    private static decimal Dec(Dictionary<string, object?> f, string columna)
+        => Valor(f, columna) is { } v && v != DBNull.Value
+            ? Convert.ToDecimal(v, CultureInfo.InvariantCulture)
+            : 0m;
+
+    private static string Cad(Dictionary<string, object?> f, string columna)
+        => Valor(f, columna) is { } v && v != DBNull.Value
+            ? (v.ToString() ?? string.Empty)
+            : string.Empty;
+
+    /// <summary>
+    /// El procedimiento las devuelve como `bit`, pero se acepta tambien el `int`
+    /// de la columna cruda: si alguien reescribe el SELECT sin el CAST, la
+    /// bandera tiene que seguir leyendose, no quedarse en false.
+    /// </summary>
+    private static bool Bandera(Dictionary<string, object?> f, string columna)
+    {
+        var v = Valor(f, columna);
+        if (v is null || v == DBNull.Value) return false;
+        if (v is bool b) return b;
+        return Convert.ToInt32(v, CultureInfo.InvariantCulture) != 0;
+    }
+
+    /// <summary>
     /// Cancela un movimiento bancario ya aplicado: revierte el pago en Ventas,
     /// [Ventas Pagos], [Ventas Pagos Usados] y el saldo del cliente.
     ///

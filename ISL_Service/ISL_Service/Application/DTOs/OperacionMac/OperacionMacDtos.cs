@@ -379,6 +379,150 @@ public static class AplicacionTransferencia
         };
 }
 
+/// <summary>
+/// El estado de UN movimiento bancario, leido de la base para poder decidir si
+/// se le puede aplicar un pago. LO DEVUELVE sp_w_EstadoBancoTransferenciaMovimiento.
+///
+/// POR QUE HACE FALTA ESTE DTO: los cuatro estados que impiden marcar un
+/// deposito (Rechazado, Aplicado, EsRetiro, Duplicado) estaban puestos CINCO
+/// veces en el cliente de Mac31 —doble clic, CellClick, CellContentClick,
+/// CellEndEdit, CellBeginEdit— y NI UNA del lado del servidor. Cualquier cliente
+/// que no replicara las cinco podia aplicar un deposito ya aplicado o rechazado
+/// y el servidor lo aceptaba. Aqui se mueve dinero: aplicar dos veces el mismo
+/// deposito abona dos veces al cliente.
+///
+/// La regla no puede vivir solo en la pantalla, y para comprobarla del lado del
+/// servidor hay que leer el estado real del movimiento — no el que diga el
+/// cuerpo de la peticion.
+/// </summary>
+public class EstadoMovimientoTransferencia
+{
+    /// <summary>
+    /// false cuando no hubo renglon: el movimiento no existe. Se distingue de
+    /// "existe y no se puede" porque el mensaje tiene que ser otro.
+    /// </summary>
+    public bool Existe { get; set; }
+
+    public int IdMovimiento { get; set; }
+    public int IdBancoTransferencia { get; set; }
+
+    /// <summary>El numero de renglon DENTRO del archivo del banco, que es el que
+    /// lee la persona en la pantalla y el que nombran los mensajes de Mac31
+    /// ("EL MOVIMIENTO NUM 12 YA ESTA APLICADO").</summary>
+    public int Num { get; set; }
+
+    public int IdEmpresa { get; set; }
+    public int IdCliente { get; set; }
+
+    public bool Aplicado { get; set; }
+    public bool Rechazado { get; set; }
+    public bool Duplicado { get; set; }
+    public bool Identificado { get; set; }
+
+    /// <summary>
+    /// DERIVADO, no es una columna: `Retiro > 0`. Es exactamente como lo deriva
+    /// sp_n_ConsultaBancoTranferenciasMovimientos, para que la pantalla y la
+    /// guarda no digan cosas distintas del mismo renglon.
+    /// </summary>
+    public bool EsRetiro { get; set; }
+
+    public decimal Deposito { get; set; }
+    public decimal DepositoAplicado { get; set; }
+    public decimal DepositoSaldo { get; set; }
+    public decimal Retiro { get; set; }
+
+    /// <summary>Del ESTADO DE CUENTA, no del movimiento: `FechaCancelacion IS NOT NULL`.</summary>
+    public bool ArchivoCancelado { get; set; }
+
+    public string Archivo { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// LA GUARDA DEL SERVIDOR PARA LOS MOVIMIENTOS BANCARIOS.
+///
+/// Es la regla, dicha UNA vez y en el servidor, de que un movimiento no se puede
+/// aplicar. En Mac31 esa regla esta repetida cinco veces en el cliente
+/// (VerBancosTransferencias.cs lineas 600, 1006, 1043, 1063, 1083 y 1103) y cero
+/// veces en el servidor.
+///
+/// Los mensajes son LOS DE LEGACY, palabra por palabra, los de
+/// `ValidacionesAplicar()` (VerBancosTransferencias.cs:1424) y
+/// `AplicarDineroCascos()` (:1330): quien captura lleva años leyendolos y un
+/// texto nuevo le haria creer que es otro fallo.
+/// </summary>
+public static class GuardaDeTransferencias
+{
+    /// <summary>
+    /// El motivo por el que NO se puede aplicar, o null si se puede.
+    ///
+    /// EL ORDEN ES EL DE LEGACY (rechazado, retiro, duplicado, aplicado, no
+    /// identificado) porque es el que ve quien captura: con dos problemas a la
+    /// vez, el mensaje que sale tiene que ser el mismo que saldria en Mac31.
+    /// </summary>
+    public static string? MotivoParaNoAplicar(EstadoMovimientoTransferencia e)
+    {
+        if (!e.Existe)
+            return "El movimiento no existe.";
+
+        /*
+          EL ARCHIVO CANCELADO NO ESTA EN LEGACY Y HACE FALTA. Mac31 no lo
+          comprueba al aplicar (solo la consulta de movimientos filtra por
+          `arch.IDStatus = 1`), asi que hoy se puede aplicar un deposito de un
+          estado de cuenta que alguien ya cancelo — y el archivo cancelado existe
+          justamente porque se cargo mal. Va PRIMERO porque invalida el renglon
+          entero, no solo esta operacion.
+        */
+        if (e.ArchivoCancelado)
+            return $"EL ESTADO DE CUENTA {e.Archivo} ESTA CANCELADO.";
+
+        /* Los CUATRO que el cliente de Mac31 comprueba cinco veces. */
+        if (e.Rechazado) return $"EL MOVIMIENTO NUM {e.Num} ESTA RECHAZADO.";
+        if (e.EsRetiro) return $"EL MOVIMIENTO NUM {e.Num} ES UN RETIRO.";
+        if (e.Duplicado) return $"EL MOVIMIENTO NUM {e.Num} ESTA DUPLICADO.";
+        if (e.Aplicado) return $"EL MOVIMIENTO NUM {e.Num} YA ESTA APLICADO.";
+
+        /* Y los tres de `AplicarDineroCascos`, que tambien viven solo en el
+           cliente. El orden entre ellos es el de alla. */
+        if (e.Deposito == 0) return "SELECCIONE UN DEPÓSITO.";
+        if (e.DepositoSaldo == 0) return "EL DEPÓSITO YA ESTA APLICADO.";
+        if (e.IdCliente == 0) return "PRIMERO DEBE IDENTIFICAR EL CLIENTE DEL DEPÓSITO.";
+
+        if (!e.Identificado) return $"EL MOVIMIENTO NUM {e.Num} NO ESTA IDENTIFICADO.";
+
+        return null;
+    }
+
+    /// <summary>
+    /// El motivo por el que NO se puede cancelar, o null si se puede.
+    ///
+    /// AQUI NO HAY NADA QUE COPIAR DE LEGACY, Y SE DICE: el boton CANCELAR de
+    /// `ConsultarBancosTransferencias` tiene el cuerpo VACIO
+    /// (ConsultarBancosTransferencias.cs:805 — `btnCancelar_Click` con dos
+    /// llaves y nada dentro), asi que alla cancelar no tiene ni guarda ni
+    /// funcion. Y el repositorio de MacServicios2 manda un parametro que el
+    /// procedimiento no declara, de modo que la llamada no llega a ejecutarse.
+    ///
+    /// Las dos reglas de abajo son las minimas honestas: cancelar REVIERTE un
+    /// pago, y un movimiento que no se aplico no tiene pago que revertir. Sin
+    /// esto, `sp_n_CancelarBancoTransferencia` corre contra un movimiento sin
+    /// aplicacion y lo que pasa depende de lo que ese procedimiento haga con un
+    /// cero.
+    /// </summary>
+    public static string? MotivoParaNoCancelar(EstadoMovimientoTransferencia e)
+    {
+        if (!e.Existe)
+            return "El movimiento no existe.";
+
+        if (!e.Aplicado)
+            return $"EL MOVIMIENTO NUM {e.Num} NO ESTA APLICADO: NO HAY PAGO QUE CANCELAR.";
+
+        if (e.Rechazado)
+            return $"EL MOVIMIENTO NUM {e.Num} ESTA RECHAZADO.";
+
+        return null;
+    }
+}
+
 // ===========================================================================
 // CAMBIOS DE VIGENCIA
 // ===========================================================================
