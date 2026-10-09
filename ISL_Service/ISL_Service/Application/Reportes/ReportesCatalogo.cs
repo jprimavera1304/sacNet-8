@@ -160,6 +160,23 @@ public static class ReportesCatalogo
         Ventas("hoja_de_cobro_total_cascos", "Hoja de Cobro Total Cascos"),
         Ventas("hoja_de_cobro_cheques", "Hoja de Cobro Cheques"),
         /*
+          LA HOJA DE COBRO DE UNA LIQUIDACION, Y POR QUE VA SIN PERMISO PROPIO.
+
+          Los tres de arriba tienen su clave en WPermiso
+          (reportes.ventas.hoja_de_cobro_total_cobrado.ver y sus hermanas);
+          `reportes.ventas.hoja_de_cobro.ver` NO existe, comprobado en MacZ. Si
+          se declarara segun la regla, el candado seria un permiso que nadie
+          tiene y el boton no se dibujaria para NADIE: el reporte quedaria
+          escrito y apagado, que es peor que el hueco que vino a tapar.
+
+          Con SinPermiso queda igual que en Mac31, donde IMPRIMIR COBRO no pide
+          un permiso suyo: lo que lo protege es poder entrar al modulo
+          (reportes.ver_modulo, que el controlador exige siempre) y a la
+          pantalla de cobros. El dia que se de de alta la clave, se cambia esta
+          linea por `Ventas("hoja_de_cobro", ...)` y nada mas.
+        */
+        new("hoja_de_cobro", "ventas", "Hoja de Cobro", SinPermiso),
+        /*
           CAMBIOS DE VIGENCIA (1535): el documento de UN cambio de vigencia.
 
           Lo imprime el boton IMPRIMIR de ConsultarCambiosVigencia de Mac31, no un

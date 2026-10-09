@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.Reportes;
+﻿using ISL_Service.Application.DTOs.Reportes;
 using ISL_Service.Application.Interfaces;
 
 namespace ISL_Service.Application.Services;
@@ -93,11 +93,35 @@ public class ReportesVentasService : IReportesVentasService
         return _repository.GenerarCobranzaAsync(request, ct);
     }
 
+    /*
+      LOS REPORTES QUE NO SON DE UN PERIODO.
+
+      La validacion comun exige las dos fechas, y para cincuenta y dos reportes
+      eso es correcto: son listados de un rango. La hoja de cobro NO: imprime
+      LAS HOJAS MARCADAS en la rejilla, igual que IMPRIMIR COBRO de Mac31, y sus
+      procedimientos no reciben fechas (Param2/3/4 son los tres juegos de ids).
+
+      Se exime en vez de pedirle al front que mande dos fechas de adorno. Una
+      fecha obligatoria que no filtra nada es la clase de dato que alguien acaba
+      usando: el dia que se toque el reporte, el rango estaria ahi pareciendo
+      significar algo.
+
+      Es una LISTA y no un `if` suelto para que el siguiente que llegue se
+      agregue aqui, con su porque al lado, en vez de volver a eximirse por otro
+      camino.
+    */
+    private static readonly string[] ReportesSinPeriodo = { "hoja_de_cobro" };
+
     public Task<ReportesVentasGenerateResponse> GenerarLegacyVentasAsync(
         ReportesVentasLegacyRequest request,
         CancellationToken ct = default)
     {
-        Validate(request);
+        if (request is null)
+            throw new ArgumentException("Body requerido.");
+
+        var clave = (request.ReporteKey ?? "").Trim().ToLowerInvariant();
+        Validate(request, exigirFechas: !ReportesSinPeriodo.Contains(clave));
+
         if (string.IsNullOrWhiteSpace(request.ReporteKey) && request.IDReporte <= 0)
             throw new ArgumentException("reporteKey o idReporte requerido.");
 
@@ -154,16 +178,26 @@ public class ReportesVentasService : IReportesVentasService
         return _repository.GenerarReporteVentasExcelPorParametrosAsync(parametrosLegacy, idCentro, ct);
     }
 
-    private static void Validate(ReportesVentasAcumuladoresProductosRequest request)
+    /*
+      `exigirFechas` por omision en true: los cincuenta y dos reportes de periodo
+      siguen validandose igual que siempre y ninguna de sus llamadas cambia. Ver
+      ReportesSinPeriodo.
+    */
+    private static void Validate(
+        ReportesVentasAcumuladoresProductosRequest request,
+        bool exigirFechas = true)
     {
         if (request is null)
             throw new ArgumentException("Body requerido.");
-        if (request.FechaInicial == default)
-            throw new ArgumentException("fechaInicial es requerida.");
-        if (request.FechaFinal == default)
-            throw new ArgumentException("fechaFinal es requerida.");
-        if (request.FechaFinal < request.FechaInicial)
-            throw new ArgumentException("fechaFinal no puede ser menor a fechaInicial.");
+        if (exigirFechas)
+        {
+            if (request.FechaInicial == default)
+                throw new ArgumentException("fechaInicial es requerida.");
+            if (request.FechaFinal == default)
+                throw new ArgumentException("fechaFinal es requerida.");
+            if (request.FechaFinal < request.FechaInicial)
+                throw new ArgumentException("fechaFinal no puede ser menor a fechaInicial.");
+        }
 
         var salida = (request.Salida ?? "pantalla").Trim().ToLowerInvariant();
         if (salida != "pantalla" && salida != "excel")

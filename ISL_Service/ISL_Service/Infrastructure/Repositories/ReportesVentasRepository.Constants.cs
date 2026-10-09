@@ -186,6 +186,17 @@ public partial class ReportesVentasRepository
     private const int ReporteVentasMotoBateriasPorCodigo = 1485;
     private const int ReporteVentasMotoBateriasPorMarca = 1490;
     private const int ReporteHojaCobroCheques = 1495;
+
+    /*
+      LA HOJA DE COBRO DE UNA LIQUIDACION (el papel que firma el repartidor).
+
+      No se parece a los cuatro de arriba, que son LISTADOS de un periodo: este
+      es el documento de UNAS hojas concretas, las que estan marcadas en la
+      rejilla, y por eso no lleva fechas sino ids. Es `enumReportes.Cobro` de
+      Mac31, y su renglon en `Reportes` declara TRES procedimientos en `spV2`,
+      asi que no lo pinta la plantilla generica: lo arma CobroHtmlBuilder.
+    */
+    private const int ReporteCobro = 1006;
     private const int GrupoCategoriaAcumuladores = 1;
     private const int ProductoServicioDomicilio = 11807;
     private const string FallbackLogoPath = "Assets/Logos/Logo_Zaragoza.png";

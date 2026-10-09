@@ -215,6 +215,9 @@ public partial class ReportesVentasRepository
             "hoja_de_cobro_total_cobrado" => ResolveFormatoDetallado(request.Formato) ? ReporteHojaCobroTotalCobradoDetallado : ReporteHojaCobroTotalCobradoTotalizado,
             "hoja_de_cobro_total_cascos" => ReporteHojaCobroTotalCascos,
             "hoja_de_cobro_cheques" => ReporteHojaCobroCheques,
+            // La hoja de UNA liquidacion. No es del periodo: es de las hojas
+            // marcadas, y sus ids van en IDsConcentrado/IDsCobranza/IDsCobro.
+            "hoja_de_cobro" => ReporteCobro,
             "garantias" => ReporteGarantias,
             "garantias_registradas" => ReporteGarantiasRegistradas,
             "gasolinas" => ResolveReporteGasolinas(request.Formato),
@@ -674,6 +677,88 @@ public partial class ReportesVentasRepository
         };
     }
 
+    /*
+      LOS CUATRO PARAMETROS DE LA HOJA DE COBRO, Y NINGUNO MAS.
+
+      Los enumera el propio #ParamIds de sus procedimientos, leido en MacZ, y
+      los manda igual Mac31 (Funciones.cs:223-237 llamado desde
+      ConsultarCobros.cs:2635):
+
+          Param1 = Equipo[IDUsuario
+          Param2 = IDsConcentrado
+          Param3 = IDsCobranza
+          Param4 = IDsCobro
+
+      Del 5 al 7 Mac31 manda cadena vacia y aqui tambien: el reporte NO lleva
+      rango de fechas ni presentacion. Mandarle las fechas del filtro de la
+      pantalla —que el DTO generico si trae— no lo filtraria: le cambiaria el
+      sentido a un parametro que el procedimiento lee como otra cosa.
+
+      LAS TRES LISTAS SE UNEN SIN LIMPIAR. No se usa JoinIds, que es lo que
+      usan los otros cincuenta reportes, y la razon esta escrita en el DTO: ahi
+      los ids son un conjunto y aqui son tres listas que se cruzan por
+      posicion. `JoinIds` tira los ceros y los repetidos, y las dos cosas
+      CORREN la lista: la cobranza de la tercera hoja se le aplicaria a la
+      segunda y el papel saldria con los folios de otro repartidor.
+    */
+    private static LegacyReportParams BuildCobroLegacyParams(ReportesVentasLegacyRequest request)
+    {
+        if (request.IDsConcentrado.Count == 0)
+            throw new ArgumentException("La hoja de cobro necesita al menos una hoja: manda idsConcentrado, idsCobranza e idsCobro.");
+
+        if (request.IDsCobranza.Count != request.IDsConcentrado.Count ||
+            request.IDsCobro.Count != request.IDsConcentrado.Count)
+        {
+            /* Se rechaza en vez de rellenar con ceros a proposito: si las
+               longitudes no cuadran, quien llamo no esta mandando triples y
+               completarlas aqui daria un reporte con los folios mezclados en
+               silencio. Un reporte de dinero equivocado es peor que un 400. */
+            throw new ArgumentException("idsConcentrado, idsCobranza e idsCobro tienen que traer el mismo numero de elementos, uno por hoja y en el mismo orden.");
+        }
+
+        return new LegacyReportParams
+        {
+            NombreEquipo = ResolveLegacyNombreEquipo(request),
+            IDUsuario = ResolveLegacyIDUsuario(request),
+            Param1 = BuildLegacyUsuarioParam(request),
+            Param2 = JoinIdsPorPosicion(request.IDsConcentrado),
+            Param3 = JoinIdsPorPosicion(request.IDsCobranza),
+            Param4 = JoinIdsPorPosicion(request.IDsCobro),
+            Param5 = "",
+            Param6 = "",
+            Param7 = ""
+        };
+    }
+
+    /* Une tal cual: mismo orden, con los ceros dentro. Ver arriba. */
+    private static string JoinIdsPorPosicion(IEnumerable<int> ids)
+    {
+        return string.Join("~", ids.Select(x => x.ToString(CultureInfo.InvariantCulture)));
+    }
+
+    /*
+      LA HOJA DE COBRO NO ES DE LA FAMILIA GENERICA, y por eso tiene su propio
+      predicado de una sola linea en vez de entrar en IsGenericVentasReporte:
+      ese `is ... or ...` es la lista de los que SI pinta la plantilla
+      generica, y meterlo ahi lo mandaria por ese camino.
+    */
+    private static bool IsCobroReporte(int idReporte) => idReporte == ReporteCobro;
+
+    /*
+      EL REPORTE NO NECESITA NADA DEL RENGLON DE PARAMETROS PARA PINTARSE.
+
+      Los otros reportes reconstruyen aqui su peticion —fechas, empresas,
+      salida— porque la plantilla generica imprime esos filtros en la cabecera.
+      La hoja de cobro no imprime filtros: su cabecera son el folio, la fecha y
+      el repartidor, y todo eso lo traen los procedimientos. Lo unico que se
+      lee de la peticion es la salida, y por omision es "pantalla", que es la
+      que hace que se arme el HTML.
+    */
+    private static ReportesVentasAcumuladoresProductosRequest BuildCobroStoredRequest()
+    {
+        return new ReportesVentasAcumuladoresProductosRequest();
+    }
+
     private static async Task<LegacyReportParams> BuildLegacyVentasParamsAsync(
         SqlConnection conn,
         int idReporte,
@@ -712,6 +797,9 @@ public partial class ReportesVentasRepository
             case ReporteVentasCobranzaDetallado:
             case ReporteVentasCobranzaDetalladoZara:
                 return await BuildCobranzaLegacyParamsAsync(conn, request, request.CobranzaStatus, ct);
+
+            case ReporteCobro:
+                return BuildCobroLegacyParams(request);
         }
 
         var idCliente = await ResolveClienteLegacyAsync(conn, request, ct);
@@ -1089,7 +1177,7 @@ public partial class ReportesVentasRepository
             case ReporteVentasLiquidaciones:
                 legacy.Param2 = fechaInicial;
                 legacy.Param3 = fechaFinal;
-                legacy.Param4 = ResolveTipoLiquidacion(request.TipoReporte).ToString();
+                legacy.Param4 = ResolveTipoLiquidacion(request.TipoLiquidacion, request.TipoReporte).ToString();
                 legacy.Param5 = JoinIds(request.IDRepartidores);
                 legacy.Param6 = presentacion;
                 break;
@@ -2204,9 +2292,21 @@ public partial class ReportesVentasRepository
         return ResolveSalida(ReadString(row, column));
     }
 
-    private static int ResolveTipoLiquidacion(string? tipoReporte)
+    /// <summary>
+    /// CAMIONETA (1) O AGENTE (2) para el 1319.
+    ///
+    /// Mira primero `TipoLiquidacion`, que es el campo propio, y solo si viene
+    /// vacio cae a `TipoReporte`, que es de donde se leia antes. El porque de
+    /// los dos campos esta en el DTO: con `TipoReporte = "agente"` la
+    /// validacion general exigia agentes y la liquidacion por agente no se
+    /// podia pedir.
+    /// </summary>
+    private static int ResolveTipoLiquidacion(string? tipoLiquidacion, string? tipoReporte)
     {
-        return (tipoReporte ?? "").Trim().ToLowerInvariant() switch
+        var elegido = (tipoLiquidacion ?? "").Trim();
+        if (elegido.Length == 0) elegido = tipoReporte ?? "";
+
+        return elegido.Trim().ToLowerInvariant() switch
         {
             "liquidacion_agente" or "agente" => 2,
             _ => 1

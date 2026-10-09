@@ -422,6 +422,10 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
             var request = BuildCobranzaStoredRequest(row);
             return await ConsultarReportePorParametrosAsync(conn, parametrosLegacy, idReporte, request, ct);
         }
+        if (IsCobroReporte(idReporte))
+        {
+            return await ConsultarReportePorParametrosAsync(conn, parametrosLegacy, idReporte, BuildCobroStoredRequest(), ct);
+        }
         if (IsGenericVentasReporte(idReporte))
         {
             var request = BuildGenericVentasStoredRequest(row);
@@ -525,6 +529,30 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
             if (!string.IsNullOrWhiteSpace(errorParams))
             {
                 reportHtml = GenerateSinInformacionHtml(logo, templates, config.NombreReporte, request, errorParams);
+            }
+            /*
+              LA HOJA DE COBRO SE ARMA APARTE, Y SE DESVIA AQUI Y NO ANTES.
+
+              Este es el punto donde ya estan en la mano las tres cosas que el
+              armador necesita y que cuesta conseguir: el DataSet con las tres
+              tablas (ExecuteLegacySpAsync ya recorrio el `spV2` de tres
+              procedimientos y nombro cada tabla con su SP), las once
+              plantillas `cobro_*` y los dos logos —el de la cabecera y el de
+              la marca de agua—. Armarlo mas arriba obligaria a volver a
+              pedirlo todo.
+
+              Va ANTES del `3columnas` y del formato normal porque su `aspx`
+              esta vacio en la base y caeria en el formato normal, que buscaria
+              una plantilla `cuerpo` que este reporte no tiene.
+            */
+            else if (idReporte == ReporteCobro)
+            {
+                reportHtml = CobroHtmlBuilder.Construir(
+                    logo,
+                    constants.LogoWatermark,
+                    config.NombreReporte,
+                    data,
+                    templates);
             }
             else if (idReporte == ReporteListasPreciosZaragoza)
             {

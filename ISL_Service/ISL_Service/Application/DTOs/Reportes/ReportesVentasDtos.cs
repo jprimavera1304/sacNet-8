@@ -70,6 +70,26 @@ public class ReportesVentasLegacyRequest : ReportesVentasAcumuladoresProductosRe
     public string TipoFactura { get; set; } = "factura";
     public string TipoFechaCompras { get; set; } = "captura";
     public string EstatusComprasFacturas { get; set; } = "vigentes";
+
+    /// <summary>
+    /// CAMIONETA O AGENTE, PARA EL 1319 (Liquidaciones). Y SU PROPIO CAMPO.
+    ///
+    /// Antes esto se sacaba de `TipoReporte`: `ResolveTipoLiquidacion` leia
+    /// "agente" -> 2 y cualquier otra cosa -> 1. El problema es que
+    /// `TipoReporte` significa otra cosa en todo el resto del modulo —de quien
+    /// es el reporte, empresa / agente / cliente— y por eso hay una validacion
+    /// general que exige al menos un agente cuando vale "agente"
+    /// (ReportesVentasService.ValidateLegacy). O sea que pedir la liquidacion
+    /// POR AGENTE contestaba 400 "seleccione al menos un agente", cuando aqui
+    /// "agente" no es un filtro de agentes: es la forma de agrupar la
+    /// liquidacion. Era inalcanzable, y el motivo del 400 mandaba a llenar un
+    /// campo que este reporte no tiene.
+    ///
+    /// Se deja que `TipoReporte` siga sirviendo (lo manda el movil y cualquier
+    /// cliente viejo) y este campo gana cuando viene: el valor por omision
+    /// vacio significa "mira TipoReporte como siempre".
+    /// </summary>
+    public string TipoLiquidacion { get; set; } = "";
     public bool InventarioConCostos { get; set; }
     public bool InventarioHistorico { get; set; }
     public bool InventarioGenerarPedido { get; set; }
@@ -147,6 +167,28 @@ public class ReportesVentasLegacyRequest : ReportesVentasAcumuladoresProductosRe
     /// haber intentado sellar la impresion del documento 0.
     /// </summary>
     public int IDCambioVigencia { get; set; }
+
+    /*
+      LA HOJA DE COBRO (1006): LAS HOJAS MARCADAS EN LA REJILLA.
+
+      SON TRES LISTAS PARALELAS Y EL ORDEN ES PARTE DEL DATO. Cada hoja de
+      cobro son tres ids —su concentrado, su cobranza y ella misma— y el
+      procedimiento los vuelve a juntar POR POSICION: mete cada lista en una
+      tabla con IDENTITY y las cruza por ese numero de renglon
+      (sp_n_rptConcentradoFoliosUsadosMultiple, el LEFT JOIN de
+      #ConcentradoCobranzaTmp). O sea que la tercera cobranza se le asigna al
+      tercer concentrado, sin mirar a quien pertenece.
+
+      CONSECUENCIA PARA QUIEN LLAME A ESTO: las tres listas tienen que venir
+      con la MISMA longitud y en el MISMO orden, y los ceros CUENTAN —una hoja
+      sin cobranza manda 0 en esa posicion—. Mandar solo las cobranzas que
+      existen correria la lista y el reporte saldria con los folios de otra
+      hoja. Es lo mismo que hace Mac31, que recorre la rejilla y agrega los
+      tres ids de cada renglon marcado (ConsultarCobros.cs:2585-2592).
+    */
+    public List<int> IDsConcentrado { get; set; } = new();
+    public List<int> IDsCobranza { get; set; } = new();
+    public List<int> IDsCobro { get; set; } = new();
 
     /// <summary>
     /// Liquidaciones de Descuento (1030): los folios SELECCIONADOS a imprimir.
