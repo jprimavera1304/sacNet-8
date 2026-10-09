@@ -354,7 +354,13 @@ public partial class ReportesVentasRepository
                 if (lineas == 0)
                 {
                     htmlCuerpo = "<p style='page-break-before: always'></p>";
-                    htmlCuerpo += BuildColumnas3Header(cuerpoTemplate, logo, reporteNombre, numPagina, totalPaginas, table, row, request);
+                    /* El primer renglon del grupo, no el que abre la hoja: el
+                       encabezado de 3 columnas lo llena legacy con
+                       `dtDetalle.Rows[0]` igual que el del formato normal
+                       (RepFormatoColumnas3Service, en su EncabezadoHtml). Este
+                       formato no usa #topWM#, asi que no hace falta el segundo
+                       renglon. */
+                    htmlCuerpo += BuildColumnas3Header(cuerpoTemplate, logo, reporteNombre, numPagina, totalPaginas, table, rows[0], request);
                 }
 
                 htmlDetalle1 += ReplaceValues(table, row, detalle1Template);
@@ -501,9 +507,8 @@ public partial class ReportesVentasRepository
             return html;
         }
 
-        html = ReplaceAgentHeader(html, table, row, request);
-        html = ReplaceClientHeader(html, table, row);
-        return ReplaceValues(table, row, html);
+        /* Mismo caso que en el formato normal: ver la nota de BuildFormatoNormalHeader. */
+        return ReemplazarValoresDelEncabezado(table, row, html);
     }
 
     private static string GenerateEmptyFormatoNormalHtml(
@@ -616,8 +621,23 @@ public partial class ReportesVentasRepository
         if (table.Columns.Contains("topWM") && filaEnCurso is not null)
             html = html.Replace("#topWM#", FormatoFechaLegacy.Celda(filaEnCurso["topWM"]));
 
-        html = ReplaceAgentHeader(html, table, filaDeLosValores, request);
-        html = ReplaceClientHeader(html, table, filaDeLosValores);
+        /*
+          #Agente# Y #Cliente# NO LLEVAN TRATO ESPECIAL EN EL CUERPO.
+
+          Ni `EncabezadoHtml` de RepFormatoNormalService ni el de
+          RepFormatoColumnas3Service saben nada de agentes ni de clientes en el
+          camino CON datos: toman `dtDetalle.Rows[0]`, recorren las columnas y
+          ya. Solo los ponen en blanco en el papel SIN informacion, que es el
+          otro `if` de esta misma funcion.
+
+          Aqui se llamaba a dos ayudantes que escribian "Agente: <b>…</b>" y
+          "Cliente: <b>…</b>" -texto que Mac31 nunca imprime- o, cuando el
+          reporte no era por agente, dejaban el tag en blanco pisando el valor
+          de la columna. Lo que de verdad va en `#Agente#` es el valor de la
+          columna `Agente`, que en este motor vale 0 y `FormateaNumero`
+          convierte en cadena vacia; el nombre del agente que si se lee en el
+          papel sale de `#NombreAgente#`, que es otra columna del `sp_n_`.
+        */
         return ReemplazarValoresDelEncabezado(table, filaDeLosValores, html);
     }
 
