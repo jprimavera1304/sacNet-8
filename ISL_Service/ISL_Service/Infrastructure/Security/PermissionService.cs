@@ -3530,23 +3530,55 @@ WHERE UPPER(LTRIM(RTRIM(f.Descripcion))) = @Forma
 
         var effective = await LoadEffectivePermissionsFromWebAsync(conn, schema, userId, empresaId, rolLegacy, ct);
         var movementUserId = await ResolveMovementLegacyUserIdAsync(conn, ct);
+
+        /*
+          SE OTORGA Y TAMBIEN SE QUITA, PERO SOLO SI LA PANTALLA LO ENSEÑO.
+
+          Antes esto solo otorgaba, y por una razon buena: el 2026-08-26, en
+          produccion, guardar permisos de un usuario desde la pantalla web le
+          revoco 44 de sus 135 permisos de Mac31 —todos los botones de CONSULTA
+          DE VENTAS y varios reportes— sin avisar y sin que nadie los hubiera
+          tocado. La causa no fue escribir en legacy: fue tratar la AUSENCIA en
+          "effective" como una negacion. El web no sabia lo que habia en Mac31,
+          asi que "no lo tengo" y "no me lo ensenaron" eran la misma cosa.
+
+          Pero dejarlo en solo-otorgar deja una puerta de un solo sentido:
+          encendias un boton, se escribia en Mac31, y al volver a leer lo de
+          Mac31 pisaba lo del web, asi que la casilla volvia a salir encendida y
+          ya no habia forma de apagarla desde ninguna de las dos pantallas. Es
+          el mismo sintoma que se midio en Zaragoza para `reportes.*` el
+          28-sep-2026 y que ahi ya se arreglo con el candado de abajo; esto solo
+          extiende ese arreglo —ya probado— a `ventas.`, `empleados.` y
+          `prestamos.`.
+
+          QUE LO HACE SEGURO AHORA Y NO EN AGOSTO: el bootstrap ya mezcla el
+          estado real de Mac31 dentro de las casillas de estas tres familias
+          (ver GetPermisosBootstrapAsync, donde a cada usuario se le cargan
+          legacyVentas / legacyEmpleados / legacyPrestamos y se le quita del
+          Allow/Deny todo lo que no sea semilla del web). O sea: quien desmarca
+          esta viendo el estado de verdad y lo esta quitando a proposito.
+
+          EL CANDADO: solo se toca un permiso si SU modulo esta ENCENDIDO. Con el
+          modulo apagado sus permisos se caen del catalogo y la pantalla no los
+          ensena; sin este candado, guardarle a alguien cualquier otra cosa le
+          apagaria en Mac31 permisos que nadie vio ni pidio quitar. Ese es
+          exactamente el accidente de agosto. Se pregunta por la clave de cada
+          permiso —no por una sola del modulo— porque este mismo metodo lo usan
+          las tres familias.
+
+          Dar de baja es IDStatus = 2, NUNCA borrar la fila: asi lo hace Mac31 en
+          su propia pantalla (UsuariosFormasProcesoPermisos manda
+          enumStatus.Inactivo = 2) y asi lo entiende
+          sp_n_ActualizarUsuarioFormaProceso, que con IDStatus = 2 y sin fila
+          previa no inserta nada. El SP toca una sola fila, la de ESTE usuario y
+          ESTE proceso, y trae su propia transaccion.
+        */
+        var activeModules = await GetActiveModulesAsync(conn, empresaId, ct);
+
         foreach (var action in ventasCatalog.Values)
         {
-            // Solo se OTORGA en legacy. NUNCA se revoca.
-            //
-            // Antes esta linea mandaba IDStatus=2 para todo lo que el web no
-            // tuviera, tratando al web como la fuente de la verdad. No lo es:
-            // los permisos de ventas VIVEN en legacy (se leen de los botones
-            // de Mac31) y no existen como filas en las tablas web, asi que
-            // "effective" casi nunca los contiene.
-            //
-            // Consecuencia real, medida en produccion el 2026-08-26: guardar
-            // permisos de un usuario desde la pantalla web le revoco 44 de sus
-            // 135 permisos de Mac31 —todos los botones de CONSULTA DE VENTAS y
-            // varios reportes— sin avisar y sin que nadie los hubiera tocado.
-            //
-            // Quitar un permiso de legacy se hace en Mac31, que es donde vive.
-            if (!effective.Contains(action.Key))
+            var loTiene = effective.Contains(action.Key);
+            if (!loTiene && !IsPermissionInActiveModule(action.Key, activeModules))
                 continue;
 
             await using var cmd = new SqlCommand("dbo.sp_n_ActualizarUsuarioFormaProceso", conn)
@@ -3555,7 +3587,7 @@ WHERE UPPER(LTRIM(RTRIM(f.Descripcion))) = @Forma
             };
             cmd.Parameters.Add(new SqlParameter("@IDUsuario", SqlDbType.Int) { Value = legacyUserId.Value });
             cmd.Parameters.Add(new SqlParameter("@IDProceso", SqlDbType.Int) { Value = action.LegacyProcessId });
-            cmd.Parameters.Add(new SqlParameter("@IDStatus", SqlDbType.Int) { Value = 1 });
+            cmd.Parameters.Add(new SqlParameter("@IDStatus", SqlDbType.Int) { Value = loTiene ? 1 : 2 });
             cmd.Parameters.Add(new SqlParameter("@IDUsuarioMovimiento", SqlDbType.Int) { Value = movementUserId });
             await cmd.ExecuteNonQueryAsync(ct);
         }
