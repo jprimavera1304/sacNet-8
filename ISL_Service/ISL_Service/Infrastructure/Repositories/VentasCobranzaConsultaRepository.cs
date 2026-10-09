@@ -14,6 +14,7 @@ public class VentasCobranzaConsultaRepository : ConsultaLegacyRepositoryBase, IV
     private const string SpCobranzaDetalle = "dbo.sp_n_ConsultarCobranzaDetalle";
     private const string SpConcentradoFolio = "dbo.sp_n_ConsultarConcentradoFolio";
     private const string SpConcentradoDetalle = "dbo.sp_n_ConsultarConcentradoDetalle";
+    private const string SpConcentrados = "dbo.sp_n_ConsultarConcentrados";
     private const string SpCobrosCentroServicio = "dbo.sp_n_ConsultarCobrosCentroServicio";
     private const string SpFoliosUsados = "dbo.sp_n_ConcentradoFoliosUsados";
     private const string SpCobroPagos = "dbo.sp_n_ConsultaVentasCobroPagos";
@@ -78,6 +79,60 @@ public class VentasCobranzaConsultaRepository : ConsultaLegacyRepositoryBase, IV
             p.AddWithValue("@IDConcentradoActual", request.IDConcentradoActual);
             p.AddWithValue("@IDUsuarioActual", idUsuarioActual);
             p.AddWithValue("@IDTipoDocumento", request.IDTipoDocumento);
+        }, ct);
+    }
+
+    /*
+      LA REJILLA DE LA PANTALLA DE CONCENTRADOS
+
+      Tres cosas que en legacy estan en la forma y aqui cambian de sitio, todas
+      con motivo:
+
+      1) LOS DOS FOLIOS DE CADA PAR. El procedimiento pide @FolioInicial y
+         @FolioFinal, y ConsultarConcentrados.cs mete el mismo valor en los dos
+         desde una sola caja (lineas 600-610). Se duplica aqui para que el DTO
+         tenga un campo por folio y no dos que siempre valen lo mismo.
+
+      2) EL @IDUSUARIOACTUAL SALE DEL TOKEN. En legacy viaja en el cuerpo
+         (ConsultaConcentradosInputDTO lo rellena desde Globales) y el
+         procedimiento lo usa para recortar por UsuariosAlmacenes. Que viaje en
+         el cuerpo significa que cualquiera puede pedir la consulta con el id de
+         otro y ver los almacenes de ese otro. Mismo criterio que la cobranza.
+
+      3) LAS FECHAS VAN EN ISO Y NO EN LA CULTURA DE LA MAQUINA. Legacy manda
+         `dtFechaInicial.Value.ToShortDateString()`, que en es-MX sale
+         "dd/MM/yyyy"; el procedimiento lo pega dentro de un BETWEEN de SQL
+         dinamico, asi que el formato lo interpreta el servidor con SU idioma.
+         "yyyy-MM-dd HH:mm:ss" es el unico que no cambia de significado, y el
+         fin del rango lleva 23:59:59 porque la columna es datetime: sin la hora,
+         "hasta el 5" deja fuera todo lo capturado ese dia.
+
+      La precedencia (folio de concentrado > folio de nota > fechas) NO se toca:
+      es un IF/ELSE IF/ELSE del propio procedimiento y se mandan los tres.
+    */
+    public Task<ConsultaFilasResponse> ConsultarConcentradosAsync(
+        ConcentradosConsultaRequest request, int idUsuarioActual, CancellationToken ct)
+    {
+        return EjecutarFilasAsync(SpConcentrados, p =>
+        {
+            p.AddWithValue("@IDConcentrado", 0);
+            p.AddWithValue("@IDRepartidor", request.IDRepartidor);
+            /* La pantalla de Mac31 no tiene filtro de usuario del concentrado:
+               el parametro existe en el procedimiento y la forma nunca lo manda. */
+            p.AddWithValue("@IDUsuarioConcentrado", 0);
+            p.AddWithValue("@FolioInicialConcentrado", request.FolioConcentrado);
+            p.AddWithValue("@FolioFinalConcentrado", request.FolioConcentrado);
+            p.AddWithValue("@FechaInicialConcentrado", Fecha(request.FechaInicial, false));
+            p.AddWithValue("@FechaFinalConcentrado", Fecha(request.FechaFinal, true));
+            /* La caja EMPRESA de la pantalla no entra en este filtro: el
+               procedimiento tiene la linea `AND V.IDEmpresa = ...` COMENTADA
+               junto al folio de venta (sp_n_ConsultarConcentrados, rama
+               @FolioInicialVenta). Mandar la empresa no cambiaria nada, y
+               mandarla haria creer que filtra. */
+            p.AddWithValue("@IDEmpresaVenta", 0);
+            p.AddWithValue("@FolioInicialVenta", request.FolioVenta);
+            p.AddWithValue("@FolioFinalVenta", request.FolioVenta);
+            p.AddWithValue("@IDUsuarioActual", idUsuarioActual);
         }, ct);
     }
 

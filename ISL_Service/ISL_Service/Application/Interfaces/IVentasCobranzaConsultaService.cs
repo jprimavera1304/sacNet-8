@@ -11,6 +11,8 @@ public interface IVentasCobranzaConsultaService
 
     Task<ConsultaFilasResponse> ValidarFolioConcentradoAsync(ConcentradoFolioRequest request, int idUsuarioActual, CancellationToken ct);
 
+    Task<ConsultaFilasResponse> ConsultarConcentradosAsync(ConcentradosConsultaRequest request, int idUsuarioActual, CancellationToken ct);
+
     Task<ConsultaFilasResponse> ConsultarConcentradoDetalleAsync(int idConcentrado, CancellationToken ct);
 
     Task<ConsultaFilasResponse> ConsultarCobrosCentroServicioAsync(int idCobro, int folioCobro, CancellationToken ct);
