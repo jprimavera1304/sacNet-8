@@ -75,10 +75,47 @@ public static class ProcedimientosRotosEnLaBase
     /// Zaragoza. El gemelo se instala en las dos para que exista donde se
     /// busca.
     /// </summary>
+    /// <summary>
+    /// 493, Comparativo Ventas y Pagos.
+    ///
+    /// Su `spV2` es `sp_n_rptVentasPagosVsFoliosGlobales`, que hace dos veces
+    /// `INSERT INTO #VentasPagosTmp EXEC sp_n_rptVentasPagos`:
+    ///
+    ///     Msg 213 ... Procedure sp_n_rptVentasPagos
+    ///     Column name or number of supplied values does not match table definition.
+    ///
+    /// Aqui el interno NO esta roto: es el mismo que usan el 71, el 75 y el 77,
+    /// y esos tres salen. Lo que esta mal es el ENVOLVENTE del 493. Su temporal
+    /// se quedo en 115 columnas mientras el interno crecio a 125, y
+    /// `INSERT ... EXEC` empareja POR POSICION, no por nombre.
+    ///
+    /// La rama detallada del interno devuelve `SELECT * FROM`
+    /// `#PagosMovimientosResultado`, que es `#PagosMovimientos` (59 columnas)
+    /// mas 66 totales calculados. El envolvente del 71
+    /// (`#VentasPagosDetallado`) si se actualizo a esas 125 y es la referencia
+    /// contra la que se alineo el gemelo. Faltaban diez:
+    ///   - `IDPagoVentaUsado`, en la posicion 2.
+    ///   - `IDRepartidorLiquidacion`, `IDAgenteLiquidacion`, `Liquidacion`,
+    ///     que cierran el bloque de datos.
+    ///   - los seis de cascos por kilo, justo despues del bloque de Efectivo.
+    ///
+    /// La POSICION es el arreglo: agregarlas al final habria compilado y habria
+    /// corrido los valores de cincuenta columnas sin dar un solo error.
+    ///
+    /// Tambien se corrigieron tipos que el envolvente tenia mas estrechos que
+    /// el interno (`NumeroCliente` llega como `varchar(200)`, no `int`; los
+    /// `NumPagosSaldoDinero*` llegan ya formateados con `FORMAT()`, no como
+    /// numero).
+    ///
+    /// Aqui el gemelo es UNO SOLO, el envolvente: el interno se deja intacto
+    /// porque esta bien y lo comparten el 71, el 75 y el 77.
+    /// Script: `Querrys/34 Reporte 493 Ventas y Pagos Temporal Atrasado/`.
+    /// </summary>
     private static readonly Dictionary<string, string> Reemplazos = new(StringComparer.OrdinalIgnoreCase)
     {
         ["sp_n_rptAutos"] = "sp_w_rptAutos",
-        ["sp_n_rptVentasCobrosDineroCascosGlobales"] = "sp_w_rptVentasCobrosDineroCascosGlobales"
+        ["sp_n_rptVentasCobrosDineroCascosGlobales"] = "sp_w_rptVentasCobrosDineroCascosGlobales",
+        ["sp_n_rptVentasPagosVsFoliosGlobales"] = "sp_w_rptVentasPagosVsFoliosGlobales"
     };
 
     /// <summary>
