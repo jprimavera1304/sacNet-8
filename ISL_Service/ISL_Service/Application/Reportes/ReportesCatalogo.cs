@@ -136,6 +136,43 @@ public static class ReportesCatalogo
           reporte: es que el fichero exista donde el timbrado lo deja.
         */
         Ventas("concentrados", "Concentrados"),
+        /*
+          EL CONCENTRADO DE UN REPARTIDOR (1005), QUE NO ES EL DE ARRIBA.
+
+          `concentrados` es el 1185: el LISTADO de los concentrados de un rango
+          de fechas, el nodo del arbol de Reportes. Este es el DOCUMENTO de UN
+          concentrado -la hoja que firma el repartidor- y faltaba por completo:
+          no estaba en el catalogo, no tenia id y no tenia armador, asi que
+          desde el web no habia forma de imprimirlo.
+
+          FUERA DEL ARBOL, como los demas documentos de boton: pide los
+          IDConcentrado marcados en la rejilla, no un rango, y un nodo del arbol
+          no sabria que pedirle. Sale del boton IMPRIMIR de
+          ConsultarConcentrados de Mac31 y de la pantalla Concentrado.
+
+          SIN PERMISO PROPIO, y es la misma decision que ya se tomo para
+          `hoja_de_cobro`, no una nueva. Su clave por la regla seria
+          `reportes.ventas.concentrado.ver` y NO existe en WPermiso -comprobado
+          en MacZ: las unicas que mencionan concentrados son
+          `reportes.ventas.concentrados.ver`, que es la del NODO del arbol (el
+          1185), y `cobranza.concentrados.{editar, cancelar}`, que son las de la
+          pantalla-. Declararla seria un candado que nadie tiene: el boton no se
+          dibujaria para NADIE.
+
+          Y NO SE LE CUELGA la del listado. Se probo y el propio juego de
+          pruebas lo rechaza: la regla de la casa es un permiso por reporte, y la
+          unica excepcion es el nodo "Movimientos Centros", que dispara tres
+          reportes con UN clic. Aqui son dos clics en dos pantallas distintas
+          -el nodo del arbol de Reportes y el boton IMPRIMIR de la pantalla de
+          concentrados-, asi que compartir el permiso obligaria a tener el
+          listado de Reportes para imprimir el papel del repartidor, que es
+          justo lo que se decidio NO hacer con la hoja de cobro.
+
+          Lo que lo protege es poder entrar al modulo (reportes.ver_modulo, que
+          el controlador exige siempre) y a la pantalla de concentrados. El dia
+          que se de de alta la clave, se cambia esta linea y nada mas.
+        */
+        new("concentrado", "ventas", "Concentrado", SinPermiso, EnArbol: false),
         Ventas("cobranza", "Cobranza"),
         Ventas("cobranza_detallado", "Cobranza Detallado"),
         // Legacy pide el proceso ("Ventas Pagadas" + "Cobranza Pagadas"), una

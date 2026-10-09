@@ -184,6 +184,8 @@ public partial class ReportesVentasRepository
             "remisiones" => ResolveStatusFolio(request.EstatusFolio) == 4 ? ReporteVentasRemisionesSaldoFavor : ReporteVentasRemisiones,
             "facturas" => ReporteVentasFacturas,
             "concentrados" => ReporteVentasConcentradosDetalle,
+            // El DOCUMENTO de un concentrado, no el listado. Ver las constantes.
+            "concentrado" => ReporteConcentrado,
             // "cobranza" NO esta aqui: depende de la empresa y se resuelve arriba,
             // con las constantes en la mano.
             "motobaterias" => ResolveReporteMotobaterias(request.FormatoMotobaterias),
@@ -841,6 +843,52 @@ public partial class ReportesVentasRepository
         return new ReportesVentasAcumuladoresProductosRequest();
     }
 
+    /*
+      LOS PARAMETROS DEL CONCENTRADO: LOS IDS Y NADA MAS.
+
+      Mac31 lo pide con `VerReporte(enumReportes.Concentrado, IDsConcentrado)`
+      (ConsultarConcentrados.cs:1239), y ese VerReporte deja Param2 = los ids
+      separados por `~` y Param3..Param7 vacios (Funciones.cs:223-236). No lleva
+      fechas, ni empresas, ni presentacion: la cabecera del papel -folio, fecha,
+      repartidor, observaciones- la traen los procedimientos.
+
+      Se reusa `idsConcentrado`, que es el campo que ya existia para la hoja de
+      cobro, en vez de inventar otro: es el mismo dato pedido desde otra
+      pantalla.
+    */
+    private static LegacyReportParams BuildConcentradoLegacyParams(ReportesVentasLegacyRequest request)
+    {
+        if (request.IDsConcentrado.Count == 0)
+            throw new ArgumentException("El concentrado necesita al menos un concentrado: manda idsConcentrado.");
+
+        return new LegacyReportParams
+        {
+            NombreEquipo = ResolveLegacyNombreEquipo(request),
+            IDUsuario = ResolveLegacyIDUsuario(request),
+            Param1 = BuildLegacyUsuarioParam(request),
+            Param2 = JoinIdsPorPosicion(request.IDsConcentrado),
+            Param3 = "",
+            Param4 = "",
+            Param5 = "",
+            Param6 = "",
+            Param7 = ""
+        };
+    }
+
+    /*
+      TAMPOCO ES DE LA FAMILIA GENERICA, y por la misma razon que la hoja de
+      cobro: sus plantillas se llaman `concentrado_*` y la generica buscaria un
+      `cuerpo_n` que este reporte no tiene.
+    */
+    private static bool IsConcentradoDocumentoReporte(int idReporte) => idReporte == ReporteConcentrado;
+
+    /* No imprime filtros en la cabecera, asi que no hay nada que reconstruir
+       del renglon de parametros. Mismo caso que BuildCobroStoredRequest. */
+    private static ReportesVentasAcumuladoresProductosRequest BuildConcentradoStoredRequest()
+    {
+        return new ReportesVentasAcumuladoresProductosRequest();
+    }
+
     private static async Task<LegacyReportParams> BuildLegacyVentasParamsAsync(
         SqlConnection conn,
         int idReporte,
@@ -882,6 +930,9 @@ public partial class ReportesVentasRepository
 
             case ReporteCobro:
                 return BuildCobroLegacyParams(request);
+
+            case ReporteConcentrado:
+                return BuildConcentradoLegacyParams(request);
         }
 
         var idCliente = await ResolveClienteLegacyAsync(conn, request, ct);

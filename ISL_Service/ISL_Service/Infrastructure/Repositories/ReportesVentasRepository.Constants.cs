@@ -266,6 +266,27 @@ public partial class ReportesVentasRepository
       asi que no lo pinta la plantilla generica: lo arma CobroHtmlBuilder.
     */
     private const int ReporteCobro = 1006;
+
+    /*
+      EL CONCENTRADO DEL REPARTIDOR, QUE NO ES EL LISTADO DE CONCENTRADOS.
+
+      1185 (ReporteVentasConcentradosDetalle, arriba) es el LISTADO por rango de
+      fechas, el nodo del arbol. 1005 es el DOCUMENTO de UN concentrado: la hoja
+      con sus acumuladores, sus productos, sus cascos y su rejilla de folios, la
+      que imprime el boton IMPRIMIR de ConsultarConcentrados de Mac31
+      (ConsultarConcentrados.cs:1239) y la propia pantalla Concentrado
+      (Concentrado.cs:908).
+
+      Su `spV2` declara TRES procedimientos, igual que la hoja de cobro, y sus
+      seis plantillas se llaman `concentrado_*`: no lo puede pintar la plantilla
+      generica, lo arma ConcentradoHtmlBuilder.
+
+      1008 ("Concentrado Devueltas") comparte los tres procedimientos y las seis
+      piezas con otro texto. No se da de alta todavia: en Mac31 no hay ningun
+      boton que lo dispare -se busco `enumReportes.ConcentradoDevueltas` en todo
+      Mac31 y no aparece-, asi que no se sabe con que parametros se pide.
+    */
+    private const int ReporteConcentrado = 1005;
     private const int GrupoCategoriaAcumuladores = 1;
     private const int ProductoServicioDomicilio = 11807;
     private const string FallbackLogoPath = "Assets/Logos/Logo_Zaragoza.png";
