@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using ISL_Service.Application.DTOs.Reportes;
 using ISL_Service.Application.Interfaces;
@@ -16,6 +17,22 @@ public partial class ReportesVentasRepository
         int idReporte,
         CancellationToken ct)
     {
+        /*
+          EL RECIBO DE NOMINA NO TIENE RENGLON Y NO LO NECESITA.
+
+          `dbo.Reportes` no tiene el 1020 en ninguna de las dos bases, asi que
+          preguntarselo a `sp_ConsultaReportes` solo puede devolver vacio. Su
+          configuracion esta escrita aqui porque es FIJA: el nombre que imprime
+          Mac31 y el procedimiento que de verdad trae los datos. No se le agrega
+          el renglon a la tabla: esa tabla la lee tambien Mac31 y no estamos
+          migrando a Mac31.
+
+          Va antes de la consulta para no gastar un viaje a la base que se sabe
+          que vuelve vacio.
+        */
+        if (idReporte == ReporteNominaRecibos)
+            return ConfiguracionDeReporteSinRenglon(idReporte);
+
         var ds = await ExecuteLegacySpAsync(conn, "sp_ConsultaReportes", idReporte.ToString(), ct);
         if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
             throw new InvalidOperationException("Reporte no encontrado en sp_ConsultaReportes.");
@@ -44,6 +61,28 @@ public partial class ReportesVentasRepository
             StoredProcedure = sp,
             Aspx = Convert.ToString(row["aspx"]) ?? "",
             IDReporteMaster = ReadInt(row, "IDReporteMaster")
+        };
+    }
+
+    /*
+      LA CONFIGURACION DE LOS REPORTES QUE NO ESTAN EN `dbo.Reportes`.
+
+      Hoy es uno solo, el recibo de nomina. El nombre es el que imprime la
+      cabecera del papel y el procedimiento es el que trae los empleados con sus
+      percepciones; el `Aspx` dice que armador lo pinta, igual que para los que
+      si tienen renglon.
+    */
+    private static LegacyReportConfig ConfiguracionDeReporteSinRenglon(int idReporte)
+    {
+        if (idReporte != ReporteNominaRecibos)
+            throw new InvalidOperationException("Reporte no encontrado en sp_ConsultaReportes.");
+
+        return new LegacyReportConfig
+        {
+            NombreReporte = "RECIBOS DE NOMINA",
+            StoredProcedure = "sp_n_ConsultaEmpleadosTipoSueldoRecibo",
+            Aspx = "recibo_nomina",
+            IDReporteMaster = 0
         };
     }
 
@@ -140,6 +179,118 @@ public partial class ReportesVentasRepository
             throw new InvalidOperationException("No se encontraron templates HTML para el reporte.");
 
         return ds.Tables[0];
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* LOS DATOS DE NOMINA QUE EL CAMINO GENERICO NO SABE PEDIR            */
+    /* ------------------------------------------------------------------ */
+
+    /*
+      QUE PROCEDIMIENTO DE RECIBOS LE TOCA A ESTA EMPRESA.
+
+      Legacy elige con `AppMac.Contains("MACT")`
+      (EmpleadoTipoSueldoReciboRepository.cs:108-111). Aqui se reusa el `EsTauro`
+      que ya tiene este repositorio, que mira `Funcionalidad`: es la otra cara de
+      la misma moneda y las dos bases coinciden —MacZ dice AppMac "MacZ.exe" y
+      Funcionalidad "ZARA"; Produccion_svr dice "MacT.exe" y "TAU"—.
+    */
+    private static string SpDeRecibos(bool esTauro)
+    {
+        return esTauro
+            ? "sp_n_ConsultaEmpleadosTipoSueldoRecibo"
+            : "sp_n_ConsultaEmpleadosTipoSueldoReciboZara";
+    }
+
+    /// <summary>
+    /// Los recibos de un periodo. El procedimiento recibe DOS argumentos: el
+    /// renglon de parametros y el periodo. Con el periodo en 0 el propio SP toma
+    /// el que guarda el renglon (Param3).
+    /// </summary>
+    private static async Task<DataTable> ConsultarRecibosAsync(
+        SqlConnection conn,
+        string sp,
+        int parametroId,
+        int idPeriodoTipoSueldo,
+        CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand(sp, conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = 500
+        };
+        cmd.Parameters.AddWithValue("@Params", parametroId.ToString(CultureInfo.InvariantCulture));
+        cmd.Parameters.AddWithValue("@IDPeriodoTipoSueldo", idPeriodoTipoSueldo);
+
+        var ds = await FillDataSetAsync(cmd, ct);
+        return ds.Tables.Count > 0 ? ds.Tables[0] : new DataTable();
+    }
+
+    /// <summary>Los dias del periodo, de donde salen los siete encabezados.</summary>
+    private static async Task<DataTable> ConsultarDiasDelPeriodoAsync(
+        SqlConnection conn,
+        int idPeriodoTipoSueldo,
+        CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("sp_n_ConsultaPeriodosTipoSueldoDias", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = 500
+        };
+        cmd.Parameters.AddWithValue("@IDPeriodoTipoSueldo", idPeriodoTipoSueldo);
+        cmd.Parameters.AddWithValue("@IDPeriodicidad", 0);
+        cmd.Parameters.AddWithValue("@IDTipoSueldo", 0);
+        cmd.Parameters.AddWithValue("@IDPeriodoStatus", 0);
+
+        var ds = await FillDataSetAsync(cmd, ct);
+        return ds.Tables.Count > 0 ? ds.Tables[0] : new DataTable();
+    }
+
+    /// <summary>El renglon del periodo, de donde salen sus tags en la plantilla.</summary>
+    private static async Task<DataTable> ConsultarPeriodoAsync(
+        SqlConnection conn,
+        int idPeriodoTipoSueldo,
+        CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("sp_n_ConsultaPeriodosTipoSueldo", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = 500
+        };
+        cmd.Parameters.AddWithValue("@IDPeriodoTipoSueldo", idPeriodoTipoSueldo);
+        cmd.Parameters.AddWithValue("@IDPeriodicidad", 0);
+        cmd.Parameters.AddWithValue("@IDTipoSueldo", 0);
+        cmd.Parameters.AddWithValue("@IDPeriodoStatus", 0);
+        cmd.Parameters.AddWithValue("@Orden", 0);
+
+        var ds = await FillDataSetAsync(cmd, ct);
+        return ds.Tables.Count > 0 ? ds.Tables[0] : new DataTable();
+    }
+
+    /*
+      LAS SIETE COLUMNAS DE DIAS POR EMPLEADO.
+
+      Es el procedimiento que la nota decia que no existia. `@IDEmpleado = 0`
+      trae todos y se filtra despues por empleado, que es lo que hace legacy
+      (sp_n_ConsultaEmpleadosTipoSueldoRecibo lo llama asi, con su comentario
+      "Traer las asistencias de todos los empleados y despues filtrar").
+      `@IDStatus = 3` es TODOS, como en ReporteAsistenciaService.cs:109.
+    */
+    private static async Task<DataTable> ConsultarAsistenciasDelPeriodoAsync(
+        SqlConnection conn,
+        int idPeriodoTipoSueldo,
+        CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("sp_n_ConsultaEmpleadosPeriodoAsistencia", conn)
+        {
+            CommandType = CommandType.StoredProcedure,
+            CommandTimeout = 500
+        };
+        cmd.Parameters.AddWithValue("@IDPeriodoTipoSueldo", idPeriodoTipoSueldo);
+        cmd.Parameters.AddWithValue("@IDEmpleado", 0);
+        cmd.Parameters.AddWithValue("@IDStatus", 3);
+
+        var ds = await FillDataSetAsync(cmd, ct);
+        return ds.Tables.Count > 0 ? ds.Tables[0] : new DataTable();
     }
 
     private static LegacyTemplate BuildTemplateInfo(DataTable templates)

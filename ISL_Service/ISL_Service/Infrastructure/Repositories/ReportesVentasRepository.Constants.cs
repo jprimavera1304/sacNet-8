@@ -67,10 +67,14 @@ public partial class ReportesVentasRepository
       Es otro formulario de Mac31 (Forms/Reportes/ReporteEmpleadoAsistenciaRecibos.cs)
       con dos rejillas -periodos de tipo de sueldo y empleados- y cinco botones.
       Cuatro de los cinco son reportes de `dbo.Reportes` y entran aqui; el quinto
-      (RECIBOS) NO: Mac31 lo manda a otra direccion
-      (`Variables.URL_REPORTES_RECIBOS` -> /EmpleadosTipoSueldoRecibos/Index de
-      MacReportes, :286) y NO tiene renglon en `dbo.Reportes`, asi que este motor
-      no lo puede alcanzar. Comprobado en MacZ: 1020 no existe en la tabla.
+      (RECIBOS) SIGUE SIN RENGLON EN `dbo.Reportes` —comprobado en MacZ y en
+      Produccion_svr— y por eso NO pasa por el camino de `spV2`: su
+      configuracion la pone ConfiguracionDeReporteSinRenglon y su HTML lo arma
+      ReciboNominaHtmlBuilder con las plantillas 1020 de `Template_Html`, que si
+      existen en las dos bases. Que Mac31 lo mande a
+      /EmpleadosTipoSueldoRecibos/Index de MacReportes no significa que el papel
+      se arme alla: alla solo se pasa a PDF un HTML que arma MacServicios con
+      estas mismas plantillas y estos mismos procedimientos.
 
       LOS CUATRO COMPARTEN UN JUEGO DE PARAMETROS PROPIO, distinto del generico
       de ventas. Lo dice su `#ParamIds`, leido en MacZ:
@@ -87,13 +91,17 @@ public partial class ReportesVentasRepository
       - 1027 VACACIONES ES SOLO EXCEL, y no por decision nuestra: el propio
         `sp_n_rptEmpleadosVacaciones` hace `SELECT @Presentacion = 3` pisando lo
         que le llegue. Pedirlo "en pantalla" devuelve la tabla de Excel igual.
-      - 1024 y 1025 tienen `Aspx` VACIO en `dbo.Reportes`. No es un problema para
-        este motor -el motor solo lee `spV2` y las plantillas de `Template_Html`,
-        y las tres filas de cada uno SI existen- pero explica por que Legacy los
-        trata aparte en ReporteV2Service.cs:860.
+      - 1024 y 1025 tienen `Aspx` VACIO en `dbo.Reportes`, y por eso caerian en
+        el formato normal, que no sabe llenar las siete columnas de dias. Se
+        desvian a NominaAsistenciasHtmlBuilder, que es la rama dedicada de
+        legacy (MacServicios2/.../ReporteAsistenciaService.cs) portada: las
+        columnas de dias salen de `sp_n_ConsultaEmpleadosPeriodoAsistencia` y
+        los encabezados de `sp_n_ConsultaPeriodosTipoSueldoDias`.
     */
     private const int ReporteNominaAsistenciasCorto = 1024;
     private const int ReporteNominaAsistencias = 1025;
+    /// <summary>Recibos de nomina. Sin renglon en `dbo.Reportes`: ver ReciboNominaHtmlBuilder.</summary>
+    private const int ReporteNominaRecibos = 1020;
     private const int ReporteNominaVacaciones = 1027;
     private const int ReporteNominaInasistencias = 1190;
     private const int ReporteAsistenciasZaragoza = 1026;
