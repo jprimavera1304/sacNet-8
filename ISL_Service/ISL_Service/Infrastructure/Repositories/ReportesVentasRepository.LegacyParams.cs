@@ -164,14 +164,40 @@ public partial class ReportesVentasRepository
           Se mantiene la regla de la casa: el front manda la CLAVE y nunca el
           IDReporte, asi que es aqui —y solo aqui— donde se decide.
         */
+        /*
+          "inventario_actual" e "inventario_faltante" ENTRAN AQUI porque la
+          variante de FILTROS es solo de Tauro.
+
+          Mac31 manda la categoria FILTROS al reporte de Filtros unicamente
+          cuando la instalacion es Tauro:
+
+              if (Variables.funcionalidad.ToUpper().Contains("TAU"))
+                  if (IDGrupoCategoria == ID_GRUPO_CATEGORIA_FILTROS)
+                      this.IDReporte = InventarioFiltros;      // 212
+                  else
+                      this.IDReporte = InventarioProductos;    // 210
+              else
+                  this.IDReporte = InventarioProductos;        // 210
+
+          (ReportesMenu.cs, el case InventarioAcumuladores). Nosotros mandabamos
+          al 212 en cualquier empresa, asi que en Zaragoza -Funcionalidad =
+          "ZARA", leido de Constantes en MacZ- el papel salia titulado
+          "Inventario Actual de Filtros" en vez de "... de Productos" y con otra
+          plantilla de totales (652 contra 942 caracteres en Template_Html). Es
+          literalmente otro documento.
+        */
         if (clave is "pagos" or "listas_de_precios" or "listas_de_precios_imp" or "cobranza"
-            or "comprobante_de_cascos")
+            or "comprobante_de_cascos" or "inventario_actual" or "inventario_faltante")
         {
             var constants = await ConsultarConstantesAsync(conn, ct);
             if (clave == "cobranza")
                 return ResolveReporteCobranza(constants);
             if (clave == "comprobante_de_cascos")
                 return EsTauro(constants) ? ReporteComprobanteCascosTauro : ReporteComprobanteCascos;
+            if (clave == "inventario_actual")
+                return ResolveReporteInventarioActual(request, constants);
+            if (clave == "inventario_faltante")
+                return ResolveReporteInventarioFaltante(request.IDGrupoCategoria);
             return clave == "pagos"
                 ? ResolveReportePagos(request.Formato, constants)
                 : ResolveReporteListasPrecios(request, constants);
@@ -210,8 +236,8 @@ public partial class ReportesVentasRepository
             "clientes_acum_moto_lub_clarios" => ReporteClientesAcumMotoLubClarios,
             "compras_acumuladores_y_productos" => request.IDGrupoCategoria == GrupoCategoriaAcumuladores ? ReporteCompraAcumuladores : ReporteCompraProductos,
             "compras_facturas" => ReporteComprasFacturas,
-            "inventario_actual" => ResolveReporteInventarioActual(request),
-            "inventario_faltante" => ResolveReporteInventarioFaltante(request.IDGrupoCategoria),
+            // "inventario_actual" e "inventario_faltante" se resuelven arriba,
+            // con las Constantes en la mano: la variante de Filtros es de Tauro.
             "ajustes_al_inventario" => ReporteAjustesInventario,
             "movimientos" => ReporteMovimientosAlmacen,
             "cascos" => ReporteVentasUsadosCreditos,
@@ -435,17 +461,25 @@ public partial class ReportesVentasRepository
         };
     }
 
-    private static int ResolveReporteInventarioActual(ReportesVentasLegacyRequest request)
+    /// <summary>El grupo FILTROS. Solo Tauro tiene reporte propio para el.</summary>
+    private const int GrupoCategoriaFiltros = 2;
+
+    private static int ResolveReporteInventarioActual(ReportesVentasLegacyRequest request, LegacyConstants constants)
     {
         var idGrupoCategoria = request.IDGrupoCategoria > 0 ? request.IDGrupoCategoria : GrupoCategoriaAcumuladores;
+
         if (request.InventarioConCostos)
         {
-            return idGrupoCategoria switch
-            {
-                2 => ReporteInventarioFiltrosCosto,
-                GrupoCategoriaAcumuladores => ReporteInventarioAcumuladoresCosto,
-                _ => ReporteInventarioProductosCosto
-            };
+            /*
+              NO HAY VARIANTE DE FILTROS CON COSTOS, Y NO ES UN OLVIDO: en Mac31
+              esa rama esta COMENTADA (`////else if(IDGrupoCategoria ==
+              ID_GRUPO_CATEGORIA_FILTROS) this.IDReporte = InventarioFiltrosCosto;`),
+              asi que ni Tauro ni Zaragoza sacan nunca el 227. Pedirlo era
+              imprimir un reporte que en Mac31 no existe.
+            */
+            return idGrupoCategoria == GrupoCategoriaAcumuladores
+                ? ReporteInventarioAcumuladoresCosto
+                : ReporteInventarioProductosCosto;
         }
 
         if (request.InventarioGenerarPedido)
@@ -455,22 +489,28 @@ public partial class ReportesVentasRepository
                 : ReportePedidoProductos;
         }
 
-        return idGrupoCategoria switch
-        {
-            2 => ReporteInventarioFiltros,
-            GrupoCategoriaAcumuladores => ReporteInventarioAcumuladores,
-            _ => ReporteInventarioProductos
-        };
+        if (idGrupoCategoria == GrupoCategoriaAcumuladores)
+            return ReporteInventarioAcumuladores;
+
+        // El 212 (Filtros) solo en Tauro; en Zaragoza FILTROS es el 210.
+        return idGrupoCategoria == GrupoCategoriaFiltros && EsTauro(constants)
+            ? ReporteInventarioFiltros
+            : ReporteInventarioProductos;
     }
 
+    /*
+      EL FALTANTE NO TIENE VARIANTE DE FILTROS EN NINGUNA EMPRESA. Igual que el
+      de costos: la rama de Mac31 esta comentada (`////else if
+      (IDGrupoCategoria == ID_GRUPO_CATEGORIA_FILTROS) this.IDReporte =
+      InventarioFaltanteFiltros;`), asi que el 1141 no lo imprime nadie. Antes lo
+      pediamos para la categoria FILTROS y salia con otro titulo y otra plantilla
+      de totales que el papel de Mac31.
+    */
     private static int ResolveReporteInventarioFaltante(int idGrupoCategoria)
     {
-        return idGrupoCategoria switch
-        {
-            2 => ReporteInventarioFaltanteFiltros,
-            GrupoCategoriaAcumuladores => ReporteInventarioFaltanteAcumuladores,
-            _ => ReporteInventarioFaltanteProductos
-        };
+        return idGrupoCategoria == GrupoCategoriaAcumuladores
+            ? ReporteInventarioFaltanteAcumuladores
+            : ReporteInventarioFaltanteProductos;
     }
 
     private static string ResolveFormatoEstadoCuenta(string? formato)
