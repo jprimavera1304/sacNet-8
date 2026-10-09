@@ -26,31 +26,22 @@ namespace ISL_Service.Infrastructure.Reports;
 public static class RemisionFormatoLegacy
 {
     /*
-      LA CULTURA SE FIJA Y ADEMAS SE LE CLAVAN LOS DESIGNADORES DE AM/PM.
+      LA CULTURA SALE DE FormatoFechaLegacy, QUE ES LA DE TODOS LOS REPORTES.
 
-      Legacy corre sobre .NET Framework, donde es-MX da la hora en 12 horas con
-      "a. m." / "p. m.". Nosotros corremos sobre .NET 8, que toma sus datos de
-      ICU y ahi es-MX es de 24 horas: el papel salia "11:18:58" donde Mac31
-      imprime "11:19:01 a. m.".
+      Aqui vivia su propia copia: es-MX con los designadores "a. m." / "p. m."
+      escritos a mano, porque legacy corre sobre .NET Framework (hora de 12) y
+      nosotros sobre .NET 8, que saca es-MX de ICU y ahi la hora es de 24.
 
-      No basta con pedir el formato de 12 horas: el texto del designador tambien
-      cambia entre versiones de ICU (hay entornos donde es "a.m." sin espacios, y
-      otros donde viene con espacio duro). Se escriben a mano para que el papel
-      salga igual en cualquier maquina donde se despliegue, que es justo lo que
-      no se puede dejar al azar en un documento que se imprime y se archiva.
+      El mismo problema aparecio en la hoja de cobro, asi que la cultura se
+      mudo a FormatoFechaLegacy y aqui solo se apunta: una sola definicion para
+      todos los papeles portados, y un solo sitio donde mirar si alguna vez un
+      reporte imprime la hora distinta a Mac31. El resultado es el mismo que
+      antes para la remision, con los patrones ademas clavados.
     */
-    public static readonly CultureInfo Cultura = CrearCultura();
+    public static readonly CultureInfo Cultura = FormatoFechaLegacy.Cultura;
 
     /* El formato con el que legacy escribe una fecha con hora. */
     private const string FormatoFechaHora = "dd/MM/yyyy hh:mm:ss tt";
-
-    private static CultureInfo CrearCultura()
-    {
-        var cultura = (CultureInfo)CultureInfo.GetCultureInfo("es-MX").Clone();
-        cultura.DateTimeFormat.AMDesignator = "a. m.";
-        cultura.DateTimeFormat.PMDesignator = "p. m.";
-        return cultura;
-    }
 
     /// Convierte el valor crudo de una columna a texto igual que lo hace legacy.
     public static string ValorDeColumna(object? valor)

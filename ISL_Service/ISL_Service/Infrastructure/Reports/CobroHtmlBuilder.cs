@@ -66,8 +66,13 @@ public static class CobroHtmlBuilder
        "0.00" y no como "0", y es el que esta en las cuarenta llamadas de
        ReporteCobroService. La cultura va fija a es-MX porque el servidor puede
        levantarse con la de la maquina y entonces el punto decimal cambia de
-       sitio: el mismo reporte diria 9,353.00 aqui y 9.353,00 alla. */
-    private static readonly CultureInfo Mx = CultureInfo.GetCultureInfo("es-MX");
+       sitio: el mismo reporte diria 9,353.00 aqui y 9.353,00 alla.
+
+       Se toma de FormatoFechaLegacy, que es la misma es-MX pero con los
+       patrones de fecha y hora clavados a los de Mac31. Para los numeros da
+       exactamente lo mismo; se comparte para que no haya dos culturas sueltas
+       en el mismo papel. */
+    private static readonly CultureInfo Mx = FormatoFechaLegacy.Cultura;
 
     public static string Construir(
         string logo,
@@ -168,7 +173,7 @@ public static class CobroHtmlBuilder
         cuerpo = cuerpo.Replace("#Titulo#", reporteNombre);
         /* La fecha de impresion es la de AHORA, no la del cobro: sirve para
            distinguir dos copias del mismo folio sacadas en dias distintos. */
-        cuerpo = cuerpo.Replace("#Impresion#", DateTime.Now.ToString(Mx));
+        cuerpo = cuerpo.Replace("#Impresion#", FormatoFechaLegacy.FechaHora(DateTime.Now));
         cuerpo = cuerpo.Replace("#FolioCobro#", Texto(cabecera, "FolioCobro"));
         cuerpo = cuerpo.Replace("#FechaCobroFtm#", Texto(cabecera, "FechaCobro"));
         cuerpo = cuerpo.Replace("#Titulo3#", $"REPARTIDOR: <b>{Texto(cabecera, "Repartidor")}</b>");
@@ -509,10 +514,9 @@ public static class CobroHtmlBuilder
     {
         var html = new StringBuilder();
 
-        foreach (var fila in folios)
+        foreach (var fila in PorFolio(folios, conA: false))
         {
             if (!EsFolioDelConcentrado(fila)) continue;
-            if (Texto(fila, "FolioVentaFtm").StartsWith("A-", StringComparison.Ordinal)) continue;
 
             pie.Tomar(fila);
 
@@ -574,10 +578,9 @@ public static class CobroHtmlBuilder
     {
         var html = new StringBuilder();
 
-        foreach (var fila in folios)
+        foreach (var fila in PorFolio(folios, conA: true))
         {
             if (!EsFolioDelConcentrado(fila)) continue;
-            if (!Texto(fila, "FolioVentaFtm").StartsWith("A-", StringComparison.Ordinal)) continue;
 
             pie.Tomar(fila);
 
@@ -632,6 +635,42 @@ public static class CobroHtmlBuilder
         }
 
         return html.ToString();
+    }
+
+    /*
+      LAS DOS PRIMERAS PASADAS VAN ORDENADAS POR FOLIO, Y NO ES UN CAPRICHO.
+
+      El `sp_n_` devuelve los renglones con `ORDER BY IDConcentrado, FolioVenta,
+      Orden`, o sea por el folio NUMERICO: en el cobro 27861 eso pone el
+      G-8569 (folio 8569) delante de los 125349..125369.
+
+      Mac31 lo imprime al reves, el G-8569 AL FINAL, y no porque ordene nada a
+      mano: porque separa las dos pasadas con
+
+          dtCobroFoliosUsados.Select("FolioVentaFtm NOT LIKE 'A-%'")
+          dtCobroFoliosUsados.Select("FolioVentaFtm LIKE 'A-%'")
+
+      y `DataTable.Select(filtro)` NO conserva el orden de la tabla: construye
+      un indice sobre la columna del filtro y devuelve las filas por ese indice.
+      El filtro mira `FolioVentaFtm`, que es TEXTO, asi que el resultado sale
+      ordenado como texto —"125349" < … < "125369" < "G-8569"— y el renglon de
+      garantia cae al final. Es un efecto secundario, no una decision, pero es
+      el que esta impreso en el papel que firma el repartidor.
+
+      Nosotros filtramos con LINQ sobre un DataRow[], que SI conserva el orden,
+      y por eso el G-8569 nos salia arriba. Se reproduce el orden de legacy
+      ordenando explicitamente por FolioVentaFtm. Ordinal porque es lo que hace
+      el indice sobre una columna de folios (digitos y prefijos A-/G-, sin
+      acentos) y porque asi el resultado no depende de la maquina.
+
+      La tercera pasada, la de cobranza, no pasa por aqui: esa si la ordena
+      legacy a mano por NombreCliente.
+    */
+    private static IEnumerable<DataRow> PorFolio(DataRow[] folios, bool conA)
+    {
+        return folios
+            .Where(fila => Texto(fila, "FolioVentaFtm").StartsWith("A-", StringComparison.Ordinal) == conA)
+            .OrderBy(fila => Texto(fila, "FolioVentaFtm"), StringComparer.Ordinal);
     }
 
     private static bool EsFolioDelConcentrado(DataRow fila)
@@ -893,8 +932,11 @@ public static class CobroHtmlBuilder
     {
         if (fila is null || !fila.Table.Columns.Contains(columna))
             return "";
-        var valor = fila[columna];
-        return valor == DBNull.Value ? "" : Convert.ToString(valor) ?? "";
+        /* Legacy escribe `fila[columna].ToString()` a pelo, asi que las columnas
+           datetime (FechaCobro, FechaModificacion) salen con el formato de la
+           cultura. Se pasan por FormatoFechaLegacy para que esa cultura sea la
+           de Mac31 y no la que traiga la maquina. Ver FormatoFechaLegacy. */
+        return FormatoFechaLegacy.Celda(fila[columna]);
     }
 
     private static int Entero(DataRow? fila, string columna)
