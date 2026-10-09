@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using ISL_Service.Application.DTOs.Reportes;
 using ISL_Service.Application.Interfaces;
@@ -209,8 +210,25 @@ public partial class ReportesVentasRepository
 
                 if (lineas == 0)
                 {
+                    /*
+                      EL ENCABEZADO SE LLENA SIEMPRE CON EL PRIMER RENGLON, NO CON
+                      EL QUE ABRE LA HOJA.
+
+                      Legacy toma `DataRow dr = dtDetalle.Rows[0]` UNA vez, fuera
+                      de cualquier cuenta de paginas, y con ese renglon resuelve
+                      todos los tags del cuerpo (RepFormatoNormalService.cs, dentro
+                      de EncabezadoHtml). Nosotros le pasabamos `row`, el renglon
+                      con el que empieza la hoja: en la hoja 1 da igual, y de la
+                      hoja 2 en adelante el encabezado salia con los datos de otro
+                      registro. En el 1260 (maxLineas 2) y en el 1345 (23) eso pasa
+                      enseguida.
+
+                      El unico tag que legacy SI saca del renglon en curso es
+                      #topWM#, la altura de la marca de agua, y por eso van dos
+                      renglones a la funcion y no uno.
+                    */
                     htmlCuerpo = "<p style='page-break-before: always'></p>";
-                    htmlCuerpo += BuildFormatoNormalHeader(cuerpoTemplate, logo, reporteNombre, numPagina, totalPaginas, table, row, numRegistro, request);
+                    htmlCuerpo += BuildFormatoNormalHeader(cuerpoTemplate, logo, reporteNombre, numPagina, totalPaginas, table, rows[0], row, request);
                 }
 
                 htmlDetalle += ReplaceValues(table, row, detalleTemplate);
@@ -409,7 +427,7 @@ public partial class ReportesVentasRepository
         ReportesVentasAcumuladoresProductosRequest request)
     {
         var html = BuildColumnas3Header(LeerCuerpoDeLaPlantilla(templates), logo, reporteNombre, 1, 1, null, null, request);
-        var mensaje = "<tr><td colspan='16' align='center'><br /><br /> <u> <h1>No se encontro informacion</h1> </u></td></tr>";
+        var mensaje = "<tr><td colspan='16' align='center'><br /><br /> <u> <h1>No se encontro información</h1> </u></td></tr>";
         html = html.Replace("#Detalle1#", mensaje);
         html = html.Replace("#Detalle2#", "");
         html = html.Replace("#Detalle3#", "");
@@ -460,7 +478,7 @@ public partial class ReportesVentasRepository
         ReportesVentasAcumuladoresProductosRequest request)
     {
         var html = BuildEmptyHeader(LeerCuerpoDeLaPlantilla(templates), logo, reporteNombre, request);
-        var mensaje = "<tr><td colspan='16' align='center'><br /><br /> <u> <h1>No se encontro informacion</h1> </u></td></tr>";
+        var mensaje = "<tr><td colspan='16' align='center'><br /><br /> <u> <h1>No se encontro información</h1> </u></td></tr>";
         html = html.Replace("#Detalle1#", mensaje);
         html = html.Replace("#Detalle#", mensaje);
         html = html.Replace("#Totales#", "");
@@ -510,6 +528,14 @@ public partial class ReportesVentasRepository
         return html;
     }
 
+    /// <param name="filaDeLosValores">
+    /// El PRIMER renglon del grupo: de ahi salen todos los tags del cuerpo, como
+    /// en legacy. Null solo en el papel sin informacion.
+    /// </param>
+    /// <param name="filaEnCurso">
+    /// El renglon con el que empieza esta hoja. Legacy lo usa unicamente para
+    /// #topWM#.
+    /// </param>
     private static string BuildFormatoNormalHeader(
         string cuerpoTemplate,
         string logo,
@@ -517,8 +543,8 @@ public partial class ReportesVentasRepository
         int numPagina,
         int totalPaginas,
         DataTable? table,
-        DataRow? row,
-        int numRegistro,
+        DataRow? filaDeLosValores,
+        DataRow? filaEnCurso,
         ReportesVentasAcumuladoresProductosRequest request)
     {
         var html = cuerpoTemplate;
@@ -527,7 +553,7 @@ public partial class ReportesVentasRepository
         html = html.Replace("#NumPagina#", numPagina.ToString());
         html = html.Replace("#TotalPaginas#", totalPaginas.ToString());
 
-        if (table is null || row is null)
+        if (table is null || filaDeLosValores is null)
         {
             html = html.Replace("#Agente#", "");
             html = html.Replace("#agente#", "");
@@ -540,12 +566,39 @@ public partial class ReportesVentasRepository
             return ReplaceRemainingTags(html);
         }
 
-        if (table.Columns.Contains("topWM") && numRegistro > 0)
-            html = html.Replace("#topWM#", Convert.ToString(row["topWM"]) ?? "");
+        if (table.Columns.Contains("topWM") && filaEnCurso is not null)
+            html = html.Replace("#topWM#", FormatoFechaLegacy.Celda(filaEnCurso["topWM"]));
 
-        html = ReplaceAgentHeader(html, table, row, request);
-        html = ReplaceClientHeader(html, table, row);
-        return ReplaceValues(table, row, html);
+        html = ReplaceAgentHeader(html, table, filaDeLosValores, request);
+        html = ReplaceClientHeader(html, table, filaDeLosValores);
+        return ReemplazarValoresDelEncabezado(table, filaDeLosValores, html);
+    }
+
+    /*
+      EL ENCABEZADO NO REEMPLAZA IGUAL QUE EL DETALLE, Y LA DIFERENCIA SE VE.
+
+      Legacy tiene DOS rutinas de sustitucion y no son la misma:
+
+        * el detalle y los totales pasan por `Funciones.ReemplazaValores`, que
+          SALTA el formateo cuando la celda viene vacia y ademas repite el
+          reemplazo con el tag en minusculas;
+        * el cuerpo lo arma `EncabezadoHtml`, que llama a `FormateaNumero`
+          SIEMPRE -tambien con la celda vacia- y NO prueba el tag en minusculas.
+
+      Esa llamada sin guarda es la que hace que un entero nulo salga "0" y un
+      decimal nulo "0.00" en el encabezado, mientras en el detalle los mismos
+      nulos salen en blanco. Parece un descuido suyo, pero es lo que esta
+      impreso en el papel que la gente firma, asi que se copia tal cual.
+    */
+    private static string ReemplazarValoresDelEncabezado(DataTable table, DataRow row, string html)
+    {
+        foreach (DataColumn column in table.Columns)
+        {
+            var valor = FormatLegacyNumber(column.DataType, FormatoFechaLegacy.Celda(row[column.ColumnName]), false);
+            html = html.Replace("#" + column.ColumnName + "#", valor);
+        }
+
+        return html;
     }
 
     /*
@@ -592,7 +645,9 @@ public partial class ReportesVentasRepository
         foreach (DataColumn column in table.Columns)
         {
             var tag = "#" + column.ColumnName + "#";
-            var value = Convert.ToString(row[column.ColumnName]) ?? "";
+            /* Una celda de fecha sale como la escribe Mac31 ("05:49:14 p. m."),
+               no como la escribe .NET 8. Ver FormatoFechaLegacy. */
+            var value = FormatoFechaLegacy.Celda(row[column.ColumnName]);
             if (value != "")
                 value = FormatLegacyNumber(column.DataType, value, esTotales);
 
@@ -686,14 +741,24 @@ public partial class ReportesVentasRepository
         if (value == "0") return esTotales ? value : "";
         if (value is "0.00" or "0.0000") return esTotales ? value : "";
 
-        if (dataType == typeof(int) && int.TryParse(value, out var intValue))
-            return intValue.ToString("###,##0");
-        if ((dataType == typeof(float) || dataType == typeof(double)) && double.TryParse(value, out var doubleValue))
-            return doubleValue.ToString("###,##0.00");
-        if (dataType == typeof(decimal) && decimal.TryParse(value, out var decimalValue))
-            return Math.Truncate(decimalValue * 100m / 1m) / 100m == 0
-                ? decimalValue.ToString("###,##0.00")
-                : (Math.Truncate(decimalValue * 100m) / 100m).ToString("###,##0.00");
+        var cultura = FormatoFechaLegacy.Cultura;
+
+        if (dataType == typeof(int) && int.TryParse(value, NumberStyles.Any, cultura, out var intValue))
+            return intValue.ToString("###,##0", cultura);
+        if ((dataType == typeof(float) || dataType == typeof(double))
+            && double.TryParse(value, NumberStyles.Any, cultura, out var doubleValue))
+            return doubleValue.ToString("###,##0.00", cultura);
+        /*
+          EL DECIMAL SE TRUNCA A DOS, NO SE REDONDEA.
+
+          Legacy hace `TruncateDecimal(valor, 2)` y luego lo formatea
+          (Funciones.cs). Aqui habia un caso aparte para cuando el truncado daba
+          cero, y en ese caso formateaba el valor ORIGINAL, que redondea: 0.009
+          salia "0.01" donde el papel de Mac31 dice "0.00". Se deja el truncado
+          a secas, que es lo que hace legacy para todos los valores.
+        */
+        if (dataType == typeof(decimal) && decimal.TryParse(value, NumberStyles.Any, cultura, out var decimalValue))
+            return (Math.Truncate(decimalValue * 100m) / 100m).ToString("###,##0.00", cultura);
 
         return value;
     }
