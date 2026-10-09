@@ -50,7 +50,21 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
 
             foreach (var required in requirement.Permissions)
             {
-                var tieneLaClave = Tiene(required) || CanUseLegacyVerAsModuleView(snapshot.Permissions, required);
+                // SIN RAMPA: la clave pedida se tiene o no se tiene.
+                //
+                // Aqui habia un CanUseLegacyVerAsModuleView: si el endpoint
+                // pedia "X.ver_modulo" y la persona tenia "X.ver", pasaba. Se
+                // quito junto con su gemela de EntradasDeModulo.PuedeEntrar —
+                // las dos en el mismo cambio, porque cerrar una sola dejaba el
+                // modulo abierto por el otro camino de la API.
+                //
+                // Nadie pierde acceso: cuando Mac31 concede el ".ver" de una
+                // familia puenteada, el snapshot ya trae su ".ver_modulo"
+                // derivado (ver PermissionService.FamiliasLegacy.cs). La rampa
+                // solo seguia tapando el caso que se queria cerrar: un permiso
+                // fino suelto, sin entrada al modulo, en familias como
+                // "usuarios." que nunca fueron de legacy.
+                var tieneLaClave = Tiene(required);
 
                 // ADEMAS del permiso fino, la ENTRADA al modulo.
                 //
@@ -70,15 +84,5 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
 
         if (requirement.Permissions.Any(required => _permissionService.IsAllowedByLegacy(rolLegacy, required)))
             context.Succeed(requirement);
-    }
-
-    private static bool CanUseLegacyVerAsModuleView(IReadOnlyCollection<string> permissions, string requiredPermission)
-    {
-        var required = (requiredPermission ?? string.Empty).Trim().ToLowerInvariant();
-        if (!required.EndsWith(".ver_modulo", StringComparison.Ordinal))
-            return false;
-
-        var legacyEquivalent = required[..^("_modulo".Length)];
-        return permissions.Any(p => string.Equals((p ?? string.Empty).Trim(), legacyEquivalent, StringComparison.OrdinalIgnoreCase));
     }
 }

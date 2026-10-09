@@ -68,8 +68,36 @@ public sealed partial class PermissionService : IPermissionService
       (VentasWebPermissionSeeds y compania). Reportes era la unica de las cuatro
       familias que no lo hacia. Esto la iguala.
     */
+    /*
+      LAS CLAVES DE `reportes.` QUE MANDA EL WEB Y NO MAC31.
+
+      Todo lo que empiece con "reportes." y NO este aqui (ni sea de centros) se
+      BORRA del snapshot y se vuelve a calcular desde los procesos de Mac31. O
+      sea: si una clave de reportes es del web y no aparece en esta lista, darla
+      desde la pantalla de permisos no sirve de nada — se guarda en
+      WUsuarioPermiso, no da error, y desaparece al siguiente calculo.
+
+      "reportes.parametros.ver" y ".editar" ESTABAN FUERA, Y ERA UN FALLO.
+      Guardan los parametros de reportes de ConfiguracionMacController
+      (PermisosParametrosVer / PermisosParametrosGuardar), que es una funcion
+      del web: en Mac31 no hay ningun proceso equivalente, asi que el
+      reemplazo por lo de legacy se las llevaba y nunca las devolvia.
+
+      Medido: concedidas por la API a QA_LEGWEB (que SI existe en Mac31) junto
+      con "reportes.administracion.cortes.ver". Las tres quedaron como `allow`
+      en WUsuarioPermiso; en /api/me volvieron "reportes.ver_modulo" y
+      "reportes.administracion.cortes.ver" —esta ultima ademas se escribio en
+      Mac31, IDStatus=1— y "reportes.parametros.ver" NO volvio. Ese es el fallo
+      silencioso, y se arregla haciendolas del web en vez de deshabilitar la
+      casilla: la funcion existe y hay que poder concederla.
+    */
     private static readonly HashSet<string> ReportesWebPermissionKeys =
-        new(StringComparer.OrdinalIgnoreCase) { ReportesViewPermission };
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ReportesViewPermission,
+            "reportes.parametros.ver",
+            "reportes.parametros.editar"
+        };
 
     /*
       LOS PERMISOS DE CENTROS DE SERVICIO TAMBIEN SON DEL WEB.
@@ -1963,6 +1991,28 @@ WHERE EmpresaId = @EmpresaId
         };
         await r.DisposeAsync();
         await tx.CommitAsync(ct);
+
+        /*
+          APAGAR UN MODULO TAMBIEN TIRA LA CACHE, Y DE TODA LA EMPRESA.
+
+          Faltaba. El estatus del modulo ya entra en el calculo de permisos
+          (LoadEffectivePermissionsAsync lo mira), asi que apagar uno CAMBIA el
+          juego de permisos de cualquiera que lo tuviera — pero esta funcion no
+          invalidaba nada y el snapshot viejo seguia sirviendose.
+
+          Medido en un backend en Production (no Development, donde la cache
+          esta puenteada): QA_REPORTES con "reportes.ver_modulo" en /api/me, se
+          apaga el modulo por PUT /api/permisos-web/modulos/reportes/status,
+          responde 200 y WModulo queda en IdStatus=2 — y el SIGUIENTE /api/me
+          del mismo usuario seguia trayendo "reportes.ver_modulo". Hasta 5
+          minutos por el TTL activo y hasta 30 por el camino stale, y volver a
+          entrar no lo arreglaba porque la clave de cache no lleva el token.
+
+          Es de EMPRESA y no de usuario porque un modulo no es de nadie en
+          particular: apagarlo afecta a todos los que tengan permisos suyos, y
+          aqui no se sabe quienes son sin recorrer la tabla entera.
+        */
+        InvalidateEmpresaPermissionCache(empresaId);
         return updated;
     }
 

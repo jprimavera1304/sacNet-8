@@ -167,19 +167,41 @@ public static class EntradasDeModulo
     /// alguien que tiene los permisos que contesta <paramref name="tiene"/>.
     /// </summary>
     /// <remarks>
-    /// LA EQUIVALENCIA ".ver" vale como ".ver_modulo" SE RESPETA.
+    /// LA RAMPA ".ver" VALE COMO ".ver_modulo" ESTA CERRADA.
     ///
-    /// No se invento aqui: ya vivia en PermissionAuthorizationHandler
-    /// (CanUseLegacyVerAsModuleView) porque en los modulos que gobierna Mac31
-    /// el ".ver_modulo" no existe alla y mucha gente tiene el ".ver" y nada
-    /// mas. Si esta comprobacion no la respetara, las dos mitades de la API
-    /// opinarian distinto sobre la misma persona: el endpoint con
-    /// [Authorize(Policy)] la dejaria pasar y el que usa PermisoControllerBase
-    /// le diria que no. Eso es peor que cualquiera de las dos reglas.
+    /// Aqui habia un reintento: si no tenia "compras.ver_modulo" se le
+    /// aceptaba "compras.ver". Venia de PermissionAuthorizationHandler
+    /// (CanUseLegacyVerAsModuleView) y era una rampa de compatibilidad para
+    /// los modulos que gobierna Mac31, donde el ".ver_modulo" no existe.
     ///
-    /// Lo que SI se cierra —y es todo el punto— es el caso de quien tiene un
-    /// permiso fino suelto y NI la entrada NI el ".ver": antes entraba por
-    /// URL a un modulo donde el front no le ensenaba ni la tarjeta.
+    /// CONTRADECIA LA REGLA, que es "entrada al modulo + permiso de la
+    /// operacion" y se pidio con un ejemplo literal: quien no tiene el acceso
+    /// general a Reportes no entra ni consulta ninguno, aunque tenga veinte
+    /// reportes autorizados. Con la rampa abierta eso no se cumplia: se midio
+    /// que QA_ESPECIFICOS —los siete "usuarios.*" y NINGUN
+    /// "usuarios.ver_modulo"— recibia 200 y los 31 usuarios en
+    /// GET /api/usuarios.
+    ///
+    /// YA NO HACE FALTA, y esa es la razon por la que se puede quitar sin
+    /// quitarle el acceso a nadie: el snapshot DERIVA la entrada. Cuando Mac31
+    /// concede el ".ver" de una familia puenteada, PermissionService mete su
+    /// ".ver_modulo" en la lista de permisos (ver la derivacion en
+    /// PermissionService.FamiliasLegacy.cs, ClaveDeEntrada /
+    /// ClaveQueDaLaEntrada). O sea: la rampa resolvia en la AUTORIZACION algo
+    /// que hoy ya viene resuelto en el SNAPSHOT, y de paso se lo regalaba a
+    /// las familias que NO son de legacy —como "usuarios."— donde nunca hubo
+    /// motivo.
+    ///
+    /// Medido en las dos bases antes de cerrarla: en MacZ el unico que
+    /// dependia de la rampa era la cuenta de prueba QA_ESPECIFICOS, y en
+    /// Produccion_svr (Tauro) nadie. Quien tiene el ".ver" de empleados o
+    /// prestamos en Mac31 (NORMA en MacZ; JANET y JESY en Tauro) sigue
+    /// entrando por la derivacion, no por la rampa.
+    ///
+    /// Las entradas DUPLICADAS siguen valiendo las dos: el recorrido es sobre
+    /// la lista completa de entradas, asi que quien tenga la "mala" de
+    /// facturas/facturacion o cambios_vigencia/cambiosvigencia no se queda
+    /// fuera.
     /// </remarks>
     public static bool PuedeEntrar(string clave, Func<string, bool> tiene)
     {
@@ -191,13 +213,6 @@ public static class EntradasDeModulo
         foreach (var entrada in entradas)
         {
             if (tiene(entrada)) return true;
-
-            if (entrada.EndsWith(SufijoEntrada, StringComparison.OrdinalIgnoreCase))
-            {
-                // "compras.ver_modulo" -> "compras.ver"
-                var equivalente = entrada[..^"_modulo".Length];
-                if (tiene(equivalente)) return true;
-            }
         }
 
         return false;

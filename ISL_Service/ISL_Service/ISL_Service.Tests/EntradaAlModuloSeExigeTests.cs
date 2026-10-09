@@ -77,16 +77,46 @@ public class EntradaAlModuloSeExigeTests
     }
 
     /// <summary>
-    /// El ".ver" sigue valiendo como entrada. No es un descuido: ya lo hacia
-    /// PermissionAuthorizationHandler, y en los modulos que gobierna Mac31 hay
-    /// gente que tiene el ".ver" y ningun ".ver_modulo" porque alla esa llave
-    /// no existe. Quitarlo habria apagado modulos que hoy funcionan.
+    /// EL ".ver" YA NO VALE COMO ENTRADA: la rampa esta cerrada.
+    /// </summary>
+    /// <remarks>
+    /// Esta prueba afirmaba lo contrario, y se invirtio a proposito. La rampa
+    /// contradecia la regla ("entrada al modulo + permiso de la operacion") y
+    /// dejaba entrar a quien tenia permisos finos sueltos y ninguna entrada:
+    /// medido con QA_ESPECIFICOS, que con los siete "usuarios.*" y sin
+    /// "usuarios.ver_modulo" recibia 200 y los 31 usuarios.
+    ///
+    /// Se puede cerrar sin quitarle acceso a nadie porque el snapshot DERIVA la
+    /// entrada cuando Mac31 concede el ".ver" de una familia puenteada (ver
+    /// PermissionService.FamiliasLegacy.cs). Lo que antes resolvia la rampa en
+    /// la autorizacion hoy viene resuelto en la lista de permisos.
+    /// </remarks>
+    [Fact]
+    public void El_Ver_Ya_No_Vale_Como_Entrada()
+    {
+        Assert.False(Puede("compras.cancelar", "compras.cancelar", "compras.ver"));
+        Assert.False(Puede("garantias.editar", "garantias.editar", "garantias.ver"));
+
+        // Con la entrada de verdad si pasa.
+        Assert.True(Puede("compras.cancelar", "compras.cancelar", "compras.ver_modulo"));
+        Assert.True(Puede("garantias.editar", "garantias.editar", "garantias.ver_modulo"));
+    }
+
+    /// <summary>
+    /// Cerrar la rampa NO toca las entradas duplicadas: el recorrido sigue
+    /// siendo sobre la lista completa, asi que cualquiera de las dos vale.
+    /// Si esto se rompiera, a quien tenga la llave "mala" lo dejariamos fuera.
     /// </summary>
     [Fact]
-    public void El_Ver_Vale_Como_Entrada()
+    public void Cerrar_La_Rampa_No_Rompe_Las_Duplicadas()
     {
-        Assert.True(Puede("compras.cancelar", "compras.cancelar", "compras.ver"));
-        Assert.True(Puede("garantias.editar", "garantias.editar", "garantias.ver"));
+        Assert.True(Puede("cobros.aplicar", "cobros.aplicar", "cobros.ver_modulo"));
+        Assert.True(Puede("cobros.aplicar", "cobros.aplicar", "dinero_usados.ver_modulo"));
+        Assert.True(Puede("cambiosvigencia.crear", "cambiosvigencia.crear", "cambios_vigencia.ver_modulo"));
+        Assert.True(Puede("facturacion.timbrar", "facturacion.timbrar", "facturas.ver_modulo"));
+
+        // Y sin ninguna de las dos, no.
+        Assert.False(Puede("cobros.aplicar", "cobros.aplicar"));
     }
 
     /// <summary>
