@@ -1,3 +1,4 @@
+using ISL_Service.Application.DTOs.CatalogosAdmin;
 using ISL_Service.Application.DTOs.OperacionMac;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
@@ -27,15 +28,104 @@ public class ComprasController : PermisoControllerBase
     private static readonly string[] PermisosTransito = { "inventario.transito.procesar" };
 
     private readonly IOperacionMacService _service;
+    private readonly ICatalogosAdminService _catalogos;
+    private readonly IProveedoresConsultaRepository _proveedores;
 
     public ComprasController(
         IOperacionMacService service,
+        ICatalogosAdminService catalogos,
+        IProveedoresConsultaRepository proveedores,
         ICurrentUserAccessor currentUser,
         IPermissionService permissionService)
         : base(currentUser, permissionService)
     {
         _service = service;
+        _catalogos = catalogos;
+        _proveedores = proveedores;
     }
+
+    /// <summary>
+    /// Los dos combos de la pantalla de consulta: almacenes y proveedores.
+    ///
+    /// VA AQUI Y NO SE REUSAN `api/catalogos/almacenes` NI `api/proveedores`
+    /// porque esos piden `catalogos.ver` y `proveedores.ver`. En Mac31 los dos
+    /// combos los llena `ConsultarCompras_Load` (ConsultarCompras.cs:64-76) sin
+    /// pedir ningun permiso aparte: quien puede consultar compras puede ver por
+    /// que almacen y por que proveedor filtrarlas. Pedir las otras dos claves
+    /// dejaria la pantalla con dos desplegables vacios —que no se distinguen de
+    /// "no hay almacenes dados de alta"— a quien SI tiene `compras.ver`.
+    ///
+    /// Solo el id y el nombre: es un desplegable, no el padron. El RFC y el
+    /// domicilio del proveedor siguen detras de `proveedores.ver`.
+    /// </summary>
+    [HttpGet("catalogos")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> Catalogos(CancellationToken ct)
+    {
+        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        if (sinPermiso != null) return sinPermiso;
+
+        // Activos nada mas, que es con lo que arrancan los dos combos de Mac31:
+        // el almacen entra con `soloActivos` y el proveedor con IDStatus = 1.
+        var almacenesCrudos = await _catalogos.ConsultarAlmacenesAsync(
+            new AlmacenesFiltro { IdStatus = (int)EstatusActivo }, ct);
+
+        var proveedores = await _proveedores.ConsultarAsync(
+            new ProveedoresConsultaFiltro { IDStatus = (int)EstatusActivo }, ct);
+
+        return Ok(new
+        {
+            ok = true,
+            message = "Catalogos de compras consultados.",
+            data = new
+            {
+                almacenes = almacenesCrudos
+                    .Select(a => new { id = LeerEntero(a, "idAlmacen"), nombre = LeerTexto(a, "almacen") })
+                    .Where(a => a.id > 0)
+                    .ToList(),
+                proveedores = proveedores
+                    .Select(p => new { id = p.IDProveedor, nombre = p.NombreProveedor })
+                    .ToList()
+            }
+        });
+    }
+
+    /// <summary>1 = Activo en el Catalogo Status de Mac31.</summary>
+    private const int EstatusActivo = 1;
+
+    /*
+      LOS RENGLONES DE LOS `sp_n_` LLEGAN COMO DICCIONARIO, Y LA CLAVE NO SIEMPRE
+      VIENE EN LA MISMA CAJA.
+
+      `DataTableToRows` camelCasea el nombre de la columna tal como la devuelve el
+      procedimiento, y los `sp_n_` no son parejos: unos dicen `IDAlmacen` y otros
+      `idAlmacen`. Leer con una sola grafia dejaba el combo con ceros sin que
+      nadie reportara un error, asi que se prueban las dos.
+    */
+    private static int LeerEntero(IDictionary<string, object?> fila, string nombre)
+    {
+        foreach (var llave in new[] { nombre, Mayuscula(nombre) })
+        {
+            if (fila.TryGetValue(llave, out var valor) && valor is not null && valor is not DBNull
+                && int.TryParse(valor.ToString(), out var entero))
+                return entero;
+        }
+        return 0;
+    }
+
+    private static string LeerTexto(IDictionary<string, object?> fila, string nombre)
+    {
+        foreach (var llave in new[] { nombre, Mayuscula(nombre) })
+        {
+            if (fila.TryGetValue(llave, out var valor) && valor is not null && valor is not DBNull)
+                return valor.ToString()?.Trim() ?? string.Empty;
+        }
+        return string.Empty;
+    }
+
+    private static string Mayuscula(string nombre)
+        => nombre.Length == 0 ? nombre : char.ToUpperInvariant(nombre[0]) + nombre[1..];
 
     /// <summary>
     /// Consulta de compras.
