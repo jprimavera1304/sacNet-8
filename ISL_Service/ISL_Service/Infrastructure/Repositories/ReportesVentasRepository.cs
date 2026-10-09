@@ -426,6 +426,10 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
         {
             return await ConsultarReportePorParametrosAsync(conn, parametrosLegacy, idReporte, BuildCobroStoredRequest(), ct);
         }
+        if (IsConcentradoDocumentoReporte(idReporte))
+        {
+            return await ConsultarReportePorParametrosAsync(conn, parametrosLegacy, idReporte, BuildConcentradoStoredRequest(), ct);
+        }
         if (IsGenericVentasReporte(idReporte))
         {
             var request = BuildGenericVentasStoredRequest(row);
@@ -553,6 +557,36 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
                     config.NombreReporte,
                     data,
                     templates);
+            }
+            /*
+              EL CONCENTRADO TAMBIEN SE ARMA APARTE, Y AQUI POR LA MISMA RAZON
+              QUE LA HOJA DE COBRO: en este punto ya estan el DataSet con las
+              tres tablas -ExecuteLegacySpAsync recorrio los tres `sp_n_` del
+              `spV2` y nombro cada tabla con el suyo- y las seis plantillas
+              `concentrado_*`. Va antes del `3columnas` y del formato normal
+              porque su `aspx` esta VACIO en la base y caeria en el formato
+              normal, que buscaria un `cuerpo_n` que este reporte no tiene.
+            */
+            else if (idReporte == ReporteConcentrado)
+            {
+                reportHtml = ConcentradoHtmlBuilder.Construir(
+                    logo,
+                    config.NombreReporte,
+                    data,
+                    templates);
+
+                /*
+                  SIN CONCENTRADO NO SE ENTREGA UN PAPEL EN BLANCO.
+
+                  Legacy aqui tampoco imprime nada: su GroupBy().CopyToDataTable()
+                  lanza "La fuente no contiene DataRows" y el catch de
+                  ReporteConcentradoService devuelve el texto de la excepcion. O
+                  sea que en Mac31 sale un mensaje, no una hoja vacia. Se dice
+                  en castellano en vez de copiar el texto de la excepcion: el
+                  unico caso en que pasa es un IDConcentrado que no existe.
+                */
+                if (string.IsNullOrWhiteSpace(reportHtml))
+                    throw new InvalidOperationException("No se encontro el concentrado que se pidio.");
             }
             else if (idReporte == ReporteListasPreciosZaragoza)
             {
