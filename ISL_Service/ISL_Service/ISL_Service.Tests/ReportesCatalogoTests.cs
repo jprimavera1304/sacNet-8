@@ -1,4 +1,4 @@
-using ISL_Service.Application.Reportes;
+﻿using ISL_Service.Application.Reportes;
 using Xunit;
 
 namespace ISL_Service.Tests;
@@ -103,6 +103,15 @@ public class ReportesCatalogoTests
     // cambiosvigencia.ver: exigiria los dos permisos a la vez.
     [InlineData("cambios_vigencia")]
     [InlineData("liquidaciones_descuentos")]
+    // Y los tres de los botones de cortes (1315, 1317 y 1345), comprobado en
+    // MacZ el 08-10-2026: la unica clave de reportes de cortes en WPermiso es
+    // reportes.administracion.cortes.ver, que es la del NODO del arbol (el
+    // 1320). Estos tres salen de un boton de pantalla, igual que autos y
+    // cambios_vigencia, y por eso no tienen clave propia. Tampoco se les cuelga
+    // cortes.ver: exigiria los dos permisos a la vez.
+    [InlineData("corte_diario")]
+    [InlineData("corte_diario_detalle_mac")]
+    [InlineData("corte_cs")]
     public void Reportes_Sin_Permiso_No_Se_Bloquean(string clave)
     {
         Assert.NotNull(ReportesCatalogo.Buscar(clave));

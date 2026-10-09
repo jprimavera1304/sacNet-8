@@ -11,7 +11,30 @@
 /// reporte todavia": NO se bloquea. Ver la nota de SIN_PERMISO en
 /// <see cref="ReportesCatalogo"/>.
 /// </param>
-public sealed record ReporteCatalogoItem(string Clave, string Grupo, string Etiqueta, string? Permiso);
+/// <param name="EnArbol">
+/// Si este reporte es un NODO del arbol de Reportes de Mac31 (true, lo normal)
+/// o un documento que sale de un BOTON de otra pantalla (false).
+///
+/// POR QUE HACE FALTA DISTINGUIRLOS. El arbol del web y del movil se pinta con
+/// lo que devuelve GET /reportes/ventas/permisos, o sea con este catalogo. Los
+/// documentos de boton no tienen filtros que pedir -piden el ID del documento
+/// que esta seleccionado en SU pantalla-, asi que al colgarlos del arbol el
+/// front dibuja un nodo que al pulsarlo no sabe que campos ensenar. Eso le
+/// pasaba a `cambios_vigencia`: aparecia en el arbol y contestaba honestamente
+/// que no sabia que pedirle.
+///
+/// Con EnArbol = false el reporte SIGUE en el catalogo y
+/// POST legacy/generar lo sigue aceptando -es como se imprime desde su
+/// pantalla-, pero el arbol no lo ofrece. Un cliente viejo que no lea el campo
+/// se comporta igual que hoy, asi que el movil no se rompe: deja de ensenar el
+/// nodo cuando lo lea.
+/// </param>
+public sealed record ReporteCatalogoItem(
+    string Clave,
+    string Grupo,
+    string Etiqueta,
+    string? Permiso,
+    bool EnArbol = true);
 
 /// <summary>
 /// EL CATALOGO DE REPORTES Y SUS PERMISOS, EN UN SOLO LUGAR.
@@ -195,7 +218,36 @@ public static class ReportesCatalogo
           endpoint ya pide reportes.ver_modulo por politica) y dejaria sin imprimir
           a quien tiene el modulo de reportes completo.
         */
-        new("cambios_vigencia", "ventas", "Cambios de Vigencia", SinPermiso),
+        // FUERA DEL ARBOL: pide el id de UN documento, no un rango. Ver EnArbol.
+        // Se imprime desde la pantalla de Cambios de Vigencia, por el registro
+        // seleccionado, que es de donde sale en Mac31 (el boton IMPRIMIR de
+        // ConsultarCambiosVigencia). En el arbol era un nodo que al pulsarlo no
+        // sabia que campos pedir.
+        new("cambios_vigencia", "ventas", "Cambios de Vigencia", SinPermiso, EnArbol: false),
+        /*
+          LOS COMPROBANTES DE CASCOS (1255 / 1256 / 1260).
+
+          FUERA DEL ARBOL, y por la misma razon que cambios_vigencia: son el
+          papel de UN movimiento, no un listado de un rango. `comprobante_de_cascos`
+          pide el idUsadoMovimiento (y en Tauro, donde se resuelve al 1260, una
+          fecha); `venta_de_cascos` pide el idUsadoMovimiento. Un nodo del arbol
+          no sabria que pedirle. Salen del boton IMPRIMIR de la pantalla de
+          movimientos de cascos, que es de donde salen en Mac31
+          (ConsultarUsadosMovimientos.btnImprimir).
+
+          SinPermiso, y comprobado, no supuesto: en MacZ el 08-10-2026 no existe
+          ninguna clave `reportes.ventas.comprobante_de_cascos.ver` ni
+          `...venta_de_cascos.ver` en WPermiso -- las unicas de reportes que
+          mencionan cascos son reportes.ventas.cascos.ver,
+          reportes.ventas.cascos_excedentes.ver y
+          reportes.ventas.hoja_de_cobro_total_cascos.ver, que son otros tres
+          reportes. Igual que los otros ocho sin permiso, entran abiertos a quien
+          tenga reportes.ver_modulo; no se les cuelga `usados.ver` porque eso
+          exigiria dos permisos a la vez y dejaria sin su comprobante a quien
+          tiene el modulo de reportes completo.
+        */
+        new("comprobante_de_cascos", "ventas", "Comprobante de Cascos", SinPermiso, EnArbol: false),
+        new("venta_de_cascos", "ventas", "Venta de Cascos", SinPermiso, EnArbol: false),
         /*
           LIQUIDACIONES DE DESCUENTO (1030): el papel de una liquidacion.
 
@@ -228,6 +280,43 @@ public static class ReportesCatalogo
         Grupo("administracion", "listas_de_precios", "Listas de Precios"),
         Grupo("administracion", "listas_de_precios_imp", "Listas de Precios Imp"),
         Grupo("administracion", "cortes", "Cortes"),
+        /*
+          LOS TRES REPORTES DE CORTES QUE SALEN DE UN BOTON, NO DEL ARBOL.
+
+          El nodo de arriba es el 1320: el LISTADO de cortes por rango de
+          fechas, el unico que el arbol de Reportes de Mac31 ofrece y el unico
+          con clave en WPermiso (reportes.administracion.cortes.ver, comprobado
+          en MacZ el 08-10-2026).
+
+          Estos tres son el PAPEL de un corte concreto y los imprime un boton de
+          pantalla:
+
+            corte_diario (1315)              IMPRIMIR de ConsultarCortes
+            corte_diario_detalle_mac (1317)  VER DETALLE MAC del corte abierto
+            corte_cs (1345)                  IMPRIMIR de ConsultarCortesCS y del
+                                             propio CorteDiarioCS
+
+          VAN SIN PERMISO PROPIO, por la misma razon medida que `autos`,
+          `cambios_vigencia` y `liquidaciones_descuentos`: su clave por la regla
+          seria reportes.administracion.corte_diario.ver y hermanas, y NINGUNA
+          existe en WPermiso -el script del catalogo legacy no las genero porque
+          el nodo no vive en el arbol-. Declararlas seria poner un candado que
+          nadie tiene: el boton no se dibujaria para NADIE y el reporte quedaria
+          escrito y apagado.
+
+          Y NO SE LES CUELGA `cortes.ver`, que es la clave de la pantalla:
+          este endpoint ya exige reportes.ver_modulo por politica, asi que
+          sumarle una segunda clave exigiria las dos a la vez y le quitaria el
+          papel a quien tiene el modulo de reportes completo. Es la decision que
+          ya se tomo para los otros tres documentos de boton.
+
+          Lo que SI los protege del lado del web: el boton solo se dibuja en la
+          pantalla de cortes, y a esa pantalla se entra con cortes.ver_modulo /
+          cortes.ver (y cortes.cs.ver para el de centros).
+        */
+        new("corte_diario", "administracion", "Corte Diario", SinPermiso, EnArbol: false),
+        new("corte_diario_detalle_mac", "administracion", "Corte Diario Detalle MAC", SinPermiso, EnArbol: false),
+        new("corte_cs", "administracion", "Corte Centro de Servicio", SinPermiso, EnArbol: false),
         Grupo("administracion", "gastos", "Gastos"),
         Grupo("administracion", "impuestos", "Impuestos"),
         Grupo("administracion", "accesos", "Accesos"),

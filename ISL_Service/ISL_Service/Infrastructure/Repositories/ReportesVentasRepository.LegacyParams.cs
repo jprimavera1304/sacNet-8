@@ -157,11 +157,21 @@ public partial class ReportesVentasRepository
 
         var clave = (request.ReporteKey ?? "").Trim().ToLowerInvariant();
 
-        if (clave is "pagos" or "listas_de_precios" or "listas_de_precios_imp" or "cobranza")
+        /*
+          "comprobante_de_cascos" VA AQUI, CON LAS CONSTANTES EN LA MANO, porque
+          depende de la empresa: Zaragoza imprime el 1255 (un movimiento) y
+          Tauro el 1260 (el diario de un dia). Es el mismo caso que "cobranza".
+          Se mantiene la regla de la casa: el front manda la CLAVE y nunca el
+          IDReporte, asi que es aqui —y solo aqui— donde se decide.
+        */
+        if (clave is "pagos" or "listas_de_precios" or "listas_de_precios_imp" or "cobranza"
+            or "comprobante_de_cascos")
         {
             var constants = await ConsultarConstantesAsync(conn, ct);
             if (clave == "cobranza")
                 return ResolveReporteCobranza(constants);
+            if (clave == "comprobante_de_cascos")
+                return EsTauro(constants) ? ReporteComprobanteCascosTauro : ReporteComprobanteCascos;
             return clave == "pagos"
                 ? ResolveReportePagos(request.Formato, constants)
                 : ResolveReporteListasPrecios(request, constants);
@@ -223,6 +233,14 @@ public partial class ReportesVentasRepository
             "gasolinas" => ResolveReporteGasolinas(request.Formato),
             "control_acumulado_de_estimaciones" => ReporteControlAcumuladoEstimaciones,
             "cortes" => ReporteCortes,
+            /*
+              LOS TRES DE LOS BOTONES DE CORTES. El porque de cada id, con la
+              linea de Mac31 y los parametros leidos de su SP, esta en las
+              constantes. Aqui solo la clave.
+            */
+            "corte_diario" => ReporteCorteDiario,
+            "corte_diario_detalle_mac" => ReporteCorteDiarioDetalleMac,
+            "corte_cs" => ReporteCorteCentroServicio,
             "gastos" => ResolveFormatoDetallado(request.Formato) ? ReporteGastosDetallado : ReporteGastosTotalizado,
             "impuestos" => ReporteVentasRemisionesImpuestos,
             "accesos" => ReporteAccesosMac,
@@ -239,6 +257,13 @@ public partial class ReportesVentasRepository
             // Las liquidaciones de descuento SELECCIONADAS, lo que imprime
             // ConsultarLiquidacionesDescuentos de Mac31.
             "liquidaciones_descuentos" => ReporteVentasDescuentosAjustes,
+            /*
+              La VENTA de cascos a un gallero (el radio GALLEROS de
+              ConsultarUsadosMovimientos). No depende de la empresa —por eso no
+              esta arriba con las constantes—: es una clase de movimiento
+              distinta, no otro formato del comprobante.
+            */
+            "venta_de_cascos" => ReporteVentaCascos,
             _ => throw new InvalidOperationException("Reporte de ventas no soportado.")
         };
     }
@@ -502,6 +527,11 @@ public partial class ReportesVentasRepository
             ReporteListasPreciosTauroFpAmLth or
             ReporteControlAcumuladoEstimaciones or
             ReporteCortes or
+            // Los tres de los botones de cortes: plantilla rptTemplate y SP que
+            // recibe el @Params generico, igual que el 1320.
+            ReporteCorteDiario or
+            ReporteCorteDiarioDetalleMac or
+            ReporteCorteCentroServicio or
             ReporteGastosDetallado or
             ReporteGastosTotalizado or
             ReporteAccesosMac or
@@ -518,6 +548,14 @@ public partial class ReportesVentasRepository
             // Cambios de Vigencia: su plantilla es rptTemplate y su SP recibe el
             // @Params generico, igual que los otros cincuenta y tres.
             ReporteCambiosVigencia or
+            /*
+              Los tres comprobantes de cascos. Sin estar en esta lista el POST
+              arma el psp y el GET de ReportesV3W no sabe re-hidratarlo: el
+              reporte "se genera" y al abrirlo no sale nada.
+            */
+            ReporteComprobanteCascos or
+            ReporteVentaCascos or
+            ReporteComprobanteCascosTauro or
             ReporteClientesFacturasRFC or
             ReporteVentasUtilidadAcumuladores or
             ReporteVentasUtilidadProductos or
@@ -1336,6 +1374,126 @@ public partial class ReportesVentasRepository
                 legacy.Param4 = presentacion;
                 break;
 
+            /*
+              CORTE DIARIO (1315): UN CORTE, DOS PARAMETROS.
+
+              sp_n_rptCorteDiario, leido de MacZ, nombra las posiciones de su
+              #ParamIds `IDCorte` y `Presentacion`, asi que el orden no se
+              supone. Las fechas que pide el DTO generico se ignoran aqui a
+              proposito -el reporte es de UN corte, no de un rango-, igual que
+              en Autos y en Cambios de Vigencia.
+
+              EL 0 SE RECHAZA AQUI. El SP solo se protege de NULL
+              (`IF @IDCorte IS NULL`), asi que con 0 corre los JOIN completos y
+              devuelve cero renglones: un PDF en blanco en vez de un error.
+            */
+            case ReporteCorteDiario:
+                if (request.IDCorte <= 0)
+                    throw new ArgumentException("El reporte de corte diario necesita el idCorte del corte a imprimir.");
+                legacy.Param2 = request.IDCorte.ToString(CultureInfo.InvariantCulture);
+                legacy.Param3 = presentacion;
+                break;
+
+            /*
+              CORTE DIARIO DETALLE MAC (1317): EL MISMO SP QUE EL 1319.
+
+              Los dos son sp_n_rptVentasPagosLiquidacion con los MISMOS seis
+              parametros; lo que cambia es la plantilla. Mac31 lo dispara desde
+              VER DETALLE MAC del formulario del corte y manda LA FECHA DEL
+              CORTE EN LAS DOS FECHAS, TipoLiquidacion "0" y la lista de
+              repartidores vacia (CorteDiario.cs:1208-1215): o sea "todo el MAC
+              de ese dia", camioneta y agentes juntos.
+
+              Por eso aqui no se lee ni TipoLiquidacion ni IDRepartidores aunque
+              el DTO los traiga: dejar que el cliente los mande convertiria este
+              reporte en otro distinto del que imprime Mac31, y el papel ya no
+              cuadraria con los tres importes de MAC que el corte muestra
+              arriba. Quien quiera filtrar por repartidor tiene el 1319, que es
+              el nodo "Liquidaciones" del arbol.
+            */
+            case ReporteCorteDiarioDetalleMac:
+                legacy.Param2 = fechaInicial;
+                legacy.Param3 = fechaFinal;
+                legacy.Param4 = "0";
+                legacy.Param5 = "";
+                legacy.Param6 = presentacion;
+                break;
+
+            /*
+              CORTE DE CENTRO DE SERVICIO (1345): ID, TIPO DE RETIRO Y LA FECHA
+              FINAL CON HORA.
+
+              sp_n_rptCortesCS nombra sus posiciones `IDCorte`, `IDTipoRetiro`,
+              `FechaFinal` y `Presentacion`.
+
+              LA FECHA VA CON ARROBA, NO CON ESPACIO, y esto es lo unico raro
+              del reporte: el SP hace `REPLACE(FechaFinal, '@', ' ')` antes de
+              usarla y `SUBSTRING(FechaFinal, 1, 10)` para mostrarla. Mac31 la
+              pega con DELIMITADOR_PARAM_ARROBA_SP
+              (ConsultarCortesCS.cs:725-726). Si viajara con un espacio, el
+              parametro se partiria al leerlo y la hora se perderia: el corte
+              saldria cortado a las 00:00 y sin los cobros del dia.
+
+              SE FUERZA 23:59:59 como alla: el corte de retiro es del DIA
+              completo, y los dos sitios de Mac31 que lo imprimen pegan esa hora
+              a mano en vez de dejarla al reloj.
+            */
+            case ReporteCorteCentroServicio:
+                if (request.IDCorte <= 0)
+                    throw new ArgumentException("El reporte de corte de centro de servicio necesita el idCorte del corte a imprimir.");
+                legacy.Param2 = request.IDCorte.ToString(CultureInfo.InvariantCulture);
+                legacy.Param3 = request.IDTipoRetiro.ToString(CultureInfo.InvariantCulture);
+                legacy.Param4 = request.FechaFinal.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "@23:59:59";
+                legacy.Param5 = presentacion;
+                break;
+
+            /*
+              1255 y 1256: UN MOVIMIENTO, DOS PARAMETROS.
+
+              -- Param 1 = Equipo [ IDUsuario
+              -- Param 2 = IDUsadoMovimiento
+              -- Param 3 = Presentacion
+
+              Verificado leyendo el `#ParamIds` del propio
+              `sp_n_rptUsadosMovimientos`, que nombra la segunda posicion
+              `IDUsadoMovimiento` y la tercera `Presentacion` — no se dio por
+              buenos los nombres solo porque Mac31 los mande en ese orden.
+
+              SI EL ID VIENE EN 0 SE RECHAZA AQUI. El SP no dice "sin
+              informacion": devuelve cero renglones y el motor arma un
+              comprobante en blanco con el logo y la fecha de impresion, que es
+              peor que un error porque parece un comprobante.
+            */
+            case ReporteComprobanteCascos:
+            case ReporteVentaCascos:
+                if (request.IDUsadoMovimiento <= 0)
+                    throw new ArgumentException("El comprobante de cascos necesita el idUsadoMovimiento del movimiento a imprimir.");
+                legacy.Param2 = request.IDUsadoMovimiento.ToString(CultureInfo.InvariantCulture);
+                legacy.Param3 = presentacion;
+                break;
+
+            /*
+              1260: EL DIARIO DE TAURO. Param2 es una FECHA, no un id.
+
+              -- Param 1 = Equipo [ IDUsuario
+              -- Param 2 = FechaInicial 'MM-dd-yyyy@00:00:00'
+              -- Param 3 = Presentacion
+
+              La hora va pegada con '@' y no con un espacio porque el SP parte
+              el parametro por el delimitador; con un espacio la fecha se
+              quedaria a medias. `FormatLegacyStartDateTime` ya emite
+              exactamente el formato de `Constantes.FormatoFechaDB`
+              ('MM-dd-yyyy' en las dos empresas, comprobado en la base), que es
+              el que Mac31 usa en ConsultarUsadosMovimientos.cs:254.
+
+              Aqui NO se exige el idUsadoMovimiento: pedirlo seria un error de
+              lectura del reporte. Este imprime el dia entero.
+            */
+            case ReporteComprobanteCascosTauro:
+                legacy.Param2 = FormatLegacyStartDateTime(request.FechaInicial);
+                legacy.Param3 = presentacion;
+                break;
+
             case ReporteAsistenciasZaragoza:
                 legacy.Param2 = "";
                 legacy.Param3 = FormatLegacyStartDateTime(request.FechaInicial);
@@ -2029,7 +2187,7 @@ public partial class ReportesVentasRepository
             ReporteTransferenciasFolios => "Param6",
             ReporteVentasCobrosDinero or ReporteVentasCobrosCascos => "Param2",
             ReporteCentrosRemisiones or ReporteCentrosPagosEntradasSalidas or ReporteCentrosGarantias or ReporteCentrosCompleto => "Param2",
-            ReporteVentasLiquidaciones => "Param2",
+            ReporteVentasLiquidaciones or ReporteCorteDiarioDetalleMac => "Param2",
             ReporteCompraAcumuladores or ReporteCompraProductos => "Param8",
             ReporteInventarioAcumuladores or ReporteInventarioProductos or ReporteInventarioFiltros or ReporteInventarioAcumuladoresCosto or ReporteInventarioProductosCosto or ReporteInventarioFiltrosCosto or ReportePedidoAcumuladores or ReportePedidoProductos => "Param8",
             ReporteInventarioFaltanteAcumuladores or ReporteInventarioFaltanteProductos or ReporteInventarioFaltanteFiltros => "Param8",
@@ -2054,7 +2212,7 @@ public partial class ReportesVentasRepository
             ReporteTransferenciasFolios => "Param7",
             ReporteVentasCobrosDinero or ReporteVentasCobrosCascos => "Param3",
             ReporteCentrosRemisiones or ReporteCentrosPagosEntradasSalidas or ReporteCentrosGarantias or ReporteCentrosCompleto => "Param3",
-            ReporteVentasLiquidaciones => "Param3",
+            ReporteVentasLiquidaciones or ReporteCorteDiarioDetalleMac => "Param3",
             ReporteCompraAcumuladores or ReporteCompraProductos => "Param9",
             ReporteInventarioAcumuladores or ReporteInventarioProductos or ReporteInventarioFiltros or ReporteInventarioAcumuladoresCosto or ReporteInventarioProductosCosto or ReporteInventarioFiltrosCosto or ReportePedidoAcumuladores or ReportePedidoProductos => "Param8",
             ReporteInventarioFaltanteAcumuladores or ReporteInventarioFaltanteProductos or ReporteInventarioFaltanteFiltros => "Param9",
@@ -2267,6 +2425,13 @@ public partial class ReportesVentasRepository
             ReporteControlAcumuladoEstimaciones => "Param4",
             // 1535: Param2 es el IDCambioVigencia y la presentacion queda en Param3.
             ReporteCambiosVigencia => "Param3",
+            /*
+              1255/1256/1260: Param2 lleva el id (o la fecha, en el 1260) y la
+              presentacion queda en Param3. Si esta entrada faltara, el GET
+              leeria la presentacion de Param7 —el valor por omision— y el
+              comprobante saldria como Excel o se caeria al re-abrirlo.
+            */
+            ReporteComprobanteCascos or ReporteVentaCascos or ReporteComprobanteCascosTauro => "Param3",
             // 1030: diez parametros antes de la presentacion (su #ParamIds la
             // nombra `Presentacion` en la posicion de Param11).
             ReporteVentasDescuentosAjustes => "Param11",
@@ -2276,6 +2441,12 @@ public partial class ReportesVentasRepository
             ReporteGasolinasDetallado or ReporteGasolinasMensual => "Param6",
             ReporteGastosDetallado or ReporteGastosTotalizado => "Param4",
             ReporteCortes or ReporteAccesosMac => "Param4",
+            // 1315: Param2 es el IDCorte y la presentacion queda en Param3.
+            ReporteCorteDiario => "Param3",
+            // 1317: mismos seis parametros que el 1319, presentacion en Param6.
+            ReporteCorteDiarioDetalleMac => "Param6",
+            // 1345: IDCorte, IDTipoRetiro y FechaFinal antes de la presentacion.
+            ReporteCorteCentroServicio => "Param5",
             ReporteAsistenciasZaragoza => "Param5",
             // Nomina: la presentacion es Param6 en los cuatro.
             ReporteNominaAsistencias or ReporteNominaAsistenciasCorto

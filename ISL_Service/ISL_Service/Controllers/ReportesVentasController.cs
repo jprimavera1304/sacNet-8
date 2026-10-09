@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.Reportes;
+﻿using ISL_Service.Application.DTOs.Reportes;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Reportes;
 using ISL_Service.Infrastructure.Reports;
@@ -466,7 +466,10 @@ public class ReportesVentasController : PermisoControllerBase
                 Permiso = x.Permiso,
                 // Sin permiso conocido el reporte sigue abierto: bloquear por una
                 // duda deja a alguien sin su reporte sin saber por que.
-                Permitido = x.Permiso is null || puede.Tiene(x.Permiso)
+                Permitido = x.Permiso is null || puede.Tiene(x.Permiso),
+                // El menu solo dibuja los nodos del arbol; los documentos de
+                // boton siguen aqui para que generar los acepte.
+                EnArbol = x.EnArbol
             })
             .ToList();
 

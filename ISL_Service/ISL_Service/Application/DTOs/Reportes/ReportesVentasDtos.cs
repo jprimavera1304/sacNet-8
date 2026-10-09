@@ -168,6 +168,37 @@ public class ReportesVentasLegacyRequest : ReportesVentasAcumuladoresProductosRe
     /// </summary>
     public int IDCambioVigencia { get; set; }
 
+    /// <summary>
+    /// Comprobante de Cascos (1255) y Venta de Cascos (1256): el movimiento a
+    /// imprimir. Es OBLIGATORIO en esos dos y no tiene valor por omision util:
+    /// son el papel de UN movimiento, y con 0 `sp_n_rptUsadosMovimientos`
+    /// devuelve cero renglones y el motor arma un comprobante en blanco con
+    /// logo y fecha de impresion -- que parece un comprobante y no lo es.
+    /// <para>
+    /// El Comprobante de Cascos TAURO (1260) NO lo usa: es el DIARIO de un dia
+    /// y toma la FechaInicial de la peticion. Pedirle un id seria leer mal el
+    /// reporte.
+    /// </para>
+    /// </summary>
+    public int IDUsadoMovimiento { get; set; }
+
+    /// <summary>
+    /// Corte Diario (1315) y Corte de Centro de Servicio (1345): el corte a
+    /// imprimir. Es OBLIGATORIO en los dos y no tiene valor por omision util:
+    /// los dos reportes son el papel de UN corte, no un listado, y sus
+    /// procedimientos solo se protegen de NULL -con 0 corren los JOIN y
+    /// devuelven cero renglones, o sea un PDF en blanco-.
+    /// </summary>
+    public int IDCorte { get; set; }
+
+    /// <summary>
+    /// Corte de Centro de Servicio (1345): el tipo de retiro del corte, el
+    /// mismo que la pantalla usa para filtrar. Va tal cual, incluido 0, porque
+    /// es como lo manda Mac31: lee cboTipoRetiro.SelectedValue sin tocarlo
+    /// (ConsultarCortesCS.cs:724), y el 0 del combo significa "todos".
+    /// </summary>
+    public int IDTipoRetiro { get; set; }
+
     /*
       LA HOJA DE COBRO (1006): LAS HOJAS MARCADAS EN LA REJILLA.
 
@@ -339,4 +370,12 @@ public class ReportesPermisoItem
     public string? Permiso { get; set; }
 
     public bool Permitido { get; set; }
+
+    /// <summary>
+    /// true = es un nodo del arbol de Reportes y el menu lo puede ofrecer.
+    /// false = es el documento de un BOTON de otra pantalla (pide el id del
+    /// registro seleccionado, no un rango), asi que el arbol no debe dibujarlo.
+    /// Ver ReporteCatalogoItem.EnArbol.
+    /// </summary>
+    public bool EnArbol { get; set; } = true;
 }

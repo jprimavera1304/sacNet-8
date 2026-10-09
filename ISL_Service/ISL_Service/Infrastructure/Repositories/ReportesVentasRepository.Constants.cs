@@ -106,6 +106,41 @@ public partial class ReportesVentasRepository
     /// IDCambioVigencia en Param2 y la presentacion en Param3, y nada mas.
     /// </summary>
     private const int ReporteCambiosVigencia = 1535;
+
+    /*
+      LOS TRES COMPROBANTES DE CASCOS, Y NO SON TRES FORMATOS DE LO MISMO.
+
+      Se creyo durante un tiempo que `btnImprimir` de ConsultarUsadosMovimientos
+      abria otra aplicacion. Es falso: usa el mismo camino que todo reporte de
+      Mac31 (sp_n_ActualizarParametro -> psp -> motor de plantillas), y las tres
+      filas existen en `dbo.Reportes` de LAS DOS empresas con `aspx` =
+      'rptTemplate', o sea render generico. El 1262 no existe en ninguna base:
+      no hay nada que migrar.
+
+      LO QUE SI CAMBIA ENTRE ELLOS ES EL PARAMETRO, y confundirlo imprime papel
+      vacio:
+
+        1255  Comprobante de Cascos        sp_n_rptUsadosMovimientos
+              Param2 = IDUsadoMovimiento.  UN movimiento concreto.
+              Es el radio ZARAGOZA de la pantalla (los cascos de la empresa).
+
+        1256  Venta de Cascos              sp_n_rptUsadosMovimientos  (EL MISMO
+              SP que el 1255, otra plantilla: no es una variante de empresa)
+              Param2 = IDUsadoMovimiento.  UN movimiento concreto.
+              Es el radio GALLEROS de la pantalla (la venta a un gallero).
+
+        1260  Comprobante de Cascos TAURO  sp_n_rptUsadosMovimientosDiario
+              Param2 = FECHA 'MM-dd-yyyy@00:00:00'. NO es un id: es el DIARIO
+              de un dia completo, coherente con el nombre de su SP.
+
+      O sea: 1255 y 1256 no se eligen por empresa sino por el radio de la
+      pantalla; lo que se elige por empresa es 1255 (Zaragoza) contra 1260
+      (Tauro), y ahi el cambio de id cambia TAMBIEN la clase de parametro.
+      ConsultarUsadosMovimientos.cs:250-275 es donde se lee todo esto.
+    */
+    private const int ReporteComprobanteCascos = 1255;
+    private const int ReporteVentaCascos = 1256;
+    private const int ReporteComprobanteCascosTauro = 1260;
     /*
       1160 ES EL QUE USA EL NODO REAL DEL MENU DE MAC31.
 
@@ -149,6 +184,40 @@ public partial class ReportesVentasRepository
     private const int ReporteListasPreciosProductosZaragoza = 1245;
     private const int ReporteVentasCascosExcedentes = 1305;
     private const int ReporteVentasLiquidaciones = 1319;
+    /*
+      LOS TRES REPORTES DE CORTES QUE NO SALEN DEL ARBOL.
+
+      1320 (ReporteCortes, abajo) es el NODO del arbol de Reportes: un listado
+      por rango de fechas. Estos tres salen de BOTONES de pantalla de Mac31 y
+      nadie los habia dado de alta aqui, asi que el modulo de cortes del web no
+      tenia como imprimir nada.
+
+      1315 CORTE DIARIO -- el papel de UN corte de caja.
+           Lo imprime IMPRIMIR de ConsultarCortes (ConsultarCortes.cs:444).
+           sp_n_rptCorteDiario, leido de MacZ: su #ParamIds nombra las
+           posiciones `IDCorte` y `Presentacion` en vez de Param2/Param3, asi
+           que el orden no es una suposicion. Con IDCorte NULL el propio SP
+           contesta "PARAMETROS NULL"; con 0 corre el JOIN y devuelve vacio.
+
+      1317 CORTE DIARIO DETALLE MAC -- el desglose de MAC de UN dia.
+           Lo imprime VER DETALLE MAC del formulario CorteDiario
+           (CorteDiario.cs:1211). Comparte sp_n_rptVentasPagosLiquidacion con el
+           1319: MISMOS seis parametros, otra plantilla. Mac31 manda la fecha
+           del corte en las DOS fechas, TipoLiquidacion 0 y la lista de
+           repartidores vacia, o sea "todo lo de ese dia".
+
+      1345 CORTE CENTRO DE SERVICIO -- el papel de UN corte de retiro de CS.
+           Lo imprimen IMPRIMIR de ConsultarCortesCS (ConsultarCortesCS.cs:722)
+           y el propio CorteDiarioCS (CorteDiarioCS.cs:1168), los dos con los
+           mismos cinco parametros. sp_n_rptCortesCS nombra sus posiciones
+           `IDCorte`, `IDTipoRetiro`, `FechaFinal` y `Presentacion`.
+           OJO CON LA FECHA: el SP hace REPLACE(FechaFinal, '@', ' '), asi que
+           la fecha viaja como `yyyy-MM-dd@23:59:59` -con arroba, no con
+           espacio-. Mac31 la pega con DELIMITADOR_PARAM_ARROBA_SP.
+    */
+    private const int ReporteCorteDiario = 1315;
+    private const int ReporteCorteDiarioDetalleMac = 1317;
+    private const int ReporteCorteCentroServicio = 1345;
     private const int ReporteCortes = 1320;
     private const int ReporteMovimientosAlmacen = 1325;
     private const int ReporteGastosDetallado = 1330;
