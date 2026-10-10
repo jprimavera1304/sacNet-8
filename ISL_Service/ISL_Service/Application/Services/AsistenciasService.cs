@@ -86,14 +86,20 @@ public class AsistenciasService : IAsistenciasService
 
         // SALIDA SIN ENTRADA, NO.
         //
-        // Ni el sp_w_ ni legacy lo revisan, pero la base lo paga: es EXACTAMENTE
-        // lo que rompe los totales del periodo en Zaragoza. A su copia de
-        // sp_n_ConsultaEmpleadosPeriodoAsistencia le falta el
+        // Ni el sp_w_ de guardado ni legacy lo revisan, y la regla se queda aqui
+        // aunque el sintoma que la motivo ya este curado. Era EXACTAMENTE lo que
+        // rompia los totales del periodo en Zaragoza: a su copia de
+        // sp_n_ConsultaEmpleadosPeriodoAsistencia le faltaba el
         // ISNULL(@diaHorasLaboradas, 0) que si tiene la de Tauro, asi que un
-        // DATEDIFF contra una entrada NULL deja en NULL la suma del periodo
-        // COMPLETO de esa persona. Medido en el periodo 12551 de MacZ: 3 de 85
-        // empleados sin totales, y uno de ellos (EDDER ROBLES SANCHEZ) por tener
-        // el dia 1 con salida 18:54 y sin entrada.
+        // DATEDIFF contra una entrada NULL dejaba en NULL la suma del periodo
+        // COMPLETO de esa persona. Eso se arreglo creando el gemelo
+        // sp_w_ConsultaEmpleadosPeriodoAsistencia (ver AsistenciasRepository).
+        //
+        // Pero un dia con salida y sin entrada sigue siendo un dato falso: ahora
+        // en vez de un "--" produce un total CALCULADO con cero horas ese dia,
+        // que es peor de detectar. Asi que no se acepta por la puerta de
+        // captura. Los 1,024 renglones que ya tiene MacZ los dejo el checador,
+        // no esta pantalla.
         //
         // Mac31 tampoco lo permite, aunque lo consigue de otra forma: la hora de
         // salida solo se puede escribir con la casilla SALIDA marcada, y esa

@@ -43,13 +43,21 @@ public class DiaPeriodoDto
 /// diaHorasLaboradas1..7, diaMinutosLaborados1..7, mas minsRetardo,
 /// asistencias, inasistencias y vacaciones). Ver Funciones.DataTableToRows.
 ///
-/// CUIDADO CON LOS NULL: en Zaragoza 'asistencias' e 'inasistencias' llegan en
-/// NULL para algunos empleados. No es un bug nuestro: a la copia de
-/// sp_n_ConsultaEmpleadosPeriodoAsistencia de esa base le falta la linea
-/// ISNULL(@diaHorasLaboradas,0) que si tiene la de Tauro, y basta con que un
-/// empleado tenga un dia con hora de SALIDA sin hora de ENTRADA para que la
-/// suma del periodo entero se le vuelva NULL. Se pasa el null tal cual: la
-/// pantalla debe pintar "--", no "0".
+/// LOS NULL YA NO SALEN, Y EL CAMINO PARA ELLOS SE QUEDA.
+///
+/// Hasta que se creo el gemelo, en Zaragoza 'asistencias' e 'inasistencias'
+/// llegaban en NULL para algunos empleados: a la copia de
+/// sp_n_ConsultaEmpleadosPeriodoAsistencia de esa base le faltaba la linea
+/// ISNULL(@diaHorasLaboradas,0) que si tiene la de Tauro, y bastaba con que un
+/// empleado tuviera un dia con hora de SALIDA sin hora de ENTRADA para que la
+/// suma del periodo entero se le volviera NULL. La rejilla la pide ahora a
+/// sp_w_ConsultaEmpleadosPeriodoAsistencia, que es ese mismo cuerpo con la
+/// linea puesta (ver AsistenciasRepository.SpRejilla).
+///
+/// El null se sigue pasando TAL CUAL y no se convierte en 0, por si alguna base
+/// se queda sin el gemelo o aparece otra fuente de NULL: la pantalla pinta
+/// "--", que es "no se pudo calcular". Un 0 diria "no tuvo asistencias", y con
+/// ese numero se paga nomina.
 /// </summary>
 public class RejillaAsistenciaResponse
 {

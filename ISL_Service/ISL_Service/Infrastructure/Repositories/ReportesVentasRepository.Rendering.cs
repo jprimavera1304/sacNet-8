@@ -280,7 +280,21 @@ public partial class ReportesVentasRepository
         int idPeriodoTipoSueldo,
         CancellationToken ct)
     {
-        await using var cmd = new SqlCommand("sp_n_ConsultaEmpleadosPeriodoAsistencia", conn)
+        /*
+          VA POR EL GEMELO, IGUAL QUE LA REJILLA DE LA PANTALLA.
+
+          sp_w_ConsultaEmpleadosPeriodoAsistencia es el cuerpo del sp_n_ de
+          Zaragoza mas el ISNULL(@diaHorasLaboradas, 0) que le faltaba (el
+          porque completo, en AsistenciasRepository.SpRejilla y en
+          Querrys/43 Asistencias Zaragoza Totales En Null/).
+
+          Importa que sea el MISMO que la pantalla: el papel de ASISTENCIAS y la
+          rejilla de la pantalla salen de aqui, y si uno leyera el sp_n_ y la
+          otra el gemelo, el mismo empleado tendria un total en la pantalla y
+          otro en la hoja impresa. Eso es peor que el NULL original, porque no
+          se ve.
+        */
+        await using var cmd = new SqlCommand("sp_w_ConsultaEmpleadosPeriodoAsistencia", conn)
         {
             CommandType = CommandType.StoredProcedure,
             CommandTimeout = 500

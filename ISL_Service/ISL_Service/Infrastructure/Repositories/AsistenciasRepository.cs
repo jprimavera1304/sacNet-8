@@ -12,13 +12,19 @@ namespace ISL_Service.Infrastructure.Repositories;
 /// <summary>
 /// Asistencias: la rejilla del periodo y la captura manual de un dia.
 ///
-/// LOS TRES SP DE LECTURA SE LLAMAN DIRECTO Y JAMAS SE ENVUELVEN.
+/// LOS SP DE LECTURA SE LLAMAN DIRECTO Y JAMAS SE ENVUELVEN.
 /// sp_n_ConsultaEmpleadosPeriodoAsistencia hace
 /// "INSERT INTO #EmpleadosTmp ... EXEC (@Sql)" adentro, y
 /// sp_n_ConsultaPeriodosTipoSueldo y ...Dias terminan en EXEC (@Sql).
 /// Cualquier sp_w_ que los meta en un INSERT ... EXEC revienta con
 /// "An INSERT EXEC statement cannot be nested". Es el error que se va a querer
 /// cometer; queda escrito aqui para que no se cometa.
+///
+/// OJO CON LA PALABRA "ENVOLVER": el gemelo de la rejilla
+/// (sp_w_ConsultaEmpleadosPeriodoAsistencia) NO envuelve nada. Es una COPIA
+/// COMPLETA del cuerpo del sp_n_ de Zaragoza con una linea mas, asi que su
+/// "INSERT INTO #EmpleadosTmp ... EXEC (@Sql)" es el de primer nivel y no anida.
+/// Un sp_w_ que hiciera "INSERT ... EXEC sp_n_..." si reventaria.
 ///
 /// La ESCRITURA si va por sp_w_, pero esos hacen EXEC a secas (no capturan el
 /// result set), asi que tampoco anidan nada.
@@ -27,7 +33,32 @@ public class AsistenciasRepository : IAsistenciasRepository
 {
     private const string SpPeriodos = "dbo.sp_n_ConsultaPeriodosTipoSueldo";
     private const string SpPeriodosDias = "dbo.sp_n_ConsultaPeriodosTipoSueldoDias";
-    private const string SpRejilla = "dbo.sp_n_ConsultaEmpleadosPeriodoAsistencia";
+    /// <summary>
+    /// LA REJILLA VA POR EL GEMELO, NO POR EL sp_n_.
+    ///
+    /// sp_w_ConsultaEmpleadosPeriodoAsistencia es el cuerpo del sp_n_ de
+    /// ZARAGOZA con UNA linea mas, la que a esa base le faltaba:
+    ///
+    ///     SELECT @diaHorasLaboradas = ISNULL(@diaHorasLaboradas, 0)
+    ///
+    /// Sin ella, un dia con hora de SALIDA y sin hora de ENTRADA hace que
+    /// DATEDIFF(hour, NULL, salida) devuelva NULL, ese NULL se suma a
+    /// @TotalAsistencias y los cuatro totales del PERIODO COMPLETO de esa
+    /// persona llegan en NULL. La pantalla los pintaba "--" y debajo ponia un
+    /// aviso explicando la averia. Ahora no hay averia que explicar.
+    ///
+    /// Medido con @IDStatus = 3 (TODOS) corriendo los dos procedimientos contra
+    /// los mismos periodos: en MacZ, 2/123 empleados con NULL en la semana 40,
+    /// 3/123 en la 38, 4/123 en la 34 -> CERO con el gemelo. En
+    /// Produccion_svr, cero antes y cero despues (su sp_n_ ya tenia la linea),
+    /// y renglon por renglon los dos procedimientos dan lo MISMO: 0 diferencias
+    /// en los 268 empleados del periodo 12573 fuera de los que estaban en NULL.
+    /// Por eso el gemelo se apunta en las DOS empresas y no con un "if".
+    ///
+    /// El script, con el porque completo y la comprobacion, esta en
+    /// Querrys/43 Asistencias Zaragoza Totales En Null/.
+    /// </summary>
+    private const string SpRejilla = "dbo.sp_w_ConsultaEmpleadosPeriodoAsistencia";
     private const string SpDiaria = "dbo.sp_n_ConsultaEmpleadosAsistenciaDiaria";
 
     private const string SpGuardarDia = "dbo.sp_w_GuardarAsistenciaDia";
@@ -145,9 +176,11 @@ public class AsistenciasRepository : IAsistenciasRepository
         var dt = await FillAsync(cmd, ct);
         reloj.Stop();
 
-        // Renglon completo tal cual, incluidos los NULL. En Zaragoza
-        // 'asistencias' llega NULL para algunos empleados y eso tiene que
-        // llegar asi al front (ver Funciones.DataTableToRows).
+        // Renglon completo tal cual, incluidos los NULL si los hubiera. Con el
+        // gemelo ya no salen por el ISNULL que le faltaba a Zaragoza, pero el
+        // null sigue viajando sin convertirse en cero: si algun dia aparece otra
+        // fuente de NULL, la pantalla pintara "--" en vez de inventar un 0 con
+        // el que se paga nomina (ver Funciones.DataTableToRows).
         return new RejillaAsistenciaResponse
         {
             Rows = Funciones.DataTableToRows(dt),
