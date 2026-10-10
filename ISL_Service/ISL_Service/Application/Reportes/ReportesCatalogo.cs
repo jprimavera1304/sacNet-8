@@ -235,7 +235,21 @@ public static class ReportesCatalogo
           pantalla de cobros. El dia que se de de alta la clave, se cambia esta
           linea por `Ventas("hoja_de_cobro", ...)` y nada mas.
         */
-        new("hoja_de_cobro", "ventas", "Hoja de Cobro", SinPermiso),
+        /*
+          FUERA DEL ARBOL: se imprime de las hojas MARCADAS en la rejilla de
+          Cobros, no de un rango de fechas. Con EnArbol = true el nodo se
+          pintaba y, desde la pantalla de Reportes, contestaba siempre:
+
+            "La hoja de cobro necesita al menos una hoja: manda idsConcentrado,
+             idsCobranza e idsCobro."
+
+          O sea un boton que no podia funcionar nunca -- el mismo defecto que ya
+          se corrigio en `concentrado` y `cambios_vigencia`. El reporte SIGUE en
+          el catalogo y se genera igual desde su propia pantalla; lo unico que
+          cambia es que deja de ofrecerse donde no se puede pedir.
+          Reproducido el 2026-10-10 contra el backend local.
+        */
+        new("hoja_de_cobro", "ventas", "Hoja de Cobro", SinPermiso, EnArbol: false),
         /*
           CAMBIOS DE VIGENCIA (1535): el documento de UN cambio de vigencia.
 
@@ -300,7 +314,16 @@ public static class ReportesCatalogo
           sumarle una segunda clave le quitaria el papel a quien tiene el modulo
           de reportes completo.
         */
-        new("liquidaciones_descuentos", "ventas", "Liquidaciones Descuentos", SinPermiso),
+        /*
+          FUERA DEL ARBOL, por lo mismo que la hoja de cobro: se imprime de los
+          folios SELECCIONADOS en su pantalla. Desde Reportes contestaba:
+
+            "El reporte de liquidaciones de descuento se imprime de los folios
+             seleccionados: manda al menos uno en idLiquidacionesDescuento."
+
+          Reproducido el 2026-10-10 contra el backend local.
+        */
+        new("liquidaciones_descuentos", "ventas", "Liquidaciones Descuentos", SinPermiso, EnArbol: false),
 
         // ----- COMPRAS -----
         new("compras_acumuladores_y_productos", "compras", "Acumuladores y Productos", "reportes.compras.acumuladores_y_productos.ver"),
