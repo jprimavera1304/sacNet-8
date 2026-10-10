@@ -35,9 +35,23 @@ public class EmpleadosService : IEmpleadosService
     public Task<CatalogosEmpleadoDto> ConsultarCatalogosAsync(CancellationToken ct = default)
         => _repository.ConsultarCatalogosAsync(ct);
 
-    public async Task<EmpleadoCreadoDto> CrearAsync(CrearEmpleadoRequest request, int idUsuario, CancellationToken ct = default)
+    public async Task<EmpleadoCreadoDto> CrearAsync(CrearEmpleadoRequest request, int idUsuario, bool puedeVerSueldo, CancellationToken ct = default)
     {
         ValidarComun(request);
+
+        // SIN LA LLAVE DE SUELDO NO SE FIJA UN SUELDO.
+        //
+        // No se rechaza el alta entera: dar de alta y poner un importe son dos
+        // cosas, y quien tiene 'empleados.crear' puede dar de alta. Lo que no
+        // puede es fijar dinero que no tiene permiso de leer — si lo manda, se
+        // le dice; si manda ceros, el alta pasa y el importe lo captura
+        // despues quien si puede verlo.
+        if (!puedeVerSueldo && TraeDinero(request))
+        {
+            throw new ArgumentException(
+                "No tienes permiso para capturar el sueldo. Da de alta al empleado sin importes y pide que los capture " +
+                "quien administra los sueldos.");
+        }
 
         var (resultado, creado) = await _repository.InsertarAsync(request, idUsuario, ct);
         if (!resultado.Ok)
@@ -46,7 +60,7 @@ public class EmpleadosService : IEmpleadosService
         return creado;
     }
 
-    public async Task ActualizarAsync(int idEmpleado, ActualizarEmpleadoRequest request, int idUsuario, CancellationToken ct = default)
+    public async Task ActualizarAsync(int idEmpleado, ActualizarEmpleadoRequest request, int idUsuario, bool puedeVerSueldo, CancellationToken ct = default)
     {
         ValidarComun(request);
 
@@ -56,6 +70,27 @@ public class EmpleadosService : IEmpleadosService
         var existente = await _repository.ConsultarAsync(idEmpleado, 0, 0, ct);
         if (existente.Count == 0)
             throw new NotFoundException("El empleado no existe.");
+
+        // SIN LA LLAVE DE SUELDO, LOS IMPORTES SE CONSERVAN.
+        //
+        // Se leen del renglon que YA esta guardado y se pisan los del request
+        // antes de bajar al repositorio. Importa el orden: si se hiciera
+        // despues de ActualizarAsync ya no habria nada que conservar.
+        //
+        // Se conservan en vez de rechazar el PUT a proposito. Rechazarlo
+        // dejaria a quien tiene 'empleados.editar' sin poder corregir un RFC
+        // —que es lo que hoy hace el front, escondiendo Guardar— y eso no es
+        // lo que dice el permiso: 'empleados.sueldo.ver' habla del sueldo, no
+        // de la ficha. Asi el sueldo queda intacto y lo demas se puede editar.
+        if (!puedeVerSueldo)
+        {
+            var guardado = existente[0];
+            request.SueldoSemanal = guardado.SueldoSemanal ?? 0m;
+            request.Comision = guardado.Comision ?? 0m;
+            request.Asistencia = guardado.Asistencia ?? 0m;
+            request.Puntualidad = guardado.Puntualidad ?? 0m;
+            request.SalidaTarde = guardado.SalidaTarde ?? 0m;
+        }
 
         // LA BOMBA DE LEGACY: sp_n_ActualizarEmpleado hace
         // "UPDATE EmpleadoTipoSueldo ... WHERE IDEmpleado = @IDEmpleado", SIN
@@ -103,6 +138,19 @@ public class EmpleadosService : IEmpleadosService
 
     private static int NormalizarStatus(int idStatus)
         => idStatus is 1 or 2 or 0 ? idStatus : 1;
+
+    /// <summary>
+    /// ¿El request trae algun importe distinto de cero? Es lo que distingue
+    /// "no capture sueldo" de "capture un sueldo", y hace falta porque el
+    /// request los declara `decimal` y no `decimal?`: un cliente que no los
+    /// pudo leer los manda en 0 sin querer decir nada con eso.
+    /// </summary>
+    private static bool TraeDinero(CrearEmpleadoRequest r)
+        => r.SueldoSemanal != 0m
+           || r.Comision != 0m
+           || r.Asistencia != 0m
+           || r.Puntualidad != 0m
+           || r.SalidaTarde != 0m;
 
     private static void BorrarDinero(EmpleadoDto e)
     {

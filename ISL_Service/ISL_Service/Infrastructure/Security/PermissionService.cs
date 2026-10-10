@@ -363,6 +363,60 @@ public sealed partial class PermissionService : IPermissionService
         ["permisosweb.roles.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin" },
         ["permisosweb.overrides.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin" },
         ["permisosweb.catalogo.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin" },
+
+        /*
+          LAS TRES PANTALLAS DE ACCESOS Y PERMISOS. ERA EL CANDADO QUE FALTABA.
+
+          `IsAllowedByLegacy` acaba en `return true`: lo que no esta en este
+          mapa PASA. Eso es deliberado y tiene que seguir siendo asi —un modulo
+          nuevo no puede quedarse inaccesible en una instalacion sin el modelo
+          de capacidades—, pero deja estas llaves abiertas, y no son un modulo
+          de negocio cualquiera: son las que reparten los permisos de todos.
+
+          El camino es este, y solo se recorre con PermissionsEnabled = false
+          (PermissionAuthorizationHandler, el `else` del snapshot). Tres cosas
+          lo encienden: que falten las tablas de capacidades, que la bandera
+          'autorizacion.capacidades' de la empresa este en 0, y —la que
+          preocupa— CUALQUIER excepcion al construir el snapshot sin copia en
+          cache. O sea: un hipo de SQL y, antes de esto, cualquier usuario
+          autenticado podia llamar
+
+              PUT /api/permisos-web/modulos/{clave}/status
+
+          y prender o apagar los modulos de la empresa entera. Sin un solo
+          permiso. Medido leyendo el codigo, no con una peticion: por eso se
+          cierra en vez de dejarlo anotado.
+
+          `permisosweb.*` ya estaba cubierto arriba; estas son sus hermanas,
+          con el mismo reparto para que las cinco digan lo mismo: ver con
+          Admin, cambiar solo SuperAdmin.
+
+          Lo que NO se toca: el `return true` del final y la exclusion de
+          `app_movil.*` de la puerta de entrada (EntradasDeModulo). Ninguna de
+          estas llaves es del canal movil.
+        */
+        ["permisos_roles.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["permisos_roles.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin" },
+        ["permisos_roles.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin" },
+        ["permisos_modulos.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["permisos_modulos.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["permisos_modulos.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin" },
+        ["permisos_modulos.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin" },
+        ["permisos_modulos.activar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin" },
+        ["permisos_usuarios.ver_modulo"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
+        ["permisos_usuarios.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin" },
+
+        /*
+          Y LA LLAVE DEL SUELDO, por la misma razon y en el mismo sitio.
+
+          'empleados.sueldo.ver' tampoco estaba en el mapa, asi que en modo de
+          respaldo cualquiera veia los importes — y ahora, con el candado de
+          escritura puesto en EmpleadosService, tambien podria fijarlos. Se le
+          da el reparto mas cerrado que hay: solo SuperAdmin, porque en Mac31
+          ver sueldos no es un permiso de rol sino una contrasena, y no hay un
+          rol legacy del que se pueda deducir honestamente que si.
+        */
+        ["empleados.sueldo.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin" },
         ["proveedores.ver"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin", "User" },
         ["proveedores.crear"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },
         ["proveedores.editar"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SuperAdmin", "Admin" },

@@ -455,7 +455,30 @@ public static class ReportesCatalogo
           pedir ni el periodo ni los empleados marcados.
         */
         new("nomina_asistencias", "administracion", "Asistencias", SinPermiso, EnArbol: false),
-        new("nomina_recibos", "administracion", "Recibos de nómina", SinPermiso, EnArbol: false),
+        /*
+          EL RECIBO DE NOMINA LLEVA SUELDOS, ASI QUE LO PROTEGE LA LLAVE DE LOS
+          SUELDOS.
+
+          Estaba con `SinPermiso`, y eso aqui no significa "publico sin querer":
+          significa que el unico candado era `reportes.ver_modulo`. O sea que
+          cualquiera que pudiera entrar a Reportes podia pedir
+          `POST /api/reportes/ventas/legacy/generar` con esta clave y recibir un
+          papel con los IMPORTES POR EMPLEADO -lo arma ReciboNominaHtmlBuilder
+          desde `sp_n_ConsultaEmpleadosTipoSueldoRecibo`-.
+
+          Y la pantalla de Empleados si lo protege: el servidor ANULA los cinco
+          importes antes de responder cuando falta `empleados.sueldo.ver`
+          (EmpleadosService.BorrarDinero). Tapar la puerta y dejar la ventana
+          abierta no es proteger: es creer que se protege.
+
+          Se usa `empleados.sueldo.ver` y no una clave nueva a proposito. Esa ya
+          existe en WPermiso -id 188 en MacZ, comprobado- y ya esta repartida a
+          quien debe ver sueldos. Inventar
+          `reportes.administracion.nomina_recibos.ver` daria un candado que
+          nadie tiene: el reporte quedaria escrito y apagado para todos, que es
+          peor que el hueco que viene a tapar.
+        */
+        new("nomina_recibos", "administracion", "Recibos de nómina", "empleados.sueldo.ver", EnArbol: false),
         new("nomina_inasistencias", "administracion", "Inasistencias", SinPermiso, EnArbol: false),
         new("nomina_vacaciones", "administracion", "Vacaciones", SinPermiso, EnArbol: false),
         new("nomina_solo_asistencias", "administracion", "Solo asistencias", SinPermiso, EnArbol: false),

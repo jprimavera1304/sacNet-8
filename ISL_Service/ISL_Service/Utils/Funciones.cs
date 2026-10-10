@@ -88,12 +88,14 @@ namespace ISL_Service.Utils
         /// nadie se entere. Pasando el renglon completo, lo que el SP dejo de
         /// mandar simplemente no aparece, y eso si se nota.
         ///
-        /// Ademas respeta los NULL: la copia de Zaragoza de
-        /// sp_n_ConsultaEmpleadosPeriodoAsistencia devuelve 'asistencias' en NULL
-        /// para algunos empleados (le falta un ISNULL que la de Tauro si tiene),
-        /// y eso tiene que llegar al front como null, no como cero. Un cero
-        /// seria una mentira: cero asistencias y "no se pudo calcular" no son lo
-        /// mismo.
+        /// Ademas respeta los NULL, y eso se queda aunque el caso que lo motivo
+        /// ya este arreglado: la copia de Zaragoza de
+        /// sp_n_ConsultaEmpleadosPeriodoAsistencia devolvia 'asistencias' en NULL
+        /// para algunos empleados (le faltaba un ISNULL que la de Tauro si
+        /// tiene) y la rejilla pasa ahora por el gemelo sp_w_ que lo incluye.
+        /// Si vuelve a aparecer un NULL por otra via, tiene que llegar al front
+        /// como null y no como cero. Un cero seria una mentira: cero asistencias
+        /// y "no se pudo calcular" no son lo mismo.
         /// </summary>
         public static List<Dictionary<string, object?>> DataTableToRows(DataTable dt)
         {

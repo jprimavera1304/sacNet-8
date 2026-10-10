@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.Empleados;
+﻿using ISL_Service.Application.DTOs.Empleados;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -108,7 +108,10 @@ public class EmpleadosController : PermisoControllerBase
         var sinPermiso = await ExigirPermisoAsync(PermisosCrear, ct);
         if (sinPermiso != null) return sinPermiso;
 
-        var data = await _service.CrearAsync(request, IdUsuarioLegacy(), ct);
+        // La misma llave que destapa los importes al leerlos gobierna el
+        // poder fijarlos. Se pregunta aqui, no en el front: ver IEmpleadosService.
+        var puedeVerSueldo = await TienePermisoAsync(PermisosSueldo, ct);
+        var data = await _service.CrearAsync(request, IdUsuarioLegacy(), puedeVerSueldo, ct);
         return StatusCode(StatusCodes.Status201Created,
             new { ok = true, message = "Empleado dado de alta.", data });
     }
@@ -137,7 +140,10 @@ public class EmpleadosController : PermisoControllerBase
         var sinPermiso = await ExigirPermisoAsync(PermisosEditar, ct);
         if (sinPermiso != null) return sinPermiso;
 
-        await _service.ActualizarAsync(id, request, IdUsuarioLegacy(), ct);
+        // Sin la llave de sueldo los cinco importes se conservan tal como
+        // estan guardados, en vez de tomarse del body: ver IEmpleadosService.
+        var puedeVerSueldo = await TienePermisoAsync(PermisosSueldo, ct);
+        await _service.ActualizarAsync(id, request, IdUsuarioLegacy(), puedeVerSueldo, ct);
         return Ok(new { ok = true, message = "Empleado guardado." });
     }
 }
