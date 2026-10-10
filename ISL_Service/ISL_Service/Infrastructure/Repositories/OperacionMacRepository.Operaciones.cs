@@ -232,30 +232,55 @@ public partial class OperacionMacRepository
     // =======================================================================
 
     /// <summary>
-    /// Estados de cuenta. La precedencia es: id, luego archivo, luego fechas.
-    /// Es la cascada de legacy, dicha en vez de escondida en tres
-    /// reinicializaciones del DTO.
+    /// Estados de cuenta.
+    ///
+    /// LLAMA AL GEMELO `sp_w_ConsultaBancoTransferencias` Y NO AL `sp_n_`.
+    /// El script y la medicion completa estan en
+    /// `Querrys/43 Bancos Transferencias Consulta Que Devuelve Cero/`. En corto,
+    /// medido contra la copia de produccion de Zaragoza (980 estados de cuenta
+    /// activos) con este mismo endpoint:
+    ///
+    ///   sin fechas                 -> 0 filas   (teniendo 980)
+    ///   ?idBancoTransferencia=N    -> 0 filas   (teniendo ese archivo)
+    ///   ?aplicado=1                -> HTTP 500
+    ///
+    /// Las tres salen del `sp_n_`:
+    ///
+    ///  1. Arma el BETWEEN de `arch.Fecha` con las dos fechas pegadas al texto,
+    ///     sin preguntar si vienen. Con las dos vacias eso es BETWEEN '' AND '', que
+    ///     SQL Server lee como 1900-01-01: cero filas. Mac31 no lo nota porque
+    ///     su pantalla manda SIEMPRE las dos fechas.
+    ///  2. Declara @IDBancoTransferencia y NO LO USA en ninguna parte. Pedir un
+    ///     estado de cuenta por su id no filtraba nada, y como la cascada manda
+    ///     las fechas en blanco cuando viene el id, se caia en el defecto 1.
+    ///  3. @Aplicado / @Rechazado filtran por `arch.Aplicado` y
+    ///     `arch.Rechazado`, columnas que NO EXISTEN en BancoTranferencias (ahi
+    ///     estan los CONTEOS: NumAplicados, NumRechazados). Cualquiera de los
+    ///     dos encendido revienta la consulta. Mac31 nunca los manda.
+    ///
+    /// El gemelo arregla las tres y devuelve EXACTAMENTE lo mismo que el `sp_n_`
+    /// en los caminos que si funcionaban: con rango de fechas 435 = 435, con
+    /// filtro de archivo 2 = 2, mismas 34 columnas en el mismo orden.
+    ///
+    /// LA CASCADA YA NO SE ARMA AQUI. La precedencia —id, luego archivo, luego
+    /// el resto— vive dentro del gemelo, que es donde no depende de que cada
+    /// llamador la recuerde. Los parametros viajan tal como los pidio quien
+    /// consulta, y el `sp_n_` no se toco: Mac31 y MacServicios2 lo siguen
+    /// llamando igual.
     /// </summary>
     public Task<List<Dictionary<string, object?>>> ConsultarTransferenciasAsync(
         TransferenciasFiltro filtro, CancellationToken ct)
-    {
-        var archivo = Texto(filtro.Archivo);
-        var porId = filtro.IdBancoTransferencia > 0;
-        var porArchivo = !porId && archivo.Length > 0;
-        var otrosFiltros = !porId && !porArchivo;
-
-        return ConsultarAsync("dbo.sp_n_ConsultaBancoTransferencias", cmd =>
+        => ConsultarAsync("dbo.sp_w_ConsultaBancoTransferencias", cmd =>
         {
             cmd.Parameters.AddWithValue("@IDBancoTransferencia", filtro.IdBancoTransferencia);
-            cmd.Parameters.AddWithValue("@FechaInicial", otrosFiltros ? ADesde(filtro.Desde) : string.Empty);
-            cmd.Parameters.AddWithValue("@FechaFinal", otrosFiltros ? AHasta(filtro.Hasta) : string.Empty);
-            cmd.Parameters.AddWithValue("@IDCliente", otrosFiltros ? filtro.IdCliente : 0);
-            cmd.Parameters.AddWithValue("@Referencia", otrosFiltros ? Texto(filtro.Referencia) : string.Empty);
-            cmd.Parameters.AddWithValue("@Archivo", porArchivo ? archivo : string.Empty);
-            cmd.Parameters.AddWithValue("@Aplicado", otrosFiltros ? filtro.Aplicado : 0);
-            cmd.Parameters.AddWithValue("@Rechazado", otrosFiltros ? filtro.Rechazado : 0);
+            cmd.Parameters.AddWithValue("@FechaInicial", ADesde(filtro.Desde));
+            cmd.Parameters.AddWithValue("@FechaFinal", AHasta(filtro.Hasta));
+            cmd.Parameters.AddWithValue("@IDCliente", filtro.IdCliente);
+            cmd.Parameters.AddWithValue("@Referencia", Texto(filtro.Referencia));
+            cmd.Parameters.AddWithValue("@Archivo", Texto(filtro.Archivo));
+            cmd.Parameters.AddWithValue("@Aplicado", filtro.Aplicado);
+            cmd.Parameters.AddWithValue("@Rechazado", filtro.Rechazado);
         }, ct);
-    }
 
     /// <summary>
     /// Movimientos de un estado de cuenta. Aqui todos los filtros conviven: el
