@@ -151,4 +151,48 @@ public class VentasDetalleConsultaRequest
     /// remision: el procedimiento multiple no lo recibe.
     /// </summary>
     public int IdDescuento { get; set; }
+
+    /// <summary>
+    /// FUERZA `sp_n_VentasDetalleMultiple` AUNQUE SEA UNA SOLA REMISION.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// LOS DOS PROCEDIMIENTOS LLAMAN IGUAL A COSAS DISTINTAS, Y AHI ESTABA EL
+    /// DEFECTO. Medido el 2026-10-15 en MacZ con la remision 154134, partida
+    /// 483747 (lista 3,862.07 sin IVA, descuento 1,747.86, neto 2,388.68):
+    /// </para>
+    /// <para>
+    /// `sp_n_VentasDetalleMultiple`:
+    ///   PrecioListaConIvaRnd = 2388.68  (el NETO por pieza, con IVA)
+    ///   FacturaPrecioListaConIva = 4480.00  (el de LISTA)
+    /// </para>
+    /// <para>
+    /// `sp_n_VentasDetalle` (el simple):
+    ///   PrecioListaConIvaRnd = 4480.00  (el de LISTA, el descuento NO esta
+    ///                                    aplicado; vive en ImporteConIvaRnd)
+    ///   FacturaPrecioListaConIva — NO EXISTE esa columna
+    /// </para>
+    /// <para>
+    /// O sea: la MISMA columna es el neto en uno y el precio de lista en el
+    /// otro. `ReglasPreparacionFactura` esta escrita contra el MULTIPLE —sus
+    /// comentarios lo citan y las pruebas tambien—, asi que cuando el detalle
+    /// llegaba del simple, el concepto del CFDI salia con el precio de LISTA:
+    /// 4,480.00 en un comprobante cuyo total a facturar era 2,388.68. Un 200
+    /// con 2,091.32 pesos de diferencia, en una remision de UN renglon, y
+    /// timbrable.
+    /// </para>
+    /// <para>
+    /// Y SALTABA JUSTO EN EL CASO NORMAL: el servicio manda una sola remision
+    /// al simple (para poder pasarle `@IDDescuento`), y facturar desde la app
+    /// es casi siempre UNA remision. Con dos o mas iba al multiple y las
+    /// cifras salian bien, que es lo que hacia que pareciera un problema de
+    /// datos.
+    /// </para>
+    /// <para>
+    /// Facturar no simula descuentos —el CFDI se emite con lo que la remision
+    /// ya tiene— asi que no pierde nada por no usar el simple. Lo que gana es
+    /// que las columnas significan lo que la regla cree.
+    /// </para>
+    /// </remarks>
+    public bool ExigirDetalleMultiple { get; set; }
 }

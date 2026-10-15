@@ -219,7 +219,11 @@ public class VentasPagosOperacionesService : IVentasPagosOperacionesService
           un descuento simulado) y el multiple no. Legacy, con una lista de un
           elemento, se iba al multiple y perdia el descuento sin avisar.
         */
-        if (request.IdsVenta.Count == 1 && request.IdVenta <= 0)
+        /* Salvo que quien llama EXIJA el multiple. Ver
+           VentasDetalleConsultaRequest.ExigirDetalleMultiple: las dos
+           procedimientos usan el mismo nombre de columna para cosas distintas,
+           y facturar necesita las del multiple. */
+        if (request.IdsVenta.Count == 1 && request.IdVenta <= 0 && !request.ExigirDetalleMultiple)
         {
             request.IdVenta = request.IdsVenta[0];
             request.IdsVenta = new List<int>();
@@ -227,4 +231,15 @@ public class VentasPagosOperacionesService : IVentasPagosOperacionesService
 
         return await _repository.ConsultarDetalleAsync(request, ct);
     }
+
+    /// <inheritdoc />
+    public Task<FilasLegacyDto> ConsultarDetalleParaFacturarAsync(
+        IReadOnlyCollection<int> idsVenta, CancellationToken ct)
+        => ConsultarDetalleAsync(new VentasDetalleConsultaRequest
+        {
+            IdsVenta = idsVenta.ToList(),
+            // La bandera que impide que una sola remision se vaya al
+            // procedimiento simple. Ver el remark de la interfaz.
+            ExigirDetalleMultiple = true
+        }, ct);
 }

@@ -161,7 +161,17 @@ public class VentasFacturacionPreparacionService : IVentasFacturacionPreparacion
 
         // ---- las cuatro lecturas que no dependen unas de otras ----
         var tareaPartidas = ids.Count > 0
-            ? _detalles.ConsultarDetalleAsync(new VentasDetalleConsultaRequest { IdsVenta = ids }, ct)
+            /*
+              `ConsultarDetalleParaFacturarAsync` NO ES UN ATAJO: es de
+              que columna se lee. `sp_n_VentasDetalle` y
+              `sp_n_VentasDetalleMultiple` llaman `PrecioListaConIvaRnd` a dos
+              cosas distintas —el precio de LISTA en el simple, el NETO en el
+              multiple— y esta regla esta escrita contra el multiple. Sin esto,
+              facturar UNA sola remision (el caso normal de la app) armaba el
+              concepto con el precio de lista: 4,480.00 donde el total a
+              facturar era 2,388.68. Ver el comentario del campo.
+            */
+            ? _detalles.ConsultarDetalleParaFacturarAsync(ids, ct)
             : Task.FromResult(new DTOs.VentasEscrituras.FilasLegacyDto());
 
         var tareaCascos = _cascos.ConsultarCatalogoAsync(ct);
