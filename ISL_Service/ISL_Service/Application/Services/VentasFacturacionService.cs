@@ -5,6 +5,7 @@ using ISL_Service.Application.DTOs.VentasFacturacion;
 using ISL_Service.Application.Exceptions;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Facturacion;
+using Reglas = ISL_Service.Infrastructure.Facturacion.ReglasPreparacionFactura;
 
 namespace ISL_Service.Application.Services;
 
@@ -37,20 +38,150 @@ public class VentasFacturacionService : IVentasFacturacionService
     private readonly FacturapiCliente _facturapi;
     private readonly ILogger<VentasFacturacionService> _logger;
 
+    /* Para RELEER el estado de las remisiones antes de timbrar. Ver
+       ReleerYRejaDeRemisionesAsync: el timbrado no puede fiarse de que el
+       cliente respetara el bloqueo que le devolvio `preparar`. */
+    private readonly IVentasConsultaService _consulta;
+
     public VentasFacturacionService(
         IVentasFacturacionRepository repository,
         FacturapiCliente facturapi,
-        ILogger<VentasFacturacionService> logger)
+        ILogger<VentasFacturacionService> logger,
+        IVentasConsultaService consulta)
     {
         _repository = repository;
         _facturapi = facturapi;
         _logger = logger;
+        _consulta = consulta;
+    }
+
+    /*
+      ══════════════════════════════════════════════════════════════════════
+      LA REJA, OTRA VEZ, JUSTO ANTES DEL PASO IRREVERSIBLE
+      ══════════════════════════════════════════════════════════════════════
+
+      POR QUE EXISTE
+      --------------
+      `preparar` ya comprueba si la remision se puede facturar, pero NO lanza:
+      devuelve el motivo en el campo `bloqueo` de la respuesta para que la
+      pantalla lo ensene con el resto de la informacion a la vista (es
+      deliberado, ver VentasFacturacionPreparacionService). O sea que la unica
+      defensa era que el cliente LEYERA ese campo y no llamara a timbrar.
+
+      Eso no es una defensa. Un cliente que lo ignore —o una llamada a la API a
+      mano, que es justo lo que este canal nuevo hace facil— timbraba un CFDI
+      REAL de una remision cancelada. Comprobado el 2026-10-15: la remision
+      154134 de MacZ esta cancelada desde el 13-10-2026, `preparar` devuelve
+      200 con su `bloqueo` ("LA REMISION 135020 ESTA CANCELADA.") y
+      `TimbrarAsync` no mira nada de eso. En este archivo no habia ni una
+      mencion a `Cancelada`.
+
+      Y UN CFDI NO SE DESHACE. No hay rollback: hay que cancelarlo ante el SAT.
+      Es preexistente, pero hasta ahora nadie timbraba por este camino —en seis
+      meses todo salio de terminales de Mac31—, asi que publicar la app con
+      Facturar sin esto seria entregar un camino NUEVO a un agujero viejo.
+
+      COMO
+      ----
+      * SE RELEE DEL SERVIDOR. No se mira nada de lo que venga en la peticion:
+        el estado de la remision es dato del servidor, y lo que el cliente
+        mande sobre ella no es un dato, es una afirmacion.
+      * LA MISMA REJA, NO UNA SEGUNDA VERSION: se llama a
+        `Reglas.MotivoQueImpideFacturarFilas`, que es exactamente lo que usa
+        `preparar`. Dos verdades sobre si se puede facturar es el patron que ya
+        costo tres fallos en esta entrega.
+      * FALLA CERRADA. Si no se puede determinar que la remision esta vigente
+        —no vino el renglon, o la lectura revienta— NO SE TIMBRA. Un error al
+        leer no se interpreta como "esta bien": en los dos lados del `catch`,
+        la salida es negarse.
+      * `puedeVerDeOtros: true` A PROPOSITO, y hay que entender por que: aqui
+        NO se esta autorizando a nadie, se esta mirando el ESTADO de la
+        remision para poder NEGARSE. Con `false`, una remision de otro agente
+        no vendria en la respuesta, la reja la tomaria por inexistente y
+        dejaria de timbrar a quien hoy timbra legitimamente — convertiria un
+        candado de integridad en una restriccion de visibilidad nueva. Quien
+        puede llegar aqui ya paso el permiso del endpoint y la reja de
+        `preparar`; esta lectura solo puede QUITAR, nunca dar.
+    */
+    private async Task ExigirRemisionesFacturablesAsync(
+        IReadOnlyCollection<int> idsVenta, int idUsuario, CancellationToken ct)
+    {
+        // Sin remisiones no hay nada que releer: factura sin remision y
+        // complemento de pago no pasan por aqui (ver el comentario de
+        // TimbrarComplementoAsync).
+        if (idsVenta.Count == 0) return;
+
+        DTOs.VentasConsulta.VentasConsultaRowsResponse resp;
+        try
+        {
+            resp = await _consulta.ConsultarRemisionesAsync(
+                new DTOs.VentasConsulta.VentasConsultaRequest { IDsVentaLst = idsVenta.ToList() },
+                idUsuario,
+                puedeVerDeOtros: true,
+                ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // Una cancelacion no es un fallo de la base y no se disfraza de
+            // otra cosa: sube tal cual, y lo importante es que NO se timbro.
+            throw;
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e,
+                "No se pudo releer el estado de las remisiones {Ids} antes de timbrar. No se timbra.",
+                string.Join(",", idsVenta));
+
+            throw new ConflictException(
+                "NO SE PUDO COMPROBAR EL ESTADO DE LA REMISION, ASI QUE NO SE TIMBRO. "
+                + "Vuelve a intentarlo.");
+        }
+
+        var filas = resp.Rows
+            .Select(f => (IReadOnlyDictionary<string, object?>)f)
+            .ToList();
+
+        /* NO VINO ALGUNA: no se timbra. Pedir cinco remisiones y que la
+           consulta devuelva cuatro significa que de una no se sabe nada, y de
+           lo que no se sabe no se emite un comprobante fiscal. */
+        var encontradas = Reglas.RemisionesParaFacturarDeFilas(filas)
+            .Select(r => r.IdVenta)
+            .ToHashSet();
+
+        var faltantes = idsVenta.Where(id => !encontradas.Contains(id)).ToList();
+        if (faltantes.Count > 0)
+        {
+            throw new ConflictException(
+                "NO SE ENCONTRO EL ESTADO DE "
+                + (faltantes.Count == 1 ? "LA REMISION " : "LAS REMISIONES ")
+                + string.Join(", ", faltantes)
+                + ", ASI QUE NO SE TIMBRO.");
+        }
+
+        var impedimento = Reglas.MotivoQueImpideFacturarFilas(filas);
+        if (!string.IsNullOrEmpty(impedimento))
+            throw new ConflictException(impedimento);
     }
 
     public async Task<FacturaTimbradaDto> TimbrarAsync(
         FacturaTimbrarRequest request, int idUsuario, string equipo, CancellationToken ct)
     {
         Validar(request);
+
+        /*
+          LA REJA VA AQUI: ANTES DE TOCAR FACTURAPI Y ANTES DE ESCRIBIR NADA.
+
+          El orden del archivo dice que el paso 3 (timbrar) es el unico
+          irreversible. Esta comprobacion es parte del paso 1 a proposito: si
+          se pusiera despues del timbrado ya no serviria de nada, y si se
+          pusiera entre el timbrado y el guardado dejaria un CFDI emitido que
+          la base no conoce, que es el peor estado posible de este modulo.
+
+          Cubre factura CON remisiones y nota de credito que venga con
+          remisiones. La factura SIN remision no entra (no hay remision que
+          releer) y el complemento de pago tiene su propio camino.
+        */
+        await ExigirRemisionesFacturablesAsync(request.IdsVenta, idUsuario, ct);
 
         var constantes = await _repository.LeerConstantesAsync(ct);
         var secreto = ReglasFacturacion.SecretoReal(constantes.FacturapiSecretKey, constantes.AppMac)
@@ -96,6 +227,26 @@ public class VentasFacturacionService : IVentasFacturacionService
         return timbrada;
     }
 
+    /*
+      EL COMPLEMENTO DE PAGO NO PASA POR LA REJA DE REMISIONES, Y NO ES UN
+      DESCUIDO: NO TIENE REMISIONES.
+
+      Un complemento paga FACTURAS YA EMITIDAS, y entra por el id de Facturapi
+      de cada una (`request.Documentos`), no por `IdsVenta` — no existe ese
+      campo en su peticion. Releer remisiones aqui no tendria nada que releer.
+
+      Lo que si comprueba, y es su equivalente: cada documento tiene que estar
+      guardado y tener UUID (`LeerFacturaAsync` mas abajo), y si falta uno se
+      para y no timbra. Es el mismo "fallar cerrado" aplicado a lo que aqui
+      importa.
+
+      LO QUE QUEDA FUERA Y HAY QUE SABERLO: no se comprueba que la FACTURA que
+      se esta pagando no este cancelada ante el SAT. La nota de credito si lo
+      hace (`PrepararNotaCreditoAsync` mira `Cancelada == "SI"` de la factura
+      relacionada). Se deja dicho y no se cambia hoy: es otro caso, pide leer
+      el estado fiscal de la factura y no me lo pidieron medido. No lo declaro
+      resuelto.
+    */
     public async Task<FacturaTimbradaDto> TimbrarComplementoAsync(
         ComplementoPagoTimbrarRequest request, int idUsuario, string equipo, CancellationToken ct)
     {

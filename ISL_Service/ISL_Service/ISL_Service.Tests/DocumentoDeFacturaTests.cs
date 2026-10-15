@@ -36,8 +36,13 @@ public class DocumentoDeFacturaTests
     {
         var configuracion = new ConfigurationBuilder().AddInMemoryCollection().Build();
         var facturapi = new FacturapiCliente(new FabricaDeClientes(), configuracion);
+        /* La consulta de ventas no se usa en estas pruebas: su unico papel en
+           el servicio es releer el estado de las remisiones antes de timbrar, y
+           aqui no se timbra. Va un doble que LANZA si alguien la llama, para
+           que un camino nuevo no pase inadvertido. */
         return new VentasFacturacionService(
-            new RepositorioDeMentira(correo), facturapi, NullLogger<VentasFacturacionService>.Instance);
+            new RepositorioDeMentira(correo), facturapi, NullLogger<VentasFacturacionService>.Instance,
+            new ConsultaQueNadieDebeLlamar());
     }
 
     [Theory]
@@ -167,4 +172,7 @@ public class DocumentoDeFacturaTests
     {
         public HttpClient CreateClient(string name) => new();
     }
+
+    /// <summary>Si estas pruebas la llaman, es que el servicio cambio: que se vea.</summary>
+    private sealed class ConsultaQueNadieDebeLlamar : ConsultaDeVentasDobleBase { }
 }

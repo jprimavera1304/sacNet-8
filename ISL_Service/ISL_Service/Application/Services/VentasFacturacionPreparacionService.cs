@@ -128,17 +128,15 @@ public class VentasFacturacionPreparacionService : IVentasFacturacionPreparacion
 
         var crudasPorId = remisiones.ToDictionary(r => r.IdVenta);
 
-        // ---- las seis puertas del llamador, otra vez y aqui ----
-        var impedimento = Reglas.MotivoQueImpideFacturar(remisiones
-            .Select(r => new Reglas.RemisionParaFacturar
-            {
-                IdVenta = r.IdVenta,
-                IdCliente = _clientePorRemision.TryGetValue(r.IdVenta, out var c) ? c : 0,
-                FolioFtm = r.FolioFtm,
-                TotalPagar = _totalPagarPorRemision.TryGetValue(r.IdVenta, out var t) ? t : 0m,
-                Cancelada = r.Cancelada
-            })
-            .ToList());
+        /* ---- las seis puertas del llamador, otra vez y aqui ----
+
+           Por `MotivoQueImpideFacturarFilas`, que es EXACTAMENTE la misma
+           funcion y la misma extraccion que usa el timbrado
+           (`VentasFacturacionService.TimbrarAsync`). Antes esto armaba el
+           `RemisionParaFacturar` a mano aqui y el timbrado no comprobaba nada:
+           la reja vivia en un solo lado y el otro se fiaba de que el cliente
+           respetara el `bloqueo` de abajo. */
+        var impedimento = Reglas.MotivoQueImpideFacturarFilas(_filasDeRemisiones);
 
         if (ids.Count > 0 && !string.IsNullOrEmpty(impedimento))
         {
@@ -1069,6 +1067,12 @@ public class VentasFacturacionPreparacionService : IVentasFacturacionPreparacion
     private readonly Dictionary<int, int> _clientePorRemision = new();
     private readonly Dictionary<int, decimal> _totalPagarPorRemision = new();
 
+    /* Los renglones CRUDOS de la consulta, en el orden en que se pidieron. Es
+       lo que come `Reglas.RemisionesParaFacturarDeFilas`, que es la misma
+       extraccion que usa el TIMBRADO: la reja de "se puede facturar esto" se
+       calcula igual en los dos sitios porque sale del mismo codigo. */
+    private readonly List<IReadOnlyDictionary<string, object?>> _filasDeRemisiones = new();
+
     /*
       LAS REMISIONES, EN EL ORDEN EN QUE SE PIDIERON.
 
@@ -1121,6 +1125,7 @@ public class VentasFacturacionPreparacionService : IVentasFacturacionPreparacion
 
             _clientePorRemision[id] = Reglas.Entero(Reglas.Crudo(fila, "IDCliente"));
             _totalPagarPorRemision[id] = Reglas.Numero(Reglas.Crudo(fila, "TotalPagar"));
+            _filasDeRemisiones.Add(fila);
 
             correos.Add(Reglas.Texto(Reglas.Crudo(fila, "Email")));
             correos.Add(Reglas.Texto(Reglas.Crudo(fila, "Email2")));

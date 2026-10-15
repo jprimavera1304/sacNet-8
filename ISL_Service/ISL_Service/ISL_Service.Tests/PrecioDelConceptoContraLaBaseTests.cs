@@ -273,4 +273,75 @@ public class PrecioDelConceptoContraLaBaseTests
 
     private static decimal Numero(IReadOnlyDictionary<string, object?> fila, string columna)
         => Reglas.Numero(Reglas.Crudo(fila, columna));
+
+    // ======================================================================
+    // LA REJA DEL TIMBRADO, CON UNA REMISION CANCELADA DE VERDAD
+    // ======================================================================
+
+    /*
+      POR QUE ESTA PRUEBA ESTA CONTRA LA BASE Y NO BASTAN LAS DE ESCRITORIO.
+
+      `TimbrarRevalidaLaRemisionTests` ya cubre la reja con renglones armados a
+      mano, y eso prueba la LOGICA. Lo que no puede probar es que la columna
+      `Cancelada` de `sp_n_ConsultaVentas` siga diciendo "SI" —es un dato de la
+      base, no del codigo— ni que la reja lea de ahi. Si esa columna cambiara
+      de valores (un "1", un "CANCELADA"), la logica seguiria perfecta y el
+      candado no cerraria: exactamente la clase de fallo que nos dio el defecto
+      del IVA y el de `PrecioListaConIvaRnd`.
+
+      Las dos remisiones son canceladas REALES, comprobadas el 2026-10-15:
+        MacZ 154134 (folio 135020)            cancelada el 13-10-2026
+        Produccion_svr 390271 (folio 142408)  cancelada
+
+      Las dos devolvian 200 en `preparar` con su `bloqueo`, y antes de este
+      arreglo las dos se podian timbrar llamando a la API a mano.
+
+      AQUI NO SE TIMBRA: la prueba comprueba que la REJA las rechaza, sobre los
+      renglones reales de la consulta. No construye el servicio de facturacion
+      ni se acerca al PAC.
+    */
+    [Theory]
+    [InlineData("MacZ", 154134, "135020")]
+    [InlineData("Produccion_svr", 390271, "142408")]
+    public async Task Una_Remision_Cancelada_De_Verdad_No_Pasa_La_Reja(
+        string baseDatos, int idVenta, string folioEsperado)
+    {
+        if (!await HayBaseAsync(baseDatos)) return;
+
+        var resp = await new VentasConsultaService(
+                new VentasConsultaRepository(ConfigDe(baseDatos)),
+                new VentasCancelacionRepository(ConfigDe(baseDatos)),
+                new RemisionImpresionRepository(ConfigDe(baseDatos)),
+                ConfigDe(baseDatos))
+            .ConsultarRemisionesAsync(
+                new ISL_Service.Application.DTOs.VentasConsulta.VentasConsultaRequest
+                {
+                    IDsVentaLst = new List<int> { idVenta }
+                },
+                idUsuarioToken: 1125,
+                puedeVerDeOtros: true,
+                default);
+
+        var filas = resp.Rows.Select(f => (IReadOnlyDictionary<string, object?>)f).ToList();
+        if (filas.Count == 0)
+        {
+            _out.WriteLine($"{baseDatos}: la remision {idVenta} no esta, no se pudo medir.");
+            return;
+        }
+
+        /* Primero: que la base SIGA diciendo que esta cancelada. Si esto falla,
+           la remision se descancelo o la columna cambio de valores, y hay que
+           elegir otra remision — no relajar la reja. */
+        var extraidas = Reglas.RemisionesParaFacturarDeFilas(filas);
+        var remision = Assert.Single(extraidas);
+        Assert.Equal("SI", remision.Cancelada);
+        Assert.Equal(folioEsperado, remision.FolioFtm);
+
+        /* Y la reja la rechaza, nombrando el folio. */
+        var motivo = Reglas.MotivoQueImpideFacturarFilas(filas);
+        Assert.Contains("CANCELADA", motivo, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(folioEsperado, motivo);
+
+        _out.WriteLine($"{baseDatos} {idVenta}: {motivo}");
+    }
 }

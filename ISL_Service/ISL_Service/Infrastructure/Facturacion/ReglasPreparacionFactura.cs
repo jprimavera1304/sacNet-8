@@ -129,6 +129,58 @@ public static class ReglasPreparacionFactura
         public string Cancelada { get; set; } = string.Empty;
     }
 
+    /// <summary>
+    /// Saca de los renglones de `sp_n_ConsultaVentas` lo que la reja necesita
+    /// para decidir si se puede facturar.
+    /// </summary>
+    /// <remarks>
+    /// ESTA ES LA UNICA EXTRACCION, Y ESTA AQUI PARA QUE SEA LA UNICA.
+    ///
+    /// La usan los DOS sitios que deciden: la preparacion del CFDI
+    /// (`VentasFacturacionPreparacionService`) y el TIMBRADO
+    /// (`VentasFacturacionService.TimbrarAsync`). Antes la reja solo existia en
+    /// la preparacion, y el timbrado se fiaba de que el cliente respetara el
+    /// `bloqueo` que la preparacion le devolvia — o sea, de que el cliente se
+    /// portara bien.
+    ///
+    /// Tener dos versiones de "se puede facturar esto" es el patron que ya nos
+    /// costo tres fallos en esta entrega (la clave de Modificar que la app
+    /// ensenaba y el servidor no cobraba, la columna del IVA arreglada en un
+    /// metodo y no en el otro, y el precio del concepto). Asi que la regla
+    /// —<see cref="MotivoQueImpideFacturar"/>— y la lectura de sus cinco
+    /// campos viven en un solo sitio y los dos caminos entran por aqui.
+    /// </remarks>
+    public static List<RemisionParaFacturar> RemisionesParaFacturarDeFilas(
+        IEnumerable<IReadOnlyDictionary<string, object?>> filas)
+    {
+        var salida = new List<RemisionParaFacturar>();
+
+        foreach (var fila in filas)
+        {
+            var id = Entero(Crudo(fila, "IDVenta"));
+            if (id <= 0) continue;
+
+            salida.Add(new RemisionParaFacturar
+            {
+                IdVenta = id,
+                IdCliente = Entero(Crudo(fila, "IDCliente")),
+                FolioFtm = Texto(Crudo(fila, "FolioFtm")),
+                TotalPagar = Numero(Crudo(fila, "TotalPagar")),
+                Cancelada = Texto(Crudo(fila, "Cancelada")).Trim()
+            });
+        }
+
+        return salida;
+    }
+
+    /// <summary>
+    /// La reja aplicada directamente sobre los renglones de la consulta.
+    /// Vacio = se puede facturar.
+    /// </summary>
+    public static string MotivoQueImpideFacturarFilas(
+        IEnumerable<IReadOnlyDictionary<string, object?>> filas)
+        => MotivoQueImpideFacturar(RemisionesParaFacturarDeFilas(filas));
+
     /*
       LAS COMPROBACIONES DE `btnFacturar_Click` DE LA CONSULTA DE VENTAS, CON SU
       TEXTO EXACTO.
