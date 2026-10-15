@@ -36,6 +36,61 @@ public class VentasPedidoCapturaController : ControllerBase
         _permissionService = permissionService;
     }
 
+    /*
+      LAS DOS POLITICAS DE ESTE CONTROLADOR, Y POR QUE SON DOS.
+
+      EL AGUJERO QUE CIERRAN
+      ----------------------
+      La app gatea su boton "Modificar" de CONSULTA DE VENTAS con
+      `app_movil.ventas.pedidos.modificar` (ventas_consulta.dart), y esa clave
+      no gobernaba NADA en el servidor: el unico sitio que la miraba era
+      `POST api/ventas/pedidos/usados-credito`
+      (PedidosOperacionesController.PermisoModificar), que es ajustar cascos a
+      credito, no modificar el pedido. Las rutas que de verdad modifican un
+      pedido guardado son las de AQUI. El efecto era de los peores posibles,
+      porque fallaba en las dos direcciones: quitarle la clave a alguien le
+      escondia el boton y dejaba el PUT abierto, y darsela sola le dibujaba el
+      boton para que el PUT le contestara 403.
+
+      LA CORRECCION: que estas rutas ACEPTEN la clave que la pantalla de
+      permisos promete. Va en los dos sitios que deciden —esta politica y
+      HayQueCobrarLaClaveDeEditarAsync—, porque con uno solo la clave seguiria
+      sin alcanzar.
+
+      POR QUE EN ESTA DIRECCION Y NO CAMBIANDO LA APP. La alternativa era que
+      la app gateara Modificar con `app_movil.pedidos.editar`, y eso AMPLIA
+      alcance sin que nadie lo conceda: esa clave ya esta repartida en
+      produccion y los repartidores la usan hoy para editar sus pedidos
+      pendientes desde "Mis pedidos", asi que todos ellos verian aparecer
+      Modificar en Consulta de ventas al dia siguiente. Por este lado el efecto
+      HOY ES CERO —nadie tiene la clave nueva, son 0 filas en WPermiso en las
+      dos bases— y pasa a ser correcto en cuanto alguien la reparta a mano.
+
+      NO SE QUITA NADA A QUIEN HOY EDITA: `app_movil.pedidos.editar` y
+      `ventas.pedidos.crear` siguen valiendo exactamente igual. La clave nueva
+      se SUMA con un OR; un OR no puede cerrar nada que estuviera abierto.
+
+      POR QUE SON DOS POLITICAS Y NO UNA
+      ----------------------------------
+      `app_movil.ventas.pedidos.modificar` es la clave de MODIFICAR un pedido
+      que ya existe. No es la de CREAR uno. Si se pusiera en todas las rutas,
+      quien tuviera solo esa clave podria estrenar pedidos por `bootstrap` y
+      tirar borradores, que es alcance que nadie le concedio. Asi que:
+
+        * PoliticaCaptura    — crear: bootstrap, borrador, mis-pedidos.
+        * PoliticaModificar  — abrir y modificar uno que ya existe: el GET, el
+          historial, los buscadores que hacen falta para cambiar un renglon, el
+          alta y baja de detalle y el PUT.
+
+      Las dos siguen aceptando `ventas.pedidos.crear` (oficina/Mac31) y
+      `app_movil.pedidos` (la app), que es lo que funciona hoy.
+    */
+    private const string PoliticaCaptura =
+        "perm:ventas.pedidos.crear|app_movil.pedidos";
+
+    private const string PoliticaModificar =
+        "perm:ventas.pedidos.crear|app_movil.pedidos|app_movil.ventas.pedidos.modificar";
+
     // Blindaje de propiedad para usuarios "solo movil" (repartidores).
     //
     // Los sp_n_ de captura NO validan que el pedido sea del usuario del token:
@@ -171,7 +226,8 @@ public class VentasPedidoCapturaController : ControllerBase
             return StatusCode(403, new
             {
                 ok = false,
-                message = "No tienes permiso para editar pedidos (app_movil.pedidos.editar)."
+                message = "No tienes permiso para editar pedidos "
+                          + "(app_movil.pedidos.editar o app_movil.ventas.pedidos.modificar)."
             });
         }
 
@@ -212,9 +268,34 @@ public class VentasPedidoCapturaController : ControllerBase
 
         if (!snapshot.PermissionsEnabled) return false;
 
+        /*
+          LAS TRES CLAVES QUE DEJAN MODIFICAR UN PEDIDO YA GUARDADO.
+
+          `app_movil.pedidos.editar`  el boton Editar de "Mis pedidos". Es la
+                                      que ya esta repartida y la que usan hoy
+                                      los repartidores: no se toca.
+          `ventas.pedidos.crear`      la de oficina y la que lee Mac31. Quien
+                                      la tiene ya modifica por estas rutas
+                                      desde el web.
+          `app_movil.ventas.pedidos.modificar`  la del boton Modificar de
+                                      Consulta de ventas en la app. SE SUMA
+                                      AQUI porque es la que la pantalla de
+                                      permisos promete, y hasta ahora no
+                                      gobernaba ninguna de estas rutas (ver el
+                                      bloque de PoliticaModificar, arriba). Es
+                                      un OR mas: no le quita la edicion a
+                                      nadie, y hoy no se la da a nadie tampoco
+                                      —son 0 filas en las dos bases—.
+
+          Y UN PEDIDO EN BORRADOR (IDStatusPedido = 0) NO COBRA NINGUNA DE LAS
+          TRES: es la primera grabada de un pedido nuevo, que es CREAR. Eso lo
+          decide quien llama (el `propiedad.IdStatus == 1` de arriba), no esta
+          funcion.
+        */
         var puedeEditar = snapshot.Permissions.Any(p =>
             string.Equals(p, "app_movil.pedidos.editar", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(p, "ventas.pedidos.crear", StringComparison.OrdinalIgnoreCase));
+            || string.Equals(p, "ventas.pedidos.crear", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(p, "app_movil.ventas.pedidos.modificar", StringComparison.OrdinalIgnoreCase));
 
         return !puedeEditar;
     }
@@ -239,7 +320,7 @@ public class VentasPedidoCapturaController : ControllerBase
     }
 
     [HttpGet("bootstrap")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
+    [Authorize(Policy = PoliticaCaptura)]
     public async Task<IActionResult> Bootstrap(CancellationToken ct)
     {
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
@@ -248,7 +329,7 @@ public class VentasPedidoCapturaController : ControllerBase
     }
 
     [HttpGet("{idPedido:int}")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
+    [Authorize(Policy = PoliticaModificar)]
     public async Task<IActionResult> Obtener([FromRoute] int idPedido, CancellationToken ct)
     {
         var rechazo = await ValidarPropiedadPedidoAsync(idPedido, ct);
@@ -259,7 +340,7 @@ public class VentasPedidoCapturaController : ControllerBase
     }
 
     [HttpPost("clientes/buscar")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
+    [Authorize(Policy = PoliticaModificar)]
     public async Task<IActionResult> BuscarCliente([FromBody] PedidoClienteBuscarRequest? request, CancellationToken ct)
     {
         // El usuario sale del token, NUNCA del body: si viniera del cliente,
@@ -270,7 +351,7 @@ public class VentasPedidoCapturaController : ControllerBase
     }
 
     [HttpPost("productos/buscar")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
+    [Authorize(Policy = PoliticaModificar)]
     public async Task<IActionResult> BuscarProducto([FromBody] PedidoProductoBuscarRequest? request, CancellationToken ct)
     {
         var safe = request ?? new PedidoProductoBuscarRequest();
@@ -285,7 +366,7 @@ public class VentasPedidoCapturaController : ControllerBase
     // y solo las columnas que usa la app. productos/buscar sigue vivo para la app
     // publicada.
     [HttpPost("productos/pagina")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
+    [Authorize(Policy = PoliticaModificar)]
     public async Task<IActionResult> BuscarProductoPagina([FromBody] PedidoProductoPaginaRequest? request, CancellationToken ct)
     {
         var safe = request ?? new PedidoProductoPaginaRequest();
@@ -306,7 +387,7 @@ public class VentasPedidoCapturaController : ControllerBase
     }
 
     [HttpPost("detalle")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
+    [Authorize(Policy = PoliticaModificar)]
     public async Task<IActionResult> AgregarDetalle([FromBody] PedidoAgregarDetalleRequest? request, CancellationToken ct)
     {
         if (request == null)
@@ -326,7 +407,7 @@ public class VentasPedidoCapturaController : ControllerBase
     }
 
     [HttpDelete("detalle")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
+    [Authorize(Policy = PoliticaModificar)]
     public async Task<IActionResult> EliminarDetalle([FromBody] PedidoEliminarDetalleRequest? request, CancellationToken ct)
     {
         if (request == null || request.IDPedidoDetalle <= 0)
@@ -340,7 +421,7 @@ public class VentasPedidoCapturaController : ControllerBase
     }
 
     [HttpPut("{idPedido:int}")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
+    [Authorize(Policy = PoliticaModificar)]
     public async Task<IActionResult> Guardar([FromRoute] int idPedido, [FromBody] PedidoGuardarRequest? request, CancellationToken ct)
     {
         if (request == null)
@@ -373,7 +454,7 @@ public class VentasPedidoCapturaController : ControllerBase
     // haya cambiado el usuario) o por el usuario legacy. El idUsuario sale del
     // token, no del body.
     [HttpPost("mis-pedidos")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
+    [Authorize(Policy = PoliticaCaptura)]
     public async Task<IActionResult> MisPedidos([FromBody] MisPedidosRequest? request, CancellationToken ct)
     {
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
@@ -385,7 +466,7 @@ public class VentasPedidoCapturaController : ControllerBase
     // Historial de cambios de un pedido (para el detalle): creado/modificado
     // (bitacora) + autorizado/cancelado (legacy), con quien y cuando.
     [HttpGet("{idPedido:int}/historial")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
+    [Authorize(Policy = PoliticaModificar)]
     public async Task<IActionResult> Historial([FromRoute] int idPedido, CancellationToken ct)
     {
         var rechazo = await ValidarPropiedadPedidoAsync(idPedido, ct);
@@ -396,7 +477,7 @@ public class VentasPedidoCapturaController : ControllerBase
     }
 
     [HttpDelete("borrador")]
-    [Authorize(Policy = "perm:ventas.pedidos.crear|app_movil.pedidos")]
+    [Authorize(Policy = PoliticaCaptura)]
     public async Task<IActionResult> EliminarBorrador(CancellationToken ct)
     {
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
