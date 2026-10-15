@@ -105,6 +105,35 @@ public class ExceptionHandlingMiddleware
             context.Response.ContentType = "application/json";
             await context.Response.WriteAsync(JsonSerializer.Serialize(new { message = ex.Message }));
         }
+        /*
+          EL CLIENTE SE FUE. NO ES UN ERROR.
+
+          Tiene que ir ANTES de las ramas de SqlException y Exception, porque la
+          cancelacion llega disfrazada de las dos.
+
+          Cuando el agente cierra la app o pierde la señal a media peticion,
+          ASP.NET Core dispara RequestAborted. Si la espera estaba en el `await`,
+          sale una OperationCanceledException. Pero si estaba leyendo el
+          resultado, SqlClient levanta una SqlException con "Operation cancelled
+          by user" y Number = 0, y esa caia en la rama de abajo: se anotaba
+          LogError como si la base hubiera fallado y se contestaba 500 a alguien
+          que ya no estaba escuchando.
+
+          El resultado practico era que el visor de eventos se llenaba de
+          errores de base que no eran de base, y encontrar las causas reales
+          obligaba a filtrarlos a mano.
+
+          499 es lo que usa todo el mundo para "el cliente cerro". Nadie lo lee
+          -no hay cliente-, pero deja el registro honesto.
+        */
+        catch (Exception ex) when (EsClienteQueSeFue(ex, context))
+        {
+            _logger.LogInformation(
+                "La peticion se cancelo porque el cliente se fue: {Ruta}", context.Request.Path);
+
+            if (!context.Response.HasStarted)
+                context.Response.StatusCode = 499;
+        }
         catch (SqlException ex)
         {
             var traceId = context.TraceIdentifier;
@@ -144,6 +173,28 @@ public class ExceptionHandlingMiddleware
     {
         if (yaEsMensajeDeNegocio) return ex.Message;
         return _env.IsDevelopment() ? ex.Message : null;
+    }
+
+    /*
+      ¿ES ESTO "EL CLIENTE SE FUE" O UN ERROR DE VERDAD?
+
+      Se exige que el token de la peticion este disparado. Sin esa condicion,
+      una SqlException con Number = 0 por otra causa -un corte de red con la
+      base, por ejemplo- se escondería como si fuera una cancelacion, y eso si
+      seria tapar un problema.
+    */
+    private static bool EsClienteQueSeFue(Exception ex, HttpContext context)
+    {
+        if (!context.RequestAborted.IsCancellationRequested)
+            return false;
+
+        if (ex is OperationCanceledException)
+            return true;
+
+        // El disfraz de SqlClient cuando le cancelan a media lectura.
+        return ex is SqlException sql
+            && sql.Number == 0
+            && (sql.Message ?? string.Empty).Contains("Operation cancelled by user", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsConnectionStringError(Exception ex)

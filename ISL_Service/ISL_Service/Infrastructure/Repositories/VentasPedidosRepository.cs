@@ -183,10 +183,30 @@ public class VentasPedidosRepository : IVentasPedidosRepository
                 idUsuarioAutorizar,
                 equipoAutorizar);
 
+            /*
+              UN PEDIDO QUE TRUENA NO SE LLEVA A LOS DEMAS.
+
+              `sp_w_ProcesarPedido` corre con XACT_ABORT ON, asi que un error de
+              ejecucion LANZA en vez de seguir con la transaccion condenada. Sin
+              este try/catch, la excepcion del tercer pedido se llevaba por
+              delante a los otros siete -incluidos los que ya se habian
+              convertido en venta- y el agente recibia un error sin saber que
+              habia pasado con cada uno.
+
+              Cada llamada es atomica: o el pedido se convirtio en venta o no se
+              toco nada. Por eso seguir con el siguiente es seguro, y por eso el
+              fallo se anota como un renglon mas del resultado.
+            */
             var dt = new DataTable();
-            using (var adapter = new SqlDataAdapter(cmd))
+            try
             {
+                using var adapter = new SqlDataAdapter(cmd);
                 adapter.Fill(dt);
+            }
+            catch (SqlException ex)
+            {
+                rows.Rows.Add(-1, ex.Message, idPedido, 0, 0);
+                continue;
             }
 
             if (dt.Rows.Count == 0)

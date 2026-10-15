@@ -146,32 +146,31 @@ public class CapturaPedidoContraLaBaseTests
     // ==================================================================
 
     /// <summary>
-    /// Con el token YA cancelado, la escritura se completa igual.
+    /// Con el token YA cancelado, la peticion muere ANTES de abrir la conexion
+    /// y no escribe nada.
     /// </summary>
     /// <remarks>
-    /// ESTA ES LA PRUEBA DE LA CORRECCION.
+    /// LO QUE SE MIDIO AQUI, Y QUE CORRIGE LA IDEA INTUITIVA.
     ///
-    /// Antes de la Fase 1 el embudo era <c>Task.Run(() =&gt; adapter.Fill(ds), ct)</c>
-    /// y el token solo impedia ARRANCAR el trabajo. Al pasar a
-    /// <c>ExecuteReaderAsync(ct)</c> la cancelacion se volvio real: un agente que
-    /// cierra la pantalla a media captura abortaba el lote DENTRO de la
-    /// transaccion de legacy, que corre con XACT_ABORT OFF y no se deshace sola.
+    /// La primera version de esta prueba exigia que el renglon SI quedara
+    /// escrito, razonando que el embudo de mutaciones ignora el token. Medido:
+    /// no queda. El token se revisa antes, en <c>conn.OpenAsync(ct)</c>, y
+    /// ninguna escritura llega a arrancar.
     ///
-    /// Por eso las mutaciones pasan por un embudo que usa
-    /// <c>CancellationToken.None</c>. Lo que esta prueba exige:
+    /// Eso esta BIEN y es la otra mitad del invariante: una peticion que llega
+    /// cancelada no deja nada, ni completo ni a medias. Lo que el embudo
+    /// protege es el caso distinto -la cancelacion que cae cuando el comando YA
+    /// esta corriendo en SQL Server-, y ahi no se puede provocar a voluntad
+    /// desde fuera: se mide con los procedimientos de juguete en
+    /// <see cref="CapturaTransaccionesYCandadosTests.Con_El_Token_Ya_Cancelado_La_Mutacion_Igual_Se_Termina"/>
+    /// y en
+    /// <see cref="CapturaTransaccionesYCandadosTests.Cancelar_A_Media_Transaccion_Deja_Candados_Y_La_Red_De_Seguridad_Los_Suelta"/>.
     ///
-    ///   - el renglon ESTA, exactamente una vez (si el embudo volviera a
-    ///     propagar el token, no estaria, o estaria a medias);
-    ///   - la lectura del snapshot si se cancela, porque ahi cancelar no deja
-    ///     nada abierto y es lo que libera el hilo;
-    ///   - y no queda transaccion ni candado de la sesion que escribio.
-    ///
-    /// El IDEmpresaCS se calienta antes a proposito: ese dato SI se lee con el
-    /// token de la peticion, y si se quedara sin cachear la cancelacion caeria
-    /// ANTES de la escritura y la prueba no mediria el embudo.
+    /// El IDEmpresaCS se calienta antes para que la cancelacion no se adelante
+    /// a un viaje de lectura que no tiene nada que ver con la escritura.
     /// </remarks>
     [Fact]
-    public async Task Con_El_Token_Ya_Cancelado_La_Escritura_Se_Completa_Y_No_Queda_Nada_Colgado()
+    public async Task Con_El_Token_Ya_Cancelado_No_Se_Escribe_Nada_Ni_Queda_Nada_Colgado()
     {
         await using var espia = await EspiaAsync();
         if (espia == null) return;
@@ -183,53 +182,34 @@ public class CapturaPedidoContraLaBaseTests
         var renglonesAntes = await RenglonesDelPedidoAsync(espia);
         var apartadoAntes = await ApartadoDeAsync(espia);
 
-        try
-        {
-            using var cts = new CancellationTokenSource();
-            cts.Cancel();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
 
-            // La lectura del snapshot si respeta el token, asi que lo normal es
-            // que la llamada termine cancelada. Lo que importa esta en la base.
-            try
-            {
-                await repo.AgregarDetalleAsync(Solicitud(cantidad: 1), Usuario, Firma, cts.Token);
-                _out.WriteLine("la llamada completa no se cancelo (la lectura ya tenia todo a mano)");
-            }
-            catch (OperationCanceledException)
-            {
-                _out.WriteLine("se cancelo la LECTURA del snapshot, que es lo esperado");
-            }
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            repo.AgregarDetalleAsync(Solicitud(cantidad: 1), Usuario, Firma, cts.Token));
 
-            var renglones = await RenglonesDelProductoAsync(espia);
-            _out.WriteLine($"renglones del producto tras cancelar = {renglones}");
-
-            // LA ASERCION: la escritura no se abandono.
-            Assert.Equal(1, renglones);
-            Assert.Equal(renglonesAntes + 1, await RenglonesDelPedidoAsync(espia));
-            Assert.Equal(apartadoAntes + 1, await ApartadoDeAsync(espia));
-
-            await NadaColgadoAsync(espia, "tras cancelar la solicitud");
-        }
-        finally
-        {
-            await BorrarRenglonDeLaPruebaAsync(repo, espia);
-        }
-
+        // Ni renglon nuevo, ni medio renglon, ni apartado fantasma.
+        Assert.Equal(0, await RenglonesDelProductoAsync(espia));
         Assert.Equal(renglonesAntes, await RenglonesDelPedidoAsync(espia));
         Assert.Equal(apartadoAntes, await ApartadoDeAsync(espia));
-        await NadaColgadoAsync(espia, "tras limpiar");
+        await NadaColgadoAsync(espia, "tras llegar ya cancelada");
     }
 
     /// <summary>
-    /// Cancelar a los pocos milisegundos, cuando la escritura ya va en camino.
+    /// Cancelar mientras la captura va en camino.
     /// </summary>
     /// <remarks>
-    /// Aqui el momento exacto en que cae la cancelacion no se puede fijar, asi
+    /// El momento en que cae la cancelacion no se puede fijar desde fuera, asi
     /// que la prueba no exige un resultado: exige el INVARIANTE. El renglon
-    /// esta una vez o no esta -nunca dos, nunca a medias-, y la sesion que
-    /// escribio no se queda con transaccion ni candados. Eso es lo que le
-    /// pasaba al agente que cerraba la pantalla y dejaba a los demas esperando
-    /// 500 s.
+    /// esta UNA vez o no esta -nunca dos, nunca a medias-, las piezas apartadas
+    /// cuadran con lo que quedo escrito, y la sesion que escribio no se queda
+    /// con transaccion ni candados. Eso ultimo es lo que le pasaba al agente
+    /// que cerraba la pantalla y dejaba a los demas esperando los 500 s del
+    /// CommandTimeout.
+    ///
+    /// El retraso se calcula midiendo primero una captura completa, para que la
+    /// cancelacion caiga dentro de la ventana en que el comando esta corriendo
+    /// y no antes de abrir la conexion.
     /// </remarks>
     [Fact]
     public async Task Cancelar_A_Media_Captura_No_Deja_Renglones_A_Medias_Ni_Candados()
@@ -242,24 +222,39 @@ public class CapturaPedidoContraLaBaseTests
         await CalentarEmpresaCsAsync(capacidades, cache);
 
         var renglonesAntes = await RenglonesDelPedidoAsync(espia);
+        var apartadoAntes = await ApartadoDeAsync(espia);
+
+        // Cuanto tarda una captura completa en esta maquina. Se agrega y se
+        // borra, asi que el pedido queda como estaba antes de la medicion.
+        var reloj = System.Diagnostics.Stopwatch.StartNew();
+        await repo.AgregarDetalleAsync(Solicitud(cantidad: 1), Usuario, Firma, CancellationToken.None);
+        reloj.Stop();
+        await BorrarRenglonDeLaPruebaAsync(repo, espia);
+        _out.WriteLine($"una captura completa tarda {reloj.ElapsedMilliseconds} ms");
 
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(20));
-            try
-            {
-                await repo.AgregarDetalleAsync(Solicitud(cantidad: 1), Usuario, Firma, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                /* Tambien vale: lo que se mide es lo que quedo en la base. */
-            }
+            var aMitad = Math.Max(5, reloj.ElapsedMilliseconds / 2);
+            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(aMitad));
+
+            /* No se exige NINGUN error en particular, y eso tambien es un
+               hallazgo: cuando la cancelacion cae mientras se esta leyendo el
+               resultado, SqlClient no siempre levanta OperationCanceledException
+               -se vio tambien SqlException "A severe error occurred on the
+               current command ... Operation cancelled by user"-. Lo que se mide
+               es lo que quedo en la base, no como se llamo el error. */
+            var error = await Record.ExceptionAsync(() =>
+                repo.AgregarDetalleAsync(Solicitud(cantidad: 1), Usuario, Firma, cts.Token));
+            _out.WriteLine($"la llamada cancelada termino con: {error?.GetType().Name ?? "nada, alcanzo a terminar"}");
 
             var renglones = await RenglonesDelProductoAsync(espia);
-            _out.WriteLine($"renglones del producto = {renglones} (0 o 1, nunca 2)");
+            _out.WriteLine($"cancelando a los {aMitad} ms quedaron {renglones} renglon(es) (0 o 1, nunca 2)");
 
             Assert.InRange(renglones, 0, 1);
             Assert.Equal(renglonesAntes + renglones, await RenglonesDelPedidoAsync(espia));
+            // Si quedo renglon, tiene que traer exactamente la pieza pedida: un
+            // renglon con cantidad 0 o duplicada seria un pedido a medias.
+            Assert.Equal(apartadoAntes + renglones, await ApartadoDeAsync(espia));
             await NadaColgadoAsync(espia, "tras cancelar a media captura");
         }
         finally
