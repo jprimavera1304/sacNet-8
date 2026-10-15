@@ -2904,6 +2904,15 @@ VALUES ({string.Join(", ", insertValues)});";
 
     public async Task UpsertUserOverridesAsync(int empresaId, Guid userId, IReadOnlyCollection<string> allow, IReadOnlyCollection<string> deny, bool sincronizarConLegacy, CancellationToken ct)
     {
+        /* Era el UNICO punto de entrada que no abria la memoria de la peticion
+           (ver AbrirMemoriaDePeticion), y es el que mas veces pregunta lo
+           mismo: cinco sembradores de catalogo y cinco write-backs al mismo
+           usuario. Sin ella, el catalogo de WPermiso y el estado de Mac31 de
+           este usuario se leen una vez por pasada en vez de una vez. Muere al
+           salir del metodo: no es una cache, es no preguntar diez veces lo que
+           no puede haber cambiado dentro de la misma llamada. */
+        using var memoriaDeLaPeticion = AbrirMemoriaDePeticion();
+
         await using var conn = new SqlConnection(_db.Database.GetConnectionString());
         await conn.OpenAsync(ct);
 
@@ -4364,6 +4373,196 @@ ORDER BY COALESCE(f.Orden, 0), COALESCE(p.Orden, 0), p.IDProceso;", conn);
         return (allow, deny);
     }
 
+    /*
+      ================================================================
+      EL WRITE-BACK A MAC31: SOLO LO QUE CAMBIA
+      ================================================================
+
+      EL PROBLEMA, MEDIDO
+      -------------------
+      Guardar permisos de UN usuario llamaba a
+      `sp_n_ActualizarUsuarioFormaProceso` una vez por cada entrada del
+      CATALOGO —no por cada cambio—: una vuelta desde
+      SyncLegacyReportPermissionsForUserAsync y cuatro desde
+      SyncLegacyModulePermissionsForUserAsync, cada vuelta un
+      `ExecuteNonQueryAsync` propio con su BEGIN TRAN/COMMIT dentro del SP.
+      Medido con Extended Events en las dos empresas: ~330 viajes por guardado
+      (hay 330 procesos activos en MacZ y 332 en Produccion_svr). Mover UN
+      permiso costaba lo mismo que mover un modulo entero, porque el bucle
+      recorria el catalogo y no el cambio. Los necesarios son ~8.
+
+      LA CORRECCION
+      -------------
+      Se lee UNA vez el estado que ya tiene el usuario en
+      `[Usuario Forma Procesos]`, se calcula la diferencia contra lo que se
+      quiere dejar, y se llama al procedimiento SOLO por los procesos que de
+      verdad cambian — todos en un unico viaje.
+
+      `sp_n_ActualizarUsuarioFormaProceso` NO SE TOCA: es un `sp_n_`. Lo que
+      cambia es cuantas veces se le llama, no lo que hace.
+
+      LO QUE **NO** SE HACE, Y ES LA PARTE IMPORTANTE
+      ----------------------------------------------
+      No se guarda de forma optimista. Cuando la pantalla diga que el permiso
+      se guardo, la escritura esta CONFIRMADA: el lote se manda con
+      `ExecuteNonQueryAsync` y se espera su resultado, igual que antes; lo que
+      se quita son los viajes que no escribian nada, no la confirmacion.
+
+      Tampoco hay cache nueva de permisos: el estado de Mac31 se recuerda
+      durante ESTA peticion y nada mas (muere con ella, ver
+      AbrirMemoriaDePeticion), y no participa en decidir si alguien tiene un
+      permiso — solo en decidir si hace falta reescribir una fila que ya dice
+      lo mismo. El esquema de autorizacion no se toca en absoluto.
+    */
+
+    /// <summary>
+    /// El estado que el usuario YA tiene en `[Usuario Forma Procesos]`:
+    /// IDProceso -> IDStatus. Se lee una vez por peticion y se mantiene al dia
+    /// a mano cuando se escribe.
+    /// </summary>
+    private static async Task<Dictionary<int, int>> LeerEstadoLegacyDelUsuarioAsync(
+        SqlConnection conn, int legacyUserId, CancellationToken ct)
+    {
+        var llave = $"estadoLegacyUsuario|{conn.Database}|{legacyUserId}";
+        var memoria = _memoDeLaPeticion.Value;
+
+        if (memoria is not null
+            && memoria.TryGetValue(llave, out var guardado)
+            && guardado is Dictionary<int, int> vigente)
+        {
+            return vigente;
+        }
+
+        var estado = new Dictionary<int, int>();
+        await using (var cmd = new SqlCommand(
+            "SELECT IDProceso, IDStatus FROM dbo.[Usuario Forma Procesos] WHERE IDUsuario = @IDUsuario;", conn))
+        {
+            cmd.Parameters.Add(new SqlParameter("@IDUsuario", SqlDbType.Int) { Value = legacyUserId });
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                if (reader.IsDBNull(0)) continue;
+                /* Si el mismo proceso sale dos veces, gana el ACTIVO: es la
+                   misma regla de "cualquier si gana" que usa el agrupado por
+                   IDProceso de mas abajo, y equivocarse hacia el lado de
+                   "ya esta activo" solo puede hacer que se escriba de mas,
+                   nunca que se deje de conceder algo. */
+                var proceso = reader.GetInt32(0);
+                var status = reader.IsDBNull(1) ? 2 : reader.GetInt32(1);
+                if (!estado.TryGetValue(proceso, out var previo) || status == 1 || previo != 1)
+                    estado[proceso] = status;
+            }
+        }
+
+        if (memoria is not null) memoria[llave] = estado;
+        return estado;
+    }
+
+    /// <summary>
+    /// QUE PROCESOS HAY QUE ESCRIBIR DE VERDAD. Es la decision entera del
+    /// arreglo, y esta aparte para que se pueda probar sin base: es puramente
+    /// comparar dos diccionarios.
+    /// </summary>
+    /// <param name="deseado">IDProceso -> IDStatus que se quiere dejar.</param>
+    /// <param name="estadoActual">IDProceso -> IDStatus que ya hay en Mac31.</param>
+    public static List<KeyValuePair<int, int>> CambiosQueHacenFalta(
+        IReadOnlyDictionary<int, int> deseado,
+        IReadOnlyDictionary<int, int> estadoActual)
+    {
+        var cambios = new List<KeyValuePair<int, int>>();
+
+        foreach (var par in deseado)
+        {
+            var hayFila = estadoActual.TryGetValue(par.Key, out var actual);
+
+            // Ya dice lo mismo: no se escribe. Es el 97% de los viajes viejos.
+            if (hayFila && actual == par.Value) continue;
+
+            /* SIN FILA Y SE PIDE BAJA: `sp_n_ActualizarUsuarioFormaProceso` no
+               inserta nada con IDStatus = 2 y sin fila previa —esta
+               documentado en SyncLegacyModulePermissionsForUserAsync y asi lo
+               hace Mac31 en su propia pantalla—, asi que el viaje no haria
+               absolutamente nada. No escribir aqui no es una decision nueva:
+               es no pagar un viaje cuyo efecto ya era cero.
+
+               OJO CON LA TENTACION DE SIMPLIFICARLO a `if (!hayFila && par.Value
+               == 2)`: cualquier IDStatus que no sea 1 es una baja, y tratar un
+               valor raro como alta SI insertaria una fila. Se compara contra 1,
+               que es el unico que concede. */
+            if (!hayFila && par.Value != 1) continue;
+
+            cambios.Add(par);
+        }
+
+        return cambios;
+    }
+
+    /// <summary>
+    /// Deja los procesos que CAMBIAN en el estado que se pide, en un solo
+    /// viaje, y actualiza el estado recordado.
+    /// </summary>
+    /// <param name="deseado">IDProceso -> IDStatus que se quiere dejar (1 alta, 2 baja).</param>
+    private static async Task<int> EscribirCambiosLegacyAsync(
+        SqlConnection conn,
+        int legacyUserId,
+        int movementUserId,
+        IReadOnlyDictionary<int, int> deseado,
+        Dictionary<int, int> estadoActual,
+        CancellationToken ct)
+    {
+        var cambios = CambiosQueHacenFalta(deseado, estadoActual);
+        if (cambios.Count == 0) return 0;
+
+        /*
+          UN SOLO VIAJE PARA TODOS LOS CAMBIOS.
+
+          Cada EXEC sigue siendo una llamada completa al procedimiento, con su
+          propia transaccion: el lote no las junta en una sola transaccion ni
+          las cambia en nada: solo ahorra la ida y vuelta por la red. Se
+          numeran los parametros porque un lote no puede reusar el mismo
+          nombre con dos valores.
+
+          Y NO SE TROCEA EL AWAIT: se espera a que el lote entero termine antes
+          de contestar, porque la pantalla va a decir "guardado" en cuanto esto
+          vuelva.
+        */
+        var sql = new System.Text.StringBuilder();
+        await using var cmd = new SqlCommand { Connection = conn, CommandType = CommandType.Text };
+        cmd.Parameters.Add(new SqlParameter("@IDUsuario", SqlDbType.Int) { Value = legacyUserId });
+        cmd.Parameters.Add(new SqlParameter("@IDUsuarioMovimiento", SqlDbType.Int) { Value = movementUserId });
+
+        for (var i = 0; i < cambios.Count; i++)
+        {
+            sql.Append("EXEC dbo.sp_n_ActualizarUsuarioFormaProceso @IDUsuario, @P")
+               .Append(i).Append(", @S").Append(i).Append(", @IDUsuarioMovimiento;\n");
+            cmd.Parameters.Add(new SqlParameter($"@P{i}", SqlDbType.Int) { Value = cambios[i].Key });
+            cmd.Parameters.Add(new SqlParameter($"@S{i}", SqlDbType.Int) { Value = cambios[i].Value });
+        }
+
+        cmd.CommandText = sql.ToString();
+        await cmd.ExecuteNonQueryAsync(ct);
+
+        /*
+          EL ESTADO RECORDADO TIENE QUE QUEDAR AL DIA, Y NO ES UN DETALLE.
+
+          A este write-back se entra CINCO veces en el mismo guardado, y un
+          mismo IDProceso puede caer en dos catalogos —esta documentado arriba,
+          en UpsertUserOverridesAsync: "si alguna clave cayera en dos
+          catalogos, mande el calculo de la familia", que es el que va ultimo—.
+
+          Si el estado recordado se quedara con la foto de antes de escribir,
+          la quinta pasada compararia contra un valor que ya no esta en la base
+          y podria decidir "no hace falta tocarlo" cuando si hace falta: se
+          quedaria lo que escribio la primera pasada y ganaria la que no debe.
+          Dejandolo al dia, la ultima pasada sigue mandando, que es como se
+          comportaba antes de agrupar.
+        */
+        foreach (var cambio in cambios)
+            estadoActual[cambio.Key] = cambio.Value;
+
+        return cambios.Count;
+    }
+
     private async Task SyncLegacyReportPermissionsForUserAsync(
         SqlConnection conn,
         CapabilitySchema schema,
@@ -4411,22 +4610,27 @@ ORDER BY COALESCE(f.Orden, 0), COALESCE(p.Orden, 0), p.IDProceso;", conn);
         var activeModules = await GetActiveModulesAsync(conn, empresaId, ct);
         var puedeQuitar = IsPermissionInActiveModule(ReportesViewPermission, activeModules);
 
+        /* Se arma lo que se QUIERE dejar y se escribe solo la diferencia. Ver
+           el bloque de LeerEstadoLegacyDelUsuarioAsync: antes esto eran tantos
+           viajes como reportes tuviera el catalogo. */
+        var deseado = new Dictionary<int, int>();
         foreach (var report in reportCatalog.Values)
         {
             var loTiene = effective.Contains(report.Key);
             if (!loTiene && !puedeQuitar)
                 continue;
 
-            await using var cmd = new SqlCommand("dbo.sp_n_ActualizarUsuarioFormaProceso", conn)
-            {
-                CommandType = CommandType.StoredProcedure
-            };
-            cmd.Parameters.Add(new SqlParameter("@IDUsuario", SqlDbType.Int) { Value = legacyUserId.Value });
-            cmd.Parameters.Add(new SqlParameter("@IDProceso", SqlDbType.Int) { Value = report.LegacyProcessId });
-            cmd.Parameters.Add(new SqlParameter("@IDStatus", SqlDbType.Int) { Value = loTiene ? 1 : 2 });
-            cmd.Parameters.Add(new SqlParameter("@IDUsuarioMovimiento", SqlDbType.Int) { Value = movementUserId });
-            await cmd.ExecuteNonQueryAsync(ct);
+            /* Si dos reportes comparten IDProceso, cualquier SI gana: la misma
+               regla que el agrupado de SyncLegacyModulePermissionsForUserAsync,
+               y por la misma razon (nunca convertir un detalle del catalogo en
+               una revocacion de un permiso real de Mac31). */
+            if (loTiene || !deseado.ContainsKey(report.LegacyProcessId))
+                deseado[report.LegacyProcessId] = loTiene ? 1 : 2;
         }
+
+        var estadoActual = await LeerEstadoLegacyDelUsuarioAsync(conn, legacyUserId.Value, ct);
+        await EscribirCambiosLegacyAsync(
+            conn, legacyUserId.Value, movementUserId, deseado, estadoActual, ct);
     }
 
     private async Task SyncLegacyReportPermissionsForRoleAsync(
@@ -4958,22 +5162,22 @@ ORDER BY COALESCE(p.Orden, 0), p.IDProceso;", conn);
           algo que nadie vio ni pidio quitar: el accidente de agosto otra vez,
           por la puerta de al lado.
         */
+        /* El agrupado y las dos reglas de arriba NO cambian. Lo unico nuevo es
+           que el resultado se junta y se escribe solo la diferencia, en un
+           viaje (ver LeerEstadoLegacyDelUsuarioAsync). */
+        var deseado = new Dictionary<int, int>();
         foreach (var grupo in ventasCatalog.Values.GroupBy(a => a.LegacyProcessId))
         {
             var loTiene = grupo.Any(a => effective.Contains(a.Key));
             if (!loTiene && !grupo.All(a => IsPermissionInActiveModule(a.Key, activeModules)))
                 continue;
 
-            await using var cmd = new SqlCommand("dbo.sp_n_ActualizarUsuarioFormaProceso", conn)
-            {
-                CommandType = CommandType.StoredProcedure
-            };
-            cmd.Parameters.Add(new SqlParameter("@IDUsuario", SqlDbType.Int) { Value = legacyUserId.Value });
-            cmd.Parameters.Add(new SqlParameter("@IDProceso", SqlDbType.Int) { Value = grupo.Key });
-            cmd.Parameters.Add(new SqlParameter("@IDStatus", SqlDbType.Int) { Value = loTiene ? 1 : 2 });
-            cmd.Parameters.Add(new SqlParameter("@IDUsuarioMovimiento", SqlDbType.Int) { Value = movementUserId });
-            await cmd.ExecuteNonQueryAsync(ct);
+            deseado[grupo.Key] = loTiene ? 1 : 2;
         }
+
+        var estadoActual = await LeerEstadoLegacyDelUsuarioAsync(conn, legacyUserId.Value, ct);
+        await EscribirCambiosLegacyAsync(
+            conn, legacyUserId.Value, movementUserId, deseado, estadoActual, ct);
     }
 
     private async Task SyncLegacyModulePermissionsForRoleAsync(
@@ -5577,12 +5781,52 @@ WHERE EmpresaId = @EmpresaId
         {
             var descripcion = descripcionDe(seed);
 
-            /* Ya esta igual: no se toca. Escribir lo mismo no solo cuesta el
-               viaje, ademas mueve FechaActualizacion y hace parecer que alguien
-               cambio permisos cuando nadie los cambio. */
-            if (actuales.TryGetValue(seed.Key, out var actual)
-                && string.Equals(actual.Nombre, seed.Name, StringComparison.Ordinal)
-                && (!hayDescripcion || string.Equals(actual.Descripcion, descripcion, StringComparison.Ordinal)))
+            /*
+              YA ESTA IGUAL: NO SE TOCA. Escribir lo mismo no solo cuesta el
+              viaje, ademas mueve FechaActualizacion y hace parecer que alguien
+              cambio permisos cuando nadie los cambio.
+
+              LA COMPARACION MIRA `Nombre` Y YA NO `Descripcion`. POR QUE
+              ------------------------------------------------------------
+              Porque `Descripcion` ESTABA EN DISPUTA, y la disputa se pagaba en
+              cada peticion. Cuatro sembradores pasan un `descripcionDe`
+              distinto PARA LA MISMA CLAVE:
+
+                EnsureCatalogoSembradoAsync            seed => seed.Module    ("cobranza")
+                EnsureLegacyModulePermissionsSyncedAsync  "cobranza.legacy" / "cobranza.web"
+                EnsureLegacyReportPermissionsSyncedAsync  "reportes.legacy" / "reportes.web"
+                EnsureCentrosPermissionsSyncedAsync       "reportes.centros"
+
+              Con `Descripcion` dentro de la comparacion, cada pasada veia la
+              descripcion que habia dejado la pasada anterior, la declaraba
+              "distinta" y reescribia el renglon para dejar la suya; y la
+              siguiente hacia lo mismo al reves. MEDIDO con Extended Events en
+              las dos empresas: 359 escrituras a WPermiso sobre 164 claves,
+              ~20 s de red, y el estado final IDENTICO —diff de WPermiso antes
+              y despues: 0 filas—. Eran 359 escrituras para no cambiar nada.
+
+              Es tambien de donde salia el pico de `/api/me` en frio (535
+              viajes contra 10 en caliente) y el de `modulos/disponibles`, que
+              no es otro evento: es el MISMO, porque hay un semaforo por
+              usuario y la segunda peticion solo espera a la primera.
+
+              POR QUE ESTO ES SEGURO: `WPermiso.Descripcion` NO SE LEE NUNCA.
+              Comprobado clave por clave: los seis SELECT sobre dbo.WPermiso de
+              este archivo piden `Clave`, `Nombre` o un `TOP 1`, ninguno pide
+              `Descripcion`; el unico que la leia es la consulta de este mismo
+              metodo, para esta comparacion. Y no sale a ningun cliente:
+              `PermisosWebPermissionItem` no tiene ese campo. Es una etiqueta de
+              procedencia que se escribia y nadie consultaba.
+
+              LO QUE SE ESCRIBE NO CAMBIA. En los renglones que YA EXISTEN la
+              descripcion se queda tal cual esta hoy en la base (el UPDATE de
+              mas abajo ya no la toca), y lo que hay hoy es precisamente el
+              valor con el que terminaba cada pasada. En una clave NUEVA la
+              sigue escribiendo el INSERT, con la etiqueta del sembrador que
+              llegue primero. Lo unico que desaparece son las reescrituras.
+            */
+            var yaExistia = actuales.TryGetValue(seed.Key, out var actual);
+            if (yaExistia && string.Equals(actual.Nombre, seed.Name, StringComparison.Ordinal))
             {
                 continue;
             }
@@ -5613,10 +5857,22 @@ WHERE EmpresaId = @EmpresaId
               NOT EXISTS tomando UPDLOCK/HOLDLOCK, la insercion es una sola
               sentencia atomica: el segundo en llegar no inserta y no rompe.
             */
+            /*
+              EL UPDATE YA NO TOCA `Descripcion`, Y ES LA OTRA MITAD DEL
+              ARREGLO DE ARRIBA.
+
+              Si solo se quitara de la comparacion, este UPDATE seguiria
+              pisando la descripcion del sembrador anterior cada vez que de
+              verdad cambiara un `Nombre`: la clave dejaria de reescribirse 359
+              veces, pero seguiria en disputa. Dejandola fuera, la descripcion
+              de un renglon que ya existe no vuelve a moverse nunca, y lo que
+              hay en la base se queda como esta.
+
+              En una clave NUEVA si se escribe: la pone el INSERT de abajo.
+            */
             await using var cmd = new SqlCommand(@"
 UPDATE dbo.WPermiso
-   SET Nombre = @Nombre,
-       Descripcion = CASE WHEN COL_LENGTH('dbo.WPermiso','Descripcion') IS NOT NULL THEN @Descripcion ELSE Descripcion END
+   SET Nombre = @Nombre
  WHERE EmpresaId = @EmpresaId
    AND Clave = @Clave;
 
@@ -5637,8 +5893,16 @@ END", conn);
 
             /* El memo de arriba tiene que reflejar lo que acaba de quedar en la
                base: si no, la siguiente forma volveria a creer que esta clave
-               esta desactualizada y la escribiria otra vez. */
-            actuales[seed.Key] = (seed.Name, descripcion);
+               esta desactualizada y la escribiria otra vez.
+
+               La descripcion que se guarda en el memo es la que QUEDO en la
+               base, no la que traia esta semilla: si el renglon ya existia, el
+               UPDATE no la toco y sigue siendo la de antes. Solo cuando la
+               clave es nueva la escribio el INSERT. Ya no se compara, pero un
+               memo que miente sobre la base es una trampa para quien lo lea
+               despues. */
+            var descripcionQueQuedo = yaExistia ? actual.Descripcion : descripcion;
+            actuales[seed.Key] = (seed.Name, descripcionQueQuedo);
         }
 
         return escritos;
