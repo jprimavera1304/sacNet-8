@@ -57,10 +57,20 @@ public class VentasFacturacionRepository : SpLegacyRepositoryBase, IVentasFactur
     /// </summary>
     /// <remarks>
     /// NO SE REUSA <see cref="LeerConstantesAsync"/> A PROPOSITO. Esa trae seis
-    /// columnas porque timbrar las necesita, y una de ellas -`PorcentajeIva`- no
-    /// existe en todas las bases: "Ver el PDF" moria con "Invalid column name"
-    /// por una columna que no iba a usar. Pedir de mas es pedir que falle por
-    /// algo que no te importa.
+    /// columnas porque timbrar las necesita, y pedir de mas es pedir que falle
+    /// por algo que no te importa: "Ver el PDF" moria con
+    /// "Invalid column name 'PorcentajeIva'" por una columna que no iba a usar.
+    ///
+    /// LO QUE DECIA ESTE COMENTARIO Y ERA FALSO, PORQUE COSTO CARO. Aqui estaba
+    /// escrito que `PorcentajeIva` "no existe en TODAS las bases". No existe en
+    /// NINGUNA: la columna de `dbo.Constantes` se llama `IVA` (comprobado el
+    /// 2026-10-15 en MacZ y en Produccion_svr: `PorcentajeIva` no esta, `IVA`
+    /// esta y vale 16.00). Se arreglo ESTE metodo quitando la columna mala y se
+    /// dejo la mala en el otro, asi que preparar Y TIMBRAR contestaban 500
+    /// siempre, para cualquier folio — por eso por el camino del web y del
+    /// telefono no se habia timbrado nunca en seis meses. El aviso estaba
+    /// escrito y el defecto siguio ahi: un comentario a medias es peor que
+    /// ninguno, porque se cree.
     /// </remarks>
     public async Task<(string? SecretKey, string? AppMac)> LeerLlaveFacturapiAsync(CancellationToken ct)
     {
@@ -80,6 +90,46 @@ FROM dbo.Constantes;", conn)
         return (rd["FacturapiSecretKey"] as string, rd["AppMac"] as string);
     }
 
+    /// <summary>
+    /// Las seis constantes que necesitan preparar y timbrar.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// EL IVA: LA COLUMNA SE LLAMA `IVA` Y VIENE EN PORCENTAJE, NO EN TANTO POR
+    /// UNO. Son dos trampas, y la segunda es mucho peor que la primera.
+    /// </para>
+    /// <para>
+    /// La primera es el nombre. No hay ninguna columna `PorcentajeIva` en
+    /// `dbo.Constantes`: ni en MacZ ni en Produccion_svr. Nombrarla hacia que
+    /// `POST /api/ventas/facturacion/preparar` y el timbrado contestaran
+    /// "Invalid column name 'PorcentajeIva'" para TODA remision. Falla ruidoso
+    /// y se ve.
+    /// </para>
+    /// <para>
+    /// La segunda es el factor, y esa falla CALLADA. `IVA` esta guardado como
+    /// 16.00, no como 0.16, y <c>PorcentajeIva</c> se lee con
+    /// <c>rd.GetDecimal</c> sin tocar: aliasear `IVA` tal cual quita el 500 y
+    /// deja un IVA CIEN VECES MAYOR, que ademas timbra. Seria cambiar un error
+    /// visible por un error fiscal silencioso. De ahi el <c>/ 100.0</c>.
+    /// </para>
+    /// <para>
+    /// EL TANTO POR UNO ES LA CONVENCION DE TODO EL CODIGO, no una decision de
+    /// aqui: <c>IVentasUsadosRepository</c> ("En tanto por uno: Constantes.IVA
+    /// / 100"), <c>VentasUsadosRepository</c> (<c>LeerDecimal(rd,"IVA") /
+    /// 100m</c>), <c>MapaDeCapacidades</c> (<c>c.Iva / 100m</c>), y el propio
+    /// procedimiento de legacy, que arranca con
+    /// <c>SELECT @PorcentajeIva = IVA/100</c>.
+    /// </para>
+    /// <para>
+    /// `100.0` y NO `100.0e0`: con el literal flotante el resultado seria
+    /// `float` y <c>GetDecimal</c> reventaria.
+    /// </para>
+    /// <para>
+    /// Lo vigila <c>ConstantesDeFacturacionContraLaBaseTests</c>, que ejecuta
+    /// esta consulta de verdad en las dos empresas y exige 0.16. Caza las dos
+    /// trampas a la vez: el nombre y el factor.
+    /// </para>
+    /// </remarks>
     public async Task<ConstantesFacturacion> LeerConstantesAsync(CancellationToken ct)
     {
         await using var conn = GetConnection();
@@ -92,7 +142,9 @@ SELECT TOP 1
     Funcionalidad       = ISNULL(Funcionalidad, ''),
     URLVerificaSat      = ISNULL(URLVerificaSat, ''),
     RFCEmisor           = ISNULL(RFCEmisor, ''),
-    PorcentajeIva       = ISNULL(PorcentajeIva, 0)
+    -- LA COLUMNA SE LLAMA `IVA`, Y VA DIVIDIDA ENTRE 100. Las dos mitades de
+    -- esto hacen falta; ver el bloque de arriba del metodo.
+    PorcentajeIva       = ISNULL(IVA, 0) / 100.0
 FROM dbo.Constantes;", conn)
         { CommandTimeout = CommandTimeoutSeconds };
 
