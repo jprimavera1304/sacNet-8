@@ -43,8 +43,18 @@ public class VentasDescuentosController : PermisoControllerBase
       POR usuario y equipo, los dos del token. Con este permiso solo se puede
       tocar el borrador propio.
     */
+    /*
+      LAS PAREJAS DEL TELEFONO VAN TAMBIEN, O LA CLAVE MOVIL NO SIRVE.
+
+      `VentasConsultaController` ya acepta `app_movil.ventas.simular.*` para
+      abrir la simulacion, asi que alguien puede entrar con SOLO la clave del
+      telefono... y recibir un 403 justo al pulsar "Crear el esquema", que es
+      el unico paso de esa pantalla que escribe. Un boton vivo que falla es lo
+      que esta pantalla existe para evitar.
+    */
     private static readonly string[] PermisoSimular =
-        { "descuentos.simular", "ventas.simular.con_remision", "ventas.simular.sin_remision" };
+        { "descuentos.simular", "ventas.simular.con_remision", "ventas.simular.sin_remision",
+          "app_movil.ventas.simular.con_remision", "app_movil.ventas.simular.sin_remision" };
 
     /*
       Y EL CATALOGO NUEVO, QUE TAMBIEN LO PIDE LA SIMULACION.
@@ -58,11 +68,13 @@ public class VentasDescuentosController : PermisoControllerBase
       blanco. No se puede apuntar a nada de nadie con el.
     */
     private static readonly string[] PermisoCrear =
-        { "descuentos.editar", "ventas.simular.con_remision", "ventas.simular.sin_remision" };
+        { "descuentos.editar", "ventas.simular.con_remision", "ventas.simular.sin_remision",
+          "app_movil.ventas.simular.con_remision", "app_movil.ventas.simular.sin_remision" };
 
     /* Las dos claves de los botones SIMULAR, para el permiso acotado de abajo. */
     private static readonly string[] PermisoSimularVentas =
-        { "ventas.simular.con_remision", "ventas.simular.sin_remision" };
+        { "ventas.simular.con_remision", "ventas.simular.sin_remision",
+          "app_movil.ventas.simular.con_remision", "app_movil.ventas.simular.sin_remision" };
     private static readonly string[] PermisoAjusteVer = { "descuentos.ajustes.ver", "descuentos.ver" };
     private static readonly string[] PermisoAjusteCrear = { "descuentos.ajustes.crear" };
     private static readonly string[] PermisoAjusteAutorizar = { "descuentos.ajustes.autorizar" };
