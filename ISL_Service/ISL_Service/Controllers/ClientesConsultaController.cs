@@ -74,7 +74,9 @@ public class ClientesConsultaController : ControllerBase
       cualquier autenticado se llevaba los 887 clientes de los 15 agentes.
     */
     [HttpGet]
-    [Authorize(Policy = "perm:clientes.ver_modulo|clientes.ver")]
+    // `app_movil.clientes` es la llave del modulo en el telefono: quien la tenga
+    // puede listar, que es lo unico que esa pantalla hace de entrada.
+    [Authorize(Policy = "perm:clientes.ver_modulo|clientes.ver|app_movil.clientes")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Consultar(

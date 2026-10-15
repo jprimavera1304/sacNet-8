@@ -29,7 +29,10 @@ public class VentasPagosController : PermisoControllerBase
       segunda. Los IDProceso son los MISMOS numeros en Tauro y en Zaragoza
       (1032 y 1033), asi que el puente vale igual en las dos.
     */
-    private static readonly string[] PermisosVer = { "ventas.pagos.ver" };
+    // La hoja de "Pagos" de Consulta de ventas en el telefono entra por aqui.
+    // Cancelar un pago NO existe en el telefono y por eso no lleva par.
+    private static readonly string[] PermisosVer =
+        { "ventas.pagos.ver", "app_movil.ventas.consulta.pagos" };
     private static readonly string[] PermisosCancelar = { "ventas.pagos.cancelar" };
 
     private readonly IVentasPagosService _service;

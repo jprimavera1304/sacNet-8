@@ -25,7 +25,14 @@ public class ComprasController : PermisoControllerBase
     private static readonly string[] PermisosCancelar = { "compras.cancelar" };
 
     // Procesar el transito mueve existencias entre almacenes.
-    private static readonly string[] PermisosTransito = { "inventario.transito.procesar" };
+    //
+    // Dos canales, como la consulta: el endpoint vive aqui por historia -lo
+    // estreno la pantalla de Compras- pero quien lo llama hoy tambien es el
+    // telefono, y alla el permiso tiene que poder darse y quitarse aparte.
+    // Los permisos de COMPRAS de este mismo controlador no llevan pareja
+    // movil: esa pantalla no existe en la app.
+    private static readonly string[] PermisosTransito =
+        { "inventario.transito.procesar", "app_movil.inventario.transito.procesar" };
 
     private readonly IOperacionMacService _service;
     private readonly ICatalogosAdminService _catalogos;

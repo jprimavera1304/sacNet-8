@@ -20,6 +20,16 @@ public interface IRemisionImpresionRepository
 {
     Task<DataTable> ConsultarPlantillasAsync(CancellationToken ct);
 
+    /*
+      LAS DIEZ PLANTILLAS DE LA SIMULACION (reporte 1175).
+
+      Mismas piezas que la remision con otra raiz (`simular_cuerpo_n2`...), y en
+      las dos bases. Van aparte y no como un parametro de la de arriba para que
+      se lea en el llamador que papel se esta pidiendo. Ver
+      SimulacionImpresionService.
+    */
+    Task<DataTable> ConsultarPlantillasSimulacionAsync(CancellationToken ct);
+
     Task<RemisionDatosVentaResultado> ConsultarDatosVentaAsync(
         int idVenta,
         int idUsuarioImpresion,

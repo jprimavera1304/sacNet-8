@@ -40,6 +40,12 @@ public class NominaBatchController : PermisoControllerBase
     private static readonly string[] PermisosPeriodos = { "nomina.periodos.generar" };
     private static readonly string[] PermisosDescontar = { "nomina.prestamos.descontar" };
 
+    // Para DEVOLVER los importes del recibo, no para calcularlo. Calcular lo
+    // gobierna `nomina.recibos.calcular`; ver un sueldo lo gobierna esta, que es
+    // la misma que usan la ficha de empleados y el recibo en PDF. Sin ella el
+    // batch corre y los importes vuelven en null (ver NominaBatchService).
+    private static readonly string[] PermisosSueldo = { "empleados.sueldo.ver" };
+
     private readonly INominaBatchService _service;
 
     public NominaBatchController(
@@ -88,7 +94,11 @@ public class NominaBatchController : PermisoControllerBase
         var sinPermiso = await ExigirPermisoAsync(PermisosCalcular, ct);
         if (sinPermiso != null) return sinPermiso;
 
-        return Responder(await _service.CalcularRecibosAsync(request, ct), "Recibos calculados.");
+        // Calcular y ver los importes son dos permisos: el que falte el segundo
+        // recalcula igual, pero recibe los renglones sin dinero.
+        var puedeVerSueldo = await TienePermisoAsync(PermisosSueldo, ct);
+
+        return Responder(await _service.CalcularRecibosAsync(request, puedeVerSueldo, ct), "Recibos calculados.");
     }
 
     /// <summary>

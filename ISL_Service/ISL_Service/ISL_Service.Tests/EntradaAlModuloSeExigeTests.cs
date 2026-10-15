@@ -180,6 +180,40 @@ public class EntradaAlModuloSeExigeTests
         Assert.True(Puede(clave, clave));
     }
 
+    /// <summary>
+    /// REASIGNACION ABRE CON SU PROPIA LLAVE, NO CON LA DE COBROS.
+    ///
+    /// Sus claves empiezan con "cobros.", asi que caian en el renglon generico
+    /// y el backend les pedia "cobros.ver_modulo". Resultado medido: el mosaico
+    /// de Reasignacion SI aparecia -el snapshot deriva "reasignacion.ver_modulo"
+    /// desde Mac31- y al entrar daba 403. La tarjeta se veia y no servia.
+    ///
+    /// La tabla se recorre por prefijo MAS LARGO, asi que "cobros.reasignar"
+    /// gana sobre "cobros." sin depender de en que orden esten escritos.
+    /// </summary>
+    [Fact]
+    public void Reasignacion_Abre_Con_Su_Propia_Entrada()
+    {
+        Assert.Equal(
+            new[] { "reasignacion.ver_modulo" },
+            EntradasDeModulo.Requeridas("cobros.reasignar"));
+        Assert.Equal(
+            new[] { "reasignacion.ver_modulo" },
+            EntradasDeModulo.Requeridas("cobros.reasignar.consultar"));
+
+        // Con su llave entra...
+        Assert.True(Puede("cobros.reasignar", "reasignacion.ver_modulo"));
+        // ...y la de cobros ya NO le sirve: son dos pantallas distintas.
+        Assert.False(Puede("cobros.reasignar", "cobros.ver_modulo"));
+
+        // Y el resto de "cobros." se queda como estaba: esto no se lo llevo por
+        // delante.
+        Assert.Equal(
+            new[] { "cobros.ver_modulo", "dinero_usados.ver_modulo" },
+            EntradasDeModulo.Requeridas("cobros.pagos.aplicar"));
+        Assert.True(Puede("cobros.pagos.aplicar", "cobros.ver_modulo"));
+    }
+
     [Fact]
     public void Una_Clave_Vacia_No_Revienta()
     {

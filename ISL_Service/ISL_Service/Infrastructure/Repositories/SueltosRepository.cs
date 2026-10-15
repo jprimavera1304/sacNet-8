@@ -401,6 +401,24 @@ public class SueltosRepository : ISueltosRepository
     private static SqlCommand Sp(string sp, SqlConnection conn)
         => new(sp, conn) { CommandType = CommandType.StoredProcedure };
 
+    /*
+      NO CONVERTIR ESTO A ExecuteReaderAsync(ct) SIN LEER ESTO PRIMERO.
+
+      Parece un bloqueo de hilo que conviene volver asincrono, y lo es: el Fill
+      es sincrono y retiene un hilo del ThreadPool durante toda la consulta. Pero
+      el `ct` de Task.Run solo impide que el trabajo ARRANQUE; una vez empezado,
+      la cancelacion se ignora y el lote llega siempre a su COMMIT. Eso es lo que
+      hoy protege a las escrituras de este repositorio.
+
+      Al convertirlo tal cual en captura, la cancelacion se volvio REAL y
+      empezo a abortar lotes a media transaccion: con XACT_ABORT OFF eso no
+      deshace nada y la conexion vuelve al pool con la transaccion abierta y los
+      candados puestos. Costo un dia encontrarlo.
+
+      Si algun dia hace falta volverlo asincrono, hay que pasar la señal de
+      Infrastructure.Data.CancelacionSegura en vez del token, que es la que
+      distingue consulta de escritura.
+    */
     private static async Task<DataTable> FillAsync(SqlCommand cmd, CancellationToken ct)
     {
         var ds = new DataSet();

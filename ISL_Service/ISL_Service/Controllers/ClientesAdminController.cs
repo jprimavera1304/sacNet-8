@@ -25,9 +25,10 @@ namespace ISL_Service.Controllers;
 [Authorize]
 public class ClientesAdminController : MaestrosControllerBase
 {
-    private static readonly string[] PermisosCrear = { "clientes.crear" };
-    private static readonly string[] PermisosEditar = { "clientes.editar" };
-    private static readonly string[] PermisosBaja = { "clientes.estado.editar" };
+    private static readonly string[] PermisosCrear = { "clientes.crear", "app_movil.clientes.crear" };
+    private static readonly string[] PermisosEditar = { "clientes.editar", "app_movil.clientes.editar" };
+    private static readonly string[] PermisosBaja =
+        { "clientes.estado.editar", "app_movil.clientes.estado.editar" };
 
     // La bonificacion por tipo de usado ES DINERO: es lo que se le abona al
     // cliente por cada casco que entrega. Permiso propio por eso.

@@ -1,4 +1,4 @@
-using ISL_Service.Application.Interfaces;
+﻿using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -64,8 +64,25 @@ public class CatalogosComplementosController : ControllerBase
     /// El filtro de texto busca por PREFIJO (LIKE 'texto%') cuando no se pide
     /// exacto: asi lo hace el SP.
     /// </remarks>
+    /// <remarks>
+    /// QUIEN DA DE ALTA UN CLIENTE TAMBIEN LO PIDE.
+    ///
+    /// `catalogos.ver` se queda y se le suman las dos claves del padron.
+    /// Medido: `Clientes._Load` de Mac31 carga este catalogo SIN comprobar
+    /// permiso y, si falla, **cierra la forma**
+    /// (Legacy/Mac31/Mac31/Forms/Clientes/Clientes.cs:92-115). Son los dos
+    /// desplegables que decide quien da de alta: sin ellos el alta sale con los
+    /// campos vacios, que es justo lo que avisaba la app
+    /// ("No se pudieron cargar: condiciones de credito, tipos de cliente").
+    ///
+    /// No concede nada de mas: es una lista de opciones, sin dato de ningun
+    /// cliente. Crear o cambiar el catalogo sigue pidiendo lo suyo
+    /// (`CatalogosAdminController`), que no se toco.
+    /// </remarks>
     [HttpGet("condiciones-credito")]
-    [Authorize(Policy = "perm:catalogos.ver")]
+    // Con `app_movil.clientes` tambien: la lista y el alta del telefono piden
+    // este catalogo en el mismo arranque (ClientesApi.catalogos).
+    [Authorize(Policy = "perm:catalogos.ver|clientes.crear|clientes.editar|app_movil.clientes")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> CondicionesCredito(
         [FromQuery] int id = 0,
@@ -103,7 +120,7 @@ public class CatalogosComplementosController : ControllerBase
     /// `IDStatus = 1`. Solo hay activos, y eso es lo que se publica.
     /// </remarks>
     [HttpGet("fe/formas-pago")]
-    [Authorize(Policy = "perm:catalogos.fe.ver")]
+    [Authorize(Policy = "perm:catalogos.fe.ver|facturacion.timbrar|ventas.facturar")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public Task<IActionResult> FeFormasPago(
         [FromQuery] int id = 0, [FromQuery] string? clave = null, [FromQuery] bool exacto = false,
@@ -112,7 +129,7 @@ public class CatalogosComplementosController : ControllerBase
 
     /// <summary>Metodos de pago del SAT (PUE / PPD). Tampoco acepta idStatus, por lo mismo.</summary>
     [HttpGet("fe/metodos-pago")]
-    [Authorize(Policy = "perm:catalogos.fe.ver")]
+    [Authorize(Policy = "perm:catalogos.fe.ver|facturacion.timbrar|ventas.facturar")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public Task<IActionResult> FeMetodosPago(
         [FromQuery] int id = 0, [FromQuery] string? clave = null, [FromQuery] bool exacto = false,
@@ -121,7 +138,7 @@ public class CatalogosComplementosController : ControllerBase
 
     /// <summary>Motivos de cancelacion del SAT. Tampoco acepta idStatus, por lo mismo.</summary>
     [HttpGet("fe/motivos-cancelacion")]
-    [Authorize(Policy = "perm:catalogos.fe.ver")]
+    [Authorize(Policy = "perm:catalogos.fe.ver|facturacion.timbrar|ventas.facturar")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public Task<IActionResult> FeMotivosCancelacion(
         [FromQuery] int id = 0, [FromQuery] string? clave = null, [FromQuery] bool exacto = false,

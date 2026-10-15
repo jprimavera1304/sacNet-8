@@ -286,10 +286,20 @@ public class CascosCambioRepository : ICascosCambioRepository
     private static SqlCommand Sp(string nombre, SqlConnection conn)
         => new(nombre, conn) { CommandType = CommandType.StoredProcedure };
 
+    /*
+      LA CANCELACION SOLO LLEGA A LAS CONSULTAS.
+
+      Por este embudo pasan lecturas y tambien escrituras de legacy. Cancelar
+      una escritura a medias deja su transaccion abierta y sus candados puestos
+      en una conexion que vuelve al pool; quien decide es CancelacionSegura,
+      leyendo el propio comando, y el porque esta explicado ahi.
+    */
     private static async Task<DataTable> FillAsync(SqlCommand cmd, CancellationToken ct)
     {
+        var señal = Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct);
+
         var dt = new DataTable();
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        await using var reader = await cmd.ExecuteReaderAsync(señal);
         dt.Load(reader);
         return dt;
     }

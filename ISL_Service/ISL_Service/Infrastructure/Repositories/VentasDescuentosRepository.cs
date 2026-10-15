@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.VentasDescuentos;
+﻿using ISL_Service.Application.DTOs.VentasDescuentos;
 using ISL_Service.Application.DTOs.VentasEscrituras;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Data;
@@ -128,7 +128,101 @@ public class VentasDescuentosRepository : SpLegacyRepositoryBase, IVentasDescuen
             cmd.Parameters.Add(Varchar("@NombreEquipo", LargoEquipoSimular, FiltrosLegacy.Texto(equipo, LargoEquipoSimular)));
         }, ct);
 
-        return Resultado(tablas, "IDDescuento");
+        /*
+          LA TABLA QUE IMPORTA NO SIEMPRE ES LA PRIMERA, Y AQUI CASI NUNCA LO ES.
+
+          `sp_n_SimularDescuento` tiene dos salidas segun si el renglon de
+          prueba de ese usuario y ese equipo YA existe:
+
+            no existia  ->  lo inserta y devuelve UNA tabla:
+                            result / mensaje / IDDescuento
+            ya existia  ->  devuelve DOS: primero un `SELECT Porcentaje = 0`
+                            (el bloque ELSE del procedimiento) y DESPUES la de
+                            result / mensaje / IDDescuento.
+
+          Con `Resultado(tablas, ...)` a secas se leia la tabla 0 siempre, asi
+          que en el segundo caso -o sea de la SEGUNDA simulacion en adelante,
+          para siempre- devolvia `Porcentaje` y ni id ni result: la respuesta
+          salia con `hecho` en true, sin IDDescuento y sin un solo error. La
+          pantalla no tenia esquema con el que simular y no habia nada que
+          mirar para saber por que.
+
+          Asi que se elige la tabla POR SU CONTENIDO: la primera que traiga la
+          columna del id. Si ninguna la trae, se cae en la de siempre y el
+          resultado dice lo que diga.
+        */
+        return Resultado(TablasDesdeLaQueTraeElId(tablas, "IDDescuento"), "IDDescuento");
+    }
+
+    /*
+      Reordena las tablas para que la que trae `columnaId` quede primera, sin
+      perder las demas. No se cambia `Resultado` para todos porque las otras
+      escrituras SI devuelven su resultado en la tabla 0 y ahi `Filas` es lo
+      que el front ya lee.
+    */
+    private static List<List<Dictionary<string, object?>>> TablasDesdeLaQueTraeElId(
+        List<List<Dictionary<string, object?>>> tablas, string columnaId)
+    {
+        for (var i = 0; i < tablas.Count; i++)
+        {
+            var fila = tablas[i].Count > 0 ? tablas[i][0] : null;
+            if (fila is not null && fila.ContainsKey(columnaId))
+            {
+                if (i == 0) return tablas;
+
+                var ordenadas = new List<List<Dictionary<string, object?>>> { tablas[i] };
+                for (var j = 0; j < tablas.Count; j++)
+                    if (j != i) ordenadas.Add(tablas[j]);
+
+                return ordenadas;
+            }
+        }
+
+        return tablas;
+    }
+
+    /*
+      LA UNICA CONSULTA DE ESTE ARCHIVO QUE NO ES UN PROCEDIMIENTO.
+
+      Es un SELECT y no un sp_n_ porque no hay ninguno que conteste esto: la
+      pregunta ("¿este esquema es el borrador de simulacion de este puesto de
+      trabajo?") no existe en legacy, porque alla el permiso se resolvia
+      escondiendo botones. La condicion no se invento: son las TRES columnas
+      con las que `sp_n_SimularDescuento` busca y crea ese renglon, leidas de
+      su propio texto:
+
+          SELECT @IDDescuento = IDDescuento FROM Descuentos
+          WHERE NombreEquipo = @NombreEquipo
+            AND IDUsuario = @IDUsuario
+            AND EsSimular = @EsSimular   -- 1
+
+      El equipo se compara tal cual, sin recortar ni normalizar, porque asi se
+      guarda y asi se busca alla: cualquier arreglo por nuestra cuenta haria
+      que el renglon que el procedimiento SI encuentra aqui no apareciera.
+
+      Fallar cerrado es lo correcto si el renglon no existe o no es suyo: el
+      llamador se queda con el permiso que de verdad tenga.
+    */
+    public async Task<bool> EsBorradorDeSimulacionAsync(
+        int idDescuento, int idUsuario, string equipo, CancellationToken ct)
+    {
+        if (idDescuento <= 0 || idUsuario <= 0) return false;
+
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText =
+            "SELECT TOP 1 1 FROM dbo.Descuentos " +
+            "WHERE IDDescuento = @IDDescuento AND IDUsuario = @IDUsuario " +
+            "AND EsSimular = 1 AND NombreEquipo = @NombreEquipo";
+        cmd.CommandTimeout = CommandTimeoutSeconds;
+        cmd.Parameters.Add(Entero("@IDDescuento", idDescuento));
+        cmd.Parameters.Add(Entero("@IDUsuario", idUsuario));
+        cmd.Parameters.Add(Varchar("@NombreEquipo", 200, equipo ?? ""));
+
+        var hay = await cmd.ExecuteScalarAsync(ct);
+        return hay is not null && hay != DBNull.Value;
     }
 
     /* ------------------------------- Detalle ------------------------------- */

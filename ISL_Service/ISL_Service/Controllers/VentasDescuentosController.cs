@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.VentasDescuentos;
+﻿using ISL_Service.Application.DTOs.VentasDescuentos;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -28,7 +28,41 @@ public class VentasDescuentosController : PermisoControllerBase
     private static readonly string[] PermisoVer = { "descuentos.ver" };
     private static readonly string[] PermisoEditar = { "descuentos.editar" };
     private static readonly string[] PermisoEliminar = { "descuentos.eliminar" };
-    private static readonly string[] PermisoSimular = { "descuentos.simular" };
+    /*
+      SIMULAR UN DESCUENTO TAMBIEN LO PUEDE PEDIR QUIEN SIMULA VENTAS.
+
+      `descuentos.simular` se queda, y se le suman las dos claves de los
+      botones SIMULAR de la consulta de ventas. Medido, y es lo que hacia
+      falta: `VentasSimular._Load` llama a este procedimiento AL ABRIR
+      (VentasSimular.cs:75), sin preguntar ningun permiso, porque el esquema de
+      prueba es lo primero que necesita la pantalla. Con solo
+      `descuentos.simular`, un usuario que en Mac31 abre SIMULAR sin problema
+      recibia aqui un 403 y se quedaba sin poder probar un descuento.
+
+      No concede nada de nadie: `sp_n_SimularDescuento` busca y crea el renglon
+      POR usuario y equipo, los dos del token. Con este permiso solo se puede
+      tocar el borrador propio.
+    */
+    private static readonly string[] PermisoSimular =
+        { "descuentos.simular", "ventas.simular.con_remision", "ventas.simular.sin_remision" };
+
+    /*
+      Y EL CATALOGO NUEVO, QUE TAMBIEN LO PIDE LA SIMULACION.
+
+      El editor de la captura de pedidos abre con `IDDescuentoSimular = 0`
+      (Ventas.cs:74 y :5088) y, con 0, lo primero que hace es DAR DE ALTA una
+      cabecera (DetalleDescuentos.cs:84-91 -> este mismo POST). Sin esta clave,
+      "simular sin remision" no podia estrenar su esquema.
+
+      `sp_n_InsertarDescuentos` no recibe un solo parametro: crea un renglon en
+      blanco. No se puede apuntar a nada de nadie con el.
+    */
+    private static readonly string[] PermisoCrear =
+        { "descuentos.editar", "ventas.simular.con_remision", "ventas.simular.sin_remision" };
+
+    /* Las dos claves de los botones SIMULAR, para el permiso acotado de abajo. */
+    private static readonly string[] PermisoSimularVentas =
+        { "ventas.simular.con_remision", "ventas.simular.sin_remision" };
     private static readonly string[] PermisoAjusteVer = { "descuentos.ajustes.ver", "descuentos.ver" };
     private static readonly string[] PermisoAjusteCrear = { "descuentos.ajustes.crear" };
     private static readonly string[] PermisoAjusteAutorizar = { "descuentos.ajustes.autorizar" };
@@ -57,7 +91,7 @@ public class VentasDescuentosController : PermisoControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CrearAsync([FromBody] DescuentoCrearRequest? request, CancellationToken ct)
     {
-        var veto = await ExigirPermisoAsync(PermisoEditar, ct);
+        var veto = await ExigirPermisoAsync(PermisoCrear, ct);
         if (veto is not null) return veto;
 
         var data = await _service.CrearDescuentoAsync(request ?? new DescuentoCrearRequest(), ct);
@@ -127,6 +161,41 @@ public class VentasDescuentosController : PermisoControllerBase
         return Ok(new { ok = true, message = Mensaje(data.Hecho, "Descuento simulado."), data });
     }
 
+    /*
+      EL PERMISO ACOTADO DE LOS TRES BOTONES DEL EDITOR DE DESCUENTOS
+
+      Devuelve null si puede pasar y el 403 si no. El orden importa:
+
+        1. quien tiene la clave del CATALOGO pasa como siempre, sin consultar
+           nada a la base;
+        2. quien no la tiene, pero puede SIMULAR, pasa SOLO si ese esquema es
+           su propio borrador de simulacion -EsSimular = 1, su usuario, su
+           equipo-, que es lo que comprueba EsBorradorDeSimulacionAsync.
+
+      Por que hace falta: en Mac31 estos tres botones no piden permiso cuando
+      el editor se abre desde simular (`if (!this.simular)
+      ValidaOperadorProcesos`, DetalleDescuentos.cs:81-82). Dar la clave del
+      catalogo para igualarlo seria abrir la edicion de TODOS los esquemas,
+      incluido el de un cliente. Esto iguala la funcion sin abrir la puerta: el
+      unico esquema que se puede tocar es el de prueba de uno mismo.
+
+      La consulta extra solo corre en el caso 2, que es el raro.
+    */
+    private async Task<IActionResult?> ExigirSobreElEsquemaAsync(
+        string[] permisoDelCatalogo, int idDescuento, CancellationToken ct)
+    {
+        if (await TienePermisoAsync(permisoDelCatalogo, ct))
+            return null;
+
+        if (await TienePermisoAsync(PermisoSimularVentas, ct)
+            && await _service.EsBorradorDeSimulacionAsync(idDescuento, IdUsuarioLegacy(), Equipo(), ct))
+        {
+            return null;
+        }
+
+        return await ExigirPermisoAsync(permisoDelCatalogo, ct);
+    }
+
     /* ------------------------------- Detalle ------------------------------- */
 
     /// <summary>
@@ -157,9 +226,10 @@ public class VentasDescuentosController : PermisoControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CrearDetalleAsync([FromBody] DescuentoDetalleCrearRequest? request, CancellationToken ct)
     {
-        var veto = await ExigirPermisoAsync(PermisoEditar, ct);
-        if (veto is not null) return veto;
         if (request is null) return BadRequest(new { message = "Body requerido." });
+
+        var veto = await ExigirSobreElEsquemaAsync(PermisoEditar, request.IdDescuento, ct);
+        if (veto is not null) return veto;
 
         var data = await _service.CrearDetalleAsync(request, IdUsuarioLegacy(), Equipo(), ct);
         return Ok(new { ok = true, message = Mensaje(data.Hecho, "Renglon agregado."), data });
@@ -172,9 +242,10 @@ public class VentasDescuentosController : PermisoControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ActualizarDetalleAsync([FromBody] DescuentoDetalleActualizarRequest? request, CancellationToken ct)
     {
-        var veto = await ExigirPermisoAsync(PermisoEditar, ct);
-        if (veto is not null) return veto;
         if (request is null) return BadRequest(new { message = "Body requerido." });
+
+        var veto = await ExigirSobreElEsquemaAsync(PermisoEditar, request.IdDescuento, ct);
+        if (veto is not null) return veto;
 
         var data = await _service.ActualizarDetalleAsync(request, IdUsuarioLegacy(), Equipo(), ct);
         return Ok(new { ok = true, message = Mensaje(data.Hecho, "Renglon actualizado."), data });
@@ -187,9 +258,10 @@ public class VentasDescuentosController : PermisoControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> EliminarDetalleAsync([FromBody] DescuentoDetalleEliminarRequest? request, CancellationToken ct)
     {
-        var veto = await ExigirPermisoAsync(PermisoEliminar, ct);
-        if (veto is not null) return veto;
         if (request is null) return BadRequest(new { message = "Body requerido." });
+
+        var veto = await ExigirSobreElEsquemaAsync(PermisoEliminar, request.IdDescuento, ct);
+        if (veto is not null) return veto;
 
         var data = await _service.EliminarDetalleAsync(request, IdUsuarioLegacy(), Equipo(), ct);
         return Ok(new { ok = true, message = Mensaje(data.Hecho, "Renglon eliminado."), data });

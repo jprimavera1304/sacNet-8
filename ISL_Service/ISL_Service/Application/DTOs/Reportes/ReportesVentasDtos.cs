@@ -190,6 +190,18 @@ public class ReportesVentasLegacyRequest : ReportesVentasAcumuladoresProductosRe
     public List<int> IDProductos { get; set; } = new();
 
     /// <summary>
+    /// Comprobación de Compras (1017): las facturas MARCADAS en la rejilla de
+    /// CONSULTA DE COMPRAS. Es OBLIGATORIO y con la lista vacía no se imprime.
+    /// <para>
+    /// No es un descuido pedirlo: el procedimiento no filtra por compra si la
+    /// cadena viene vacía, así que el papel saldría con TODAS las compras de la
+    /// base. Mac31 tampoco llama al reporte sin nada marcado — dice
+    /// "SELECCIONE UNA FACTURA" (ConsultarCompras.cs, MuestraComprobacion).
+    /// </para>
+    /// </summary>
+    public List<int> IDsCompra { get; set; } = new();
+
+    /// <summary>
     /// Cambios de Vigencia (1535): el documento a imprimir. Es OBLIGATORIO y no
     /// tiene valor por omision util: el reporte imprime UN cambio de vigencia, no
     /// un listado, y con 0 el procedimiento devuelve cero renglones despues de

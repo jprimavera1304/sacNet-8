@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -48,8 +48,46 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
             bool Tiene(string clave) =>
                 snapshot.Permissions.Any(p => string.Equals(p, clave, StringComparison.OrdinalIgnoreCase));
 
+            /*
+              "modulo:<clave>": PUEDE ABRIR LA PANTALLA DEL MODULO.
+
+              No es un permiso: es la pregunta "en Mac31 esta forma se le
+              abriria". Alla el permiso no decide si la pantalla aparece, decide
+              si el BOTON se puede pulsar; quien tiene NUEVO y no tiene VER
+              entra a la forma y ve el boton VER en gris. El web usaba la clave
+              de lectura como candado de la pantalla entera y dejaba fuera a esa
+              misma persona: medido el 2026-10-12, le pasaba a XOCHITL y JAZMIN
+              con proveedores y a NAOLANY con productos, entre otras.
+
+              SE EXIGEN LAS DOS COSAS, la entrada al modulo y algun permiso de
+              trabajo suyo. Solo con la entrada entraria DEMO, que tiene las 34
+              puertas de plataforma y ni un permiso de Mac31.
+
+              Y NO CONCEDE LA CLAVE DE LECTURA: las rutas de detalle y las de
+              escritura siguen pidiendo la suya, como los botones grises.
+            */
+            bool PuedeAbrirElModulo(string clave)
+            {
+                if (!Tiene($"{clave}.ver_modulo")) return false;
+                var familia = clave + ".";
+                return snapshot.Permissions.Any(p =>
+                    !p.EndsWith(".ver_modulo", StringComparison.OrdinalIgnoreCase)
+                    && p.StartsWith(familia, StringComparison.OrdinalIgnoreCase));
+            }
+
             foreach (var required in requirement.Permissions)
             {
+                if (required.StartsWith("modulo:", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (PuedeAbrirElModulo(required.Substring("modulo:".Length)))
+                    {
+                        context.Succeed(requirement);
+                        return;
+                    }
+
+                    continue;
+                }
+
                 // SIN RAMPA: la clave pedida se tiene o no se tiene.
                 //
                 // Aqui habia un CanUseLegacyVerAsModuleView: si el endpoint

@@ -121,8 +121,25 @@ public class ReportesVentasService : IReportesVentasService
       "fechaInicial es requerida." antes de llegar a ninguno. Medido al abrir el
       boton IMPRIMIR de la pantalla de concentrados: 400 contra
       /api/reportes/ventas/legacy/generar.
+
+      Y EL TERCERO: `compra_comprobacion`, la comprobacion de compras (1017).
+
+      Mismo caso otra vez: imprime LAS FACTURAS MARCADAS en la rejilla y sus
+      unicos parametros son la lista de ids y la presentacion -Mac31 no le manda
+      fechas en `MuestraComprobacion`-. Se agrego al implementarlo, no despues:
+      la primera llamada rebotó aqui con "fechaInicial es requerida." antes de
+      llegar al reporte, igual que le habia pasado al concentrado.
+
+      Y EL CUARTO: `compra_detalle`, el documento de UNA compra (1015).
+
+      Es el boton IMPRIMIR y el doble clic de la misma pantalla. Su unico dato
+      es el IDCompra de la fila: sus tres procedimientos reciben
+      `@IDCompra1, @IDCompra2, @IDCompra3` y no hay un solo parametro de fecha
+      en toda su firma. Se agrego al implementarlo, con el antecedente ya
+      escrito aqui tres veces.
     */
-    private static readonly string[] ReportesSinPeriodo = { "hoja_de_cobro", "concentrado" };
+    private static readonly string[] ReportesSinPeriodo =
+        { "hoja_de_cobro", "concentrado", "compra_comprobacion", "compra_detalle" };
 
     public Task<ReportesVentasGenerateResponse> GenerarLegacyVentasAsync(
         ReportesVentasLegacyRequest request,

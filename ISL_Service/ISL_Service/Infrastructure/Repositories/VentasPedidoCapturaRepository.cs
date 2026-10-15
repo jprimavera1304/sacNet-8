@@ -5,6 +5,7 @@ using ISL_Service.Application.DTOs.VentasPedidoCaptura;
 using ISL_Service.Application.Exceptions;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Data;
+using ISL_Service.Infrastructure.Concurrencia;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -115,15 +116,72 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
     private readonly IConfiguration _configuration;
     private readonly IMemoryCache _cache;
 
+    private readonly ICapacidadesEmpresaRepository _constantes;
+
     public VentasPedidoCapturaRepository(
         IConfiguration configuration,
         IMemoryCache cache,
-        ILogger<VentasPedidoCapturaRepository> logger)
+        ILogger<VentasPedidoCapturaRepository> logger,
+        ICapacidadesEmpresaRepository constantes)
     {
         _configuration = configuration;
         _cache = cache;
         _logger = logger;
+        _constantes = constantes;
     }
+
+    /*
+      ══════════════════════════════════════════════════════════════════
+      EL IDEmpresaCS LO PONE EL SERVIDOR. LO QUE MANDE EL CLIENTE SE IGNORA.
+      ══════════════════════════════════════════════════════════════════
+
+      QUE SE MIDIO (2026-10-13, las dos bases locales)
+
+        MacZ (Zaragoza)          Constantes.IDEmpresaCS = 1
+        Produccion_svr (Tauro)   Constantes.IDEmpresaCS = 0
+
+      Y el front mandaba `idEmpresaCS: idEmpresa` —la empresa ELEGIDA EN EL
+      COMBO del pedido—. En Zaragoza la empresa por omision es ZARA, IDEmpresa
+      1, que coincide con la constante por pura casualidad y todo parecia
+      funcionar. En Tauro la empresa por omision es REFTAU, IDEmpresa 9, y
+      entonces:
+
+          POST clientes/buscar  {numero:"1071", idEmpresaCS:9}  ->  0 clientes
+          POST clientes/buscar  {numero:"1071", idEmpresaCS:0}  ->  1 cliente
+
+      O sea que en TAURO la pantalla de NUEVO PEDIDO no podia encontrar a NINGUN
+      cliente: se teclea el numero y contesta "No hay cliente con el numero
+      1071" sobre un padron completo. No era un filtro mal elegido, eran dos
+      conceptos distintos con nombres parecidos.
+
+      QUE ES CADA COSA
+
+      `IDEmpresa` es la empresa que FACTURA el pedido, y se elige en el combo.
+      `IDEmpresaCS` es el CENTRO DE SERVICIO DE ESTA INSTALACION, y no se elige:
+      Mac31 lo lee UNA VEZ al arrancar de `dbo.Constantes` y lo guarda en
+      `Variables.IDEmpresaCS` (Globales.cs:473), que es lo que manda en todas
+      las llamadas de la captura (Ventas.cs:699, :1184, :1797, :1868, :2283).
+
+      La unica excepcion de Mac31 es `EsCentroServicio == 1` junto con
+      factura/remision de MAYORISTA, donde sale del combo `cboEmpresaCS`
+      (Ventas.cs:1186-1190). Hoy `EsCentroServicio = 0` en LAS DOS bases y la
+      captura del web no tiene flujo de mayorista, asi que esa rama no existe
+      aqui todavia; cuando exista, se agrega en ESTE metodo y no en el cliente.
+
+      POR QUE NO SE OBEDECE AL CLIENTE, NI SIQUIERA COMO OPCION
+
+      `sp_n_ConsultaClientes` le pega SIEMPRE `AND C.IDEmpresaCS = @IDEmpresaCS`
+      al SQL que arma. Dejar ese numero en manos del navegador es dejarle elegir
+      el padron de que centro de servicio ve: no es una preferencia, es un
+      limite de visibilidad de datos. Se resuelve aqui, se cachea media hora
+      —hay que editar `dbo.Constantes` a mano para cambiarlo— y se lee con un
+      SELECT, NUNCA con `sp_n_ConsultaConstantes`, que HACE EL CIERRE DEL DIA.
+
+      Es la misma decision que ya tomo `api/clientes`
+      (ClientesConsultaRepository.cs:114); lo que faltaba era aplicarla aqui.
+    */
+    private Task<int> EmpresaCsDeLaInstalacionAsync(CancellationToken ct)
+        => EmpresaCsPorOmision.ResolverAsync(_constantes, _cache, ct);
 
     public async Task<PedidoBootstrapResponse> BootstrapAsync(int idUsuario, CancellationToken ct)
     {
@@ -151,6 +209,9 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
 
     public async Task<PedidoClienteContextResponse> BuscarClienteAsync(PedidoClienteBuscarRequest request, int idUsuario, CancellationToken ct)
     {
+        /* El centro de servicio lo pone el servidor: ver EmpresaCsDeLaInstalacionAsync. */
+        request.IDEmpresaCS = await EmpresaCsDeLaInstalacionAsync(ct);
+
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
 
@@ -240,29 +301,35 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         SqlConnection conn, PedidoClienteBuscarRequest request, int idAgenteFiltro, CancellationToken ct)
     {
         var key = $"clientes:{request.IDEmpresaCS}:{idAgenteFiltro}";
-        if (_cache.TryGetValue(key, out DataTable? cacheada) && cacheada != null)
-            return cacheada;
 
-        // Sin texto: se trae la lista completa que le toca a este usuario.
-        var sinTexto = new PedidoClienteBuscarRequest
-        {
-            IDCliente = 0,
-            Numero = string.Empty,
-            Nombre = string.Empty,
-            ApellidoPaterno = string.Empty,
-            ApellidoMaterno = string.Empty,
-            RFC = string.Empty,
-            IDEmpresaCS = request.IDEmpresaCS
-        };
+        /* UNA SOLA TRAIDA AUNQUE PREGUNTEN NUEVE.
 
-        var tabla = await ConsultarClientesAsync(conn, sinTexto, idAgenteFiltro, ct);
-
-        _cache.Set(key, tabla, new MemoryCacheEntryOptions
-        {
-            AbsoluteExpirationRelativeToNow = ClientesCacheTtl
-        });
-
-        return tabla;
+           La llave lleva el agente, asi que nueve repartidores son nueve llaves
+           distintas: los nueve fallaban el cache en el mismo instante y los
+           nueve se traian el padron COMPLETO de clientes por el mismo enlace.
+           Medido en el banco con la latencia de produccion: 36 s. */
+        return await UnaSolaVez.HazloAsync(
+            key,
+            () => (_cache.TryGetValue(key, out DataTable? c) && c != null, c),
+            valor => _cache.Set(key, valor, new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = ClientesCacheTtl
+            }),
+            async () =>
+            {
+                // Sin texto: se trae la lista completa que le toca a este usuario.
+                var sinTexto = new PedidoClienteBuscarRequest
+                {
+                    IDCliente = 0,
+                    Numero = string.Empty,
+                    Nombre = string.Empty,
+                    ApellidoPaterno = string.Empty,
+                    ApellidoMaterno = string.Empty,
+                    RFC = string.Empty,
+                    IDEmpresaCS = request.IDEmpresaCS
+                };
+                return await ConsultarClientesAsync(conn, sinTexto, idAgenteFiltro, ct);
+            });
     }
 
     // Devuelve el IDCliente solo si de verdad esta en el resultado de la
@@ -297,16 +364,14 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         if (idUsuario <= 0) return 0;
 
         var key = $"agenteFiltro:{idUsuario}";
-        if (_cache.TryGetValue(key, out int cacheado)) return cacheado;
-
-        var filtro = await ConsultarAgenteFiltroAsync(idUsuario, ct);
-
-        _cache.Set(key, filtro, new MemoryCacheEntryOptions
-        {
-            AbsoluteExpirationRelativeToNow = AgenteFiltroCacheTtl
-        });
-
-        return filtro;
+        return await UnaSolaVez.HazloAsync(
+            key,
+            () => (_cache.TryGetValue(key, out int c), c),
+            valor => _cache.Set(key, valor, new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = AgenteFiltroCacheTtl
+            }),
+            () => ConsultarAgenteFiltroAsync(idUsuario, ct));
     }
 
     private async Task<int> ConsultarAgenteFiltroAsync(int idUsuario, CancellationToken ct)
@@ -480,6 +545,9 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
 
     public async Task<PedidoRowsResponse> BuscarProductoAsync(PedidoProductoBuscarRequest request, CancellationToken ct)
     {
+        /* El centro de servicio lo pone el servidor: ver EmpresaCsDeLaInstalacionAsync. */
+        request.IDEmpresaCS = await EmpresaCsDeLaInstalacionAsync(ct);
+
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
 
@@ -552,17 +620,14 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
     {
         var generacion = Interlocked.Read(ref _comprometidoGeneracion);
         var key = $"comprometido:{generacion}:{idAlmacen}:{idEmpresaCs}";
-        if (_cache.TryGetValue(key, out Dictionary<int, int>? cacheado) && cacheado != null)
-            return cacheado;
-
-        var mapa = await ConsultarComprometidoAsync(idAlmacen, idEmpresaCs, ct);
-
-        _cache.Set(key, mapa, new MemoryCacheEntryOptions
-        {
-            AbsoluteExpirationRelativeToNow = ComprometidoCacheTtl
-        });
-
-        return mapa;
+        return await UnaSolaVez.HazloAsync(
+            key,
+            () => (_cache.TryGetValue(key, out Dictionary<int, int>? c) && c != null, c),
+            valor => _cache.Set(key, valor, new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = ComprometidoCacheTtl
+            }),
+            () => ConsultarComprometidoAsync(idAlmacen, idEmpresaCs, ct));
     }
 
     private async Task<Dictionary<int, int>> ConsultarComprometidoAsync(
@@ -608,6 +673,9 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
 
     public async Task<PedidoProductoPaginaResponse> BuscarProductoPaginaAsync(PedidoProductoPaginaRequest request, CancellationToken ct)
     {
+        /* El centro de servicio lo pone el servidor: ver EmpresaCsDeLaInstalacionAsync. */
+        request.IDEmpresaCS = await EmpresaCsDeLaInstalacionAsync(ct);
+
         var idGrupoCategoria = ResolverIDGrupoCategoria(request.Modo, await ConsultarFuncionalidadConCacheAsync(ct));
 
         // El catalogo cacheado ya viene filtrado (Existencia > 0), proyectado y
@@ -669,19 +737,19 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
     private async Task<string> ConsultarFuncionalidadConCacheAsync(CancellationToken ct)
     {
         const string key = "constantes:funcionalidad";
-        if (_cache.TryGetValue(key, out string? cacheada) && cacheada != null)
-            return cacheada;
-
-        await using var conn = GetConnection();
-        await conn.OpenAsync(ct);
-        var funcionalidad = await ConsultarFuncionalidadAsync(conn, ct);
-
-        _cache.Set(key, funcionalidad, new MemoryCacheEntryOptions
-        {
-            AbsoluteExpirationRelativeToNow = FuncionalidadCacheTtl
-        });
-
-        return funcionalidad;
+        return await UnaSolaVez.HazloAsync(
+            key,
+            () => (_cache.TryGetValue(key, out string? c) && c != null, c),
+            valor => _cache.Set(key, valor, new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = FuncionalidadCacheTtl
+            }),
+            async () =>
+            {
+                await using var conn = GetConnection();
+                await conn.OpenAsync(ct);
+                return await ConsultarFuncionalidadAsync(conn, ct);
+            });
     }
 
     private static async Task<string> ConsultarFuncionalidadAsync(SqlConnection conn, CancellationToken ct)
@@ -728,20 +796,22 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         // El grupo va en la llave: normal y aceites devuelven catalogos distintos y
         // sin esto un modo serviria el catalogo cacheado del otro.
         var key = $"almacenProducto:{idAlmacen}:{idEmpresaCs}:{idGrupoCategoria}";
-        if (_cache.TryGetValue(key, out List<Dictionary<string, object?>>? cacheado) && cacheado != null)
-            return cacheado;
 
-        var catalogo = ProyectarProductosConExistencia(await ConsultarAlmacenProductoAsync(idAlmacen, idEmpresaCs, idGrupoCategoria, ct));
-
-        // Solo expiracion absoluta (no deslizante): un almacen consultado sin parar
-        // igual se refresca cada 3 min, y el cache no crece sin limite porque cada
-        // entrada muere sola.
-        _cache.Set(key, catalogo, new MemoryCacheEntryOptions
-        {
-            AbsoluteExpirationRelativeToNow = AlmacenProductoCacheTtl
-        });
-
-        return catalogo;
+        /* Los repartidores de un mismo almacen SI comparten llave, asi que al
+           vencer los 3 minutos todos la fallan a la vez y cada uno se traia el
+           almacen entero. Ahora lo trae uno y los demas esperan a ese. */
+        return await UnaSolaVez.HazloAsync(
+            key,
+            () => (_cache.TryGetValue(key, out List<Dictionary<string, object?>>? c) && c != null, c),
+            // Solo expiracion absoluta (no deslizante): un almacen consultado sin
+            // parar igual se refresca cada 3 min, y el cache no crece sin limite
+            // porque cada entrada muere sola.
+            valor => _cache.Set(key, valor, new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = AlmacenProductoCacheTtl
+            }),
+            async () => ProyectarProductosConExistencia(
+                await ConsultarAlmacenProductoAsync(idAlmacen, idEmpresaCs, idGrupoCategoria, ct)));
     }
 
     private async Task<DataTable> ConsultarAlmacenProductoAsync(int idAlmacen, int idEmpresaCs, int idGrupoCategoria, CancellationToken ct)
@@ -872,15 +942,25 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
 
     public async Task<PedidoSnapshotDto> AgregarDetalleAsync(PedidoAgregarDetalleRequest request, int idUsuario, string equipo, CancellationToken ct)
     {
+        /* El centro de servicio lo pone el servidor: ver EmpresaCsDeLaInstalacionAsync. */
+        request.IDEmpresaCS = await EmpresaCsDeLaInstalacionAsync(ct);
+
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
 
-        var result = await ExecuteDataSetWithFallbackAsync(
-            conn,
-            "sp_w_InsertarPedidoDetalle",
-            "sp_n_InsertarPedidoDetalle",
-            cmd => AddInsertarDetalleParams(cmd, request, idUsuario, equipo),
-            ct);
+        DataSet result;
+        try
+        {
+            result = await EjecutarMutacionAsync(
+                conn,
+                "sp_w_InsertarPedidoDetalle",
+                "sp_n_InsertarPedidoDetalle",
+                cmd => AddInsertarDetalleParams(cmd, request, idUsuario, equipo));
+        }
+        finally
+        {
+            await DeshacerTransaccionColgadaAsync(conn);
+        }
 
         // Se acaba de apartar (o de intentar) inventario: el disponible cacheado
         // ya no sirve. Va aqui y no despues del throw para que tambien se tire
@@ -910,17 +990,24 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
 
-        var result = await ExecuteDataSetWithFallbackAsync(
-            conn,
-            "sp_w_EliminarPedidoDetalle",
-            "sp_n_EliminarPedidoDetalle",
-            cmd =>
-            {
-                cmd.Parameters.AddWithValue("@IDPedidoDetalle", request.IDPedidoDetalle);
-                cmd.Parameters.AddWithValue("@Observaciones", request.Observaciones ?? string.Empty);
-                cmd.Parameters.AddWithValue("@SinModificarObservaciones", request.SinModificarObservaciones);
-            },
-            ct);
+        DataSet result;
+        try
+        {
+            result = await EjecutarMutacionAsync(
+                conn,
+                "sp_w_EliminarPedidoDetalle",
+                "sp_n_EliminarPedidoDetalle",
+                cmd =>
+                {
+                    cmd.Parameters.AddWithValue("@IDPedidoDetalle", request.IDPedidoDetalle);
+                    cmd.Parameters.AddWithValue("@Observaciones", request.Observaciones ?? string.Empty);
+                    cmd.Parameters.AddWithValue("@SinModificarObservaciones", request.SinModificarObservaciones);
+                });
+        }
+        finally
+        {
+            await DeshacerTransaccionColgadaAsync(conn);
+        }
 
         // Quitar un renglon libera piezas: el disponible sube y hay que releerlo.
         InvalidarComprometido();
@@ -937,7 +1024,9 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
 
-        await ExecuteDataSetWithFallbackAsync(
+        try
+        {
+            await EjecutarMutacionAsync(
             conn,
             "sp_w_ActualizarPedido",
             "sp_n_ActualizarPedido",
@@ -958,8 +1047,12 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
                 cmd.Parameters.AddWithValue("@ServicioTelefono", request.ServicioTelefono ?? string.Empty);
                 cmd.Parameters.AddWithValue("@SoloLogistica", request.SoloLogistica);
                 cmd.Parameters.AddWithValue("@PedidoSinCascosCambio", request.PedidoSinCascosCambio);
-            },
-            ct);
+            });
+        }
+        finally
+        {
+            await DeshacerTransaccionColgadaAsync(conn);
+        }
 
         // Confirmar el pedido lo pasa de borrador (estatus 0) a pedido real
         // (estatus 1). El apartado no cambia de monto, pero si de origen: deja de
@@ -1220,10 +1313,13 @@ ORDER BY Fecha;";
         cmd.Parameters.AddWithValue("@AjusteVigencia", string.Empty);
         cmd.Parameters.AddWithValue("@AjusteGarantia", string.Empty);
         cmd.Parameters.AddWithValue("@AjusteDiagnostico", string.Empty);
-        cmd.Parameters.AddWithValue("@Factura", string.Empty);
-        cmd.Parameters.AddWithValue("@FechaEmision", string.Empty);
-        cmd.Parameters.AddWithValue("@FechaVencimiento", string.Empty);
-        cmd.Parameters.AddWithValue("@IDProveedor", 0);
+        /* Los cuatro de la compra. En un pedido de venta llegan vacios y el
+           procedimiento recibe exactamente lo que recibia antes. Ver la nota
+           del DTO. */
+        cmd.Parameters.AddWithValue("@Factura", request.Factura ?? string.Empty);
+        cmd.Parameters.AddWithValue("@FechaEmision", request.FechaEmision ?? string.Empty);
+        cmd.Parameters.AddWithValue("@FechaVencimiento", request.FechaVencimiento ?? string.Empty);
+        cmd.Parameters.AddWithValue("@IDProveedor", request.IDProveedor);
         cmd.Parameters.AddWithValue("@Equipo", equipo);
         cmd.Parameters.AddWithValue("@ServicioPrecioConIva", request.ServicioPrecioConIva);
         cmd.Parameters.AddWithValue("@ServicioNombre", request.ServicioNombre ?? string.Empty);
@@ -1545,12 +1641,86 @@ ORDER BY Fecha;";
         };
     }
 
+    /*
+      LO QUE ESCRIBE SE EJECUTA HASTA EL FINAL.
+
+      Este es el camino de los procedimientos que MUTAN: apartar inventario,
+      insertar o borrar un renglon, confirmar el pedido. No recibe
+      CancellationToken, y es a proposito.
+
+      POR QUE. Legacy abre su propia transaccion dentro del procedimiento y
+      corre con XACT_ABORT OFF. Si la cancelacion llega de verdad a SQL Server,
+      el lote se aborta a media transaccion y esa transaccion NO se deshace: la
+      conexion vuelve al pool con @@TRANCOUNT mayor que cero, arrastrando
+      candados exclusivos sobre Pedidos, [Pedidos Detalle] y AlmacenProducto, y
+      el applock de apartado sin liberar. El siguiente agente se queda
+      esperandolos hasta agotar los 500 s de CommandTimeout.
+
+      Antes de la Fase 1 esto no podia pasar: el embudo era
+      `Task.Run(() => adapter.Fill(ds), ct)` y el token solo impedia que el
+      trabajo arrancase, nunca lo interrumpia a medias. Al pasar a
+      ExecuteReaderAsync la cancelacion se volvio real, y con ella el riesgo.
+
+      Una escritura de captura dura decimas de segundo. Dejarla terminar cuesta
+      eso; abandonarla cuesta un pedido a medias y a los demas bloqueados.
+
+      La LECTURA del snapshot que se devuelve al cliente si sigue recibiendo
+      `ct`: ahi cancelar no deja nada abierto y es lo que libera el hilo.
+    */
+    /*
+      LA RED DE SEGURIDAD: NADA VUELVE AL POOL CON UNA TRANSACCION ABIERTA.
+
+      Legacy tiene caminos que salen sin cerrar su transaccion, y no todos
+      lanzan excepcion -alguno simplemente hace RETURN-. En Zaragoza eso se
+      contiene dentro de `sp_w_InsertarPedidoDetalle`, pero Tauro no tiene esos
+      `sp_w_`: sus escrituras llaman al `sp_n_` directo por el camino de
+      respaldo, y ahi no hay nada que lo pare.
+
+      Esto lo para para las dos, sin importar que procedimiento corriera.
+
+      No se delega en `sp_reset_connection`: SqlClient lo manda con el
+      SIGUIENTE comando que tome esa conexion, asi que entre tanto la
+      transaccion sigue viva en el servidor con sus candados puestos.
+
+      El timeout es corto a proposito. Si esta comprobacion no puede correr, lo
+      que hay es un problema de red mas grande, y colgarse aqui solo retrasaria
+      el error de verdad.
+    */
+    private static async Task DeshacerTransaccionColgadaAsync(SqlConnection conn)
+    {
+        if (conn.State != System.Data.ConnectionState.Open)
+            return;
+
+        try
+        {
+            await using var cmd = new SqlCommand("IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;", conn)
+            {
+                CommandTimeout = 10
+            };
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch
+        {
+            /* Si no se puede ni preguntar, la conexion ya no sirve para nada y
+               se descarta al cerrarse. Tapar esto con un throw cambiaria el
+               error que ve el agente por uno que no explica nada. */
+        }
+    }
+
+    private static Task<DataSet> EjecutarMutacionAsync(
+        SqlConnection conn,
+        string webSp,
+        string legacySp,
+        Action<SqlCommand> addParams)
+        => ExecuteDataSetWithFallbackAsync(conn, webSp, legacySp, addParams, CancellationToken.None, esMutacion: true);
+
     private static async Task<DataSet> ExecuteDataSetWithFallbackAsync(
         SqlConnection conn,
         string webSp,
         string legacySp,
         Action<SqlCommand> addParams,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool esMutacion = false)
     {
         try
         {
@@ -1558,7 +1728,7 @@ ORDER BY Fecha;";
             addParams(cmd);
             return await ExecuteDataSetAsync(cmd, ct);
         }
-        catch (SqlException ex) when (IsMissingStoredProcedure(ex, webSp))
+        catch (SqlException ex) when (IsMissingStoredProcedure(ex, webSp, esMutacion))
         {
             await using var fallbackCmd = CreateStoredProcedureCommand(legacySp, conn);
             addParams(fallbackCmd);
@@ -1566,9 +1736,27 @@ ORDER BY Fecha;";
         }
     }
 
-    private static bool IsMissingStoredProcedure(SqlException ex, string sp)
+    /*
+      EN UNA MUTACION NO SE REINTENTA POR EL TEXTO DEL MENSAJE.
+
+      El respaldo existe para cuando el `sp_w_` todavia no esta instalado en una
+      base: entonces SQL Server contesta 2812 o 208 y se llama al `sp_n_`.
+
+      Pero el `sp_w_` de captura atrapa los errores de legacy y los vuelve a
+      levantar con RAISERROR, asi que el mensaje puede traer cualquier texto. Si
+      ese texto contiene el nombre del procedimiento, el filtro por mensaje daba
+      el error por "procedimiento ausente" y VOLVIA A EJECUTAR la insercion:
+      renglon duplicado sobre una escritura que quizas ya hizo la mitad de su
+      trabajo.
+
+      En lecturas el reintento es inofensivo y el filtro por mensaje se queda.
+    */
+    private static bool IsMissingStoredProcedure(SqlException ex, string sp, bool esMutacion = false)
     {
-        return ex.Number == 2812 || ex.Number == 208 || (ex.Message ?? "").Contains(sp, StringComparison.OrdinalIgnoreCase);
+        if (ex.Number == 2812 || ex.Number == 208)
+            return true;
+
+        return !esMutacion && (ex.Message ?? "").Contains(sp, StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task<DataTable> ExecuteFirstTableAsync(SqlCommand cmd, CancellationToken ct)
@@ -1577,13 +1765,19 @@ ORDER BY Fecha;";
         return ds.Tables.Count > 0 ? ds.Tables[0] : new DataTable();
     }
 
-    private static async Task<DataSet> ExecuteDataSetAsync(SqlCommand cmd, CancellationToken ct)
-    {
-        var ds = new DataSet();
-        using var adapter = new SqlDataAdapter(cmd);
-        await Task.Run(() => adapter.Fill(ds), ct);
-        return ds;
-    }
+    /// <summary>
+    /// El embudo por el que pasan TODOS los procedimientos de captura.
+    /// </summary>
+    /// <remarks>
+    /// Aqui vivia `await Task.Run(() => adapter.Fill(ds), ct)`, que no es
+    /// asincrono: bloquea un hilo del ThreadPool durante toda la consulta. Con
+    /// la base a 56 ms de viaje y cuatro nucleos en el servidor, nueve agentes
+    /// capturando a la vez ponian nueve bloqueos en cola sobre un pool que
+    /// arranca con cuatro hilos e inyecta uno por segundo. Ver
+    /// <see cref="LlenadoAsincrono"/>.
+    /// </remarks>
+    private static Task<DataSet> ExecuteDataSetAsync(SqlCommand cmd, CancellationToken ct)
+        => LlenadoAsincrono.LlenarAsync(cmd, ct);
 
     private static List<Dictionary<string, object?>> DataTableToRows(DataTable table)
     {

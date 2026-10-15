@@ -31,6 +31,14 @@ namespace ISL_Service.Infrastructure.Repositories;
   (Zaragoza). Pasar por ahi habria dejado la pantalla vacia en una de las dos
   empresas sin ningun error que lo explicara.
 */
+/*
+  LA CANCELACION SOLO LLEGA A LAS CONSULTAS.
+
+  Este repositorio escribe: cancelar a media escritura de legacy deja la
+  transaccion abierta y los candados puestos en una conexion que vuelve al pool.
+  Quien decide es CancelacionSegura, leyendo el propio comando; el porque esta
+  explicado ahi.
+*/
 public class VentasDevolucionRepository : IVentasDevolucionRepository
 {
     private const int CommandTimeoutSeconds = 500;
@@ -51,7 +59,7 @@ public class VentasDevolucionRepository : IVentasDevolucionRepository
             "SELECT TOP 1 UPPER(ISNULL(Funcionalidad, '')) FROM Constantes;", conn)
         { CommandTimeout = CommandTimeoutSeconds };
 
-        var v = await cmd.ExecuteScalarAsync(ct);
+        var v = await cmd.ExecuteScalarAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
         return Convert.ToString(v)?.Trim() ?? string.Empty;
     }
 
@@ -89,8 +97,8 @@ public class VentasDevolucionRepository : IVentasDevolucionRepository
         cmd.Parameters.AddWithValue("@IDsProducto", "");
         cmd.Parameters.AddWithValue("@IDProducto", 0);
 
-        await using var rd = await cmd.ExecuteReaderAsync(ct);
-        if (!await rd.ReadAsync(ct)) return (vista, false);
+        await using var rd = await cmd.ExecuteReaderAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
+        if (!await rd.ReadAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct))) return (vista, false);
 
         vista.Folio = LeerTexto(rd, "Folio");
         vista.Empresa = LeerTexto(rd, "Empresa");
@@ -149,8 +157,8 @@ public class VentasDevolucionRepository : IVentasDevolucionRepository
         // Mac31 manda 0: aqui no se esta consultando un descuento concreto.
         cmd.Parameters.AddWithValue("@IDDescuento", 0);
 
-        await using var rd = await cmd.ExecuteReaderAsync(ct);
-        while (await rd.ReadAsync(ct))
+        await using var rd = await cmd.ExecuteReaderAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
+        while (await rd.ReadAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct)))
         {
             var numPiezas = LeerEntero(rd, "NumPiezas");
             lista.Add(new VentasDevolucionPartida
@@ -193,8 +201,8 @@ public class VentasDevolucionRepository : IVentasDevolucionRepository
         };
         cmd.Parameters.AddWithValue("@IDVenta", idVenta);
 
-        await using var rd = await cmd.ExecuteReaderAsync(ct);
-        while (await rd.ReadAsync(ct))
+        await using var rd = await cmd.ExecuteReaderAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
+        while (await rd.ReadAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct)))
         {
             /*
               LA COLUMNA DE COSTO ES CostoVentaCargoConIva, NO CostoUsadoCargo.
@@ -245,8 +253,8 @@ public class VentasDevolucionRepository : IVentasDevolucionRepository
         cmd.Parameters.AddWithValue("@Accion", 2);
         cmd.Parameters.AddWithValue("@IDVenta", idVenta);
 
-        await using var rd = await cmd.ExecuteReaderAsync(ct);
-        while (await rd.ReadAsync(ct))
+        await using var rd = await cmd.ExecuteReaderAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
+        while (await rd.ReadAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct)))
         {
             resumen.Renglones.Add(new VentasDevolucionCasco
             {
@@ -287,8 +295,8 @@ public class VentasDevolucionRepository : IVentasDevolucionRepository
         cmd.Parameters.AddWithValue("@Cantidades", cantidades);
         cmd.Parameters.AddWithValue("@Equipo", equipo);
 
-        await using var rd = await cmd.ExecuteReaderAsync(ct);
-        if (!await rd.ReadAsync(ct))
+        await using var rd = await cmd.ExecuteReaderAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
+        if (!await rd.ReadAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct)))
         {
             return new VentasDevolucionResponse
             {

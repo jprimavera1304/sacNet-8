@@ -193,6 +193,42 @@ public class VentasPedidoFaltanteItem
     public decimal CantidadFaltante { get; set; }
 }
 
+/*
+  LO QUE SE PIDE PARA SIMULAR (reporte 1175)
+
+  Los dos botones SIMULAR de consulta de ventas mandan esto mismo con dos
+  rellenos distintos:
+
+    SIMULAR SIN REMISION  manda `IdPedido` del pedido que se acaba de capturar
+                          con la bandera de simulacion, `IdDescuento` el que se
+                          eligio en la captura y `ConCascos` en 0 -alla no hay
+                          casilla que marcar (Ventas.cs:3973)-.
+    SIMULAR CON REMISION  manda `IdVenta` de una remision emitida, el descuento
+                          que se este probando en la pantalla y `ConCascos` 1 o
+                          2 segun la casilla "cascos a cambio"
+                          (VentasSimular.cs:526).
+
+  Van los DOS ids y no uno firmado porque el signo es cosa del procedimiento, no
+  del navegador: quien pide "el pedido 216063" no deberia tener que saber que
+  eso se le manda a la base como -216063. El servidor lo convierte.
+*/
+public class VentasSimulacionRequest
+{
+    /// La remision emitida que se quiere simular. Se usa cuando IdPedido es 0.
+    public int IdVenta { get; set; }
+
+    /// El pedido sin emitir que se quiere simular. Gana sobre IdVenta.
+    public int IdPedido { get; set; }
+
+    /// El descuento simulado. 0 = ninguno, y el papel sale con los importes
+    /// que ya tiene el documento.
+    public int IdDescuento { get; set; }
+
+    /// 0 = como venga, 1 = CON cascos a cambio, 2 = SIN cascos a cambio. Son
+    /// los valores de `enumSimulaCascos` de Mac31.
+    public int ConCascos { get; set; }
+}
+
 public class VentasReporteResponse
 {
     public bool Ok { get; set; }

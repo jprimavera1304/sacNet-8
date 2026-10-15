@@ -44,16 +44,64 @@ public class FamiliasLegacyNoSePierdenTests
             yield return (string)Propiedad(seed!, "Key")!;
     }
 
-    /// <summary>Las familias nuevas, como (prefijo, claves que gobierna, claves del web).</summary>
-    private static List<(string Prefijo, HashSet<string> DeLegacy, HashSet<string> DelWeb)> Familias()
+    /// <summary>
+    /// Las familias nuevas, como (prefijo, claves que gobierna, claves del web).
+    /// </summary>
+    /// <remarks>
+    /// EL `Map` NO ES TODO LO QUE LEGACY PRODUCE, Y POR NO VERLO ESTA PRUEBA
+    /// ACUSABA EN FALSO.
+    ///
+    /// Desde que existe la tabla de verbos (PermissionService.VerbosLegacy.cs),
+    /// una forma que NO mapea nada igual produce claves: LoadLegacyModuleCatalogAsync
+    /// llama a DerivarClaveLegacy y arma "{Prefijo de la forma}.{verbo}" para
+    /// cada boton cuyo nombre este en la tabla. La familia de proveedores es el
+    /// ejemplo: su unica forma tiene el `Map` VACIO a proposito, y aun asi
+    /// produce "proveedores.ver", ".crear" y ".editar" -los tres botones que el
+    /// web ya usaba-.
+    ///
+    /// Leyendo solo el `Map`, esas tres claves parecian huerfanas y la prueba
+    /// decia que ProveedoresController quedaria en 403 permanente. Es falso, y
+    /// se comprobo contra las dos bases el 2026-10-10: cero claves que se
+    /// borren sin reponerse y cero endpoints en 403, tanto en MacZ como en
+    /// Produccion_svr (ver DiagnosticoFamiliasContraLaBase).
+    ///
+    /// Asi que aqui se modela el mecanismo entero: lo del `Map` MAS lo que la
+    /// tabla de verbos puede derivar para el prefijo de cada forma.
+    ///
+    /// LO QUE ESTA APROXIMACION NO PUEDE SABER: si ese boton existe de verdad
+    /// en n_Procesos. "{prefijo}.editar" se da por cubierto aunque la forma no
+    /// tenga btnModificar -es justo el caso de `gasolinas.editar`, donde el
+    /// boton MODIFICAR se llama btnVer-. Esa mitad solo se puede comprobar
+    /// contra una base, y para eso esta la prueba de la base.
+    /// </remarks>
+    /// <param name="Mapeadas">
+    /// Lo que la familia declara A MANO en su <c>Map</c>. Es intencion escrita,
+    /// exacta, y por eso es lo que miran las pruebas de "dos duenos" y "dos
+    /// familias se pisan": ahi lo que importa es lo que alguien declaro.
+    /// </param>
+    /// <param name="Derivables">
+    /// <paramref name="Mapeadas"/> mas todo lo que la tabla de verbos PODRIA
+    /// derivar. Es lo que miran las pruebas de "sin dueno", porque la pregunta
+    /// ahi es "despues del borrado por prefijo, puede legacy reponer esto".
+    /// </param>
+    private readonly record struct Familia(
+        string Prefijo,
+        HashSet<string> Mapeadas,
+        HashSet<string> Derivables,
+        HashSet<string> DelWeb);
+
+    private static List<Familia> Familias()
     {
-        var resultado = new List<(string, HashSet<string>, HashSet<string>)>();
+        var verbos = (IDictionary)LeerCampo("VerbosLegacy");
+        var resultado = new List<Familia>();
 
         foreach (var familia in (IEnumerable)LeerCampo("FamiliasLegacyAmpliadas"))
         {
             var prefijo = (string)Propiedad(familia!, "Prefijo")!;
 
-            var deLegacy = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var mapeadas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var derivables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var forma in (IEnumerable)Propiedad(familia!, "Formas")!)
             {
                 var mapa = (IEnumerable)Propiedad(forma!, "Map")!;
@@ -61,15 +109,25 @@ public class FamiliasLegacyNoSePierdenTests
                 {
                     // KeyValuePair<string, (string Key, string Name)>
                     var valor = Propiedad(par!, "Value")!;
-                    deLegacy.Add((string)valor.GetType().GetField("Item1")!.GetValue(valor)!);
+                    mapeadas.Add((string)valor.GetType().GetField("Item1")!.GetValue(valor)!);
                 }
+
+                // Y lo que la tabla de verbos deriva sola. Mismo fallback que
+                // LoadLegacyModuleCatalogAsync: `Prefijo` de la forma, y si no
+                // lo declara, su ModuleKey.
+                var prefijoForma = (string?)Propiedad(forma!, "Prefijo")
+                    ?? (string)Propiedad(forma!, "ModuleKey")!;
+                foreach (string verbo in verbos.Values)
+                    derivables.Add($"{prefijoForma}.{verbo}");
             }
+
+            derivables.UnionWith(mapeadas);
 
             var delWeb = new HashSet<string>(
                 ClavesDe(Propiedad(familia!, "SemillasDelWeb")!),
                 StringComparer.OrdinalIgnoreCase);
 
-            resultado.Add((prefijo, deLegacy, delWeb));
+            resultado.Add(new Familia(prefijo, mapeadas, derivables, delWeb));
         }
 
         return resultado;
@@ -125,13 +183,13 @@ public class FamiliasLegacyNoSePierdenTests
         var catalogo = ClavesDe(LeerCampo("PermissionCatalogSeeds")).ToList();
         var huerfanas = new List<string>();
 
-        foreach (var (prefijo, deLegacy, delWeb) in Familias())
+        foreach (var f in Familias())
         {
             foreach (var clave in catalogo)
             {
-                if (!clave.StartsWith(prefijo, StringComparison.OrdinalIgnoreCase)) continue;
-                if (deLegacy.Contains(clave) || delWeb.Contains(clave)) continue;
-                huerfanas.Add($"{clave} (prefijo '{prefijo}')");
+                if (!clave.StartsWith(f.Prefijo, StringComparison.OrdinalIgnoreCase)) continue;
+                if (f.Derivables.Contains(clave) || f.DelWeb.Contains(clave)) continue;
+                huerfanas.Add($"{clave} (prefijo '{f.Prefijo}')");
             }
         }
 
@@ -155,11 +213,11 @@ public class FamiliasLegacyNoSePierdenTests
 
         foreach (var clave in ClavesQueExigenLosControladores())
         {
-            foreach (var (prefijo, deLegacy, delWeb) in familias)
+            foreach (var f in familias)
             {
-                if (!clave.StartsWith(prefijo, StringComparison.OrdinalIgnoreCase)) continue;
-                if (deLegacy.Contains(clave) || delWeb.Contains(clave)) continue;
-                huerfanas.Add($"{clave} (prefijo '{prefijo}')");
+                if (!clave.StartsWith(f.Prefijo, StringComparison.OrdinalIgnoreCase)) continue;
+                if (f.Derivables.Contains(clave) || f.DelWeb.Contains(clave)) continue;
+                huerfanas.Add($"{clave} (prefijo '{f.Prefijo}')");
             }
         }
 
@@ -176,10 +234,15 @@ public class FamiliasLegacyNoSePierdenTests
     [Fact]
     public void Ninguna_Clave_Tiene_Dos_Duenos()
     {
-        foreach (var (prefijo, deLegacy, delWeb) in Familias())
+        // Sobre lo MAPEADO, no sobre lo derivable: una clave como "compras.ver"
+        // es semilla del web a proposito -la forma de Mac31 no tiene boton de
+        // buscar dado de alta- y la tabla de verbos la daria por derivable sin
+        // que exista el boton. Lo que no puede pasar es que alguien la declare
+        // en el `Map` Y como semilla.
+        foreach (var f in Familias())
         {
-            var ambas = deLegacy.Intersect(delWeb, StringComparer.OrdinalIgnoreCase).ToList();
-            Assert.True(ambas.Count == 0, $"'{prefijo}' declara con dos duenos: {string.Join(", ", ambas)}");
+            var ambas = f.Mapeadas.Intersect(f.DelWeb, StringComparer.OrdinalIgnoreCase).ToList();
+            Assert.True(ambas.Count == 0, $"'{f.Prefijo}' declara con dos duenos: {string.Join(", ", ambas)}");
         }
     }
 
@@ -193,43 +256,135 @@ public class FamiliasLegacyNoSePierdenTests
         var familias = Familias();
         var vistas = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var (prefijo, deLegacy, _) in familias)
+        // Tambien sobre lo MAPEADO: lo derivable se solapa por construccion
+        // entre familias cuyo prefijo cuelga de otro ("cobros." y
+        // "cobros.reasignar"), y eso ya lo resuelve EsLaFamiliaMasEspecifica.
+        foreach (var f in familias)
         {
-            foreach (var clave in deLegacy)
+            foreach (var clave in f.Mapeadas)
             {
                 Assert.False(
                     vistas.TryGetValue(clave, out var otro),
-                    $"'{clave}' la reclaman '{otro}' y '{prefijo}'.");
-                vistas[clave] = prefijo;
+                    $"'{clave}' la reclaman '{otro}' y '{f.Prefijo}'.");
+                vistas[clave] = f.Prefijo;
             }
         }
     }
 
     /// <summary>
-    /// Toda clave que una familia saca de Mac31 tiene que existir tambien en
-    /// el catalogo escrito a mano. No es redundante: el catalogo es lo que
-    /// siembra el arranque, y sin esa semilla el permiso solo aparece en
-    /// WPermiso la primera vez que alguien abre la pantalla de permisos.
+    /// TODA CLAVE MAPEADA A MANO CAE BAJO EL PREFIJO DE SU PROPIA FAMILIA.
     /// </summary>
+    /// <remarks>
+    /// ESTA PRUEBA PEDIA OTRA COSA Y LA PEDIA MAL.
+    ///
+    /// Antes exigia que cada clave que sale de Mac31 estuviera ademas escrita a
+    /// mano en <c>PermissionCatalogSeeds</c>, con el argumento de que el
+    /// catalogo es lo unico que siembra WPermiso. Eso no es cierto desde que
+    /// existen las familias: <c>EnsureLegacyModulePermissionsSyncedAsync</c>
+    /// llama a <c>SincronizarCatalogoDePermisosAsync</c> con el catalogo que
+    /// acaba de resolver, o sea que la familia SIEMBRA SUS PROPIAS CLAVES cada
+    /// vez que se resuelve, incluido el snapshot de /api/me. La semilla a mano
+    /// es redundante para ellas.
+    ///
+    /// Y pedirla era ademas contrario a lo decidido: las claves nuevas que
+    /// todavia no protegen ningun endpoint NO deben aparecer como permisos
+    /// administrables. Sembrar las 105 a mano es justo lo contrario.
+    ///
+    /// Lo que de verdad hacia falta comprobar -que nada se borre sin reponerse-
+    /// no se puede saber leyendo el codigo, porque depende de que el boton
+    /// exista en n_Procesos. Se midio contra las dos bases el 2026-10-10 y dio
+    /// cero en las dos; esa comprobacion vive en
+    /// <see cref="DiagnosticoFamiliasContraLaBase"/>.
+    ///
+    /// Lo que SI se puede comprobar aqui, y sigue siendo un fallo real si se
+    /// rompe: una clave mapeada que cayera FUERA del prefijo de su familia se
+    /// sembraria pero no la gobernaria nadie —el borrado por prefijo no la
+    /// alcanza y el puente no la repone—, asi que se quedaria congelada con lo
+    /// que dijera el web y Mac31 dejaria de mandar sobre ella en silencio.
+    /// </remarks>
     [Fact]
-    public void Lo_Que_Sale_De_Mac31_Tambien_Esta_En_El_Catalogo()
+    public void Ninguna_Clave_Mapeada_Se_Sale_De_Su_Familia()
     {
-        var catalogo = new HashSet<string>(
-            ClavesDe(LeerCampo("PermissionCatalogSeeds")),
-            StringComparer.OrdinalIgnoreCase);
+        var fuera = new List<string>();
 
-        var faltantes = new List<string>();
-        foreach (var (prefijo, deLegacy, _) in Familias())
+        foreach (var f in Familias())
         {
-            foreach (var clave in deLegacy)
+            foreach (var clave in f.Mapeadas)
             {
-                if (!catalogo.Contains(clave))
-                    faltantes.Add($"{clave} (familia '{prefijo}')");
+                if (!clave.StartsWith(f.Prefijo, StringComparison.OrdinalIgnoreCase))
+                    fuera.Add($"{clave} (familia '{f.Prefijo}')");
             }
         }
 
-        Assert.True(faltantes.Count == 0,
-            "Faltan en PermissionCatalogSeeds:\n  - " + string.Join("\n  - ", faltantes));
+        Assert.True(fuera.Count == 0,
+            "Estas claves las produce la familia pero su prefijo no las gobierna, asi que nadie "
+            + "las repone ni las borra:\n  - " + string.Join("\n  - ", fuera));
+    }
+
+    /// <summary>
+    /// EL PRIMER TRAMO DE LA CLAVE TIENE QUE SER EL MODULO DE LA FAMILIA.
+    ///
+    /// De esto depende el unico candado que hace seguro escribir de vuelta en
+    /// Mac31: <c>SyncLegacyModulePermissionsForUserAsync</c> solo apaga un
+    /// permiso si <c>IsPermissionInActiveModule</c> dice que su modulo esta
+    /// encendido, y ese metodo saca el modulo cortando la clave en el PRIMER
+    /// punto (<c>ExtractModuleFromPermissionKey</c>).
+    ///
+    /// Si el <c>ModuleKey</c> de una familia no fuera ese primer tramo, el
+    /// modulo que se da de alta en WModulo no seria el que luego se busca: el
+    /// candado daria siempre falso, las concesiones si viajarian a Mac31 y las
+    /// revocaciones no. Esa es exactamente la "puerta de un solo sentido" que
+    /// ya se documento para reportes —encendias un boton y no habia forma de
+    /// apagarlo desde ninguna de las dos pantallas—.
+    ///
+    /// NO se exige que cada atadura declare como <c>ModuleKey</c> su propio
+    /// primer tramo: <c>FacturasFamilia</c> pone a proposito <c>"facturas"</c>
+    /// en la atadura que deriva claves <c>facturacion.*</c>, para que el upsert
+    /// de WModulo cree el renglon <c>facturas</c> que a Tauro le falta. Eso vale
+    /// porque OTRA atadura de la misma familia si da de alta <c>facturacion</c>.
+    /// Lo que se exige es que el renglon exista, lo cree quien lo cree.
+    /// </summary>
+    [Fact]
+    public void El_Modulo_De_Cada_Clave_Lo_Da_De_Alta_Alguien()
+    {
+        // Todos los modulos que el puente llega a crear en WModulo.
+        var modulosQueSeCrean = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var familia in (IEnumerable)LeerCampo("FamiliasLegacyAmpliadas"))
+        {
+            modulosQueSeCrean.Add((string)Propiedad(familia!, "ModuleKey")!);
+            foreach (var forma in (IEnumerable)Propiedad(familia!, "Formas")!)
+                modulosQueSeCrean.Add((string)Propiedad(forma!, "ModuleKey")!);
+        }
+
+        var malas = new List<string>();
+
+        foreach (var familia in (IEnumerable)LeerCampo("FamiliasLegacyAmpliadas"))
+        {
+            var prefijo = (string)Propiedad(familia!, "Prefijo")!;
+            var moduleKey = (string)Propiedad(familia!, "ModuleKey")!;
+
+            // El prefijo que GOBIERNA el borrado.
+            if (!modulosQueSeCrean.Contains(prefijo.Split('.')[0]))
+                malas.Add($"familia '{prefijo}': nadie da de alta el modulo '{prefijo.Split('.')[0]}'");
+
+            if (!string.Equals(prefijo.Split('.')[0], moduleKey, StringComparison.OrdinalIgnoreCase))
+                malas.Add($"familia '{prefijo}' dice ModuleKey '{moduleKey}' pero su primer tramo es '{prefijo.Split('.')[0]}'");
+
+            // Y el prefijo con el que cada forma DERIVA sus claves.
+            foreach (var forma in (IEnumerable)Propiedad(familia!, "Formas")!)
+            {
+                var moduloForma = (string)Propiedad(forma!, "ModuleKey")!;
+                var prefijoForma = (string?)Propiedad(forma!, "Prefijo") ?? moduloForma;
+                var tramoForma = prefijoForma.Split('.')[0];
+
+                if (!modulosQueSeCrean.Contains(tramoForma))
+                    malas.Add($"forma de '{prefijo}' deriva claves '{tramoForma}.*' y nadie da de alta ese modulo");
+            }
+        }
+
+        Assert.True(malas.Count == 0,
+            "El candado del modulo no cerraria para estas, asi que se podria conceder en Mac31 y no revocar:\n  - "
+            + string.Join("\n  - ", malas.Distinct()));
     }
 
     /// <summary>

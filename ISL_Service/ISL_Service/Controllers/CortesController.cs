@@ -46,7 +46,7 @@ public class CortesController : ControllerBase
     /// </remarks>
     /// <response code="400">idCorte requerido</response>
     [HttpGet("{idCorte:int}/detalle")]
-    [Authorize(Policy = "perm:cortes.ver")]
+    [Authorize(Policy = "perm:cortes.ver|app_movil.cortes.ver")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Detalle([FromRoute] int idCorte, CancellationToken ct)
@@ -77,7 +77,7 @@ public class CortesController : ControllerBase
     /// <response code="200">Siguiente fecha</response>
     /// <response code="404">No hay ningun corte del que partir</response>
     [HttpGet("siguiente-fecha")]
-    [Authorize(Policy = "perm:cortes.ver")]
+    [Authorize(Policy = "perm:cortes.ver|app_movil.cortes.ver")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SiguienteFecha(CancellationToken ct)
@@ -111,7 +111,7 @@ public class CortesController : ControllerBase
     /// la lista de cortes CS, no los proyecta.
     /// </remarks>
     [HttpGet("centros-servicio/cobros")]
-    [Authorize(Policy = "perm:cortes.cs.ver")]
+    [Authorize(Policy = "perm:cortes.cs.ver|app_movil.cortes.cs.ver")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> CobrosCs(
         [FromQuery] int idCorte = 0,
@@ -141,7 +141,7 @@ public class CortesController : ControllerBase
     /// base, asi que no se puede confiar en el como texto capturado por nadie.
     /// </remarks>
     [HttpGet("centros-servicio/ventas-canceladas")]
-    [Authorize(Policy = "perm:cortes.cs.ver")]
+    [Authorize(Policy = "perm:cortes.cs.ver|app_movil.cortes.cs.ver")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> VentasCanceladasCs(
         [FromQuery] int idCorte = 0,

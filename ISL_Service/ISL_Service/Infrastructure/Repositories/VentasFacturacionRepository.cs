@@ -51,6 +51,35 @@ public class VentasFacturacionRepository : SpLegacyRepositoryBase, IVentasFactur
 
     public VentasFacturacionRepository(IConfiguration configuration) : base(configuration) { }
 
+    /// <summary>
+    /// Solo lo que hace falta para hablar con Facturapi: la llave y el nombre de
+    /// la aplicacion (de los dos sale el secreto real, ver ReglasFacturacion).
+    /// </summary>
+    /// <remarks>
+    /// NO SE REUSA <see cref="LeerConstantesAsync"/> A PROPOSITO. Esa trae seis
+    /// columnas porque timbrar las necesita, y una de ellas -`PorcentajeIva`- no
+    /// existe en todas las bases: "Ver el PDF" moria con "Invalid column name"
+    /// por una columna que no iba a usar. Pedir de mas es pedir que falle por
+    /// algo que no te importa.
+    /// </remarks>
+    public async Task<(string? SecretKey, string? AppMac)> LeerLlaveFacturapiAsync(CancellationToken ct)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(@"
+SELECT TOP 1
+    AppMac             = ISNULL(AppMac, ''),
+    FacturapiSecretKey = ISNULL(FacturapiSecretKey, '')
+FROM dbo.Constantes;", conn)
+        { CommandTimeout = CommandTimeoutSeconds };
+
+        await using var rd = await cmd.ExecuteReaderAsync(ct);
+        if (!await rd.ReadAsync(ct)) return (null, null);
+
+        return (rd["FacturapiSecretKey"] as string, rd["AppMac"] as string);
+    }
+
     public async Task<ConstantesFacturacion> LeerConstantesAsync(CancellationToken ct)
     {
         await using var conn = GetConnection();

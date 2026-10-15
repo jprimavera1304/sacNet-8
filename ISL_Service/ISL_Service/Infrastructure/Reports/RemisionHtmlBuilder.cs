@@ -53,13 +53,35 @@ public static class RemisionHtmlBuilder
       la pantalla de consulta cuando hay varias marcadas. El salto de pagina
       entre una y otra ya viene en el html de cada remision.
     */
-    public static string Construir(IReadOnlyList<RemisionDatosVenta> ventas, DataTable dtTemplateHtml, int copias)
+    /// <param name="raiz">
+    /// Que juego de plantillas se arma: "remision" (reporte 1001) o "simular"
+    /// (reporte 1175). Ver RemisionPlantillas.
+    /// </param>
+    /// <param name="hayReimpresion">
+    /// Si existe el juego "reimp_" y hay que usarlo cuando el procedimiento
+    /// diga que la venta ya se imprimio.
+    ///
+    /// LA SIMULACION MANDA false, Y NO ES UN ATAJO. En legacy el papel de la
+    /// simulacion se arma SIEMPRE con el juego normal: la condicion es
+    /// `if ((Reimpresion == "") || (IDReporte == enumReportes.Simular))`
+    /// (Legacy/MacServicios2/.../VentasImprimirService.cs ~292). Tiene sentido:
+    /// lo que se simula es un pedido que no se ha emitido, no hay primera
+    /// impresion que repetir, y el 1175 no tiene plantillas `reimp_` en
+    /// Template_Html. Pedirlas tronaria por una plantilla que no existe.
+    /// </param>
+    public static string Construir(
+        IReadOnlyList<RemisionDatosVenta> ventas,
+        DataTable dtTemplateHtml,
+        int copias,
+        string raiz = "remision",
+        bool hayReimpresion = true,
+        IReadOnlyCollection<string>? marcadoresQueNoVienen = null)
     {
         if (copias <= 0)
             copias = 1;
 
-        var normales = RemisionPlantillas.Desde(dtTemplateHtml, "");
-        var reimpresiones = RemisionPlantillas.Desde(dtTemplateHtml, "reimp_");
+        var normales = RemisionPlantillas.Desde(dtTemplateHtml, "", raiz);
+        var reimpresiones = hayReimpresion ? RemisionPlantillas.Desde(dtTemplateHtml, "reimp_", raiz) : normales;
 
         var remisionesHtml = new StringBuilder();
 
@@ -77,6 +99,36 @@ public static class RemisionHtmlBuilder
         }
 
         var html = remisionesHtml.ToString();
+
+        /*
+          LOS MARCADORES QUE EL PROCEDIMIENTO NO PUEDE DAR SE VACIAN, Y SOLO ESOS.
+
+          No es un atajo para que la comprobacion de abajo pase: es un caso
+          medido. Cuando se simula un PEDIDO -id en negativo-,
+          `sp_n_VentasDetalle` se va por su rama de simulacion y devuelve otro
+          juego de columnas, mas corto: 18 en vez de las 120 de una venta. Entre
+          las que no vienen esta `Observaciones`, que la plantilla del 1175 si
+          usa.
+
+          Que hace Mac31 con eso: nada. Su sustitucion recorre las columnas que
+          HAY, asi que el marcador se queda en el html y el papel sale con el
+          texto "#Observaciones#" impreso. Eso no es un dato que falte, es un
+          hueco: para una venta, `Observaciones` es el texto que COMPONE el
+          procedimiento ("SI ENTREGA LOS CASCOS USADOS COMPLETOS, USTED SOLO
+          PAGARA: $...") y para un pedido no lo compone, porque todavia no hay
+          entrega. Vacio es lo que corresponde.
+
+          Lo que NO se hace es vaciar cualquier marcador que sobre: la lista la
+          pone el llamador, nombre por nombre, y todo lo demas sigue tronando.
+          Un importe o un folio sin sustituir es un papel mal hecho, y eso tiene
+          que seguir doliendo.
+        */
+        if (marcadoresQueNoVienen is { Count: > 0 })
+        {
+            foreach (var marcador in marcadoresQueNoVienen)
+                html = html.Replace("#" + marcador + "#", "");
+        }
+
         VerificarQueNoQuedenMarcadores(html);
         return html;
     }

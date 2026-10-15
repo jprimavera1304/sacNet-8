@@ -12,6 +12,25 @@ public class VentasPedidosRepository : IVentasPedidosRepository
     private const string SpConsultaVentasPedidos = "sp_n_ConsultaVentasPedidos";
     private const string SpProcesarPedido = "sp_w_ProcesarPedido";
 
+    /*
+      LOS 500 s QUE ESTE ARCHIVO NO TENIA.
+
+      No fijaba ningun CommandTimeout, asi que los comandos corrian con los
+      30 s por defecto de ADO.NET. Y a los 30 s SqlClient manda la señal de
+      atencion y ABANDONA EL LOTE A MEDIA TRANSACCION, con las mismas
+      consecuencias que una cancelacion: transaccion sin cerrar, candados en el
+      pool, y el BEGIN CATCH del procedimiento sin correr.
+
+      Abandonar `sp_w_ProcesarPedido` a medias es un pedido que ya movio
+      inventario y no llego a ser venta. Y no hacia falta que nadie cerrara el
+      navegador: bastaba que tardara medio minuto.
+
+      500 s es el mismo plazo que usan los demas repositorios de ventas. No es
+      holgura por holgura: es la unica forma de que una escritura que tarda
+      termine en vez de romperse.
+    */
+    private const int CommandTimeoutSeconds = 500;
+
     private readonly IConfiguration _configuration;
 
     public VentasPedidosRepository(IConfiguration configuration)
@@ -38,6 +57,7 @@ public class VentasPedidosRepository : IVentasPedidosRepository
 
         await using var cmd = new SqlCommand(SpConsultaVentasPedidos, conn)
         {
+            CommandTimeout = CommandTimeoutSeconds,
             CommandType = CommandType.StoredProcedure
         };
 
@@ -150,6 +170,7 @@ public class VentasPedidosRepository : IVentasPedidosRepository
 
             await using var cmd = new SqlCommand(SpProcesarPedido, conn)
             {
+                CommandTimeout = CommandTimeoutSeconds,
                 CommandType = CommandType.StoredProcedure
             };
 

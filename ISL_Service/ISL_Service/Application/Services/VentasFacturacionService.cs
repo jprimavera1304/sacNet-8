@@ -413,10 +413,14 @@ public class VentasFacturacionService : IVentasFacturacionService
           documento acabe. Aqui, si el archivo no esta, se dice que no esta — con su
           ruta, que es lo que hace falta para arreglarlo.
         */
-        if (!File.Exists(pdf))
-            throw new ConflictException($"NO SE ENCONTRO EL ARCHIVO PDF.{Environment.NewLine}({pdf})");
-        if (!File.Exists(xml))
-            throw new ConflictException($"NO SE ENCONTRO EL ARCHIVO XML.{Environment.NewLine}({xml})");
+        /* Mismo caso que en LeerDocumentoAsync: el disco es de la oficina y la
+           API corre en el servidor. Si no estan, se bajan de Facturapi. */
+        var pdfBytes = File.Exists(pdf)
+            ? await File.ReadAllBytesAsync(pdf, ct)
+            : await DescargarDeFacturapiAsync(datos.IdFacturapi, "pdf", pdf, ct);
+        var xmlBytes = File.Exists(xml)
+            ? await File.ReadAllBytesAsync(xml, ct)
+            : await DescargarDeFacturapiAsync(datos.IdFacturapi, "xml", xml, ct);
 
         /*
           EL CANDADO DE MAQUINA NO SE HEREDA.
@@ -447,10 +451,12 @@ public class VentasFacturacionService : IVentasFacturacionService
                 mensaje.Bcc.Add(copia);
         }
 
-        await using var flujoPdf = File.OpenRead(pdf);
-        await using var flujoXml = File.OpenRead(xml);
-        mensaje.Attachments.Add(new Attachment(flujoPdf, Path.GetFileName(pdf)));
-        mensaje.Attachments.Add(new Attachment(flujoXml, Path.GetFileName(xml)));
+        /* Desde memoria y no desde el disco: los bytes pueden venir de
+           Facturapi, donde no hay archivo que abrir. */
+        using var flujoPdf = new MemoryStream(pdfBytes);
+        using var flujoXml = new MemoryStream(xmlBytes);
+        mensaje.Attachments.Add(new Attachment(flujoPdf, NombreDeAdjunto(pdf, datos.IdFacturapi, "pdf")));
+        mensaje.Attachments.Add(new Attachment(flujoXml, NombreDeAdjunto(xml, datos.IdFacturapi, "xml")));
 
         using var smtp = new SmtpClient(datos.Smtp, datos.Puerto)
         {
@@ -500,22 +506,99 @@ public class VentasFacturacionService : IVentasFacturacionService
             ? datos.Archivo
             : datos.Archivo.Replace(".pdf", ".xml", StringComparison.OrdinalIgnoreCase);
 
-        if (string.IsNullOrWhiteSpace(ruta))
-            throw new ConflictException("El comprobante no tiene archivo registrado.");
+        /*
+          PRIMERO EL DISCO, Y SI NO ESTA, FACTURAPI.
 
-        if (!File.Exists(ruta))
-            throw new ConflictException(
-                $"NO SE ENCONTRO EL ARCHIVO {tipo.ToUpperInvariant()}.{Environment.NewLine}({ruta})");
+          La ruta que da el procedimiento es un disco DE LA OFICINA, donde Mac31
+          genera el archivo. La API corre en el servidor y ahi ese disco no
+          existe, asi que en produccion esto fallaba SIEMPRE con "no se encontro
+          el archivo" y una ruta que nadie podia revisar: no faltaba el archivo,
+          faltaba el disco entero.
+
+          Se sigue mirando el disco primero porque cuando la API corre en la
+          oficina el archivo SI esta, y leerlo es gratis e instantaneo frente a
+          una llamada por internet.
+        */
+        var deDisco = !string.IsNullOrWhiteSpace(ruta) && File.Exists(ruta);
+
+        var contenido = deDisco
+            ? await File.ReadAllBytesAsync(ruta, ct)
+            : await DescargarDeFacturapiAsync(datos.IdFacturapi, tipo, ruta, ct);
 
         return new DocumentoDeFactura
         {
-            Contenido = await File.ReadAllBytesAsync(ruta, ct),
-            NombreArchivo = Path.GetFileName(ruta),
+            Contenido = contenido,
+            /* Si vino de Facturapi no hay nombre de disco: se arma uno legible.
+               `Path.GetFileName` de una ruta vacia devuelve vacio, y el navegador
+               bautizaria el archivo "descarga". */
+            NombreArchivo = deDisco
+                ? Path.GetFileName(ruta)
+                : $"{datos.IdFacturapi}.{tipo}",
             TipoContenido = tipo == "pdf" ? "application/pdf" : "application/xml"
         };
     }
 
     /* ---------------------------------------------------------------- */
+
+    /// <summary>
+    /// Baja el PDF o el XML de Facturapi cuando el disco no los tiene.
+    /// </summary>
+    /// <remarks>
+    /// SE EXPLICA EL PORQUE EN EL MENSAJE DE ERROR, y no solo el que.
+    ///
+    /// Antes, cuando el archivo no estaba, se decia "NO SE ENCONTRO EL ARCHIVO
+    /// PDF" con una ruta tipo `C:\macZ\Facturas\...`. En produccion eso mandaba
+    /// a buscar en un disco que no existe en el servidor, y quien lo leia se iba
+    /// a revisar la carpeta de la oficina —donde el archivo SI estaba— sin
+    /// entender nada. Si ahora falla tambien Facturapi, se dice que se intento
+    /// por los dos lados y cual fue el motivo de cada uno.
+    /// </remarks>
+    private async Task<byte[]> DescargarDeFacturapiAsync(
+        string? idFacturapi, string tipo, string? rutaDeDisco, CancellationToken ct)
+    {
+        var mayus = tipo.ToUpperInvariant();
+
+        if (string.IsNullOrWhiteSpace(idFacturapi))
+            throw new ConflictException(
+                $"NO SE ENCONTRO EL ARCHIVO {mayus}.{Environment.NewLine}"
+                + $"No esta en disco ({rutaDeDisco}) y el comprobante no tiene folio de Facturapi "
+                + "para poder bajarlo.");
+
+        var (secretKey, appMac) = await _repository.LeerLlaveFacturapiAsync(ct);
+        var secreto = ReglasFacturacion.SecretoReal(secretKey, appMac);
+
+        if (string.IsNullOrWhiteSpace(secreto))
+            throw new ConflictException(
+                $"NO SE PUDO OBTENER EL {mayus}.{Environment.NewLine}"
+                + "No esta en el disco de esta maquina y esta empresa no tiene configurada "
+                + "la llave de Facturapi para bajarlo.");
+
+        var (contenido, error) = await _facturapi.DescargarAsync(secreto, idFacturapi, tipo, ct);
+
+        if (contenido is null || contenido.Length == 0)
+            throw new ConflictException(
+                $"NO SE PUDO OBTENER EL {mayus}.{Environment.NewLine}"
+                + $"No esta en disco ({rutaDeDisco}) y Facturapi contesto: {error}");
+
+        return contenido;
+    }
+
+    /// <summary>
+    /// Como se llama el adjunto del correo.
+    ///
+    /// Si vino del disco se conserva su nombre, que es el que la gente reconoce
+    /// ("Factura 135018 80617 .pdf"). Si vino de Facturapi no hay nombre de
+    /// archivo, y uno vacio deja un adjunto sin nombre que algunos clientes de
+    /// correo ni siquiera ensenan.
+    /// </summary>
+    private static string NombreDeAdjunto(string? rutaDeDisco, string? idFacturapi, string tipo)
+    {
+        var nombre = string.IsNullOrWhiteSpace(rutaDeDisco)
+            ? string.Empty
+            : Path.GetFileName(rutaDeDisco);
+
+        return string.IsNullOrWhiteSpace(nombre) ? $"{idFacturapi}.{tipo}" : nombre;
+    }
 
     private async Task GuardarAsync(
         FacturaTimbrarRequest request, FacturaTimbradaDto timbrada, string serie, int folio,

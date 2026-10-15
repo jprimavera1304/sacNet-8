@@ -217,12 +217,92 @@ public sealed partial class PermissionService : IPermissionService
     // SQL: el puente de ventas y el de empleados son identicos salvo estos
     // cinco datos. Reportes sigue aparte porque su clave se DEDUCE del texto
     // del proceso, en vez de estar mapeada a mano.
+    /// <param name="LegacyForm">
+    /// La DESCRIPCION de la forma en n_Formas. Se deja como estaba porque las
+    /// cinco ataduras que ya existian la usan asi.
+    /// </param>
+    /// <param name="FormaExacta">
+    /// El NOMBRE de la forma (n_Formas.Forma) cuando la descripcion no sirve
+    /// para distinguirla. Hace falta porque hay descripciones repetidas:
+    /// medido en las DOS empresas el 2026-10-10, "CONSULTA DE PROVEEDORES" son
+    /// dos formas distintas (ConsultarProveedores con 3 procesos y
+    /// MCConsultarProveedores con 7), y "REPORTES" otras dos. Empatar por
+    /// descripcion ahi mezcla los permisos de dos pantallas. Cuando viene con
+    /// valor, manda sobre <paramref name="LegacyForm"/>.
+    /// </param>
+    /// <param name="Prefijo">
+    /// Prefijo de las claves que se DERIVEN con la tabla de verbos, sin punto
+    /// final. Si va en null se usa <paramref name="ModuleKey"/>. Hace falta
+    /// cuando una familia tiene varias formas y cada una tiene su btnNuevo: sin
+    /// prefijo propio las cuatro formas de proveedores derivarian la misma
+    /// clave y se pisarian.
+    /// </param>
+    /// <param name="ClaveDeEntrada">
+    /// El ".ver_modulo" que se concede a quien Mac31 le deje usar ESTA FORMA.
+    /// Es la version por pantalla de FamiliaLegacy.ClaveDeEntrada, y existe
+    /// porque hay familias cuyas formas abren pantallas DISTINTAS del web: la
+    /// familia "inventario." alimenta dos, y sus entradas se llaman
+    /// "inventario_ajustes.ver_modulo" e "inventario_transito.ver_modulo". Una
+    /// sola clave por familia no podia expresarlo, asi que la familia declaraba
+    /// null y NADIE heredaba la entrada: medido el 2026-10-12, cuatro usuarios
+    /// de Zaragoza y tres de Tauro heredaban los botones de ajustes al
+    /// inventario y el backend se los rechazaba con 403.
+    /// </param>
+    /// <param name="ClaveDeLectura">
+    /// La clave de LEER esta pantalla, cuando es una semilla del web que Mac31
+    /// no puede producir. En Mac31 un boton vive DENTRO de su forma: si la
+    /// forma esta en tu menu la puedes leer, y esta en tu menu justamente
+    /// porque tienes alguno de sus procesos. AJUSTES AL INVENTARIO es el caso:
+    /// tiene btnNuevo y btnCancelar y ni un boton de buscar, asi que
+    /// "inventario.ajustes.ver" -que es lo que exige
+    /// InventarioOperacionesController- era inalcanzable desde Mac31.
+    /// Se deja en null salvo que se compruebe que la forma no tiene ningun
+    /// boton de lectura: donde si lo tiene, el permiso debe venir de ese boton
+    /// y no regalarse.
+    /// </param>
+    /// <param name="ConcesionesExtra">
+    /// Boton de ESTA forma -> clave del web QUE YA EXISTE y que ese boton
+    /// tambien debe conceder. SOLO PARA LEER.
+    ///
+    /// POR QUE NO SE PONEN EN EL `Map`
+    /// -------------------------------
+    /// Porque el `Map` alimenta el CATALOGO, y el catalogo guarda UN IDProceso
+    /// por clave: es el boton que el web enciende o apaga en Mac31 cuando se
+    /// concede o se revoca desde la pantalla de permisos. Si una clave tuviera
+    /// dos botones en el catalogo, revocarla desde el web apagaria uno y
+    /// dejaria el otro encendido, y el usuario se quedaria con el permiso en
+    /// Mac31 y sin el en el web -o al contrario-. Eso es justo lo que no puede
+    /// pasar.
+    ///
+    /// Asi que esto es un puente de UNA SOLA DIRECCION, y se dice para que
+    /// nadie lo confunda: la clave se HEREDA si Mac31 concede este boton, pero
+    /// el boton que el web escribe sigue siendo el canonico del catalogo.
+    ///
+    /// EL CASO QUE LA OBLIGO A EXISTIR, medido el 2026-10-12 en las dos bases:
+    /// el web ya tiene casi todas las acciones de estas pantallas, pero las
+    /// protege con la clave que produce OTRO boton de la misma forma. Quien en
+    /// Mac31 tiene solo el segundo boton podia hacer la operacion alla y no
+    /// aca. Ejemplos reales: NORMA y RICARDO tienen btnPagosCascos de la hoja
+    /// de cobro y no btnPagos de consulta de ventas, asi que no heredaban
+    /// "ventas.pagos.ver"; REBECA tiene btnNuevaNotaCredito y no btnFacturar,
+    /// asi que no heredaba "facturacion.timbrar"; JESY tiene los seis botones
+    /// del flujo de garantias en Tauro y no btnModificar, asi que no heredaba
+    /// "garantias.editar".
+    ///
+    /// NO INVENTA CLAVES: todas las de aqui existen ya en el catalogo y las
+    /// exige un endpoint. Lo unico que cambia es DE QUE BOTON se heredan.
+    /// </param>
     private sealed record LegacyModuleBinding(
         string ModuleKey,
         string ModuleName,
         string LegacyForm,
         IReadOnlyDictionary<string, (string Key, string Name)> Map,
-        IReadOnlyList<PermissionSeed> WebSeeds);
+        IReadOnlyList<PermissionSeed> WebSeeds,
+        string? FormaExacta = null,
+        string? Prefijo = null,
+        string? ClaveDeEntrada = null,
+        string? ClaveDeLectura = null,
+        IReadOnlyDictionary<string, string>? ConcesionesExtra = null);
 
     private static readonly LegacyModuleBinding VentasBinding = new(
         VentasModuleKey, "Ventas", VentasLegacyForm, VentasLegacyPermissionMap, VentasWebPermissionSeeds);
@@ -348,6 +428,260 @@ public sealed partial class PermissionService : IPermissionService
     private static readonly TimeSpan ActiveCacheTtl = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan StaleCacheTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan SchemaCacheTtl = TimeSpan.FromMinutes(15);
+
+    /*
+      DOS MEMOS PARA PREGUNTAS QUE NO CAMBIAN DENTRO DE UNA PETICION.
+
+      Medido con los DMV: un solo `/api/permisos-web/bootstrap` hacia 5383
+      viajes a SQL, y 4160 de ellos eran estas dos preguntas repetidas (2080
+      cada una). No son consultas lentas: son consultas TRIVIALES preguntadas
+      miles de veces, una por usuario y por familia dentro de los bucles.
+
+      En local no se notaba porque el motor esta en la misma maquina y cada
+      viaje vale menos de un milisegundo. En produccion la API corre en el VPS y
+      la base esta en otra maquina POR INTERNET: a ~50 ms el viaje, eso son 4.5
+      minutos de espera. Por eso la pantalla de Usuarios tardaba 4 min 25 s y
+      aqui nadie lo veia.
+
+      POR QUE SE PUEDE GUARDAR CADA UNA:
+
+      - EL ESQUEMA (que tabla y que columna existen) no cambia mientras el
+        proceso corre: cambiarlo pide un despliegue. Aun asi caduca a los 15
+        minutos, el mismo plazo que ya usaba `SchemaCacheTtl`, para que un
+        cambio en caliente entre solo.
+
+      - EL IDUSUARIO DE MAC31 de un usuario web se resuelve emparejando nombres
+        (ver ResolveLegacyUserIdAsync). Cambia si alguien renombra o da de alta
+        al usuario en Mac31, y entonces tarda como mucho lo que el permiso ya
+        tardaba en refrescarse: se usa `ActiveCacheTtl`, el MISMO plazo que el
+        propio snapshot de permisos. No se introduce ninguna clase de desfase
+        que no existiera ya.
+
+      Lo que NO se guarda aqui es ningun permiso: eso sigue como estaba.
+    */
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (bool Existe, DateTime Hasta)>
+        _memoDeEsquema = new(StringComparer.OrdinalIgnoreCase);
+
+
+
+    /*
+      EL CATALOGO DE MAC31, MEMORIZADO POR EMPRESA.
+
+      Las rutinas `Ensure*SyncedAsync` hacen dos cosas: leen de Mac31 que formas,
+      procesos y reportes existen, y los SINCRONIZAN contra WPermiso y WModulo.
+      Lo segundo son escrituras: medido, 358 `UPDATE WPermiso` y 130
+      `UPDATE WModulo` en UNA consulta de permisos. Una lectura que reescribe el
+      catalogo entero, que es lo que CUIDADO-consultas-que-escriben.md prohibe.
+
+      Y no hacia falta ninguna de las dos veces: el catalogo solo cambia si
+      alguien agrega una forma o un reporte en Mac31, y de eso se encarga el
+      sembrado del ARRANQUE (CatalogoDePermisosHostedService).
+
+      Se guarda el RESULTADO por empresa y familia durante
+      `CatalogoCacheTtl`. Consecuencia que hay que saber: una forma nueva de
+      Mac31 tarda hasta ese plazo en aparecer en la pantalla de permisos, o lo
+      que tarde el siguiente arranque. A cambio, la pantalla de Usuarios deja de
+      tardar minutos.
+
+      NO GUARDA PERMISOS DE NADIE: es el catalogo de que claves EXISTEN, no de
+      quien las tiene. Lo que cada usuario puede sigue leyendose siempre.
+    */
+    /*
+      LO QUE SE RECUERDA DURANTE **UNA** PETICION.
+
+      Vive en un `AsyncLocal`, asi que acompana a la peticion por todo su arbol
+      de `await` y muere con ella. Dos peticiones no comparten nada: la segunda
+      vuelve a leer de la base, igual que antes de optimizar.
+
+      Se probo con caducidad por tiempo (5 y 10 minutos) y las pruebas de
+      permisos contra la base lo cazaron: quitar un boton en Mac31 y seguir
+      viendo el permiso. Un cache que sobrevive a una revocacion no es una
+      optimizacion, es un agujero.
+    */
+    private static readonly AsyncLocal<Dictionary<string, object>?> _memoDeLaPeticion = new();
+
+    /// <summary>Abre el alcance de memoria de una peticion. Se cierra al soltarlo.</summary>
+    private static IDisposable AbrirMemoriaDePeticion()
+    {
+        /* Si ya hay una abierta mas arriba, esta no la toca ni al cerrarse: el
+           dueno es quien la creo. Sin esto, una llamada anidada vaciaria la
+           memoria del que la envuelve justo a la mitad. */
+        if (_memoDeLaPeticion.Value is not null) return new CierreDeMemoria(false);
+
+        _memoDeLaPeticion.Value = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        return new CierreDeMemoria(true);
+    }
+
+    private sealed class CierreDeMemoria : IDisposable
+    {
+        private readonly bool _esMia;
+        public CierreDeMemoria(bool esMia) => _esMia = esMia;
+        public void Dispose() { if (_esMia) _memoDeLaPeticion.Value = null; }
+    }
+
+    /*
+      EL CATALOGO SI SE RECUERDA ENTRE PETICIONES. LO DE CADA USUARIO NO.
+
+      Son dos cosas distintas y se tratan distinto a proposito:
+
+      - EL CATALOGO es "que claves EXISTEN", leido de las formas y procesos de
+        Mac31. Es de la empresa, igual para todos, y solo cambia si alguien da
+        de alta una forma o un reporte nuevo. Recordarlo unos minutos NO puede
+        ensenar un permiso revocado, porque no dice quien tiene que.
+
+      - LO QUE CADA USUARIO TIENE CONCEDIDO vive en el memo de la PETICION
+        (_memoDeLaPeticion) y muere con ella. Aqui si estaria el riesgo: una
+        prueba quita un boton en Mac31 y comprueba que el permiso desaparece —y
+        lo cazo cuando esto duraba minutos—.
+
+      El plazo es corto a proposito: una forma nueva de Mac31 tarda eso en
+      salir en la pantalla de permisos, y el arranque la siembra igualmente.
+    */
+    private static readonly TimeSpan CatalogoCacheTtl = TimeSpan.FromMinutes(10);
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (object Valor, DateTime Hasta)>
+        _memoDeCatalogo = new(StringComparer.OrdinalIgnoreCase);
+
+    /*
+      Y CUANDO VENCE, LO RECONSTRUYE UNO SOLO.
+
+      La llave de este memo es de la EMPRESA, no del usuario, asi que vence para
+      todos en el mismo instante. Sin candado, la rafaga que caia justo despues
+      del vencimiento reconstruia el catalogo entero una vez por peticion: ~230
+      viajes a SQL cada una, a 56 ms el viaje. Es el acantilado que explicaba
+      las esperas de 11-27 s en los registros de IIS.
+
+      El candado no cambia que se recuerda ni cuanto: solo evita hacerlo nueve
+      veces. Ver Infrastructure/Concurrencia/UnaSolaVez.cs.
+    */
+    /*
+      QUIEN REFRESCA DE VERDAD ES EL SERVICIO DE FONDO.
+
+      Mientras esto vale `true`, `CatalogoMemorizadoAsync` reconstruye aunque
+      tenga algo guardado. Lo pone `CatalogoDePermisosHostedService`, que tiene
+      su propia conexion y puede tardar lo que haga falta sin que nadie espere.
+
+      Es `AsyncLocal` para que solo afecte a la llamada del refrescador: una
+      peticion normal que coincida en el tiempo sigue sirviendose de lo
+      guardado.
+    */
+    private static readonly AsyncLocal<bool> _modoRefresco = new();
+
+    internal static IDisposable AbrirRefrescoDeCatalogo()
+    {
+        _modoRefresco.Value = true;
+        return new CierreDeRefresco();
+    }
+
+    private sealed class CierreDeRefresco : IDisposable
+    {
+        public void Dispose() => _modoRefresco.Value = false;
+    }
+
+    private static Task<T> CatalogoMemorizadoAsync<T>(
+        string llave, Func<Task<T>> construir) where T : class
+    {
+        var hay = _memoDeCatalogo.TryGetValue(llave, out var guardado) && guardado.Valor is T;
+
+        /*
+          HAY ALGO GUARDADO: se devuelve, vigente o no.
+
+          Esto es lo que quita el acantilado. El plazo vence para toda la
+          empresa a la vez, asi que antes el primero que llegaba despues pagaba
+          una reconstruccion de ~507 viajes a SQL -~28 s a 56 ms- y los demas se
+          quedaban esperandolo. Ese era el pico de 11-36 s de los registros.
+
+          POR QUE SE PUEDE SERVIR LO VENCIDO. Aqui vive QUE CLAVES EXISTEN en la
+          empresa, no quien las tiene concedidas. Un catalogo con unos minutos
+          de mas no puede ensenar un permiso revocado ni esconder uno dado: lo
+          que cada usuario puede se lee SIEMPRE, en cada peticion. Lo unico que
+          se retrasa es que una forma NUEVA de Mac31 aparezca en la pantalla de
+          permisos, y de eso se encarga el refrescador de fondo.
+        */
+        if (hay && !_modoRefresco.Value)
+            return Task.FromResult((T)guardado.Valor);
+
+        /*
+          NO HAY NADA -primer arranque- o es el refrescador quien pregunta.
+          Entonces si se construye, con el candado para que lo haga uno solo.
+        */
+        return Concurrencia.UnaSolaVez.HazloAsync(
+            llave + (_modoRefresco.Value ? "|refresco" : string.Empty),
+            () => !_modoRefresco.Value
+                  && _memoDeCatalogo.TryGetValue(llave, out var g)
+                  && g.Valor is T vigente
+                      ? (true, vigente)
+                      : (false, null),
+            valor => _memoDeCatalogo[llave] = (valor, DateTime.UtcNow.Add(CatalogoCacheTtl)),
+            construir);
+    }
+
+    /// <summary>Un renglon de n_Procesos con lo que Mac31 le concede a un usuario.</summary>
+    private sealed record ProcesoDeUsuario(
+        string Forma, string FormaDescripcion, int IdProceso,
+        string Proceso, string? ProcesoDescripcion, bool Permitido);
+
+    /*
+      TODO LO QUE MAC31 LE CONCEDE A UN USUARIO, EN UNA SOLA CONSULTA.
+
+      Antes se preguntaba una vez POR FAMILIA: la misma consulta con otro filtro
+      de forma, 71 veces por usuario. En el bootstrap, que recorre los 31
+      usuarios, eso eran cientos de viajes para traer una tabla que cabe de
+      sobra en una.
+
+      Se guarda por usuario durante `ActiveCacheTtl`, el MISMO plazo que ya usa
+      el snapshot de permisos: no se agrega ninguna clase de desfase que no
+      existiera. Y cuando el web escribe permisos en Mac31 se olvida en el acto
+      porque el memo no sobrevive a la peticion que lo creo.
+    */
+    private static async Task<List<ProcesoDeUsuario>> ProcesosDeUsuarioAsync(
+        SqlConnection conn, int legacyUserId, CancellationToken ct)
+    {
+        var llave = $"procesos|{conn.Database}|{legacyUserId}";
+        var memoria = _memoDeLaPeticion.Value;
+        if (memoria is not null && memoria.TryGetValue(llave, out var guardado)
+            && guardado is List<ProcesoDeUsuario> vigente)
+        {
+            return vigente;
+        }
+
+        var filas = new List<ProcesoDeUsuario>();
+
+        await using (var cmd = new SqlCommand(@"
+SELECT f.Forma,
+       UPPER(LTRIM(RTRIM(f.Descripcion))) AS FormaDescripcion,
+       p.IDProceso,
+       p.Proceso,
+       p.Descripcion AS ProcesoDescripcion,
+       CASE WHEN ufp.IDStatus = 1 THEN 1 ELSE 0 END AS Permitido
+FROM dbo.n_Formas f
+INNER JOIN dbo.n_Procesos p
+    ON p.IDForma = f.IDForma
+LEFT JOIN dbo.[Usuario Forma Procesos] ufp
+    ON ufp.IDProceso = p.IDProceso
+   AND ufp.IDUsuario = @IDUsuario
+WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
+        {
+            cmd.Parameters.Add(new SqlParameter("@IDUsuario", SqlDbType.Int) { Value = legacyUserId });
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                filas.Add(new ProcesoDeUsuario(
+                    Forma: reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
+                    FormaDescripcion: reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                    IdProceso: reader.GetInt32(2),
+                    Proceso: reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                    ProcesoDescripcion: reader.IsDBNull(4) ? null : reader.GetString(4),
+                    Permitido: reader.GetInt32(5) == 1));
+            }
+        }
+
+        if (memoria is not null) memoria[llave] = filas;
+        return filas;
+    }
+
+
+
 
     private static readonly Dictionary<string, HashSet<string>> LegacyPolicyMap = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -1235,6 +1569,13 @@ public sealed partial class PermissionService : IPermissionService
         new("cobranzas.editar", "Cobranzas - Cambiar contenido", "cobranzas"),
         new("cobranzas.cancelar", "Cobranzas - Cancelar", "cobranzas"),
         new("cobranzas.pendientes.ver", "Cobranzas - Pendiente y vencida", "cobranzas"),
+        // btnBuscar de CONSULTA DE COBRANZAS. Lo derivaba el puente desde
+        // siempre y no estaba sembrado, asi que no salia en la pantalla de
+        // Permisos. Desde que la lectura de esta pantalla deja de exigir
+        // "cobranza.ver" -que es de CONSULTA DE COBROS, otra forma- un
+        // controlador lo pide, y lo que un controlador pide tiene que estar
+        // sembrado o contesta 403 a todos.
+        new("cobranzas.consultar", "Cobranzas - Buscar", "cobranzas"),
 
         /*
           OLA 4 — LAS ESCRITURAS DE VENTAS, EN FAMILIAS QUE NO SON `ventas.*`.
@@ -1271,6 +1612,12 @@ public sealed partial class PermissionService : IPermissionService
         new("cobranza.cobranzas.cancelar", "Cobranza - Cobranzas: cancelar", "cobranza"),
         new("cobranza.concentrados.editar", "Cobranza - Concentrados: crear y modificar", "cobranza"),
         new("cobranza.concentrados.cancelar", "Cobranza - Concentrados: cancelar", "cobranza"),
+        // Las dos de leer CONSULTA DE CONCENTRADOS, btnBuscar y btnVer. El
+        // puente ya las derivaba; ahora ademas son las que abren la pantalla
+        // de concentrados, en vez de "cobranza.ver", que es de la forma de
+        // cobros y quien solo trabaja concentrados nunca recibe.
+        new("cobranza.concentrados.consultar", "Cobranza - Concentrados: buscar", "cobranza"),
+        new("cobranza.concentrados.ver", "Cobranza - Concentrados: ver", "cobranza"),
         new("cobranza.cobros.editar", "Cobranza - Cobros: modificar", "cobranza"),
         new("cobranza.cobros.cerrar", "Cobranza - Cobros: cerrar", "cobranza"),
         new("cobranza.cobros.abrir", "Cobranza - Cobros: reabrir", "cobranza"),
@@ -1408,7 +1755,142 @@ public sealed partial class PermissionService : IPermissionService
         new("app_movil.facturacion.enviar", "App móvil - Facturas: Enviar por correo", "app_movil"),
         new("app_movil.productos", "App móvil - Productos", "app_movil"),
         new("app_movil.cortes.ver", "App móvil - Cortes: Ver", "app_movil"),
-        new("app_movil.cortes.cancelar", "App móvil - Cortes: Cancelar", "app_movil")
+        new("app_movil.cortes.cancelar", "App móvil - Cortes: Cancelar", "app_movil"),
+
+        /*
+          LOS TRES MODULOS QUE COMPARTIAN LA LLAVE DEL WEB.
+
+          Almacen de cascos, Ajustes de inventario e Inventario en transito
+          eran los unicos modulos del telefono SIN canal propio: su pantalla
+          pedia `almacen_cascos.ver`, `inventario.ajustes.ver` y
+          `inventario.transito.ver`, los mismos codigos que usan el web y
+          Mac31. La consecuencia estaba escrita en los tres archivos de la app
+          -y se pidio arreglar-: quitarle el modulo a alguien EN EL TELEFONO
+          se lo quitaba tambien en la computadora, porque no eran dos permisos
+          parecidos, era el mismo.
+
+          Las nueve claves de abajo son ese canal que faltaba. Con ellas:
+
+            - negar en el telefono es solo el telefono (se le quita la clave
+              `app_movil.` y conserva la del web);
+            - conceder SOLO el telefono tambien funciona, porque los endpoints
+              aceptan cualquiera de las dos (ver AlmacenCascosController,
+              InventarioOperacionesController, InventarioTransitoConsultaController
+              y el POST de transito en ComprasController).
+
+          Los nombres de las claves NO son nuevos: son exactamente los que los
+          tres archivos de la app ya proponian en sus comentarios
+          (almacen_cascos.dart, inventario_ajustes.dart, inventario_transito.dart),
+          para que lo que ahi esta escrito siga siendo verdad.
+
+          `inventario.ajustes` y `inventario.transito` dejan la categoria en
+          "inventario" -categoriaSegunLaClave se queda con el segundo tramo-,
+          asi que en la pantalla de permisos salen juntos bajo Inventario. Es
+          lo que se queria: en el telefono son dos mosaicos del mismo tema.
+        */
+        new("app_movil.almacen_cascos.ver", "App móvil - Almacén de cascos: Ver", "app_movil"),
+        new("app_movil.almacen_cascos.crear", "App móvil - Almacén de cascos: Registrar", "app_movil"),
+        new("app_movil.almacen_cascos.editar", "App móvil - Almacén de cascos: Modificar", "app_movil"),
+        new("app_movil.almacen_cascos.cancelar", "App móvil - Almacén de cascos: Cancelar", "app_movil"),
+        new("app_movil.inventario.ajustes.ver", "App móvil - Ajustes de inventario: Ver", "app_movil"),
+        new("app_movil.inventario.ajustes.crear", "App móvil - Ajustes de inventario: Capturar", "app_movil"),
+        new("app_movil.inventario.ajustes.cancelar", "App móvil - Ajustes de inventario: Cancelar", "app_movil"),
+        new("app_movil.inventario.transito.ver", "App móvil - Inventario en tránsito: Ver", "app_movil"),
+        new("app_movil.inventario.transito.procesar", "App móvil - Inventario en tránsito: Dar entrada", "app_movil"),
+
+        /*
+          LAS ACCIONES DE LOS CINCO MODULOS QUE SOLO TENIAN LLAVE DE MOSAICO.
+
+          Consulta de ventas, Clientes, Facturas, Productos y Cortes ya tenian su
+          `app_movil.X` para que el mosaico se pudiera apagar en el telefono. Pero
+          sus ENDPOINTS seguian pidiendo la clave del web, asi que conceder solo
+          el telefono no alcanzaba: la pantalla abria y el servidor contestaba
+          403. Lo que faltaba son estas claves de ACCION, una por cada cosa que la
+          pantalla del telefono sabe hacer.
+
+          Se declaran solo las acciones QUE LA APP TIENE. No hay
+          `app_movil.clientes.bonificaciones` ni `app_movil.cortes.crear` porque
+          esas pantallas no existen en el telefono, y una casilla que no apaga
+          nada es peor que no tenerla.
+
+          IMPRIMIR / REIMPRIMIR / VER EN PANTALLA SE SEPARAN, y antes no lo
+          estaban: las tres politicas aceptaban `app_movil.ventas.consulta.ver`,
+          o sea que dar "ver" en el telefono daba tambien imprimir. Eran tres
+          permisos distintos en Mac31 y en el web, y ahora tambien aqui. Como eso
+          QUITA algo a quien hoy lo tiene por la clave de ver, el script de
+          traspaso (Querrys/48) les da las tres: nadie pierde nada el dia del
+          despliegue.
+        */
+        new("app_movil.ventas.consulta.pantalla", "App móvil - Consulta de ventas: Ver en pantalla", "app_movil"),
+        new("app_movil.ventas.consulta.imprimir", "App móvil - Consulta de ventas: Imprimir", "app_movil"),
+        new("app_movil.ventas.consulta.reimprimir", "App móvil - Consulta de ventas: Reimprimir", "app_movil"),
+        new("app_movil.ventas.consulta.pagos", "App móvil - Consulta de ventas: Ver pagos", "app_movil"),
+        new("app_movil.ventas.consulta.cancelar", "App móvil - Consulta de ventas: Cancelar remisión", "app_movil"),
+        new("app_movil.ventas.consulta.ver_de_otros", "App móvil - Consulta de ventas: Ver las de otros usuarios", "app_movil"),
+        new("app_movil.ventas.pedidos.procesar", "App móvil - Pedidos: Procesar", "app_movil"),
+        new("app_movil.ventas.pedidos.cancelar", "App móvil - Pedidos: Cancelar", "app_movil"),
+        new("app_movil.clientes.crear", "App móvil - Clientes: Dar de alta", "app_movil"),
+        new("app_movil.clientes.editar", "App móvil - Clientes: Modificar", "app_movil"),
+        new("app_movil.clientes.estado.editar", "App móvil - Clientes: Dar de baja y reactivar", "app_movil"),
+        new("app_movil.clientes.facturacion.ver", "App móvil - Clientes: Ver los RFC para facturar", "app_movil"),
+        new("app_movil.clientes.log.ver", "App móvil - Clientes: Ver la bitácora", "app_movil"),
+        new("app_movil.cortes.cs.ver", "App móvil - Cortes de centro de servicio: Ver", "app_movil"),
+
+        /*
+          LAS CUATRO QUE LA APP PIDE Y QUE NADIE SEMBRABA. LA PRIMERA ES LA
+          LLAVE MAESTRA.
+
+          `app_movil.acceso` es lo que la app comprueba para dejar ENTRAR
+          (mobile_access_gate.dart). No estaba en este catalogo: vivia solo en
+          `Querrys/07 Permisos App Movil`, un script que alguien corrio a mano
+          en su dia. En las dos bases de aqui existe por eso. En una base de
+          empresa NUEVA no existiria, y entonces no entra NADIE a la app salvo
+          un SuperAdmin -que se salta la comprobacion y por eso no lo nota quien
+          lo prueba con su cuenta de administrador-.
+
+          Es exactamente el agujero que este catalogo vino a cerrar, con la
+          llave maestra de la app dentro. Las otras tres son el portal de
+          oficina, el modulo de Reportes en el telefono y el boton Editar de
+          "Mis pedidos".
+
+          POR QUE NO LAS ATRAPABA LA PRUEBA: ClavesDePermisoSembradasTests
+          recorre las claves que exigen los CONTROLADORES, y estas cuatro no las
+          exige ningun endpoint: viven solo en el codigo Dart. Se agrega la
+          prueba que cruza los literales de la app contra estas semillas.
+        */
+        new("app_movil.acceso", "App móvil - Entrar a la app", "app_movil"),
+        new("app_movil.oficina", "App móvil - Portal de oficina", "app_movil"),
+        new("app_movil.reportes", "App móvil - Reportes", "app_movil"),
+        new("app_movil.pedidos.editar", "App móvil - Editar en «Mis pedidos»", "app_movil"),
+
+        /*
+          LAS CUATRO PANTALLAS DE ADMINISTRACION, QUE NO TENIAN NADA.
+
+          Usuarios, Modulos, Roles y Permisos de usuarios eran las unicas del
+          telefono sin canal propio: su mosaico colgaba de `<modulo>.ver_modulo`
+          -del web- y sus botones de `usuarios.crear`, `permisos_modulos.activar`
+          y companía. O sea que para dar la administracion en el telefono habia
+          que darla tambien en la computadora.
+
+          AVISO QUE NO SE DEBE PERDER: con estas claves se reparten permisos
+          DESDE UN TELEFONO. Son exactamente igual de poderosas que sus parejas
+          del web, ni mas ni menos; lo que cambia es que ahora se pueden dar por
+          separado. Quien no quiera administracion movil, simplemente no las
+          concede.
+
+          `permisos_usuarios.ver` no existe como pareja porque esa pantalla se
+          lee con el bootstrap (`permisosweb.bootstrap`), que ya lleva la suya.
+        */
+        new("app_movil.usuarios.ver", "App móvil - Usuarios: Ver", "app_movil"),
+        new("app_movil.usuarios.crear", "App móvil - Usuarios: Dar de alta", "app_movil"),
+        new("app_movil.usuarios.editar", "App móvil - Usuarios: Modificar", "app_movil"),
+        new("app_movil.usuarios.estado.editar", "App móvil - Usuarios: Activar y desactivar", "app_movil"),
+        new("app_movil.permisosweb.bootstrap", "App móvil - Permisos: Leer el catálogo", "app_movil"),
+        new("app_movil.permisos_modulos.ver", "App móvil - Módulos: Ver", "app_movil"),
+        new("app_movil.permisos_modulos.activar", "App móvil - Módulos: Encender y apagar", "app_movil"),
+        new("app_movil.permisos_roles.ver", "App móvil - Roles: Ver", "app_movil"),
+        new("app_movil.permisos_roles.editar", "App móvil - Roles: Repartir permisos", "app_movil"),
+        new("app_movil.permisos_usuarios.editar", "App móvil - Permisos de usuarios: Repartir", "app_movil")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)
@@ -1485,6 +1967,10 @@ public sealed partial class PermissionService : IPermissionService
 
     public async Task<PermisosWebBootstrapResponse?> GetPermisosWebBootstrapAsync(int empresaId, CancellationToken ct)
     {
+        /* Memoria de ESTA peticion: lo que se pregunte dos veces aqui dentro se
+           pregunta una. Se tira al salir (ver AbrirMemoriaDePeticion). */
+        using var memoriaDeLaPeticion = AbrirMemoriaDePeticion();
+
         await using var conn = new SqlConnection(_db.Database.GetConnectionString());
         await conn.OpenAsync(ct);
 
@@ -1684,6 +2170,10 @@ WHERE up.EmpresaId = @EmpresaId;";
 
     public async Task<PermisosWebRolesBootstrapResponse?> GetPermisosRolesBootstrapAsync(int empresaId, CancellationToken ct)
     {
+        /* Memoria de ESTA peticion: lo que se pregunte dos veces aqui dentro se
+           pregunta una. Se tira al salir (ver AbrirMemoriaDePeticion). */
+        using var memoriaDeLaPeticion = AbrirMemoriaDePeticion();
+
         await using var conn = new SqlConnection(_db.Database.GetConnectionString());
         await conn.OpenAsync(ct);
 
@@ -1786,14 +2276,91 @@ FROM dbo.WPermiso
 WHERE EmpresaId = @EmpresaId
 ORDER BY Clave;", conn);
         permsCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+
+        /*
+          LO QUE NO COMPRUEBA NADA NO SE OFRECE COMO ADMINISTRABLE.
+
+          Medido el 2026-10-12: de las 606 claves de WPermiso en MacZ (611 en
+          Produccion_svr), 179 no las mira ningun endpoint, ninguna puerta de
+          modulo y ningun boton de Mac31. Enseñarlas es peor que no tenerlas,
+          porque la pantalla promete una decision que no existe: se desmarca y
+          el acceso sigue abierto.
+
+          QUE CUENTA COMO COMPROBACION, Y SON TRES COSAS
+          ----------------------------------------------
+            1. Que algun endpoint la exija (ClavesQueProtegenAlgo, por
+               reflexion sobre este mismo ensamblado).
+            2. Que sea la puerta de un modulo o una clave de reportes: las
+               decide ModulosController / ExigirPermisoReporteAsync armando la
+               clave en tiempo de ejecucion.
+            3. QUE CORRESPONDA A UN BOTON DE MAC31. Esta es la que no se puede
+               deducir del codigo y hay que preguntarle a la base de cada
+               empresa: si la clave esta en el catalogo de un puente, marcarla
+               escribe IDStatus = 1 en [Usuario Forma Procesos] y desmarcarla
+               escribe 2. Eso es una decision REAL -la de Mac31- aunque el web
+               no tenga todavia endpoint que la exija. Dejarla fuera habria
+               escondido justo las casillas que gobiernan el sistema viejo.
+
+          Y SE SIGUE MANDANDO LO QUE ALGUIEN YA TIENE, aunque no proteja nada,
+          con ProtegeAlgo = false. Esconder una clave concedida la volveria
+          inborrable desde la pantalla: quedaria para siempre en la base sin
+          que nadie pueda verla ni quitarla.
+        */
+        var tenidasPorAlguien = await ClavesConcedidasAAlguienAsync(conn, empresaId, ct);
+
         await using var reader = await permsCmd.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct))
         {
             var code = reader.GetString(reader.GetOrdinal("Clave"));
-            response.Add(EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog, ventasCatalog, empleadosCatalog, prestamosCatalog, familiasCatalog));
+            var item = EnrichPermissionItem(code, reader.GetString(reader.GetOrdinal("Nombre")), reportCatalog, ventasCatalog, empleadosCatalog, prestamosCatalog, familiasCatalog);
+
+            var protege = ClavesQueProtegenAlgo.Protege(code)
+                || item.IsLegacyReport
+                || item.LegacyProcessId is not null;
+
+            if (!protege && !tenidasPorAlguien.Contains(code))
+                continue;
+
+            item.ProtegeAlgo = protege;
+            response.Add(item);
         }
 
         return response;
+    }
+
+    /// <summary>
+    /// Las claves que algun usuario o algun rol tiene guardadas hoy.
+    /// </summary>
+    /// <remarks>
+    /// Se preguntan las DOS tablas porque una clave concedida por rol no deja
+    /// rastro en WUsuarioPermiso, y esconderla la volveria igual de inborrable.
+    /// Los nombres de columna salen de GetSchemaAsync y no escritos a mano: las
+    /// dos bases de produccion no nacieron iguales.
+    /// </remarks>
+    private async Task<HashSet<string>> ClavesConcedidasAAlguienAsync(
+        SqlConnection conn, int empresaId, CancellationToken ct)
+    {
+        var claves = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var schema = await GetSchemaAsync(conn, ct);
+
+        var sql = $@"
+SELECT p.Clave
+FROM dbo.WPermiso p
+WHERE p.EmpresaId = @EmpresaId
+  AND (EXISTS (SELECT 1 FROM dbo.WUsuarioPermiso up
+               WHERE up.EmpresaId = p.EmpresaId
+                 AND up.{Q(schema.UserPermPermissionIdColumn)} = p.{Q(schema.PermissionIdColumn)})
+    OR EXISTS (SELECT 1 FROM dbo.WRolPermiso rp
+               WHERE rp.EmpresaId = p.EmpresaId
+                 AND rp.{Q(schema.RolePermPermissionIdColumn)} = p.{Q(schema.PermissionIdColumn)}));";
+
+        await using var cmd = new SqlCommand(sql, conn);
+        cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+            if (!r.IsDBNull(0)) claves.Add(r.GetString(0).Trim());
+
+        return claves;
     }
 
     public async Task<IReadOnlyList<ModuloDisponibleResponse>> GetAvailableModulesAsync(int empresaId, string companyKey, bool includeAllTenants, CancellationToken ct)
@@ -2012,6 +2579,54 @@ WHERE EmpresaId = @EmpresaId
         }
 
         /*
+          Y EL INTERRUPTOR POR EMPRESA, QUE ES EL QUE AHORA DECIDE DE VERDAD.
+
+          Esta pantalla movia solo `WModulo.IdStatus` y dejaba `WModuloEmpresa`
+          tal cual. Mientras el calculo de permisos ignoraba el segundo daba
+          igual; desde que lo mira —que es lo que cierra el acceso por URL
+          directa— dejarlo quieto convertiria el interruptor de la pantalla en
+          un boton que no termina de hacer su trabajo: el modulo seguiria
+          apagado para la empresa aunque aqui dijera "activo".
+
+          Peor aun con el sembrador ya corregido, que da de alta los modulos
+          nuevos en `Activo = 0`: sin esto no habria **ninguna** forma de
+          encenderlos desde la aplicacion, y harian falta manos en la base.
+
+          Se escriben los dos a la vez y en la MISMA transaccion, para que no
+          pueda quedar uno encendido y el otro apagado.
+
+          Toca todas las claves de empresa de este EmpresaId. Es lo coherente con
+          la pantalla, que administra la empresa del token y no distingue entre
+          'zaragoza' y 'aviacion'; el dia que se quiera por clave, el SP
+          `sp_w_ModuloEmpresa_SetStatus` ya existe para eso.
+        */
+        /*
+          No se pregunta antes si la tabla existe: `TableExistsAsync` abre su
+          propio comando SIN la transaccion, y con una transaccion local
+          pendiente ADO.NET lo rechaza en seco ("BeginExecuteReader requires the
+          command to have a transaction"). Se intenta el UPDATE y se tolera el
+          208, que es "nombre de objeto no valido" — el unico caso en el que
+          esta tabla puede faltar es una base que todavia no la tiene.
+        */
+        try
+        {
+            await using var porEmpresa = new SqlCommand(@"
+UPDATE dbo.WModuloEmpresa
+SET Activo = @Activo,
+    FechaActualizacion = SYSUTCDATETIME()
+WHERE EmpresaId = @EmpresaId
+  AND ModuloClave = @ModuloClave;", conn, (SqlTransaction)tx);
+            porEmpresa.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+            porEmpresa.Parameters.Add(new SqlParameter("@ModuloClave", SqlDbType.NVarChar, 120) { Value = key });
+            porEmpresa.Parameters.Add(new SqlParameter("@Activo", SqlDbType.Bit) { Value = idStatus == 1 });
+            await porEmpresa.ExecuteNonQueryAsync(ct);
+        }
+        catch (SqlException ex) when (ex.Number == 208)
+        {
+            // Base sin WModuloEmpresa: solo manda WModulo.IdStatus, como antes.
+        }
+
+        /*
           APAGAR YA NO BORRA NADA.
 
           Aqui se borraban todas las filas de WRolPermiso y de WUsuarioPermiso
@@ -2221,7 +2836,7 @@ VALUES ({string.Join(", ", insertValues)});";
         InvalidateEmpresaPermissionCache(empresaId);
     }
 
-    public async Task UpsertUserOverridesAsync(int empresaId, Guid userId, IReadOnlyCollection<string> allow, IReadOnlyCollection<string> deny, CancellationToken ct)
+    public async Task UpsertUserOverridesAsync(int empresaId, Guid userId, IReadOnlyCollection<string> allow, IReadOnlyCollection<string> deny, bool sincronizarConLegacy, CancellationToken ct)
     {
         await using var conn = new SqlConnection(_db.Database.GetConnectionString());
         await conn.OpenAsync(ct);
@@ -2279,11 +2894,54 @@ WHERE EmpresaId = @EmpresaId
             await InsertUserOverrideAsync(conn, (SqlTransaction)tx, schema, userPermCols, empresaId, userId, permissionIds[key], overrideTypes.DenyToken, ct);
 
         await tx.CommitAsync(ct);
-        var userRole = await GetUserRoleAsync(conn, empresaId, userId, ct);
-        await SyncLegacyReportPermissionsForUserAsync(conn, schema, empresaId, userId, userRole, reportCatalog, ct);
-        await SyncLegacyModulePermissionsForUserAsync(conn, schema, empresaId, userId, userRole, ventasCatalog, ct);
-        await SyncLegacyModulePermissionsForUserAsync(conn, schema, empresaId, userId, userRole, empleadosCatalog, ct);
-        await SyncLegacyModulePermissionsForUserAsync(conn, schema, empresaId, userId, userRole, prestamosCatalog, ct);
+
+        /*
+          El write-back a Mac31 solo corre cuando quien llama DECIDIO el estado
+          completo del usuario. Ver el comentario de IPermissionService:
+          llamarlo con las listas vacias desde el alta de usuarios revocaba
+          todos los permisos de Mac31 de quien ya existia en el escritorio.
+        */
+        if (sincronizarConLegacy)
+        {
+            var userRole = await GetUserRoleAsync(conn, empresaId, userId, ct);
+            await SyncLegacyReportPermissionsForUserAsync(conn, schema, empresaId, userId, userRole, reportCatalog, ct);
+            await SyncLegacyModulePermissionsForUserAsync(conn, schema, empresaId, userId, userRole, ventasCatalog, ct);
+            await SyncLegacyModulePermissionsForUserAsync(conn, schema, empresaId, userId, userRole, empleadosCatalog, ct);
+            await SyncLegacyModulePermissionsForUserAsync(conn, schema, empresaId, userId, userRole, prestamosCatalog, ct);
+
+            /*
+              Y LAS FAMILIAS NUEVAS, QUE HASTA AHORA SOLO LEIAN.
+
+              Con esto la sincronizacion es bidireccional tambien para las 22
+              familias: lo que el administrador desmarca en la pantalla del web
+              se apaga en Mac31, igual que ya pasaba con reportes, ventas,
+              empleados y prestamos.
+
+              POR QUE ES SEGURO HACERLO AHORA Y NO ANTES. El metodo escribe
+              IDStatus = 2 para todo lo que no este en `effective`, y
+              `effective` es SOLO lo del web (rol + overrides). Eso es correcto
+              unicamente si quien guardo estaba viendo el estado real de Mac31.
+              Lo esta: GetPermisosWebBootstrapAsync llama a
+              AplicarFamiliasLegacyEnOverridesAsync, que mete lo de Mac31 dentro
+              del Allow/Deny de cada usuario para estas mismas familias. Y
+              ademas sigue puesto el candado de SyncLegacyModulePermissionsForUserAsync:
+              un permiso solo se apaga si su modulo esta ENCENDIDO, o sea si la
+              pantalla llego a ensenarlo.
+
+              Esto NO se hace en UpsertRolePermissionsAsync, a proposito: un rol
+              es concepto del web, y escribirlo en las filas de Mac31 de cada
+              usuario que lo tenga seria una sobreescritura masiva de legacy.
+
+              Va DESPUES de las cuatro viejas para que, si alguna clave cayera
+              en dos catalogos, mande el calculo de la familia, que es el que
+              conoce el prefijo y la forma exacta.
+            */
+            var catalogosDeFamilias = await EnsureFamiliasLegacySyncedAsync(conn, empresaId, ct);
+            await SyncLegacyModulePermissionsForUserAsync(
+                conn, schema, empresaId, userId, userRole,
+                JuntarCatalogosDeFamilias(catalogosDeFamilias), ct);
+        }
+
         InvalidateUserPermissionCache(userId, empresaId);
     }
 
@@ -2294,6 +2952,21 @@ WHERE EmpresaId = @EmpresaId
     private void InvalidateUserPermissionCache(Guid userId, int empresaId)
     {
         DispararInvalidacion(AmbitoUsuario(userId, empresaId));
+
+        /*
+          LOS MEMOS DE RENDIMIENTO SE TIRAN CON LA MISMA LLAVE.
+
+           guarda lo que Mac31 le concede a cada
+          usuario durante unos minutos. Si se cambia un permiso y no se olvida
+          aqui, la siguiente lectura devuelve lo de ANTES: justo lo que no puede
+          pasar, porque incluye seguir ensenando un permiso ya revocado.
+
+          Se tiran los de TODOS y no solo los de este usuario: cambiar un rol o
+          una forma de Mac31 afecta a mas gente, y vaciar un diccionario de
+          treinta entradas cuesta nada frente a equivocarse.
+        */
+        /* Los memos de rendimiento no viven mas alla de la peticion que los
+           creo (ver _memoDeLaPeticion), asi que no hay nada que olvidar. */
     }
 
     /// <summary>
@@ -2304,6 +2977,11 @@ WHERE EmpresaId = @EmpresaId
     private void InvalidateEmpresaPermissionCache(int empresaId)
     {
         DispararInvalidacion(AmbitoEmpresa(empresaId));
+
+        /* Ver la nota de InvalidateUserPermissionCache: los memos de
+           rendimiento caducan con la misma llave que el snapshot. */
+        /* Los memos de rendimiento no viven mas alla de la peticion que los
+           creo (ver _memoDeLaPeticion), asi que no hay nada que olvidar. */
     }
 
     private async Task<OverrideTypeTokens> GetOverrideTypeTokensAsync(SqlConnection conn, CancellationToken ct)
@@ -2375,6 +3053,14 @@ WHERE t.name = 'WUsuarioPermiso';";
     */
     public async Task SembrarCatalogoCompletoAsync(int empresaId, CancellationToken ct)
     {
+        /* La misma memoria de corta vida que usan las peticiones. Sin esto, la
+           siembra vuelve a preguntar por cada una de las ~70 formas lo que ya
+           pregunto: el catalogo de WPermiso de la empresa, las columnas, los
+           modulos. Medido: es la diferencia entre ~500 viajes y unos pocos
+           cientos, y es lo que tarda la primera peticion tras un arranque,
+           porque espera a que esto termine. */
+        using var memoria = AbrirMemoriaDePeticion();
+
         await SyncPermissionCatalogAsync(empresaId, null, ct);
 
         await using var conn = new SqlConnection(_db.Database.GetConnectionString());
@@ -2419,26 +3105,53 @@ WHERE t.name = 'WUsuarioPermiso';";
             throw new ArgumentException("No hay permisos semilla para los módulos solicitados.");
 
         var permColumns = await GetTableColumnsAsync(conn, "WPermiso", ct);
-        await using var tx = await conn.BeginTransactionAsync(ct);
 
         var response = new PermisosWebSyncCatalogResponse
         {
             TotalSeeds = seeds.Count
         };
 
-        foreach (var seed in seeds)
-        {
-            if (await PermissionExistsAsync(conn, (SqlTransaction)tx, empresaId, seed.Key, ct))
-            {
-                response.SkippedPermissions.Add(seed.Key);
-                continue;
-            }
+        /*
+          QUE CLAVES HAY YA, DE UN TIRON.
 
-            await InsertPermissionSeedAsync(conn, (SqlTransaction)tx, permColumns, empresaId, seed, null, ct);
-            response.InsertedPermissions.Add(seed.Key);
+          Aqui se preguntaba una por una, DENTRO de la transaccion: 390 viajes a
+          56 ms = ~22 s con candados tomados sobre WPermiso. Como esto corre al
+          arrancar, toda peticion de permisos de ese primer medio minuto se
+          quedaba esperando. Medido: /api/me en 31 s con el servidor recien
+          levantado y un solo usuario.
+
+          Una lectura y una comparacion en memoria dan exactamente el mismo
+          resultado. Es lo que ya hacia SincronizarCatalogoDePermisosAsync.
+        */
+        var existentes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await using (var leer = new SqlCommand(
+            "SELECT Clave FROM dbo.WPermiso WHERE EmpresaId = @EmpresaId;", conn))
+        {
+            leer.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+            await using var lector = await leer.ExecuteReaderAsync(ct);
+            while (await lector.ReadAsync(ct))
+            {
+                if (!lector.IsDBNull(0)) existentes.Add(lector.GetString(0).Trim());
+            }
         }
 
-        await tx.CommitAsync(ct);
+        var faltantes = seeds.Where(x => !existentes.Contains(x.Key)).ToList();
+        foreach (var seed in seeds.Where(x => existentes.Contains(x.Key)))
+            response.SkippedPermissions.Add(seed.Key);
+
+        /* En regimen normal no falta ninguna y no se abre transaccion siquiera:
+           la siembra del arranque cuesta UN viaje. */
+        if (faltantes.Count > 0)
+        {
+            await using var tx = await conn.BeginTransactionAsync(ct);
+            foreach (var seed in faltantes)
+            {
+                await InsertPermissionSeedAsync(conn, (SqlTransaction)tx, permColumns, empresaId, seed, null, ct);
+                response.InsertedPermissions.Add(seed.Key);
+            }
+            await tx.CommitAsync(ct);
+        }
+
         response.InsertedCount = response.InsertedPermissions.Count;
         return response;
     }
@@ -2495,6 +3208,10 @@ WHERE t.name = 'WUsuarioPermiso';";
 
     private async Task<PermissionSnapshot> BuildSnapshotAsync(Guid userId, int empresaId, string rolLegacy, CancellationToken ct)
     {
+        /* Memoria de ESTA peticion: lo que se pregunte dos veces aqui dentro se
+           pregunta una. Se tira al salir (ver AbrirMemoriaDePeticion). */
+        using var memoriaDeLaPeticion = AbrirMemoriaDePeticion();
+
         await using var conn = new SqlConnection(_db.Database.GetConnectionString());
         await conn.OpenAsync(ct);
 
@@ -2508,6 +3225,26 @@ WHERE t.name = 'WUsuarioPermiso';";
         var schema = await GetSchemaAsync(conn, ct);
         await EnsureCatalogoSembradoAsync(conn, empresaId, ct);
         var permissions = await LoadEffectivePermissionsAsync(conn, schema, userId, empresaId, rolLegacy, ct);
+
+        /*
+          UN MODULO APAGADO TAMPOCO DEJA PASAR LO QUE VIENE DE MAC31.
+
+          LoadEffectivePermissionsAsync ya filtra los modulos apagados, pero
+          filtra lo que sale de la BASE. Los cuatro bloques de abajo -reportes,
+          ventas, empleados y prestamos- AGREGAN claves despues de ese filtro,
+          leyendolas de Mac31, asi que se lo saltaban enteras: con el modulo
+          apagado para la empresa, sus permisos heredados seguian en el
+          snapshot. `AplicarFamiliasLegacyAsync` ya lo filtraba para las once
+          familias nuevas (ver su comentario); estas cuatro se habian quedado
+          sin esa red.
+
+          Importa el doble desde que la entrada se deriva: sin esto, apagar
+          Ventas para una empresa no apagaba nada para quien la tuviera
+          concedida en Mac31, y encima le derivaria su "ventas.ver_modulo".
+        */
+        var modulosApagados = await LoadInactiveModuleKeysAsync(conn, empresaId, ct);
+        bool Pasa(string clave) => !EsDeModuloApagado(clave, modulosApagados);
+
         var reportCatalog = await EnsureLegacyReportPermissionsSyncedAsync(conn, empresaId, ct);
         var ventasCatalog = await EnsureVentasPermissionsSyncedAsync(conn, empresaId, ct);
         var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
@@ -2516,13 +3253,81 @@ WHERE t.name = 'WUsuarioPermiso';";
         {
             var legacyReports = await LoadLegacyReportPermissionsForUserAsync(conn, empresaId, userId, reportCatalog, ct);
             permissions.RemoveAll(EsReporteQueMandaLegacy);
-            permissions.AddRange(legacyReports.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+            permissions.AddRange(legacyReports.Allow.Where(Pasa).OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+
+            /*
+              QUIEN TIENE UN REPORTE EN MAC31 ENTRA A REPORTES EN EL WEB.
+
+              "reportes.ver_modulo" es una llave del web -Mac31 no la tiene- y
+              hasta ahora no se derivaba de nada: habia que darla a mano desde
+              la pantalla de permisos, encima de los reportes que Mac31 ya
+              concede. Es la misma doble captura que este puente viene a quitar,
+              y desde que la entrada se exige en el backend
+              (EntradasDeModulo.cs, "reportes." -> "reportes.ver_modulo") es
+              ademas un 403 en todos los reportes heredados.
+
+              HOY NO LE CAMBIA NADA A NADIE, y se comprobo antes de ponerlo: en
+              las dos empresas, todos los que tienen reportes en Mac31 ya tenian
+              la entrada concedida por el web. Lo que cierra es la migracion de
+              los que vengan: un empleado nuevo de Mac31 con sus reportes
+              autorizados entra a Reportes sin que nadie le configure nada.
+
+              Lo que ve DENTRO sigue siendo solo lo que Mac31 le autorice: la
+              lista de reportes se dibuja con sus claves finas, una por una.
+            */
+            if (legacyReports.Allow.Count > 0
+                && Pasa(ReportesViewPermission)
+                && !permissions.Any(x => string.Equals(x, ReportesViewPermission, StringComparison.OrdinalIgnoreCase)))
+            {
+                permissions.Add(ReportesViewPermission);
+            }
         }
         if (ventasCatalog.Count > 0)
         {
             var legacyVentas = await LoadVentasPermissionsForUserAsync(conn, empresaId, userId, ventasCatalog, ct);
             permissions.RemoveAll(x => x.StartsWith($"{VentasModuleKey}.", StringComparison.OrdinalIgnoreCase) && !VentasWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
-            permissions.AddRange(legacyVentas.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+            permissions.AddRange(legacyVentas.Allow.Where(Pasa).OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+
+            /*
+              QUIEN VENDE EN MAC31 ENTRA A VENTAS EN EL WEB.
+
+              Este era el agujero mas grande de toda la herencia, y el que trajo
+              el caso de MARINA BERNAL. Empleados y prestamos derivan su
+              ".ver_modulo" desde abajo (y las once familias nuevas tambien),
+              pero VENTAS -la familia mas usada- no derivaba nada: su
+              "ventas.ver_modulo" es una semilla del web que Mac31 no produce.
+
+              El efecto no se veia en la pantalla de permisos, porque los
+              permisos finos SI se heredaban. Se veia al usar el modulo: desde
+              que la entrada se exige tambien en el backend
+              (EntradasDeModulo.cs, "ventas." -> "ventas.ver_modulo"), heredar
+              veinte botones de ventas sin la entrada significa 403 en todos.
+
+              MEDIDO el 2026-10-12 con la auditoria de herencia, ocho personas
+              reales con cuenta web:
+                Tauro     JESY (15 claves), MARINA BERNAL (11), NAOLANY (16)
+                Zaragoza  FERNANDA (12), NORMA (5), RICARDO (4), USRTMP (4),
+                          USRTMP2 (5)
+              Todas podian hacer esas operaciones en Mac31 y ninguna en el web.
+
+              CUALQUIER boton de las tres formas de ventas vale, igual que en
+              las familias nuevas y por la misma razon medida alla: no hay una
+              sola clave que cubra a todos -NORMA y RICARDO solo tienen los
+              botones de PAGOS, no el de buscar-, y en Mac31 tener un boton de
+              la forma es tener la forma en el menu. Lo que se pueda hacer
+              adentro lo siguen decidiendo los permisos finos.
+
+              NO SE DERIVA "ventas.ver": no hace falta. La pantalla del web
+              acepta las dos llaves (VentasPage.tsx:1564) y el backend tambien
+              (VentasConsultaController.cs:19). Derivarla de mas seria regalar
+              una clave que nadie pide.
+            */
+            if (legacyVentas.Allow.Count > 0
+                && Pasa(VentasViewPermission)
+                && !permissions.Any(x => string.Equals(x, VentasViewPermission, StringComparison.OrdinalIgnoreCase)))
+            {
+                permissions.Add(VentasViewPermission);
+            }
         }
         // Empleados: lo mismo que ventas. Si Mac31 no tiene la forma dada de
         // alta, empleadosCatalog viene vacio y NO se borra nada — asi una base
@@ -2532,7 +3337,7 @@ WHERE t.name = 'WUsuarioPermiso';";
         {
             var legacyEmpleados = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, userId, EmpleadosBinding, empleadosCatalog, ct);
             permissions.RemoveAll(x => x.StartsWith($"{EmpleadosModuleKey}.", StringComparison.OrdinalIgnoreCase) && !EmpleadosWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
-            permissions.AddRange(legacyEmpleados.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+            permissions.AddRange(legacyEmpleados.Allow.Where(Pasa).OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
 
             // QUIEN VE LA FORMA EN MAC31 VE EL MODULO EN EL WEB.
             //
@@ -2551,7 +3356,16 @@ WHERE t.name = 'WUsuarioPermiso';";
             // satisface ".ver_modulo"): ese solo corre al autorizar un endpoint.
             // ModulosController compara la clave EXACTA contra el snapshot, asi
             // que la llave tiene que estar aqui dentro.
-            if (legacyEmpleados.Allow.Contains("empleados.ver")
+            // CUALQUIER boton de la forma, no solo el de ver. Se iguala con las
+            // once familias nuevas, donde la regla se midio y se cambio por
+            // esto mismo: en Mac31 tener un boton de la forma es tener la forma
+            // en el menu, y no hay una sola clave que cubra a todo el mundo.
+            // Medido el 2026-10-12: hoy no cambia a nadie en ninguna de las dos
+            // empresas -no existe nadie con botones de empleados y sin el de ver-,
+            // asi que esto no abre ninguna puerta nueva; cierra la que se
+            // abriria el dia que alguien capture ese caso en Mac31.
+            if (legacyEmpleados.Allow.Count > 0
+                && Pasa(EmpleadosViewPermission)
                 && !permissions.Any(x => string.Equals(x, EmpleadosViewPermission, StringComparison.OrdinalIgnoreCase)))
             {
                 permissions.Add(EmpleadosViewPermission);
@@ -2565,7 +3379,7 @@ WHERE t.name = 'WUsuarioPermiso';";
         {
             var legacyPrestamos = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, userId, PrestamosBinding, prestamosCatalog, ct);
             permissions.RemoveAll(x => x.StartsWith($"{PrestamosModuleKey}.", StringComparison.OrdinalIgnoreCase) && !PrestamosWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
-            permissions.AddRange(legacyPrestamos.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+            permissions.AddRange(legacyPrestamos.Allow.Where(Pasa).OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
 
             // QUIEN VE LA FORMA EN MAC31 VE EL MODULO EN EL WEB.
             //
@@ -2579,7 +3393,16 @@ WHERE t.name = 'WUsuarioPermiso';";
             // MODIFICAR pero no VER no existe en Mac31 (btnVer y btnModificar
             // son permisos aparte, pero el que solo tiene modificar igual abre
             // la misma forma). Ver el modulo es el minimo comun.
-            if (legacyPrestamos.Allow.Contains("prestamos.ver")
+            // CUALQUIER boton de la forma, no solo el de ver. Se iguala con las
+            // once familias nuevas, donde la regla se midio y se cambio por
+            // esto mismo: en Mac31 tener un boton de la forma es tener la forma
+            // en el menu, y no hay una sola clave que cubra a todo el mundo.
+            // Medido el 2026-10-12: hoy no cambia a nadie en ninguna de las dos
+            // empresas -no existe nadie con botones de prestamos y sin el de ver-,
+            // asi que esto no abre ninguna puerta nueva; cierra la que se
+            // abriria el dia que alguien capture ese caso en Mac31.
+            if (legacyPrestamos.Allow.Count > 0
+                && Pasa(PrestamosViewPermission)
                 && !permissions.Any(x => string.Equals(x, PrestamosViewPermission, StringComparison.OrdinalIgnoreCase)))
             {
                 permissions.Add(PrestamosViewPermission);
@@ -2772,7 +3595,43 @@ ORDER BY pu.Clave;";
         if (!await TableExistsAsync(conn, "WModulo", ct))
             return apagados;
 
-        await using var cmd = new SqlCommand(@"
+        /*
+          DOS INTERRUPTORES, Y HASTA AHORA SOLO SE MIRABA UNO.
+
+          `WModulo.IdStatus = 2` es "apagado en toda la base" y era lo unico que
+          se leia aqui. `WModuloEmpresa.Activo = 0` es "esta empresa no usa este
+          modulo", que es el que mueve la pantalla Permisos -> Modulos, y se
+          ignoraba por completo.
+
+          El agujero: apagar un modulo para la empresa le quitaba la tarjeta del
+          Inicio y NO le quitaba nada al API. El permiso seguia en el juego del
+          usuario, asi que una peticion directa —o una URL pegada en el
+          navegador— seguia funcionando. Ocultar no es cerrar.
+
+          El `HAVING MAX(...) = 0` pide que este apagado para TODAS las claves de
+          empresa de ese EmpresaId, no para una. Es a proposito: `MacZ` tiene dos
+          ('zaragoza' y 'aviacion') compartiendo EmpresaId, y aqui no llega la
+          del token. Quitar el permiso cuando una de las dos lo tiene encendido
+          se lo quitaria a la empresa equivocada, y ese error se paga en accesos
+          perdidos; al reves solo se paga en una comprobacion de mas, que el
+          endpoint vuelve a hacer igualmente.
+
+          Si no hay tabla por empresa, se queda como antes: no se puede
+          comprobar, y lo que no se puede comprobar no se recorta.
+        */
+        var hayTablaPorEmpresa = await TableExistsAsync(conn, "WModuloEmpresa", ct);
+
+        await using var cmd = new SqlCommand(hayTablaPorEmpresa ? @"
+SELECT ModuloClave
+FROM dbo.WModulo
+WHERE EmpresaId = @EmpresaId
+  AND IdStatus = 2
+UNION
+SELECT me.ModuloClave
+FROM dbo.WModuloEmpresa me
+WHERE me.EmpresaId = @EmpresaId
+GROUP BY me.ModuloClave
+HAVING MAX(CAST(me.Activo AS int)) = 0;" : @"
 SELECT ModuloClave
 FROM dbo.WModulo
 WHERE EmpresaId = @EmpresaId
@@ -3082,7 +3941,29 @@ WHERE t.name = 'WUsuarioPermiso'
         return text.Length <= maxChars ? text : text.Substring(0, maxChars);
     }
 
+    /*
+      Las columnas de una tabla no cambian sin un despliegue, y esto se llamaba
+      UNA VEZ POR FORMA de Mac31 -~70 por reconstruccion de catalogo-. Mismo
+      plazo que el resto del esquema.
+    */
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (HashSet<string> Columnas, DateTime Hasta)>
+        _memoDeColumnas = new(StringComparer.OrdinalIgnoreCase);
+
     private static async Task<HashSet<string>> GetTableColumnsAsync(
+        SqlConnection conn,
+        string tableName,
+        CancellationToken ct)
+    {
+        var llave = $"{conn.Database}|{tableName}";
+        if (_memoDeColumnas.TryGetValue(llave, out var memorizado) && memorizado.Hasta > DateTime.UtcNow)
+            return memorizado.Columnas;
+
+        var leidas = await GetTableColumnsSinMemoriaAsync(conn, tableName, ct);
+        _memoDeColumnas[llave] = (leidas, DateTime.UtcNow.Add(SchemaCacheTtl));
+        return leidas;
+    }
+
+    private static async Task<HashSet<string>> GetTableColumnsSinMemoriaAsync(
         SqlConnection conn,
         string tableName,
         CancellationToken ct)
@@ -3123,11 +4004,19 @@ WHERE EmpresaId = @EmpresaId
 
     private static async Task<bool> TableExistsAsync(SqlConnection conn, string tableName, CancellationToken ct)
     {
+        /* Mismo caso que ColumnExistsAsync: ver _memoDeEsquema. */
+        var llave = $"tab|{conn.Database}|{tableName}";
+        if (_memoDeEsquema.TryGetValue(llave, out var guardado) && guardado.Hasta > DateTime.UtcNow)
+            return guardado.Existe;
+
         await using var cmd = new SqlCommand(@"
 SELECT CASE WHEN OBJECT_ID(@TableName, 'U') IS NOT NULL THEN 1 ELSE 0 END;", conn);
         cmd.Parameters.Add(new SqlParameter("@TableName", SqlDbType.NVarChar, 260) { Value = $"dbo.{tableName}" });
         var value = await cmd.ExecuteScalarAsync(ct);
-        return value is not null && Convert.ToInt32(value) == 1;
+
+        var existe = value is not null && Convert.ToInt32(value) == 1;
+        _memoDeEsquema[llave] = (existe, DateTime.UtcNow.Add(SchemaCacheTtl));
+        return existe;
     }
 
     private static async Task InsertPermissionSeedAsync(
@@ -3254,7 +4143,19 @@ ORDER BY Numero;", conn))
             conn, empresaId, semillas, _ => "reportes.centros", ct);
     }
 
+    /// <summary>
+    /// El catalogo de reportes de Mac31, memorizado. Ver <see cref="CatalogoCacheTtl"/>.
+    /// </summary>
     private async Task<Dictionary<string, ReportPermissionInfo>> EnsureLegacyReportPermissionsSyncedAsync(
+        SqlConnection conn,
+        int empresaId,
+        CancellationToken ct)
+        => new(await CatalogoMemorizadoAsync(
+                $"reportes|{conn.Database}|{empresaId}",
+                () => EnsureLegacyReportPermissionsSyncedSinMemoriaAsync(conn, empresaId, ct)),
+            StringComparer.OrdinalIgnoreCase);
+
+    private async Task<Dictionary<string, ReportPermissionInfo>> EnsureLegacyReportPermissionsSyncedSinMemoriaAsync(
         SqlConnection conn,
         int empresaId,
         CancellationToken ct)
@@ -3266,19 +4167,23 @@ ORDER BY Numero;", conn))
         if (await TableExistsAsync(conn, "WModulo", ct))
         {
             await using var moduleCmd = new SqlCommand(@"
-IF EXISTS (SELECT 1 FROM dbo.WModulo WHERE EmpresaId = @EmpresaId AND ModuloClave = @ModuloClave)
-BEGIN
-    UPDATE dbo.WModulo
-       SET Nombre = @Nombre,
-           IdStatus = CASE WHEN IdStatus = 2 THEN 2 ELSE 1 END,
-           FechaActualizacion = CASE WHEN COL_LENGTH('dbo.WModulo','FechaActualizacion') IS NOT NULL THEN SYSUTCDATETIME() ELSE FechaActualizacion END
-     WHERE EmpresaId = @EmpresaId
-       AND ModuloClave = @ModuloClave;
-END
-ELSE
+-- Mismo arreglo que en WPermiso y por el mismo motivo: dos sembradores a la
+-- vez (el de arranque y el de la primera peticion) insertaban los dos el
+-- mismo modulo nuevo. UPDATE primero, INSERT solo si no habia.
+UPDATE dbo.WModulo
+   SET Nombre = @Nombre,
+       IdStatus = CASE WHEN IdStatus = 2 THEN 2 ELSE 1 END,
+       FechaActualizacion = CASE WHEN COL_LENGTH('dbo.WModulo','FechaActualizacion') IS NOT NULL THEN SYSUTCDATETIME() ELSE FechaActualizacion END
+ WHERE EmpresaId = @EmpresaId
+   AND ModuloClave = @ModuloClave;
+
+IF @@ROWCOUNT = 0
 BEGIN
     INSERT INTO dbo.WModulo (EmpresaId, ModuloClave, Nombre, IdStatus, FechaCreacion, FechaActualizacion)
-    VALUES (@EmpresaId, @ModuloClave, @Nombre, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
+    SELECT @EmpresaId, @ModuloClave, @Nombre, 1, SYSUTCDATETIME(), SYSUTCDATETIME()
+    WHERE NOT EXISTS (
+        SELECT 1 FROM dbo.WModulo WITH (UPDLOCK, HOLDLOCK)
+        WHERE EmpresaId = @EmpresaId AND ModuloClave = @ModuloClave);
 END", conn);
             moduleCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
             moduleCmd.Parameters.Add(new SqlParameter("@ModuloClave", SqlDbType.NVarChar, 120) { Value = ReportesModuleKey });
@@ -3370,26 +4275,23 @@ ORDER BY COALESCE(f.Orden, 0), COALESCE(p.Orden, 0), p.IDProceso;", conn);
             return (allow, deny);
 
         var byProcessId = reportCatalog.Values.ToDictionary(x => x.LegacyProcessId, x => x.Key);
-        await using var cmd = new SqlCommand(@"
-SELECT p.IDProceso, CASE WHEN ufp.IDStatus = 1 THEN 1 ELSE 0 END AS Permitido
-FROM dbo.n_Formas f
-INNER JOIN dbo.n_Procesos p
-    ON p.IDForma = f.IDForma
-LEFT JOIN dbo.[Usuario Forma Procesos] ufp
-    ON ufp.IDProceso = p.IDProceso
-   AND ufp.IDUsuario = @IDUsuario
-WHERE LTRIM(RTRIM(f.Forma)) = @FormaReportes
-  AND ISNULL(p.IDStatus, 1) = 1;", conn);
-        cmd.Parameters.Add(new SqlParameter("@IDUsuario", SqlDbType.Int) { Value = legacyUserId.Value });
-        cmd.Parameters.Add(new SqlParameter("@FormaReportes", SqlDbType.NVarChar, 200) { Value = ReportesLegacyForm });
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
-        while (await reader.ReadAsync(ct))
+
+        /*
+          DEL MISMO LOTE QUE LAS DEMAS FAMILIAS.
+
+          Esta consulta pedia otra vez n_Formas/n_Procesos para UNA forma, la de
+          reportes, y se repetia por usuario: 25 viajes mas en cada bootstrap.
+           ya trae TODO lo del usuario en una sola
+          consulta, asi que aqui solo hay que quedarse con la forma de reportes.
+
+          El filtro imita al WHERE que sustituye: , y SQL compara sin distinguir mayusculas.
+        */
+        foreach (var fila in (await ProcesosDeUsuarioAsync(conn, legacyUserId.Value, ct))
+                     .Where(f => string.Equals(f.Forma.Trim(), ReportesLegacyForm.Trim(), StringComparison.OrdinalIgnoreCase)))
         {
-            var processId = reader.GetInt32(reader.GetOrdinal("IDProceso"));
-            if (!byProcessId.TryGetValue(processId, out var key))
+            if (!byProcessId.TryGetValue(fila.IdProceso, out var key))
                 continue;
-            var permitted = reader.GetInt32(reader.GetOrdinal("Permitido")) == 1;
-            if (permitted) allow.Add(key);
+            if (fila.Permitido) allow.Add(key);
             else deny.Add(key);
         }
 
@@ -3506,7 +4408,24 @@ WHERE EmpresaId = @EmpresaId
       el catalogo se indexa por IDProceso al leer los permisos del usuario: dos
       formas con el mismo numero se pisarian.
     */
+    /// <summary>
+    /// El catalogo de VENTAS (sus tres formas), memorizado por base y empresa.
+    /// </summary>
+    /// <remarks>
+    /// Mismo motivo que las familias: se reconstruia y RESINCRONIZABA en cada
+    /// peticion de permisos. Se memoriza el conjunto -no forma por forma- y se
+    /// devuelve copia, porque quien lo recibe puede juntarlo con otros.
+    /// </remarks>
     private async Task<Dictionary<string, VentasPermissionInfo>> EnsureVentasPermissionsSyncedAsync(
+        SqlConnection conn,
+        int empresaId,
+        CancellationToken ct)
+        => new(await CatalogoMemorizadoAsync(
+                $"ventas|{conn.Database}|{empresaId}",
+                () => EnsureVentasPermissionsSyncedSinMemoriaAsync(conn, empresaId, ct)),
+            StringComparer.OrdinalIgnoreCase);
+
+    private async Task<Dictionary<string, VentasPermissionInfo>> EnsureVentasPermissionsSyncedSinMemoriaAsync(
         SqlConnection conn,
         int empresaId,
         CancellationToken ct)
@@ -3553,22 +4472,79 @@ WHERE EmpresaId = @EmpresaId
         if (!await TableExistsAsync(conn, "WPermiso", ct))
             return ventasCatalog.ToDictionary(x => x.Key, StringComparer.OrdinalIgnoreCase);
 
+        /*
+          NO REESCRIBIR UN NOMBRE QUE YA ESTA BIEN.
+
+          Esto corria por CADA forma -~70 por peticion de permisos- y escribia
+          siempre, aunque el nombre del modulo fuera identico al que ya estaba.
+          Setenta escrituras dentro de una lectura, sobre filas que comparten
+          todos los usuarios de la empresa: ademas de los viajes, es contencion
+          en SQL entre peticiones de agentes distintos.
+
+          Se lee WModulo una vez por peticion y solo se escribe lo que de verdad
+          difiere. En regimen normal eso son CERO escrituras.
+        */
+        var yaEstaBien = false;
         if (await TableExistsAsync(conn, "WModulo", ct))
         {
+            var llaveModulos = $"catalogoWModulo|{conn.Database}|{empresaId}";
+            var memoriaModulos = _memoDeLaPeticion.Value;
+            Dictionary<string, string>? modulos = null;
+
+            if (memoriaModulos is not null
+                && memoriaModulos.TryGetValue(llaveModulos, out var guardadoMod)
+                && guardadoMod is Dictionary<string, string> vigenteMod)
+            {
+                modulos = vigenteMod;
+            }
+
+            if (modulos is null)
+            {
+                modulos = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                await using (var lectura = new SqlCommand(
+                    "SELECT ModuloClave, ISNULL(Nombre, '') AS Nombre, ISNULL(IdStatus, 0) AS IdStatus FROM dbo.WModulo WHERE EmpresaId = @EmpresaId;", conn))
+                {
+                    lectura.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+                    await using var lector = await lectura.ExecuteReaderAsync(ct);
+                    while (await lector.ReadAsync(ct))
+                    {
+                        /* El estado va en la llave del valor porque la escritura
+                           tambien lo normaliza (1, salvo que sea 2). Sin esto, un
+                           modulo con estado raro se quedaria sin corregir. */
+                        if (!lector.IsDBNull(0))
+                            modulos[lector.GetString(0).Trim()] = lector.GetString(1) + "\u0001" + lector.GetInt32(2);
+                    }
+                }
+                if (memoriaModulos is not null) memoriaModulos[llaveModulos] = modulos;
+            }
+
+            var esperado = binding.ModuleName + "\u0001";
+            yaEstaBien = modulos.TryGetValue(binding.ModuleKey, out var actualModulo)
+                         && (actualModulo == esperado + "1" || actualModulo == esperado + "2");
+
+            if (!yaEstaBien) modulos[binding.ModuleKey] = esperado + "1";
+        }
+
+        if (!yaEstaBien && await TableExistsAsync(conn, "WModulo", ct))
+        {
             await using var moduleCmd = new SqlCommand(@"
-IF EXISTS (SELECT 1 FROM dbo.WModulo WHERE EmpresaId = @EmpresaId AND ModuloClave = @ModuloClave)
-BEGIN
-    UPDATE dbo.WModulo
-       SET Nombre = @Nombre,
-           IdStatus = CASE WHEN IdStatus = 2 THEN 2 ELSE 1 END,
-           FechaActualizacion = CASE WHEN COL_LENGTH('dbo.WModulo','FechaActualizacion') IS NOT NULL THEN SYSUTCDATETIME() ELSE FechaActualizacion END
-     WHERE EmpresaId = @EmpresaId
-       AND ModuloClave = @ModuloClave;
-END
-ELSE
+-- Mismo arreglo que en WPermiso y por el mismo motivo: dos sembradores a la
+-- vez (el de arranque y el de la primera peticion) insertaban los dos el
+-- mismo modulo nuevo. UPDATE primero, INSERT solo si no habia.
+UPDATE dbo.WModulo
+   SET Nombre = @Nombre,
+       IdStatus = CASE WHEN IdStatus = 2 THEN 2 ELSE 1 END,
+       FechaActualizacion = CASE WHEN COL_LENGTH('dbo.WModulo','FechaActualizacion') IS NOT NULL THEN SYSUTCDATETIME() ELSE FechaActualizacion END
+ WHERE EmpresaId = @EmpresaId
+   AND ModuloClave = @ModuloClave;
+
+IF @@ROWCOUNT = 0
 BEGIN
     INSERT INTO dbo.WModulo (EmpresaId, ModuloClave, Nombre, IdStatus, FechaCreacion, FechaActualizacion)
-    VALUES (@EmpresaId, @ModuloClave, @Nombre, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
+    SELECT @EmpresaId, @ModuloClave, @Nombre, 1, SYSUTCDATETIME(), SYSUTCDATETIME()
+    WHERE NOT EXISTS (
+        SELECT 1 FROM dbo.WModulo WITH (UPDLOCK, HOLDLOCK)
+        WHERE EmpresaId = @EmpresaId AND ModuloClave = @ModuloClave);
 END", conn);
             moduleCmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
             moduleCmd.Parameters.Add(new SqlParameter("@ModuloClave", SqlDbType.NVarChar, 120) { Value = binding.ModuleKey });
@@ -3595,6 +4571,21 @@ END", conn);
         return ventasCatalog.ToDictionary(x => x.Key, StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Como se busca la forma en n_Formas: por nombre si la atadura lo dice,
+    /// por descripcion si no. Las dos consultas tienen que usar EL MISMO
+    /// filtro: el catalogo y los permisos del usuario se cruzan por IDProceso,
+    /// y si una mirara una forma y la otra otra, el cruce quedaria vacio sin
+    /// dar error.
+    /// </summary>
+    private static string FiltroDeForma(LegacyModuleBinding binding) =>
+        binding.FormaExacta is null
+            ? "UPPER(LTRIM(RTRIM(f.Descripcion))) = @Forma"
+            : "f.Forma = @Forma";
+
+    private static string ValorDeForma(LegacyModuleBinding binding) =>
+        binding.FormaExacta ?? binding.LegacyForm;
+
     private static async Task<List<VentasPermissionInfo>> LoadLegacyModuleCatalogAsync(SqlConnection conn, LegacyModuleBinding binding, CancellationToken ct)
     {
         if (!await TableExistsAsync(conn, "n_Formas", ct) || !await TableExistsAsync(conn, "n_Procesos", ct))
@@ -3610,10 +4601,10 @@ SELECT
 FROM dbo.n_Formas f
 INNER JOIN dbo.n_Procesos p
     ON p.IDForma = f.IDForma
-WHERE UPPER(LTRIM(RTRIM(f.Descripcion))) = @Forma
+WHERE " + FiltroDeForma(binding) + @"
   AND ISNULL(p.IDStatus, 1) = 1
 ORDER BY COALESCE(p.Orden, 0), p.IDProceso;", conn);
-        cmd.Parameters.Add(new SqlParameter("@Forma", SqlDbType.NVarChar, 200) { Value = binding.LegacyForm });
+        cmd.Parameters.Add(new SqlParameter("@Forma", SqlDbType.NVarChar, 200) { Value = ValorDeForma(binding) });
 
         var list = new List<VentasPermissionInfo>();
         await using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -3627,8 +4618,23 @@ ORDER BY COALESCE(p.Orden, 0), p.IDProceso;", conn);
             // espacio al final ("btnBuscar ") antes no empataba con el mapa y
             // se perdia el permiso en silencio. Se deja porque el espacio es
             // un error de captura, no una forma de negar un permiso.
+            // El mapa de la familia MANDA. Solo si no mapeo este boton a mano
+            // se intenta derivar la clave con la tabla de verbos compartida
+            // (VerbosLegacy), que es lo que evita escribir a mano los 226
+            // botones que se llaman btnNuevo/btnVer/btnModificar. Si tampoco
+            // esta ahi, el proceso se ignora igual que antes.
             if (!binding.Map.TryGetValue(processCode.Trim(), out var mapped))
-                continue;
+            {
+                var ordDesc = reader.GetOrdinal("ProcesoDescripcion");
+                var derivada = DerivarClaveLegacy(
+                    processCode.Trim(),
+                    binding.Prefijo ?? binding.ModuleKey,
+                    binding.ModuleName,
+                    reader.IsDBNull(ordDesc) ? null : reader.GetString(ordDesc));
+                if (derivada is null)
+                    continue;
+                mapped = derivada.Value;
+            }
 
             var info = new VentasPermissionInfo(
                 Key: mapped.Key,
@@ -3663,30 +4669,136 @@ ORDER BY COALESCE(p.Orden, 0), p.IDProceso;", conn);
         if (legacyUserId is null)
             return (allow, deny);
 
-        var byProcessId = ventasCatalog.Values.ToDictionary(x => x.LegacyProcessId, x => x.Key);
-        await using var cmd = new SqlCommand(@"
-SELECT p.IDProceso, CASE WHEN ufp.IDStatus = 1 THEN 1 ELSE 0 END AS Permitido
-FROM dbo.n_Formas f
-INNER JOIN dbo.n_Procesos p
-    ON p.IDForma = f.IDForma
-LEFT JOIN dbo.[Usuario Forma Procesos] ufp
-    ON ufp.IDProceso = p.IDProceso
-   AND ufp.IDUsuario = @IDUsuario
-WHERE UPPER(LTRIM(RTRIM(f.Descripcion))) = @Forma
-  AND ISNULL(p.IDStatus, 1) = 1;", conn);
-        cmd.Parameters.Add(new SqlParameter("@IDUsuario", SqlDbType.Int) { Value = legacyUserId.Value });
-        cmd.Parameters.Add(new SqlParameter("@Forma", SqlDbType.NVarChar, 200) { Value = binding.LegacyForm });
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
-        while (await reader.ReadAsync(ct))
+        /*
+          DOS BOTONES DE MAC31 PUEDEN PRODUCIR LA MISMA CLAVE, Y ANTES SOLO
+          CONTABA UNO.
+
+          Aqui habia `ventasCatalog.Values.ToDictionary(x => x.LegacyProcessId)`,
+          o sea: se miraba UN SOLO IDProceso por clave, el que el catalogo
+          hubiera guardado. Y el catalogo guarda uno a proposito —lo necesita
+          para saber que boton encender cuando se concede desde el web—, asi que
+          cuando dos botones derivan a la misma clave, el OTRO boton quedaba
+          invisible: quien lo tuviera concedido en Mac31 no heredaba el permiso,
+          sin error y sin rastro.
+
+          MEDIDO el 2026-10-12 con la auditoria de herencia, y no era teorico:
+
+            garantias.ver        btnBuscar de CONSULTA DE GARANTIAS (mapeado)
+                                 contra btnVer de CONSULTA DE REGISTRO DE
+                                 GARANTIAS (derivado). Ganaba el segundo, que es
+                                 la ultima forma de la familia -> perdian el
+                                 permiso JESY y NAOLANY en Tauro y QA_LEGWEB en
+                                 Zaragoza.
+            cortes.imprimir      btnImprimir de CORTES contra btnImprimir de
+                                 CORTES CENTRO DE SERVICIO, los dos derivados
+                                 con el mismo prefijo -> perdian JESY y NAOLANY.
+            cambiosvigencia.ver  btnBuscar (mapeado, Orden 1) contra btnVer
+                                 (derivado, Orden 10) de la MISMA forma; aqui
+                                 gana el primero -> perdia RICARDO, que tiene
+                                 btnVer y no btnBuscar.
+
+          LA REGLA CORRECTA: la clave se concede si Mac31 le concedio CUALQUIERA
+          de los botones que la producen. Por eso la clave se resuelve POR
+          PROCESO -con el mismo mapa y la misma tabla de verbos que el catalogo-
+          en vez de leerse de un diccionario de un solo IDProceso.
+
+          NO ENSANCHA NADA: solo se acepta la clave si el catalogo la publica
+          (`ventasCatalog.ContainsKey`), asi que no puede aparecer una clave que
+          esta familia no gobierne. Y el sentido de ESCRITURA sigue usando el
+          IDProceso unico del catalogo, que es donde esa eleccion si hace falta.
+        */
+        /*
+          DEL LOTE, NO DE UNA CONSULTA PROPIA.
+
+          Esta consulta era identica para las 71 familias salvo el filtro de la
+          forma, y se repetia por usuario: cientos de viajes en el bootstrap.
+          Ahora se pide UNA VEZ todo lo del usuario (ProcesosDeUsuarioAsync) y
+          aqui solo se queda con las filas de ESTA forma.
+
+          El filtro en memoria es el mismo que hacia el WHERE: por `f.Forma`
+          cuando el binding trae `FormaExacta`, y por la descripcion en
+          mayusculas y sin espacios cuando no. Ver FiltroDeForma.
+        */
+        var valorDeForma = ValorDeForma(binding);
+        /*
+          SE COMPARA COMO LO COMPARA SQL, NO COMO LO COMPARA C#.
+
+          El WHERE que esto sustituye lo resolvia SQL Server con la colacion de
+          la base: SIN distinguir mayusculas y SIN mirar los espacios del final
+          ('ConsultarMarcas' = 'consultarmarcas ' es verdadero alla). Un
+           aqui es exacto y habria dejado fuera
+          cualquier forma que difiera en una mayuscula o traiga un espacio de
+          mas -y las hay: estos nombres se capturaron a mano durante anios-.
+
+          Esa familia habria dejado de heredar permisos de Mac31 en silencio,
+          que es la peor forma de romper esto. Por eso OrdinalIgnoreCase y
+          TrimEnd.
+        */
+        var delLote = (await ProcesosDeUsuarioAsync(conn, legacyUserId.Value, ct))
+            .Where(f => binding.FormaExacta is null
+                ? string.Equals(f.FormaDescripcion.TrimEnd(), valorDeForma.Trim(), StringComparison.OrdinalIgnoreCase)
+                : string.Equals(f.Forma.TrimEnd(), valorDeForma.TrimEnd(), StringComparison.OrdinalIgnoreCase));
+
+        foreach (var fila in delLote)
         {
-            var processId = reader.GetInt32(reader.GetOrdinal("IDProceso"));
-            if (!byProcessId.TryGetValue(processId, out var key))
+            var nombre = fila.Proceso.Trim();
+            if (nombre.Length == 0)
                 continue;
-            var permitted = reader.GetInt32(reader.GetOrdinal("Permitido")) == 1;
-            if (permitted) allow.Add(key);
-            else deny.Add(key);
+
+            var permitido = fila.Permitido;
+
+            /*
+              LAS CONCESIONES EXTRA, QUE NO PASAN POR EL CATALOGO.
+
+              Van ANTES de resolver el mapa a proposito: casi todos estos
+              botones no estan mapeados ni se pueden derivar -btnPagosCascos,
+              btnNuevaNotaCredito, btnGarantia...-, asi que el `continue` de
+              abajo los descartaria antes de llegar aqui. Y son claves de otra
+              pantalla (o de otro boton de esta), asi que tampoco estan en el
+              catalogo de la familia: por eso no pasan por su comprobacion. Ver
+              la explicacion larga en LegacyModuleBinding.ConcesionesExtra.
+
+              SOLO SUMAN, NUNCA NIEGAN. Si este boton esta apagado, la clave no
+              se mete en `deny`: su dueno es el boton canonico, y negarla desde
+              aqui le borraria el permiso a quien si lo tiene por la via normal.
+              Un boton apagado aqui significa "este boton no la concede", no
+              "esta clave esta prohibida".
+            */
+            if (permitido
+                && binding.ConcesionesExtra is { Count: > 0 } extras
+                && extras.TryGetValue(nombre, out var claveExtra))
+            {
+                allow.Add(claveExtra);
+            }
+
+            // EL MISMO orden que LoadLegacyModuleCatalogAsync: manda el mapa de
+            // la forma y solo si no mapeo el boton se deriva con la tabla de
+            // verbos. Si se resolviera distinto que alla, se concederian claves
+            // que el catalogo no publica (o al reves) y la pantalla de permisos
+            // dejaria de cuadrar con lo que el snapshot entrega.
+            if (!binding.Map.TryGetValue(nombre, out var mapped))
+            {
+                var derivada = DerivarClaveLegacy(
+                    nombre,
+                    binding.Prefijo ?? binding.ModuleKey,
+                    binding.ModuleName,
+                    fila.ProcesoDescripcion);
+                if (derivada is null)
+                    continue;
+                mapped = derivada.Value;
+            }
+
+            if (!ventasCatalog.ContainsKey(mapped.Key))
+                continue;
+
+            if (permitido) allow.Add(mapped.Key);
+            else deny.Add(mapped.Key);
         }
 
+        // Un boton concedido gana sobre el mismo nombre negado en otro boton que
+        // produce la misma clave. Es la consecuencia directa de la regla de
+        // arriba: "cualquiera de los que la producen" significa que basta uno.
+        deny.ExceptWith(allow);
         return (allow, deny);
     }
 
@@ -3753,10 +4865,37 @@ WHERE UPPER(LTRIM(RTRIM(f.Descripcion))) = @Forma
         */
         var activeModules = await GetActiveModulesAsync(conn, empresaId, ct);
 
-        foreach (var action in ventasCatalog.Values)
+        /*
+          UN BOTON DE MAC31 PUEDE TENER DOS CLAVES, Y ANTES DECIDIA LA ULTIMA.
+
+          Medido el 2026-10-12 en Produccion_svr: conceder
+          `cobranza.cobranzas.consultar` dejaba el btnBuscar de CONSULTA DE
+          COBRANZAS en IDStatus = 2, o sea que CONCEDER APAGABA. La causa es que
+          dos claves distintas apuntan al MISMO IDProceso, a proposito y
+          documentado: esa forma la alimentan las familias "cobranza." y
+          "cobranzas." (ver PermissionService.Familias.Cobros.cs), y
+          btnModificarRFC es "clientes.rfc.abrir" en una pantalla y
+          "clientes.facturacion.editar" en la otra. Al recorrer el catalogo
+          clave por clave, la primera escribia 1 y la segunda 2 sobre la misma
+          fila: ganaba el orden del diccionario.
+
+          Asi que se agrupa por IDProceso y se decide una sola vez. La regla es
+          "CUALQUIER SI GANA": si alguna de las claves de ese boton esta
+          concedida, el boton se enciende. Nunca al contrario, porque la
+          alternativa -que cualquier NO apague- convierte un detalle de como
+          esta partido el catalogo en una revocacion de un permiso real de
+          Mac31, que es justo lo que no puede pasar.
+
+          Y para APAGAR se exige que TODAS sus claves esten en modulos
+          encendidos. Con una sola clave escondida -su modulo apagado- la
+          pantalla no ensenó ese boton completo, asi que apagarlo seria quitar
+          algo que nadie vio ni pidio quitar: el accidente de agosto otra vez,
+          por la puerta de al lado.
+        */
+        foreach (var grupo in ventasCatalog.Values.GroupBy(a => a.LegacyProcessId))
         {
-            var loTiene = effective.Contains(action.Key);
-            if (!loTiene && !IsPermissionInActiveModule(action.Key, activeModules))
+            var loTiene = grupo.Any(a => effective.Contains(a.Key));
+            if (!loTiene && !grupo.All(a => IsPermissionInActiveModule(a.Key, activeModules)))
                 continue;
 
             await using var cmd = new SqlCommand("dbo.sp_n_ActualizarUsuarioFormaProceso", conn)
@@ -3764,7 +4903,7 @@ WHERE UPPER(LTRIM(RTRIM(f.Descripcion))) = @Forma
                 CommandType = CommandType.StoredProcedure
             };
             cmd.Parameters.Add(new SqlParameter("@IDUsuario", SqlDbType.Int) { Value = legacyUserId.Value });
-            cmd.Parameters.Add(new SqlParameter("@IDProceso", SqlDbType.Int) { Value = action.LegacyProcessId });
+            cmd.Parameters.Add(new SqlParameter("@IDProceso", SqlDbType.Int) { Value = grupo.Key });
             cmd.Parameters.Add(new SqlParameter("@IDStatus", SqlDbType.Int) { Value = loTiene ? 1 : 2 });
             cmd.Parameters.Add(new SqlParameter("@IDUsuarioMovimiento", SqlDbType.Int) { Value = movementUserId });
             await cmd.ExecuteNonQueryAsync(ct);
@@ -3814,6 +4953,15 @@ WHERE EmpresaId = @EmpresaId
 
     private static async Task<int?> ResolveLegacyUserIdAsync(SqlConnection conn, int empresaId, Guid userId, CancellationToken ct)
     {
+        /*
+          Ver _memoDeUsuarioLegacy: en el bootstrap esto se preguntaba 2080
+          veces -una por usuario y por familia- y siempre contesta lo mismo.
+        */
+        var llave = $"usuariolegacy|{conn.Database}|{empresaId}|{userId}";
+        var memoria = _memoDeLaPeticion.Value;
+        if (memoria is not null && memoria.TryGetValue(llave, out var guardado) && guardado is int?[] caja)
+            return caja[0];
+
         var hasLegacyColumn = await ColumnExistsAsync(conn, "UsuarioWeb", "LegacyUserId", ct);
         var sql = hasLegacyColumn
             ? @"
@@ -3836,9 +4984,15 @@ WHERE uw.EmpresaId = @EmpresaId
         cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
         cmd.Parameters.Add(new SqlParameter("@UsuarioWebId", SqlDbType.UniqueIdentifier) { Value = userId });
         var raw = await cmd.ExecuteScalarAsync(ct);
-        if (raw is null || raw == DBNull.Value)
-            return null;
-        return Convert.ToInt32(raw, CultureInfo.InvariantCulture);
+
+        var id = raw is null || raw == DBNull.Value
+            ? (int?)null
+            : Convert.ToInt32(raw, CultureInfo.InvariantCulture);
+
+        /* En una caja para poder guardar tambien el "no se encontro" (null) sin
+           que el diccionario lo confunda con "no esta memorizado". */
+        if (memoria is not null) memoria[llave] = new[] { id };
+        return id;
     }
 
     private static async Task<int> ResolveMovementLegacyUserIdAsync(SqlConnection conn, CancellationToken ct)
@@ -3867,6 +5021,11 @@ WHERE EmpresaId = @EmpresaId
 
     private static async Task<bool> ColumnExistsAsync(SqlConnection conn, string tableName, string columnName, CancellationToken ct)
     {
+        /* Ver _memoDeEsquema: esta pregunta se hacia 2080 veces por peticion. */
+        var llave = $"col|{conn.Database}|{tableName}|{columnName}";
+        if (_memoDeEsquema.TryGetValue(llave, out var guardado) && guardado.Hasta > DateTime.UtcNow)
+            return guardado.Existe;
+
         await using var cmd = new SqlCommand(@"
 SELECT 1
 FROM sys.columns c
@@ -3876,7 +5035,10 @@ WHERE t.name = @TableName
         cmd.Parameters.Add(new SqlParameter("@TableName", SqlDbType.NVarChar, 128) { Value = tableName });
         cmd.Parameters.Add(new SqlParameter("@ColumnName", SqlDbType.NVarChar, 128) { Value = columnName });
         var raw = await cmd.ExecuteScalarAsync(ct);
-        return raw is not null && raw != DBNull.Value;
+
+        var existe = raw is not null && raw != DBNull.Value;
+        _memoDeEsquema[llave] = (existe, DateTime.UtcNow.Add(SchemaCacheTtl));
+        return existe;
     }
 
     private static PermisosWebPermissionItem EnrichPermissionItem(
@@ -4070,8 +5232,62 @@ WHERE t.name = @TableName
         if (!await TableExistsAsync(conn, "WModulo", ct))
             return null;
 
+        /*
+          UN MODULO APAGADO PARA LA EMPRESA TAMPOCO VALE POR URL DIRECTA.
+
+          Antes esto solo miraba `WModulo.IdStatus = 1`, o sea el interruptor
+          GLOBAL de la base, e ignoraba por completo `WModuloEmpresa.Activo`,
+          que es el de cada empresa. El agujero que dejaba: apagar un modulo
+          desde Permisos -> Modulos le quitaba la tarjeta del Inicio y **no le
+          quitaba nada al API**. Quien tuviera el permiso seguia usandolo con
+          una peticion directa, que es exactamente lo que no debe pasar.
+
+          Ahora hace falta lo de siempre Y que la empresa lo tenga encendido.
+
+          EL `EXISTS` VA POR EmpresaId Y NO POR EmpresaClave, Y ES A SABIENDAS.
+          Este metodo no recibe la clave de empresa del token, y `MacZ` tiene
+          dos ('zaragoza' y 'aviacion') bajo el mismo EmpresaId. Asi que un
+          modulo encendido para una de las dos cuenta como activo para las dos.
+          Es mas flojo de lo ideal, pero es lo seguro: lo contrario —adivinar la
+          clave aqui— le quitaria permisos a la empresa equivocada, y ese error
+          se paga en accesos perdidos. Lo estricto por empresa ya lo hace la
+          consulta del mosaico, que si recibe la clave.
+
+          IMPACTO MEDIDO ANTES DE PONERLO, en las dos bases: de todos los
+          usuarios con permisos de familias hoy apagadas, el unico es JUAN, que
+          es SuperAdmin y no pasa por aqui. Ningun rol concede ninguna. O sea
+          que nadie pierde un acceso que estuviera usando.
+        */
+        var hayTablaPorEmpresa = await TableExistsAsync(conn, "WModuloEmpresa", ct);
+        var hayRenglonesPorEmpresa = false;
+        if (hayTablaPorEmpresa)
+        {
+            await using var cuenta = new SqlCommand(
+                "SELECT COUNT(*) FROM dbo.WModuloEmpresa WHERE EmpresaId = @EmpresaId;", conn);
+            cuenta.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+            hayRenglonesPorEmpresa = Convert.ToInt32(await cuenta.ExecuteScalarAsync(ct) ?? 0) > 0;
+        }
+
+        /*
+          SIN RENGLONES NO SE PUEDE COMPROBAR, Y ENTONCES NO SE RECORTA.
+
+          Una base a medio migrar, sin la tabla o sin un solo renglon para esta
+          empresa, no esta diciendo "todo apagado": esta diciendo "aqui no hay
+          nada que mirar". Tratarlo como un no dejaria a la empresa entera sin
+          un permiso, y el sintoma seria todo el mundo con 403 de golpe.
+        */
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        await using var cmd = new SqlCommand(@"
+        await using var cmd = new SqlCommand(hayRenglonesPorEmpresa ? @"
+SELECT m.ModuloClave
+FROM dbo.WModulo m
+WHERE m.EmpresaId = @EmpresaId
+  AND m.IdStatus = 1
+  AND EXISTS (
+      SELECT 1
+      FROM dbo.WModuloEmpresa me
+      WHERE me.EmpresaId = m.EmpresaId
+        AND me.ModuloClave = m.ModuloClave
+        AND me.Activo = 1);" : @"
 SELECT ModuloClave
 FROM dbo.WModulo
 WHERE EmpresaId = @EmpresaId
@@ -4245,23 +5461,49 @@ WHERE EmpresaId = @EmpresaId
         var columnas = await GetTableColumnsAsync(conn, "WPermiso", ct);
         var hayDescripcion = columnas.Contains("Descripcion");
 
-        /* Como esta hoy. Se piden los de la empresa entera y no los 91 por
-           nombre: es la misma ida y vuelta y no hay que armar 91 parametros. */
-        var actuales = new Dictionary<string, (string Nombre, string Descripcion)>(StringComparer.OrdinalIgnoreCase);
-        await using (var lectura = new SqlCommand(
-            hayDescripcion
-                ? "SELECT Clave, ISNULL(Nombre, '') AS Nombre, ISNULL(Descripcion, '') AS Descripcion FROM dbo.WPermiso WHERE EmpresaId = @EmpresaId;"
-                : "SELECT Clave, ISNULL(Nombre, '') AS Nombre, '' AS Descripcion FROM dbo.WPermiso WHERE EmpresaId = @EmpresaId;",
-            conn))
+        /*
+          UNA LECTURA POR PETICION, NO UNA POR FORMA.
+
+          A este metodo se entra una vez por cada forma de Mac31 -son ~70- y
+          las ~70 veces se pedia el catalogo ENTERO de la empresa. Es el mismo
+          dato: lo que cambia entre llamadas son las semillas que se comparan
+          contra el, no el catalogo.
+
+          Se guarda en la memoria de la peticion y se mantiene al dia a mano
+          mas abajo, cuando se escribe una clave. Asi la comparacion siguiente
+          ve exactamente lo que acaba de quedar en la base.
+        */
+        var llaveDelCatalogo = $"catalogoWPermiso|{conn.Database}|{empresaId}";
+        var memoria = _memoDeLaPeticion.Value;
+        Dictionary<string, (string Nombre, string Descripcion)>? actuales = null;
+
+        if (memoria is not null
+            && memoria.TryGetValue(llaveDelCatalogo, out var guardado)
+            && guardado is Dictionary<string, (string Nombre, string Descripcion)> vigente)
         {
-            lectura.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
-            await using var reader = await lectura.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct))
+            actuales = vigente;
+        }
+
+        if (actuales is null)
+        {
+            actuales = new Dictionary<string, (string Nombre, string Descripcion)>(StringComparer.OrdinalIgnoreCase);
+            await using (var lectura = new SqlCommand(
+                hayDescripcion
+                    ? "SELECT Clave, ISNULL(Nombre, '') AS Nombre, ISNULL(Descripcion, '') AS Descripcion FROM dbo.WPermiso WHERE EmpresaId = @EmpresaId;"
+                    : "SELECT Clave, ISNULL(Nombre, '') AS Nombre, '' AS Descripcion FROM dbo.WPermiso WHERE EmpresaId = @EmpresaId;",
+                conn))
             {
-                var clave = reader.GetString(0);
-                if (!string.IsNullOrWhiteSpace(clave))
-                    actuales[clave.Trim()] = (reader.GetString(1), reader.GetString(2));
+                lectura.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
+                await using var reader = await lectura.ExecuteReaderAsync(ct);
+                while (await reader.ReadAsync(ct))
+                {
+                    var clave = reader.GetString(0);
+                    if (!string.IsNullOrWhiteSpace(clave))
+                        actuales[clave.Trim()] = (reader.GetString(1), reader.GetString(2));
+                }
             }
+
+            if (memoria is not null) memoria[llaveDelCatalogo] = actuales;
         }
 
         var escritos = 0;
@@ -4279,19 +5521,46 @@ WHERE EmpresaId = @EmpresaId
                 continue;
             }
 
+            /*
+              PRIMERO UPDATE Y SOLO SI NO HABIA, INSERT. NO AL CONTRARIO.
+
+              Antes esto era `IF EXISTS ... UPDATE ... ELSE INSERT`, que por
+              clave parece seguro y no lo es cuando hay DOS cosas sembrando a
+              la vez. Y las hay: `CatalogoDePermisosHostedService` siembra al
+              arrancar, y la primera peticion que entra siembra tambien al
+              armar su snapshot. Las dos preguntan "existe?", las dos oyen
+              "no", las dos insertan, y la segunda choca con UQ_WPermiso.
+
+              Reventaba de verdad, no en teoria: el 2026-10-10, al registrar
+              las familias heredadas nuevas, /api/me contesto
+              "Violation of UNIQUE KEY constraint 'UQ_WPermiso' ...
+              (1, recordatorios.consultar)" en la PRIMERA peticion
+              (traceId ...:00000001), y el usuario se quedo con CERO permisos,
+              porque la excepcion tumbo el armado del snapshot entero.
+
+              La carrera llevaba aqui desde siempre, pero no disparaba porque
+              no habia claves nuevas que insertar: con el catalogo ya sembrado,
+              todas las vueltas eran UPDATE. Al heredar los modulos nuevos
+              aparecieron ~100 claves nuevas y la ventana se lleno de INSERT.
+
+              Con el UPDATE primero y el INSERT solo si `@@ROWCOUNT = 0`, y el
+              NOT EXISTS tomando UPDLOCK/HOLDLOCK, la insercion es una sola
+              sentencia atomica: el segundo en llegar no inserta y no rompe.
+            */
             await using var cmd = new SqlCommand(@"
-IF EXISTS (SELECT 1 FROM dbo.WPermiso WHERE EmpresaId = @EmpresaId AND Clave = @Clave)
-BEGIN
-    UPDATE dbo.WPermiso
-       SET Nombre = @Nombre,
-           Descripcion = CASE WHEN COL_LENGTH('dbo.WPermiso','Descripcion') IS NOT NULL THEN @Descripcion ELSE Descripcion END
-     WHERE EmpresaId = @EmpresaId
-       AND Clave = @Clave;
-END
-ELSE
+UPDATE dbo.WPermiso
+   SET Nombre = @Nombre,
+       Descripcion = CASE WHEN COL_LENGTH('dbo.WPermiso','Descripcion') IS NOT NULL THEN @Descripcion ELSE Descripcion END
+ WHERE EmpresaId = @EmpresaId
+   AND Clave = @Clave;
+
+IF @@ROWCOUNT = 0
 BEGIN
     INSERT INTO dbo.WPermiso (EmpresaId, Clave, Nombre, Descripcion, FechaCreacion)
-    VALUES (@EmpresaId, @Clave, @Nombre, @Descripcion, SYSUTCDATETIME());
+    SELECT @EmpresaId, @Clave, @Nombre, @Descripcion, SYSUTCDATETIME()
+    WHERE NOT EXISTS (
+        SELECT 1 FROM dbo.WPermiso WITH (UPDLOCK, HOLDLOCK)
+        WHERE EmpresaId = @EmpresaId AND Clave = @Clave);
 END", conn);
             cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
             cmd.Parameters.Add(new SqlParameter("@Clave", SqlDbType.NVarChar, 200) { Value = seed.Key });
@@ -4299,6 +5568,11 @@ END", conn);
             cmd.Parameters.Add(new SqlParameter("@Descripcion", SqlDbType.NVarChar, 500) { Value = descripcion });
             await cmd.ExecuteNonQueryAsync(ct);
             escritos++;
+
+            /* El memo de arriba tiene que reflejar lo que acaba de quedar en la
+               base: si no, la siguiente forma volveria a creer que esta clave
+               esta desactualizada y la escribiria otra vez. */
+            actuales[seed.Key] = (seed.Name, descripcion);
         }
 
         return escritos;

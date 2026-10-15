@@ -103,9 +103,9 @@ public abstract class ConsultaLegacyRepositoryBase
         };
         parametros(cmd.Parameters);
 
-        var conjunto = new DataSet();
-        using var adapter = new SqlDataAdapter(cmd);
-        await Task.Run(() => adapter.Fill(conjunto), ct);
+        // Asincrono de verdad: `adapter.Fill` bloquea un hilo del ThreadPool
+        // durante toda la consulta. Ver LlenadoAsincrono.
+        var conjunto = await LlenadoAsincrono.LlenarAsync(cmd, ct);
 
         var salida = new List<ConsultaFilasResponse>();
         foreach (DataTable tabla in conjunto.Tables)
@@ -129,10 +129,8 @@ public abstract class ConsultaLegacyRepositoryBase
         };
         parametros(cmd.Parameters);
 
-        var tabla = new DataTable();
-        using var adapter = new SqlDataAdapter(cmd);
-        await Task.Run(() => adapter.Fill(tabla), ct);
-        return tabla;
+        var conjunto = await LlenadoAsincrono.LlenarAsync(cmd, ct);
+        return conjunto.Tables.Count > 0 ? conjunto.Tables[0] : new DataTable();
     }
 
     private static List<Dictionary<string, object?>> TablaAFilas(DataTable tabla)

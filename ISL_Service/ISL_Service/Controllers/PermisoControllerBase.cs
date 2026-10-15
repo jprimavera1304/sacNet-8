@@ -130,6 +130,72 @@ public abstract class PermisoControllerBase : ControllerBase
     }
 
     /// <summary>
+    /// Para la LECTURA PRINCIPAL de un modulo: la lista que se ve nada mas
+    /// abrirlo. Pasa con la clave de lectura, y tambien con la entrada al
+    /// modulo mas cualquier permiso de trabajo suyo.
+    /// </summary>
+    /// <remarks>
+    /// POR QUE NO BASTA LA CLAVE DE LECTURA, Y DE DONDE SALE ESTO.
+    ///
+    /// En Mac31 el permiso NO decide si la pantalla se abre: decide si el BOTON
+    /// se puede pulsar. Quien tiene NUEVO y no tiene VER entra igual a CONSULTA
+    /// DE PROVEEDORES, ve la rejilla, y el boton VER le sale en gris. El web
+    /// usaba esa misma clave ("proveedores.ver") como candado de LA PANTALLA
+    /// ENTERA, asi que la misma persona se quedaba fuera.
+    ///
+    /// Medido el 2026-10-12 contra las dos bases, pasaba en siete sitios:
+    /// proveedores (XOCHITL y JAZMIN, Tauro), productos (NAOLANY), usuarios
+    /// (JANET, y QA_AMBOS en Zaragoza), catalogos y obra (DEMO en Zaragoza) y
+    /// permisos_modulos (QA_PERMISOS). A todas la tarjeta se les dibujaba en el
+    /// Inicio y la pantalla las rebotaba, que es el peor de los dos errores.
+    ///
+    /// LO QUE ESTO **NO** HACE: no concede la clave de lectura. Quien entre asi
+    /// sigue sin poder abrir el detalle ni pulsar lo que no tenga; cada accion
+    /// conserva su propio candado, igual que los botones grises de Mac31.
+    ///
+    /// Y NO ABRE LA PUERTA A QUIEN NO TRABAJA AHI: se exigen LAS DOS cosas, la
+    /// entrada del modulo y algun permiso suyo. Con solo la entrada entraria
+    /// DEMO, que tiene las 34 puertas de plataforma y ni un permiso de Mac31;
+    /// es la misma medicion que obligo a poner dos condiciones en la tarjeta
+    /// del Inicio (Web/QR_Web/docs2/src/nucleo/entradaDeModulo.ts).
+    /// </remarks>
+    /// <param name="modulo">La clave del modulo, sin sufijo: "proveedores".</param>
+    /// <param name="clavesDeLectura">Las que bastan por si solas.</param>
+    /// <param name="familias">
+    /// Los prefijos de los permisos de trabajo del modulo. Si no se pasa
+    /// ninguno se usa "<paramref name="modulo"/>.". Hace falta pasarlo cuando
+    /// la familia no se llama como el modulo.
+    /// </param>
+    protected async Task<IActionResult?> ExigirLecturaDeModuloAsync(
+        string modulo,
+        string[] clavesDeLectura,
+        CancellationToken ct,
+        params string[] familias)
+    {
+        var puede = await LeerPermisosAsync(ct);
+        if (!puede.TokenValido)
+            return Unauthorized(new { ok = false, message = "Token invalido." });
+        if (puede.TodoPermitido) return null;
+        if (puede.Tiene(clavesDeLectura)) return null;
+
+        var entrada = $"{modulo}.ver_modulo";
+        if (puede.Tiene(entrada))
+        {
+            var prefijos = familias is { Length: > 0 } ? familias : new[] { $"{modulo}." };
+            var trabaja = puede.Permisos.Any(p =>
+                !p.EndsWith(".ver_modulo", StringComparison.OrdinalIgnoreCase)
+                && prefijos.Any(pre => p.StartsWith(pre, StringComparison.OrdinalIgnoreCase)));
+            if (trabaja) return null;
+        }
+
+        return StatusCode(StatusCodes.Status403Forbidden, new
+        {
+            ok = false,
+            message = $"No tienes permiso ({string.Join(" o ", clavesDeLectura)})."
+        });
+    }
+
+    /// <summary>
     /// Devuelve el 403 (o 401) a regresar si al usuario le faltan TODOS los
     /// permisos de la lista, o null si puede pasar.
     /// </summary>

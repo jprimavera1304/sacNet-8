@@ -14,15 +14,56 @@ public class PermisosWebController : ControllerBase
     private readonly IPermissionService _permissions;
     private readonly ICurrentUserAccessor _currentUserAccessor;
 
-    public PermisosWebController(IPermissionService permissions, ICurrentUserAccessor currentUserAccessor)
+    /*
+      EL GUARDIA QUE DECIDE LO QUE LA POLITICA NO PUEDE DECIDIR.
+
+      Los [Authorize(Policy = "perm:...")] de abajo contestan "¿tiene la llave
+      de esta pantalla?" y se quedan ahi. La pregunta que faltaba depende del
+      CUERPO de la peticion: "¿lo que esta intentando guardar cabe dentro de lo
+      que el mismo tiene, y deja a alguien capaz de deshacerlo?".
+
+      Se midio con curl contra el backend local (MacZ) ANTES de ponerlo: un
+      usuario de prueba con 11 claves, TODAS de administracion de permisos y
+      ninguna de negocio, conseguia 200 en los cuatro ataques — concederse
+      "empleados.sueldo.ver" y los "usuarios.*", degradar el rol de sistema
+      ADMIN de 17 claves a 1, firmarse ajustes individuales, y apagar los
+      modulos "permisos_roles" y "permisos_modulos", tras lo cual su propio
+      /api/me ya no traia ninguna clave "permisos*" y volver a prenderlos
+      contestaba 403. Sin vuelta por API.
+
+      Los frenos existian en el front (ModalPermisosDeRol.tsx no te deja
+      quitarte a ti mismo; nucleo/permisosWeb.ts marca los modulos del sistema
+      como no apagables), o sea que no existian.
+    */
+    private readonly IGuardiaDePermisos _guardia;
+
+    public PermisosWebController(
+        IPermissionService permissions,
+        ICurrentUserAccessor currentUserAccessor,
+        IGuardiaDePermisos guardia)
     {
         _permissions = permissions;
         _currentUserAccessor = currentUserAccessor;
+        _guardia = guardia;
     }
+
+    /// <summary>
+    /// El 403 del guardia, con SU mensaje tal cual.
+    /// </summary>
+    /// <remarks>
+    /// No se resume ni se cambia por un "No tienes permiso": el mensaje nombra
+    /// las claves que faltan o a quien hay que darle la llave antes de
+    /// reintentar, y eso es la diferencia entre que la persona lo arregle sola
+    /// y que levante el telefono. El formato { ok, message } es el mismo que ya
+    /// devuelve PermisoControllerBase, para que el front no tenga que
+    /// distinguir de donde salio el 403.
+    /// </remarks>
+    private IActionResult Prohibido(EscaladaDePermisosException ex) =>
+        StatusCode(StatusCodes.Status403Forbidden, new { ok = false, message = ex.Message });
 
     [HttpGet("bootstrap")]
     [HttpGet("/api/capacidades/bootstrap")]
-    [Authorize(Policy = "perm:permisosweb.bootstrap")]
+    [Authorize(Policy = "perm:permisosweb.bootstrap|app_movil.permisosweb.bootstrap")]
     public async Task<IActionResult> Bootstrap(CancellationToken ct)
     {
         if (!TryGetEmpresaId(out var empresaId))
@@ -45,7 +86,7 @@ public class PermisosWebController : ControllerBase
     }
 
     [HttpGet("roles/bootstrap")]
-    [Authorize(Policy = "perm:permisos_roles.ver_modulo")]
+    [Authorize(Policy = "perm:permisos_roles.ver_modulo|app_movil.permisos_roles.ver")]
     public async Task<IActionResult> RolesBootstrap(CancellationToken ct)
     {
         if (!TryGetEmpresaId(out var empresaId))
@@ -66,7 +107,7 @@ public class PermisosWebController : ControllerBase
     }
 
     [HttpGet("catalogo")]
-    [Authorize(Policy = "perm:permisos_modulos.ver_modulo")]
+    [Authorize(Policy = "perm:permisos_modulos.ver_modulo|app_movil.permisos_modulos.ver")]
     public async Task<IActionResult> Catalog(CancellationToken ct)
     {
         if (!TryGetEmpresaId(out var empresaId))
@@ -79,7 +120,7 @@ public class PermisosWebController : ControllerBase
 
     [HttpPut("modulos/{moduleKey}/status")]
     [HttpPut("catalogo/modulos/{moduleKey}/status")]
-    [Authorize(Policy = "perm:permisos_modulos.activar")]
+    [Authorize(Policy = "perm:permisos_modulos.activar|app_movil.permisos_modulos.activar")]
     public async Task<IActionResult> SetModuleStatusByRoute(
         [FromRoute] string moduleKey,
         [FromBody] PermisosWebSetModuleStatusRequest request,
@@ -97,8 +138,14 @@ public class PermisosWebController : ControllerBase
 
         try
         {
-            var updated = await _permissions.SetModuleStatusAsync(empresaId, routeKey, request?.IdStatus ?? 0, ct);
+            var idStatus = request?.IdStatus ?? 0;
+            await _guardia.ExigirPuedeCambiarEstatusDeModuloAsync(User, empresaId, routeKey, idStatus, ct);
+            var updated = await _permissions.SetModuleStatusAsync(empresaId, routeKey, idStatus, ct);
             return Ok(new { ok = true, updated });
+        }
+        catch (EscaladaDePermisosException ex)
+        {
+            return Prohibido(ex);
         }
         catch (ArgumentException ex)
         {
@@ -111,7 +158,7 @@ public class PermisosWebController : ControllerBase
     }
 
     [HttpPut("modulos/status")]
-    [Authorize(Policy = "perm:permisos_modulos.activar")]
+    [Authorize(Policy = "perm:permisos_modulos.activar|app_movil.permisos_modulos.activar")]
     public async Task<IActionResult> SetModuleStatus(
         [FromBody] PermisosWebSetModuleStatusRequest request,
         CancellationToken ct)
@@ -124,8 +171,16 @@ public class PermisosWebController : ControllerBase
 
         try
         {
+            // La MISMA comprobacion que en la variante con la clave en la ruta.
+            // Son dos puertas al mismo cambio: cerrar una sola dejaria el
+            // apagado abierto por la otra y nadie lo notaria.
+            await _guardia.ExigirPuedeCambiarEstatusDeModuloAsync(User, empresaId, request.ModuloClave, request.IdStatus, ct);
             var updated = await _permissions.SetModuleStatusAsync(empresaId, request.ModuloClave, request.IdStatus, ct);
             return Ok(new { ok = true, updated });
+        }
+        catch (EscaladaDePermisosException ex)
+        {
+            return Prohibido(ex);
         }
         catch (ArgumentException ex)
         {
@@ -139,7 +194,7 @@ public class PermisosWebController : ControllerBase
 
     [HttpPut("roles/{roleCode}/permissions")]
     [HttpPut("/api/capacidades/roles/{roleCode}/permissions")]
-    [Authorize(Policy = "perm:permisosweb.roles.editar")]
+    [Authorize(Policy = "perm:permisosweb.roles.editar|app_movil.permisos_roles.editar")]
     public async Task<IActionResult> SaveRolePermissions(
         [FromRoute] string roleCode,
         [FromBody] PermisosWebUpdateRolePermissionsRequest request,
@@ -160,7 +215,12 @@ public class PermisosWebController : ControllerBase
         var normalizedPermissions = request.Permissions ?? new List<string>();
         try
         {
+            await _guardia.ExigirPuedeEditarRolAsync(User, empresaId, roleCode, normalizedPermissions, ct);
             await _permissions.UpsertRolePermissionsAsync(empresaId, roleCode, normalizedPermissions, ct);
+        }
+        catch (EscaladaDePermisosException ex)
+        {
+            return Prohibido(ex);
         }
         catch (ArgumentException ex)
         {
@@ -175,7 +235,7 @@ public class PermisosWebController : ControllerBase
     }
 
     [HttpPost("roles")]
-    [Authorize(Policy = "perm:permisosweb.roles.editar")]
+    [Authorize(Policy = "perm:permisosweb.roles.editar|app_movil.permisos_roles.editar")]
     public async Task<IActionResult> CreateRole(
         [FromBody] PermisosWebCreateRoleRequest request,
         CancellationToken ct)
@@ -203,7 +263,7 @@ public class PermisosWebController : ControllerBase
 
     [HttpPut("usuarios/{userId:guid}/overrides")]
     [HttpPut("/api/capacidades/usuarios/{userId:guid}/overrides")]
-    [Authorize(Policy = "perm:permisosweb.overrides.editar")]
+    [Authorize(Policy = "perm:permisosweb.overrides.editar|app_movil.permisos_usuarios.editar")]
     public async Task<IActionResult> SaveUserOverrides(
         [FromRoute] Guid userId,
         [FromBody] PermisosWebUpdateUserOverridesRequest request,
@@ -223,7 +283,15 @@ public class PermisosWebController : ControllerBase
 
         try
         {
-            await _permissions.UpsertUserOverridesAsync(empresaId, userId, allow, deny, ct);
+            await _guardia.ExigirPuedeEditarOverridesAsync(User, empresaId, userId, allow, deny, ct);
+            // true: el administrador acaba de decidir el estado completo del
+            // usuario en la pantalla de permisos, asi que lo que desmarco
+            // tambien tiene que revocarse en Mac31.
+            await _permissions.UpsertUserOverridesAsync(empresaId, userId, allow, deny, sincronizarConLegacy: true, ct);
+        }
+        catch (EscaladaDePermisosException ex)
+        {
+            return Prohibido(ex);
         }
         catch (ArgumentException ex)
         {
@@ -238,7 +306,7 @@ public class PermisosWebController : ControllerBase
     }
 
     [HttpPost("catalogo/sync")]
-    [Authorize(Policy = "perm:permisosweb.catalogo.editar")]
+    [Authorize(Policy = "perm:permisosweb.catalogo.editar|app_movil.permisos_modulos.activar")]
     public async Task<IActionResult> SyncCatalog(
         [FromBody] PermisosWebSyncCatalogRequest? request,
         CancellationToken ct)
@@ -262,7 +330,7 @@ public class PermisosWebController : ControllerBase
     }
 
     [HttpPost("catalogo/permissions")]
-    [Authorize(Policy = "perm:permisosweb.catalogo.editar")]
+    [Authorize(Policy = "perm:permisosweb.catalogo.editar|app_movil.permisos_modulos.activar")]
     public async Task<IActionResult> CreatePermission(
         [FromBody] PermisosWebCreatePermissionRequest request,
         CancellationToken ct)

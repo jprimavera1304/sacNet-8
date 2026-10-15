@@ -11,6 +11,14 @@ namespace ISL_Service.Infrastructure.Repositories;
 /// <summary>
 /// Repository de Tarimas usando SP: sp_w_ConsultarTarimas, sp_w_InsertarTarima, sp_w_ActualizarTarima, sp_w_CancelarTarima.
 /// </summary>
+/*
+  LA CANCELACION SOLO LLEGA A LAS CONSULTAS.
+
+  Este repositorio escribe: cancelar a media escritura de legacy deja la
+  transaccion abierta y los candados puestos en una conexion que vuelve al pool.
+  Quien decide es CancelacionSegura, leyendo el propio comando; el porque esta
+  explicado ahi.
+*/
 public class TarimaRepository : ITarimaRepository
 {
     private readonly IConfiguration _configuration;
@@ -70,7 +78,7 @@ public class TarimaRepository : ITarimaRepository
         var outId = new SqlParameter("@IdTarima", SqlDbType.Int) { Direction = ParameterDirection.Output };
         cmd.Parameters.Add(outId);
 
-        await cmd.ExecuteNonQueryAsync(ct);
+        await cmd.ExecuteNonQueryAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
         return outId.Value is DBNull or null ? 0 : Convert.ToInt32(outId.Value);
     }
 
@@ -88,7 +96,7 @@ public class TarimaRepository : ITarimaRepository
         cmd.Parameters.AddWithValue("@Observaciones", string.IsNullOrWhiteSpace(request.Observaciones) ? DBNull.Value : request.Observaciones!.Trim());
         cmd.Parameters.AddWithValue("@UsuarioModificacion", string.IsNullOrWhiteSpace(usuarioModificacion) ? DBNull.Value : usuarioModificacion.Trim());
 
-        await cmd.ExecuteNonQueryAsync(ct);
+        await cmd.ExecuteNonQueryAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
     }
 
     public async Task CambiarStatusTarimaAsync(int idTarima, int idStatus, string? usuarioModificacion, CancellationToken ct = default)
@@ -102,6 +110,6 @@ public class TarimaRepository : ITarimaRepository
         cmd.Parameters.AddWithValue("@IdStatus", idStatus);
         cmd.Parameters.AddWithValue("@UsuarioModificacion", string.IsNullOrWhiteSpace(usuarioModificacion) ? DBNull.Value : usuarioModificacion.Trim());
 
-        await cmd.ExecuteNonQueryAsync(ct);
+        await cmd.ExecuteNonQueryAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
     }
 }

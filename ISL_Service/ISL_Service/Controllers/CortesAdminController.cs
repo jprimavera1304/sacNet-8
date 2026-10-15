@@ -23,10 +23,18 @@ namespace ISL_Service.Controllers;
 [Authorize]
 public class CortesAdminController : PermisoControllerBase
 {
-    private static readonly string[] PermisosVer = { "cortes.ver" };
+    private static readonly string[] PermisosVer = { "cortes.ver", "app_movil.cortes.ver" };
     private static readonly string[] PermisosCrear = { "cortes.crear" };
-    private static readonly string[] PermisosCancelar = { "cortes.cancelar" };
-    private static readonly string[] PermisosVerCs = { "cortes.cs.ver" };
+    // El MISMO endpoint cancela cortes de caja y de centro de servicio, asi que
+    // esta clave del telefono habilita las dos. Separarlas pedia dos endpoints.
+    private static readonly string[] PermisosCancelar =
+        { "cortes.cancelar", "app_movil.cortes.cancelar" };
+    // Centro de servicio es OTRA clave, no la de caja: la misma pantalla del
+    // telefono cambia de modo con la capacidad `esCentroServicio` de la empresa
+    // y entonces pega a otro endpoint. Con solo `app_movil.cortes.ver` esa
+    // empresa seguia viendo 403.
+    private static readonly string[] PermisosVerCs =
+        { "cortes.cs.ver", "app_movil.cortes.cs.ver" };
     private static readonly string[] PermisosCrearCs = { "cortes.cs.crear" };
 
     private readonly IOperacionMacService _service;

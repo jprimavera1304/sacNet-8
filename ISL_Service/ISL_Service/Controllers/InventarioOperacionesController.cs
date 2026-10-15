@@ -28,9 +28,21 @@ namespace ISL_Service.Controllers;
 [Authorize]
 public class InventarioOperacionesController : PermisoControllerBase
 {
-    private static readonly string[] PermisoAjusteVer = { "inventario.ajustes.ver" };
-    private static readonly string[] PermisoAjusteCrear = { "inventario.ajustes.crear" };
-    private static readonly string[] PermisoAjusteCancelar = { "inventario.ajustes.cancelar" };
+    /*
+      LOS AJUSTES TIENEN DOS CANALES; LOS PEDIDOS DE INVENTARIO, UNO.
+
+      `inventario.ajustes.*` lleva su pareja `app_movil.` porque la pantalla de
+      Ajustes existe en el telefono y hasta ahora compartia el permiso del web:
+      negarselo en la app se lo negaba tambien en la computadora.
+
+      `inventario.pedidos.*` y `usados.tipos.editar` NO la llevan, y no es un
+      olvido: esas dos pantallas no existen en la app. Una clave `app_movil.`
+      que nada pide seria una casilla que alguien reparte creyendo que hace
+      algo.
+    */
+    private static readonly string[] PermisoAjusteVer = { "inventario.ajustes.ver", "app_movil.inventario.ajustes.ver" };
+    private static readonly string[] PermisoAjusteCrear = { "inventario.ajustes.crear", "app_movil.inventario.ajustes.crear" };
+    private static readonly string[] PermisoAjusteCancelar = { "inventario.ajustes.cancelar", "app_movil.inventario.ajustes.cancelar" };
     private static readonly string[] PermisoPedidoVer = { "inventario.pedidos.ver" };
     private static readonly string[] PermisoPedidoCrear = { "inventario.pedidos.crear" };
     private static readonly string[] PermisoPedidoCancelar = { "inventario.pedidos.cancelar" };

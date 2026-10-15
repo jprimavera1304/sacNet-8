@@ -49,9 +49,28 @@
 ///   "descuentos.ver_modulo") y tres pantallas distintas colgando del mismo
 ///   prefijo. Sin poder decir cual gobierna cual, se deja fuera: equivocarse
 ///   aqui apaga un modulo entero.
-/// * cobranza.* — no tiene NINGUN ".ver_modulo" en el catalogo. No se inventa
-///   uno: una clave que no esta sembrada no se puede conceder, y el modulo
-///   quedaria muerto para todos menos el SuperAdmin.
+/// * cobranza.* — no tiene NINGUN ".ver_modulo" propio en el catalogo. No se
+///   inventa uno: una clave que no esta sembrada no se puede conceder, y el
+///   modulo quedaria muerto para todos menos el SuperAdmin.
+///
+///   SE VOLVIO A ESTUDIAR EL 2026-10-10 Y SIGUE FUERA, AHORA CON NUMEROS.
+///   La tentacion es colgarlo de "cobros.ver_modulo", que es la entrada que la
+///   familia `cobranza.` ya DERIVA de `cobranza.ver` (el btnBuscar de
+///   ConsultarCobros). Pero esa derivacion solo alcanza a quien tenga ESE
+///   boton, y se midio quien tiene permisos de cobranza en Mac31 sin el:
+///
+///     Zaragoza (MacZ):        nadie. Los 8 con cuenta web lo tienen.
+///     Tauro (Produccion_svr): CUATRO usuarios reales —ADMIN, JANET, JESY y
+///                             NAOLANY— con botones en ConsultarCobranzas /
+///                             ConsultarConcentrados, SIN btnBuscar de
+///                             ConsultarCobros, y sin "cobros.ver_modulo" ni
+///                             "dinero_usados.ver_modulo" por web ni por rol.
+///
+///   O sea que poner el renglon dejaria a esos cuatro fuera de Cobranza en
+///   Tauro, en silencio. Cerrar esta puerta pide antes decidir de que permiso
+///   de Mac31 se deriva la entrada para esas otras dos pantallas; mientras eso
+///   no se decida, se respeta la regla de la casa: lo que no se comprobo no se
+///   cierra.
 /// * Las de administracion del propio modelo de permisos (permisosweb.*,
 ///   permisos_roles.*, permisos_usuarios.*, permisos_modulos.*) y las de
 ///   plomeria (seguridad.*, sincronizacion.*, huellas.*, empresas.*): no son
@@ -95,6 +114,33 @@ public static class EntradasDeModulo
 
         // Las que ya tenian entrada en el web y nadie comprobaba.
         ("facturacion.",        new[] { "facturacion.ver_modulo", "facturas.ver_modulo" }),
+        /*
+          REASIGNACION ES SU PROPIA PANTALLA, AUNQUE SUS CLAVES EMPIECEN CON
+          "cobros.".
+
+          Sin este renglon, la herencia de la familia "cobros.reasignar" servia
+          a medias: el mosaico de Reasignacion aparecia -porque el snapshot si
+          deriva "reasignacion.ver_modulo" desde Mac31- pero el backend seguia
+          exigiendo "cobros.ver_modulo" por detras, al caer la clave en el
+          renglon generico de abajo. O sea, la tarjeta se veia y daba 403.
+
+          Va ANTES que ("cobros.", ...) solo por legibilidad: la tabla se
+          recorre por prefijo MAS LARGO, asi que el orden del arreglo no decide.
+
+          "reasignacion.ver_modulo" esta sembrada en las DOS empresas
+          -comprobado en WPermiso de MacZ y de Produccion_svr el 2026-10-10-,
+          que es la condicion para poder exigirla: una entrada que no existe no
+          se puede conceder y dejaria el modulo muerto para todos.
+
+          Y NADIE PIERDE ACCESO, medido antes de ponerlo: este renglon cambia la
+          puerta de "cobros.ver_modulo" a "reasignacion.ver_modulo", asi que el
+          riesgo seria alguien que tuviera la primera y no la segunda. Los
+          usuarios con algun boton de VentasReasignacion y cuenta web son DEMO,
+          NORMA y RICARDO en MacZ y DEMO en Produccion_svr, y los cuatro tienen
+          btnReasignarNotasCliente, que es de donde se deriva justamente
+          "reasignacion.ver_modulo". O sea: cero afectados en las dos empresas.
+        */
+        ("cobros.reasignar",    new[] { "reasignacion.ver_modulo" }),
         ("cobros.",             new[] { "cobros.ver_modulo", "dinero_usados.ver_modulo" }),
         ("cobranzas.",          new[] { "cobranzas.ver_modulo" }),
         ("almacen_cascos.",     new[] { "almacen_cascos.ver_modulo" }),
@@ -123,6 +169,20 @@ public static class EntradasDeModulo
         ("configuracionroltorneo.", new[] { "configuracionroltorneo.ver_modulo" }),
         ("generacionroltorneo.",new[] { "generacionroltorneo.ver_modulo" })
     };
+
+    /// <summary>
+    /// Todas las entradas de modulo que esta tabla puede exigir.
+    /// </summary>
+    /// <remarks>
+    /// Las usa <see cref="ClavesQueProtegenAlgo"/>: una entrada decide sin
+    /// aparecer en ningun [Authorize] ni en ningun arreglo de controlador
+    /// —la exige el manejador de autorizacion para cualquier clave de su
+    /// modulo—, asi que sin esta propiedad las 40 y tantas se verian como
+    /// claves que no protegen nada y la pantalla las esconderia. Esconder la
+    /// puerta de un modulo es justo lo contrario de lo que se busca.
+    /// </remarks>
+    public static IReadOnlyCollection<string> TodasLasEntradas { get; } =
+        Tabla.SelectMany(x => x.Entradas).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
     private static readonly (string Prefijo, string[] Entradas)[] TablaOrdenada =
         Tabla.OrderByDescending(x => x.Prefijo.Length).ToArray();

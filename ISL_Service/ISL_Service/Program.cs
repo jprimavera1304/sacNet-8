@@ -19,7 +19,94 @@ using Microsoft.OpenApi.Models;
 using Microsoft.Data.SqlClient;
 using ISL_Service.Application.Security;
 
+/*
+  EL SUELO DE HILOS, QUE NO ES EL ARREGLO PERO SI LA RED DE SEGURIDAD.
+
+  El ThreadPool de .NET arranca con un hilo de trabajo por nucleo. El servidor
+  de produccion tiene CUATRO, y cuando esos cuatro se ocupan el pool inyecta
+  aproximadamente UNO POR SEGUNDO. Para una aplicacion que pasa el tiempo
+  esperando a una base que esta a 56 ms de distancia, cuatro es un suelo muy
+  bajo: basta una rafaga de agentes para que el quinto espere un segundo antes
+  de empezar, el sexto dos, y el noveno cinco.
+
+  Esto NO sustituye al arreglo de verdad, que fue dejar de bloquear hilos
+  (LlenadoAsincrono) y dejar de repetir el mismo trabajo (UnaSolaVez). Subir el
+  minimo sin aquello solo habria escondido el sintoma. Se pone porque el coste
+  es nulo -son hilos que solo existen si hacen falta- y porque evita que un pico
+  que no hayamos previsto se vuelva otra vez medio minuto de espera.
+
+  El maximo no se toca: ese si seria tapar un problema en vez de verlo.
+*/
+{
+    ThreadPool.GetMinThreads(out _, out var minimoDeIo);
+    ThreadPool.SetMinThreads(Math.Max(Environment.ProcessorCount * 8, 32), minimoDeIo);
+}
+
+/*
+  SI EL PROCESO SE MUERE, QUE QUEDE ESCRITO.
+
+  No habia ningun enganche global, y eso significa que una excepcion no
+  controlada se llevaba el proceso SIN DEJAR RASTRO: stdout esta apagado en el
+  web.config, la carpeta de logs no existe, y lo que viva en memoria se va con
+  el proceso. Averiguar que mataba a w3wp costo descartar hipotesis una por una
+  en vez de leer un stack trace.
+
+  Se escribe en el Visor de eventos de Windows porque es el unico sitio que
+  demostro sobrevivir al reinicio. Con la fuente ".NET Runtime", que ya existe:
+  registrar una propia exige consola elevada la primera vez -el pool corre como
+  ApplicationPoolIdentity- y seria un arreglo que falla justo el dia que hace
+  falta.
+
+  Todo va envuelto en try/catch vacio a proposito: en este punto el host puede
+  estar ya medio desmontado, y un fallo al ANOTAR el fallo no debe cambiar como
+  muere el proceso.
+*/
+{
+    static void AnotarEnElVisor(string titulo, Exception? ex)
+    {
+        try
+        {
+            // El Visor de eventos solo existe en Windows, y aqui siempre es
+            // Windows (IIS); la comprobacion esta para que compile limpio y
+            // para que en un contenedor no se caiga al intentar anotar.
+            if (!OperatingSystem.IsWindows())
+                return;
+
+            System.Diagnostics.EventLog.WriteEntry(
+                ".NET Runtime",
+                $"ISL_Service: {titulo}{Environment.NewLine}" +
+                $"PID {Environment.ProcessId}{Environment.NewLine}{Environment.NewLine}{ex}",
+                System.Diagnostics.EventLogEntryType.Error);
+        }
+        catch
+        {
+            // Si ni esto se puede, no hay nada mas que hacer.
+        }
+    }
+
+    AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        AnotarEnElVisor("EXCEPCION NO CONTROLADA (el proceso se esta muriendo)", e.ExceptionObject as Exception);
+
+    TaskScheduler.UnobservedTaskException += (_, e) =>
+    {
+        AnotarEnElVisor("TAREA DE FONDO SIN OBSERVAR", e.Exception);
+        e.SetObserved(); // Que no escale: ya quedo anotado.
+    };
+}
+
 var builder = WebApplication.CreateBuilder(args);
+
+/*
+  EL APAGADO TIENE QUE CABER.
+
+  Por defecto el host da 30 s al trabajo en vuelo, y el modulo de ASP.NET Core
+  le concede 70 (shutdownTimeLimit, en el web.config). El host debe rendirse
+  ANTES que el modulo: si se pasa, IIS lo mata a la fuerza y eso es exactamente
+  el "exit code 0xffffffff" que llenaba el visor de eventos en cada despliegue.
+
+  60 deja diez segundos de holgura entre los dos.
+*/
+builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(60));
 
 // -------------------- Services --------------------
 
@@ -119,6 +206,16 @@ builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddSingleton<ICurrentUserAccessor, CurrentUserAccessor>();
+
+/*
+  EL GUARDIA DE ESCALADA DE PERMISOS.
+
+  Scoped y no Singleton porque depende de IPermissionService, que es Scoped
+  (lleva el AppDbContext de la peticion dentro). Registrarlo como Singleton
+  haria que capturara un DbContext ya cerrado y el guardia reventaria — y un
+  guardia que revienta es un guardia que, con el catch equivocado, deja pasar.
+*/
+builder.Services.AddScoped<IGuardiaDePermisos, GuardiaDePermisos>();
 
 // -------------------- USER ADMIN (NUEVO) --------------------
 builder.Services.AddScoped<IUserAdminService, UserAdminService>();
@@ -229,9 +326,17 @@ builder.Services.AddScoped<IReportesVentasService, ReportesVentasService>();
 builder.Services.AddScoped<IVentasPedidosRepository, VentasPedidosRepository>();
 builder.Services.AddScoped<IVentasPedidosService, VentasPedidosService>();
 builder.Services.AddSingleton<IAutorizarPedidosAsyncCoordinator, AutorizarPedidosAsyncCoordinator>();
+/* LA MISMA INSTANCIA como servicio del host, para que StopAsync espere a las
+   operaciones que ella misma lanzo. Registrar el tipo otra vez crearia una
+   segunda instancia, que no sabria nada de las tareas en vuelo de la primera. */
+builder.Services.AddHostedService(sp =>
+    (AutorizarPedidosAsyncCoordinator)sp.GetRequiredService<IAutorizarPedidosAsyncCoordinator>());
 builder.Services.AddScoped<IVentasConsultaRepository, VentasConsultaRepository>();
 builder.Services.AddScoped<IRemisionImpresionRepository, RemisionImpresionRepository>();
 builder.Services.AddScoped<IRemisionImpresionService, RemisionImpresionService>();
+builder.Services.AddScoped<ISimulacionImpresionService, SimulacionImpresionService>();
+builder.Services.AddScoped<ISimulacionDatosService, SimulacionDatosService>();
+builder.Services.AddScoped<ICascosAFacturarRepository, CascosAFacturarRepository>();
 builder.Services.AddScoped<IVentasConsultaService, VentasConsultaService>();
 builder.Services.AddScoped<IVentasCancelacionRepository, VentasCancelacionRepository>();
 builder.Services.AddScoped<IVentasCancelacionService, VentasCancelacionService>();

@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.CatalogosAdmin;
+﻿using ISL_Service.Application.DTOs.CatalogosAdmin;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ISL_Service.Controllers;
@@ -35,7 +35,34 @@ namespace ISL_Service.Controllers;
 /// </summary>
 public partial class CatalogosAdminController
 {
+    /*
+      SE PIDE CON ExigirLecturaDeModuloAsync Y NO CON ExigirPermisoAsync.
+
+      En Mac31 el menu de CATALOGOS se abre con cualquiera de sus catalogos
+      concedido; "catalogos.ver" es un permiso del web que Mac31 no reparte, y
+      exigirlo a secas dejaba fuera a quien tiene los catalogos sueltos
+      (medido: DEMO en Zaragoza, con 36 permisos de "catalogos.*" y sin este).
+      La clave sigue valiendo por si sola; lo que se suma es la entrada al
+      modulo mas algun catalogo concedido.
+    */
     private static readonly string[] PermisosVer = { "catalogos.ver" };
+
+    /*
+      DOS CATALOGOS CON LECTURA PROPIA PARA EL TELEFONO.
+
+      ALMACENES lo pide Ajustes de inventario y AGENTES lo piden la lista y el
+      alta de Clientes. Sin su clave, una pantalla de solo-movil abre y se queda
+      sin su selector, que es como no abrirla.
+
+      Van en arrays PROPIOS y no sumando la clave a `PermisosVer`: ese array lo
+      comparten diez catalogos mas (marcas, categorias, tipos de gasto...) y
+      ensancharlo le daria al telefono diez lecturas que no pidio.
+    */
+    private static readonly string[] PermisosAlmacenesVer =
+        { "catalogos.ver", "app_movil.inventario.ajustes.ver" };
+
+    private static readonly string[] PermisosAgentesVer =
+        { "catalogos.ver", "app_movil.clientes" };
     private static readonly string[] PermisosMarcasVer = { "catalogos.marcas.ver" };
 
     /// <summary>
@@ -58,7 +85,7 @@ public partial class CatalogosAdminController
         [FromQuery] bool identico = false,
         CancellationToken ct = default)
     {
-        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        var sinPermiso = await ExigirLecturaDeModuloAsync("catalogos", PermisosAlmacenesVer, ct);
         if (sinPermiso != null) return sinPermiso;
 
         return Listado(await _service.ConsultarAlmacenesAsync(
@@ -83,7 +110,7 @@ public partial class CatalogosAdminController
         [FromQuery] bool identico = false,
         CancellationToken ct = default)
     {
-        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        var sinPermiso = await ExigirLecturaDeModuloAsync("catalogos", PermisosAgentesVer, ct);
         if (sinPermiso != null) return sinPermiso;
 
         return Listado(await _service.ConsultarAgentesAsync(
@@ -108,7 +135,7 @@ public partial class CatalogosAdminController
         [FromQuery] bool identico = false,
         CancellationToken ct = default)
     {
-        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        var sinPermiso = await ExigirLecturaDeModuloAsync("catalogos", PermisosVer, ct);
         if (sinPermiso != null) return sinPermiso;
 
         return Listado(await _service.ConsultarTiposGastoAsync(
@@ -130,7 +157,7 @@ public partial class CatalogosAdminController
         [FromQuery] string? nombre = null,
         CancellationToken ct = default)
     {
-        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        var sinPermiso = await ExigirLecturaDeModuloAsync("catalogos", PermisosVer, ct);
         if (sinPermiso != null) return sinPermiso;
 
         return Listado(await _service.ConsultarAutosAsync(
@@ -215,7 +242,7 @@ public partial class CatalogosAdminController
         [FromQuery] bool identico = false,
         CancellationToken ct = default)
     {
-        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        var sinPermiso = await ExigirLecturaDeModuloAsync("catalogos", PermisosVer, ct);
         if (sinPermiso != null) return sinPermiso;
 
         return Listado(await _service.ConsultarTiposUsadoAsync(
@@ -283,7 +310,7 @@ public partial class CatalogosAdminController
         [FromQuery] bool identico = false,
         CancellationToken ct = default)
     {
-        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        var sinPermiso = await ExigirLecturaDeModuloAsync("catalogos", PermisosVer, ct);
         if (sinPermiso != null) return sinPermiso;
 
         return Listado(await _service.ConsultarEmpresasMacAsync(

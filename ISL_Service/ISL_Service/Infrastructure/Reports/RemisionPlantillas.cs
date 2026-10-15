@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 
 namespace ISL_Service.Infrastructure.Reports;
 
@@ -19,6 +19,19 @@ namespace ISL_Service.Infrastructure.Reports;
 
   Es la copia de SetHtmlImprimir de
   Legacy/MacServicios2/.../VentasImprimirService.cs.
+
+  Y TAMBIEN SIRVEN PARA LA SIMULACION, CON OTRA RAIZ
+
+  El reporte 1175 (SIMULAR) tiene en Template_Html las MISMAS DIEZ PIEZAS con
+  el mismo sufijo y otra raiz: `simular_cuerpo_n2`, `simular_encabezado_n`,
+  `simular_detalle_n`... Medido en las dos bases: diez filas cada una bajo
+  IDTipoTemplateHtml 1175. Por eso la raiz es un parametro y no hay una segunda
+  clase copiada: el papel de la simulacion es el de la remision con otros
+  textos, y asi se mantienen los dos de una sola vez.
+
+  La simulacion NO tiene juego `reimp_`: alla no hay reimpresion que marcar
+  porque no hay venta emitida. Ver SetHtmlSimular, que solo lee el juego
+  normal.
 */
 public sealed class RemisionPlantillas
 {
@@ -41,20 +54,24 @@ public sealed class RemisionPlantillas
       y una remision con menos conceptos de los que se entregaron no la nota
       nadie hasta que el cliente reclama.
     */
-    public static RemisionPlantillas Desde(DataTable dtTemplateHtml, string prefijo)
+    /// <param name="raiz">
+    /// "remision" para el papel de la venta (1001) y "simular" para el de la
+    /// simulacion (1175). Son los nombres tal cual estan en Template_Html.
+    /// </param>
+    public static RemisionPlantillas Desde(DataTable dtTemplateHtml, string prefijo, string raiz = "remision")
     {
         return new RemisionPlantillas
         {
-            Cuerpo = Buscar(dtTemplateHtml, prefijo + "remision_cuerpo_n2"),
-            Encabezado = Buscar(dtTemplateHtml, prefijo + "remision_encabezado_n"),
-            Detalle = Buscar(dtTemplateHtml, prefijo + "remision_detalle_n"),
-            UsadoCargo = Buscar(dtTemplateHtml, prefijo + "remision_usado_cargo_n"),
-            UsadoCreditoAnteriorDetalle = Buscar(dtTemplateHtml, prefijo + "remision_usado_credito_anterior_detalle"),
-            UsadoCreditoAnteriorEncabezado = Buscar(dtTemplateHtml, prefijo + "remision_usado_credito_anterior_encabezado"),
-            UsadoCreditoActual = Buscar(dtTemplateHtml, prefijo + "remision_usado_credito_actual"),
-            DevolucionEncabezado = Buscar(dtTemplateHtml, prefijo + "remision_devoluciones_encabezado"),
-            DevolucionDetalle = Buscar(dtTemplateHtml, prefijo + "remision_devoluciones_detalle"),
-            Pie = Buscar(dtTemplateHtml, prefijo + "remision_pie_n")
+            Cuerpo = Buscar(dtTemplateHtml, prefijo + raiz + "_cuerpo_n2"),
+            Encabezado = Buscar(dtTemplateHtml, prefijo + raiz + "_encabezado_n"),
+            Detalle = Buscar(dtTemplateHtml, prefijo + raiz + "_detalle_n"),
+            UsadoCargo = Buscar(dtTemplateHtml, prefijo + raiz + "_usado_cargo_n"),
+            UsadoCreditoAnteriorDetalle = Buscar(dtTemplateHtml, prefijo + raiz + "_usado_credito_anterior_detalle"),
+            UsadoCreditoAnteriorEncabezado = Buscar(dtTemplateHtml, prefijo + raiz + "_usado_credito_anterior_encabezado"),
+            UsadoCreditoActual = Buscar(dtTemplateHtml, prefijo + raiz + "_usado_credito_actual"),
+            DevolucionEncabezado = Buscar(dtTemplateHtml, prefijo + raiz + "_devoluciones_encabezado"),
+            DevolucionDetalle = Buscar(dtTemplateHtml, prefijo + raiz + "_devoluciones_detalle"),
+            Pie = Buscar(dtTemplateHtml, prefijo + raiz + "_pie_n")
         };
     }
 
@@ -68,7 +85,7 @@ public sealed class RemisionPlantillas
         }
 
         throw new InvalidOperationException(
-            $"Falta la plantilla '{descripcion}' en Template_Html (IDTipoTemplateHtml 1001). " +
-            "Sin ella la remision saldria incompleta, asi que no se genera.");
+            $"Falta la plantilla '{descripcion}' en Template_Html. " +
+            "Sin ella el papel saldria incompleto, asi que no se genera.");
     }
 }

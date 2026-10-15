@@ -221,6 +221,8 @@ public class Ola12IdentidadDelTokenTests
         var controller = new VentasConsultaController(
             servicio,
             new RemisionesNoUsado(),
+            new SimulacionesNoUsado(),
+            new SimulacionDatosNoUsado(),
             new AccesorFijo(),
             new PermisosFijosDeOla12(permisos),
             new ConfigurationBuilder().Build())
@@ -293,6 +295,24 @@ public class Ola12IdentidadDelTokenTests
     private sealed class RemisionesNoUsado : IRemisionImpresionService
     {
         public Task<RemisionPdf> GenerarAsync(IReadOnlyList<int> idsVenta, int idUsuarioImpresion, int primerImpresion, int reimpresion, string equipoImpresion, CancellationToken ct)
+            => throw new NotImplementedException();
+    }
+
+    /*
+      Los dos simuladores no se tocan en estas pruebas: aqui se mide QUIEN dice
+      el controlador que es el usuario, no el papel que entrega. Si alguna
+      prueba acaba llamandolos, el NotImplementedException lo dice en el sitio
+      en vez de devolver un PDF vacio que parezca bueno.
+    */
+    private sealed class SimulacionesNoUsado : ISimulacionImpresionService
+    {
+        public Task<SimulacionPdf> GenerarAsync(int idVenta, int idUsuarioImpresion, int idDescuento, int simularConCascos, CancellationToken ct)
+            => throw new NotImplementedException();
+    }
+
+    private sealed class SimulacionDatosNoUsado : ISimulacionDatosService
+    {
+        public Task<SimulacionDatos> ConsultarAsync(int idVenta, int idDescuento, CancellationToken ct)
             => throw new NotImplementedException();
     }
 
@@ -372,9 +392,18 @@ public class Ola12IdentidadDelTokenTests
         public Task<PermisosWebModuleItem> SetModuleStatusAsync(int empresaId, string moduleKey, int idStatus, CancellationToken ct) => throw new NotImplementedException();
         public Task<PermisosWebRoleItem> CreateRoleAsync(int empresaId, string roleCode, string name, CancellationToken ct) => throw new NotImplementedException();
         public Task UpsertRolePermissionsAsync(int empresaId, string roleCode, IReadOnlyCollection<string> permissions, CancellationToken ct) => throw new NotImplementedException();
-        public Task UpsertUserOverridesAsync(int empresaId, Guid userId, IReadOnlyCollection<string> allow, IReadOnlyCollection<string> deny, CancellationToken ct) => throw new NotImplementedException();
+        public Task UpsertUserOverridesAsync(int empresaId, Guid userId, IReadOnlyCollection<string> allow, IReadOnlyCollection<string> deny, bool sincronizarConLegacy, CancellationToken ct) => throw new NotImplementedException();
         public Task SembrarCatalogoCompletoAsync(int empresaId, CancellationToken ct) => Task.CompletedTask;
         public Task<PermisosWebSyncCatalogResponse> SyncPermissionCatalogAsync(int empresaId, IReadOnlyCollection<string>? modules, CancellationToken ct) => throw new NotImplementedException();
         public Task<bool> CreatePermissionAsync(int empresaId, string key, string name, string? description, CancellationToken ct) => throw new NotImplementedException();
+
+        // Metodos nuevos del guardia de escalada (ver IGuardiaDePermisos). Este
+        // doble no los usa: la prueba de la que cuelga no toca la pantalla de
+        // permisos. Si alguna llegara a usarlos, es mejor que reviente a que
+        // conteste "no hay nadie administrando" con datos inventados.
+        public Task<IReadOnlyCollection<string>> GetRolePermissionKeysAsync(int empresaId, string roleCode, CancellationToken ct) => throw new NotImplementedException();
+        public Task<(IReadOnlyCollection<string> Allow, IReadOnlyCollection<string> Deny)> GetUserOverrideKeysAsync(int empresaId, Guid userId, CancellationToken ct) => throw new NotImplementedException();
+        public Task<ISL_Service.Application.Models.AdministracionRestante> GetAdministracionRestanteAsync(int empresaId, ISL_Service.Application.Models.SimulacionDePermisos simulacion, CancellationToken ct) => throw new NotImplementedException();
+        public Task<bool> EsRolDeSistemaAsync(int empresaId, string roleCode, CancellationToken ct) => throw new NotImplementedException();
     }
 }

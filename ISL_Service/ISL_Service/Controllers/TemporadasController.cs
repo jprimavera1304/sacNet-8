@@ -69,6 +69,15 @@ public class TemporadasController : PermisoControllerBase
     ///   3. La respuesta lo declara en la cabecera X-Efecto-Lateral cuando
     ///      ocurre, para que no haya que leer el codigo para enterarse.
     /// </remarks>
+    // LAS DOS LECTURAS TAMBIEN PIDEN PERMISO.
+    //
+    // Las escrituras de este controlador si lo pedian; las lecturas se queda-
+    // ron con solo [Authorize], o sea que cualquiera con sesion las leia. No se
+    // pudo medir en Zaragoza ni en Tauro -los SP de la liga no estan desplega-
+    // dos alla y contestan 500-, pero en la base donde el modulo existe seria
+    // una lista abierta. La clave ya esta en el catalogo y la exige la entrada
+    // del modulo (EntradasDeModulo).
+    [Authorize(Policy = "perm:temporadas.ver")]
     [HttpGet]
     [ProducesResponseType(typeof(List<TemporadaDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List([FromQuery] byte? estado, [FromQuery] string? texto, CancellationToken ct)
@@ -101,6 +110,7 @@ public class TemporadasController : PermisoControllerBase
         return Ok(new { temporadasCerradas = cerradas });
     }
 
+    [Authorize(Policy = "perm:temporadas.ver")]
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(TemporadaDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

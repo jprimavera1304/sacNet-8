@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Security.Claims;
 using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.DTOs.Responses;
@@ -124,7 +124,7 @@ public class Ola10FiltrosQueNoSeTiranTests
     // ------------------------------------------------------------------ ayudas
 
     private static UserAdminService Servicio(Usuario? usuario)
-        => new(new RepoDeUnSoloUsuario(usuario), null!, new NullLogger<UserAdminService>());
+        => new(new RepoDeUnSoloUsuario(usuario), null!, new GuardiaQueDejaPasar(), new NullLogger<UserAdminService>());
 
     private static ClaimsPrincipal SuperAdmin()
         => new(new ClaimsIdentity(new[]

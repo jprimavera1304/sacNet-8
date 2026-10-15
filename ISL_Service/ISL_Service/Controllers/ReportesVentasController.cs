@@ -33,7 +33,7 @@ public class ReportesVentasController : PermisoControllerBase
     }
 
     [HttpGet("acumuladores-productos/catalogos")]
-    [Authorize(Policy = "perm:reportes.ver_modulo")]
+    [Authorize(Policy = "perm:reportes.ver_modulo|app_movil.reportes")]
     [ProducesResponseType(typeof(ReportesVentasCatalogosResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> ConsultarCatalogosAcumuladoresProductos(
         [FromQuery] int? idGrupoCategoria,
@@ -49,7 +49,7 @@ public class ReportesVentasController : PermisoControllerBase
     }
 
     [HttpGet("acumuladores-productos/clientes")]
-    [Authorize(Policy = "perm:reportes.ver_modulo")]
+    [Authorize(Policy = "perm:reportes.ver_modulo|app_movil.reportes")]
     [ProducesResponseType(typeof(List<ReportesVentasClienteItem>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ConsultarClientes(
@@ -63,7 +63,7 @@ public class ReportesVentasController : PermisoControllerBase
     }
 
     [HttpGet("remisiones/catalogos")]
-    [Authorize(Policy = "perm:reportes.ver_modulo")]
+    [Authorize(Policy = "perm:reportes.ver_modulo|app_movil.reportes")]
     [ProducesResponseType(typeof(ReportesVentasCatalogosResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> ConsultarCatalogosRemisiones(CancellationToken ct)
     {
@@ -73,7 +73,7 @@ public class ReportesVentasController : PermisoControllerBase
     }
 
     [HttpPost("acumuladores-productos/generar")]
-    [Authorize(Policy = "perm:reportes.ver_modulo")]
+    [Authorize(Policy = "perm:reportes.ver_modulo|app_movil.reportes")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerarAcumuladoresProductos(
@@ -98,7 +98,7 @@ public class ReportesVentasController : PermisoControllerBase
     }
 
     [HttpPost("remisiones/generar")]
-    [Authorize(Policy = "perm:reportes.ver_modulo")]
+    [Authorize(Policy = "perm:reportes.ver_modulo|app_movil.reportes")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerarRemisiones(
@@ -123,7 +123,7 @@ public class ReportesVentasController : PermisoControllerBase
     }
 
     [HttpPost("folios/generar")]
-    [Authorize(Policy = "perm:reportes.ver_modulo")]
+    [Authorize(Policy = "perm:reportes.ver_modulo|app_movil.reportes")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerarFolios(
@@ -148,7 +148,7 @@ public class ReportesVentasController : PermisoControllerBase
     }
 
     [HttpPost("facturas/generar")]
-    [Authorize(Policy = "perm:reportes.ver_modulo")]
+    [Authorize(Policy = "perm:reportes.ver_modulo|app_movil.reportes")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerarFacturas(
@@ -173,7 +173,7 @@ public class ReportesVentasController : PermisoControllerBase
     }
 
     [HttpPost("concentrados/generar")]
-    [Authorize(Policy = "perm:reportes.ver_modulo")]
+    [Authorize(Policy = "perm:reportes.ver_modulo|app_movil.reportes")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerarConcentrados(
@@ -198,7 +198,7 @@ public class ReportesVentasController : PermisoControllerBase
     }
 
     [HttpPost("cobranza/generar")]
-    [Authorize(Policy = "perm:reportes.ver_modulo")]
+    [Authorize(Policy = "perm:reportes.ver_modulo|app_movil.reportes")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerarCobranza(
@@ -222,8 +222,26 @@ public class ReportesVentasController : PermisoControllerBase
         return Ok(result);
     }
 
+    /*
+      LA PUERTA DE ESTE ENDPOINT NO ES UNA SOLA, Y POR ESO NO ES UN ATRIBUTO.
+
+      Para un NODO del arbol la puerta es `reportes.ver_modulo`, el menu de
+      reportes, y eso es lo que decia el atributo que estaba aqui. Para el
+      DOCUMENTO DE UN BOTON no: su puerta es la pantalla de la que sale. El
+      atributo no sabe mirar el `reporteKey`, asi que decidia igual para los
+      dos y dejaba fuera a quien en Mac31 si puede imprimir.
+
+      MEDIDO el 2026-10-13 con una cuenta aislada que tenia los SEIS botones de
+      `ConsultarCompras` y ni un proceso de `ReportesMenu` -o sea, exactamente
+      lo que tiene quien trabaja en compras y no entra a reportes-: el doble
+      clic sobre una compra contestaba 403 antes de llegar a ninguna
+      comprobacion. En Mac31 ese mismo usuario imprime.
+
+      La decision se mueve a ExigirEntradaDeReporteAsync, que lee el modulo
+      dueno del catalogo. No se concede nada nuevo: quien no puede abrir la
+      pantalla sigue sin poder sacar su papel.
+    */
     [HttpPost("legacy/generar")]
-    [Authorize(Policy = "perm:reportes.ver_modulo")]
     [ProducesResponseType(typeof(ReportesVentasGenerateResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GenerarLegacyVentas(
@@ -244,6 +262,9 @@ public class ReportesVentasController : PermisoControllerBase
 
         if (ReportesCatalogo.Buscar(request.ReporteKey) is null)
             return BadRequest(new { message = $"reporteKey desconocido: \"{request.ReporteKey}\"." });
+
+        if (await ExigirEntradaDeReporteAsync(request.ReporteKey, ct) is { } sinEntrada)
+            return sinEntrada;
 
         if (await ExigirPermisoReporteAsync(request.ReporteKey, ct) is { } negado)
             return negado;
@@ -295,7 +316,7 @@ public class ReportesVentasController : PermisoControllerBase
     }
 
     [HttpPost("acumuladores-productos/vista-previa")]
-    [Authorize(Policy = "perm:reportes.ver_modulo")]
+    [Authorize(Policy = "perm:reportes.ver_modulo|app_movil.reportes")]
     [ProducesResponseType(typeof(ReportesVentasPreviewResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ConsultarAcumuladoresProductos(
@@ -415,7 +436,7 @@ public class ReportesVentasController : PermisoControllerBase
     /// Quien traduce Id -> base es el servidor.
     /// </remarks>
     [HttpGet("centros")]
-    [Authorize(Policy = "perm:reportes.ver_modulo")]
+    [Authorize(Policy = "perm:reportes.ver_modulo|app_movil.reportes")]
     [ProducesResponseType(typeof(CentrosServicioResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> ConsultarCentros(CancellationToken ct)
     {
@@ -448,7 +469,7 @@ public class ReportesVentasController : PermisoControllerBase
     }
 
     [HttpGet("permisos")]
-    [Authorize(Policy = "perm:reportes.ver_modulo")]
+    [Authorize(Policy = "perm:reportes.ver_modulo|app_movil.reportes")]
     [ProducesResponseType(typeof(ReportesPermisosResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> ConsultarPermisosReportes(CancellationToken ct)
     {
@@ -486,6 +507,29 @@ public class ReportesVentasController : PermisoControllerBase
     /// El 403 a regresar si el usuario no puede ese reporte, o null si puede.
     /// Un reporte sin permiso en el catalogo NO se bloquea.
     /// </summary>
+    /*
+      LA PUERTA DE ENTRADA DEL PAPEL: EL MENU DE REPORTES, O SU PANTALLA.
+
+      Es lo que antes decidia el `[Authorize(Policy = "perm:reportes.ver_modulo|app_movil.reportes")]`
+      del endpoint, ahora mirando QUE papel se pide. Ver la nota larga en
+      GenerarLegacyVentas.
+
+      Un papel con modulo dueno se autoriza con la MISMA lectura que exige su
+      pantalla para abrirse (`ExigirLecturaDeModuloAsync`), ni mas ni menos:
+      si la pantalla te deja entrar, su boton de imprimir te deja imprimir,
+      que es como se comporta Mac31. Cualquier otro papel sigue pidiendo el
+      menu de reportes.
+    */
+    private async Task<IActionResult?> ExigirEntradaDeReporteAsync(string? clave, CancellationToken ct)
+    {
+        var modulo = ReportesCatalogo.Buscar(clave)?.ModuloDueno;
+
+        if (string.IsNullOrWhiteSpace(modulo))
+            return await ExigirPermisoAsync(new[] { "reportes.ver_modulo" }, ct);
+
+        return await ExigirLecturaDeModuloAsync(modulo, new[] { $"{modulo}.ver" }, ct);
+    }
+
     private async Task<IActionResult?> ExigirPermisoReporteAsync(string? clave, CancellationToken ct)
     {
         var reporte = ReportesCatalogo.Buscar(clave);

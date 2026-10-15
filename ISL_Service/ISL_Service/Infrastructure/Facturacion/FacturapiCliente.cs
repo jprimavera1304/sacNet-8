@@ -184,6 +184,54 @@ public class FacturapiCliente
     public async Task<Respuesta> ConsultarAsync(string secreto, string idFacturapi, CancellationToken ct)
         => await EnviarAsync(secreto, $"invoices/{Uri.EscapeDataString(idFacturapi)}", cuerpo: null, ct, HttpMethod.Get);
 
+    /// <summary>El PDF o el XML del comprobante, tal como los guarda Facturapi.</summary>
+    /// <remarks>
+    /// POR QUE HACE FALTA: la ruta que da `sp_n_rptFacturaElectronica` es un disco
+    /// de la OFICINA (`C:\macZ\Facturas\...`), donde Mac31 genera el archivo. La
+    /// API corre en el servidor y ese disco no existe alla, asi que leerlo nunca
+    /// podia funcionar en produccion. El comprobante bueno es el de Facturapi.
+    ///
+    /// Devuelve los bytes, o el motivo. No se mezcla con <see cref="Respuesta"/>
+    /// porque esa trae un comprobante en JSON y aqui lo que vuelve es un archivo.
+    /// </remarks>
+    public async Task<(byte[]? Contenido, string? Error)> DescargarAsync(
+        string secreto, string idFacturapi, string formato, CancellationToken ct)
+    {
+        var tipo = (formato ?? string.Empty).Trim().ToLowerInvariant();
+        if (tipo is not ("pdf" or "xml"))
+            return (null, "El formato tiene que ser pdf o xml.");
+
+        var cliente = _httpClientFactory.CreateClient("facturapi");
+        using var peticion = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"{_baseUrl}/invoices/{Uri.EscapeDataString(idFacturapi)}/{tipo}");
+
+        var credencial = Convert.ToBase64String(Encoding.UTF8.GetBytes(secreto + ":"));
+        peticion.Headers.Authorization = new AuthenticationHeaderValue("Basic", credencial);
+
+        HttpResponseMessage respuesta;
+        try
+        {
+            respuesta = await cliente.SendAsync(peticion, ct);
+        }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return (null, "Facturapi no contesto a tiempo al pedir el " + tipo.ToUpperInvariant() + ".");
+        }
+        catch (HttpRequestException ex)
+        {
+            return (null, "No se pudo pedir el " + tipo.ToUpperInvariant() + " a Facturapi: " + ex.Message);
+        }
+
+        if (!respuesta.IsSuccessStatusCode)
+        {
+            var texto = await respuesta.Content.ReadAsStringAsync(ct);
+            return (null, Traducir(texto, respuesta.StatusCode));
+        }
+
+        return (await respuesta.Content.ReadAsByteArrayAsync(ct), null);
+    }
+
     /* ---------------------------------------------------------------- */
 
     private async Task<Respuesta> EnviarAsync(

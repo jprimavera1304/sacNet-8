@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using ISL_Service.Application.DTOs.VentasDescuentos;
 using ISL_Service.Application.DTOs.VentasEscrituras;
 using ISL_Service.Application.Exceptions;
@@ -78,11 +78,34 @@ public class VentasDescuentosService : IVentasDescuentosService
     public async Task<ResultadoLegacyDto> SimularDescuentoAsync(
         DescuentoSimularRequest request, int idUsuario, string equipo, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.Descuento))
-            throw new ArgumentException("El descuento a simular es obligatorio.");
+        /*
+          EL NOMBRE NO ES OBLIGATORIO, Y EXIGIRLO ROMPIA LA SIMULACION.
+
+          Aqui habia `if (string.IsNullOrWhiteSpace(request.Descuento)) throw`.
+          Medido: Mac31 llama a este procedimiento con el nombre VACIO. Su DTO
+          lo inicializa en "" (DescuentoInputDTO.cs:23) y `VentasSimular.
+          SimularDescuento` (:85-107) solo llena IDUsuario y NombreEquipo. Y el
+          procedimiento lo declara con valor por omision `@Descuento
+          varchar(1000) = ''`: es solo el NOMBRE del renglon de prueba, no una
+          llave. La llave es usuario + equipo.
+
+          Con la exigencia puesta, el unico cliente que ya lo llamaba
+          -`simularDescuento({})` en ModalesDeCascos.tsx:261- recibia un 400
+          siempre. O sea que el endpoint no habia funcionado nunca desde el web.
+
+          Y cuando no viene se manda VACIO, no un nombre nuestro: el renglon de
+          Mac31 queda con el nombre en blanco y lo que se escribe en la base
+          tiene que ser lo mismo. Ponerle "SIMULACION" se vería mejor en el
+          catalogo y seria un dato inventado en una tabla compartida.
+        */
+        request.Descuento ??= string.Empty;
 
         return await _repository.SimularDescuentoAsync(request, idUsuario, equipo, ct);
     }
+
+    public Task<bool> EsBorradorDeSimulacionAsync(
+        int idDescuento, int idUsuario, string equipo, CancellationToken ct)
+        => _repository.EsBorradorDeSimulacionAsync(idDescuento, idUsuario, equipo, ct);
 
     /* ------------------------------- Detalle ------------------------------- */
 

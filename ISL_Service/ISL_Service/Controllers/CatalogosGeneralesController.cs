@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.CatalogosGenerales;
+﻿using ISL_Service.Application.DTOs.CatalogosGenerales;
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -80,7 +80,10 @@ public class CatalogosGeneralesController : ControllerBase
     /// </summary>
     /// <response code="400">Se pidieron las colonias sin ningun filtro</response>
     [HttpGet("colonias")]
-    [Authorize(Policy = "perm:catalogos.ver")]
+    // El formulario de clientes del TELEFONO busca la colonia por codigo
+    // postal. Sin su clave aqui, el alta de solo-movil se queda sin colonia,
+    // que es un campo obligatorio: la pantalla entera deja de servir.
+    [Authorize(Policy = "perm:catalogos.ver|app_movil.clientes.crear|app_movil.clientes.editar")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ConsultarColoniasAsync([FromQuery] ConsultaColoniasFiltro filtro, CancellationToken ct)
@@ -127,11 +130,29 @@ public class CatalogosGeneralesController : ControllerBase
         [FromQuery] int? idUnidadTerritorial, [FromQuery] int? idStatus, [FromQuery] string? clave, CancellationToken ct)
         => Lista(await _service.ConsultarUnidadesTerritorialesAsync(idUnidadTerritorial, idStatus, clave, ct), "Unidades territoriales");
 
-    // ------------------------------------------------------------ facturacion electronica
+    /*
+      ------------------------------------------------------------ facturacion electronica
+
+      LOS CATALOGOS DEL SAT TAMBIEN LOS PUEDE PEDIR QUIEN FACTURA.
+
+      `catalogos.fe.ver` se queda, y se le suman las dos claves de facturar.
+      Medido: en Mac31 estas listas se cargan en el `_Load` de las pantallas de
+      facturacion (`VentasFacturacion.cs:100` y `:107`, `ConsultarFEFormasPago`
+      / `ConsultarFEMetodosPago`, y `:600` los usos de CFDI) SIN comprobar
+      ningun permiso, y si fallan la forma se cierra. Con solo
+      `catalogos.fe.ver`, un usuario que en Mac31 factura sin problema abria la
+      pantalla del web con los tres desplegables vacios y un 403 en la consola.
+
+      No se regala nada: son los catalogos PUBLICOS del SAT —formas de pago,
+      metodos de pago, usos de CFDI, regimenes— los mismos que estan en el
+      portal del SAT. No hay un dato de la empresa ni de un cliente en ellos.
+      Lo que si protegen las claves de facturacion es TIMBRAR, que es otra cosa
+      y sigue donde estaba.
+    */
 
     /// <summary>Regimenes fiscales del SAT.</summary>
     [HttpGet("fe/regimenes-fiscales")]
-    [Authorize(Policy = "perm:catalogos.fe.ver")]
+    [Authorize(Policy = "perm:catalogos.fe.ver|facturacion.timbrar|ventas.facturar")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ConsultarFeRegimenesFiscalesAsync(
         [FromQuery] int? idRegimen, [FromQuery] string? feClave, [FromQuery] string? feRegimenFiscal,
@@ -142,7 +163,7 @@ public class CatalogosGeneralesController : ControllerBase
 
     /// <summary>Tipos de relacion entre CFDI.</summary>
     [HttpGet("fe/relaciones-factura")]
-    [Authorize(Policy = "perm:catalogos.fe.ver")]
+    [Authorize(Policy = "perm:catalogos.fe.ver|facturacion.timbrar|ventas.facturar")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ConsultarFeRelacionesFacturaAsync(
         [FromQuery] int? idRelacion, [FromQuery] string? feClave, [FromQuery] bool identico, CancellationToken ct)
@@ -150,7 +171,7 @@ public class CatalogosGeneralesController : ControllerBase
 
     /// <summary>Usos de CFDI del SAT.</summary>
     [HttpGet("fe/usos-cfdi")]
-    [Authorize(Policy = "perm:catalogos.fe.ver")]
+    [Authorize(Policy = "perm:catalogos.fe.ver|facturacion.timbrar|ventas.facturar")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ConsultarFeUsosCfdiAsync(
         [FromQuery] int? idUsoCfdi, [FromQuery] string? feClave, [FromQuery] string? feUsoCfdi,
@@ -187,8 +208,23 @@ public class CatalogosGeneralesController : ControllerBase
         => Lista(await _service.ConsultarDocumentosAsync(idDocumento, idStatus, documento, identico, ct), "Documentos");
 
     /// <summary>Grupos a los que puede pertenecer un cliente.</summary>
+    /// <remarks>
+    /// QUIEN DA DE ALTA UN CLIENTE TAMBIEN LO PIDE.
+    ///
+    /// `catalogos.ver` se queda y se le suman las dos claves del padron.
+    /// Medido: `Clientes._Load` de Mac31 carga este catalogo SIN comprobar
+    /// permiso y, si falla, **cierra la forma**
+    /// (Legacy/Mac31/Mac31/Forms/Clientes/Clientes.cs:92-115). Son los dos
+    /// desplegables que decide quien da de alta: sin ellos el alta sale con los
+    /// campos vacios, que es justo lo que avisaba la app
+    /// ("No se pudieron cargar: condiciones de credito, tipos de cliente").
+    ///
+    /// No concede nada de mas: es una lista de opciones, sin dato de ningun
+    /// cliente. Crear o cambiar el catalogo sigue pidiendo lo suyo
+    /// (`CatalogosAdminController`), que no se toco.
+    /// </remarks>
     [HttpGet("grupos-cliente")]
-    [Authorize(Policy = "perm:catalogos.ver")]
+    [Authorize(Policy = "perm:catalogos.ver|clientes.crear|clientes.editar|app_movil.clientes")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ConsultarGruposClienteAsync(
         [FromQuery] int? idGrupoCliente, [FromQuery] int? idStatus, CancellationToken ct)
@@ -202,8 +238,20 @@ public class CatalogosGeneralesController : ControllerBase
         => Lista(await _service.ConsultarPuestosAsync(idStatus, ct), "Puestos");
 
     /// <summary>Motivos de nota de credito.</summary>
+    /// <remarks>
+    /// QUIEN TIMBRA TAMBIEN LO PIDE. Medido: `VentasNotaCredito._Load` carga
+    /// este catalogo sin comprobar permiso y, si falla, **cierra la forma**
+    /// (`ConsultarTipoNotasCredito` ... `this.Close()`,
+    /// VentasNotaCredito.cs:124-131). Con solo `catalogos.ver`, la pantalla del
+    /// web abria y se quedaba en "No tienes permiso para esta accion" sobre una
+    /// nota de credito que el usuario SI puede hacer.
+    ///
+    /// Se suma `facturacion.timbrar` y no `ventas.facturar`: una nota de
+    /// credito no es "facturar desde la pantalla de ventas", es emitir un CFDI
+    /// de egreso. Es un catalogo de motivos; no hay dato de nadie en el.
+    /// </remarks>
     [HttpGet("tipos-nota-credito")]
-    [Authorize(Policy = "perm:catalogos.ver")]
+    [Authorize(Policy = "perm:catalogos.ver|facturacion.timbrar")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ConsultarTiposNotaCreditoAsync([FromQuery] int? idStatus, CancellationToken ct)
         => Lista(await _service.ConsultarTiposNotaCreditoAsync(idStatus, ct), "Tipos de nota de credito");

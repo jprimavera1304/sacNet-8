@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.VentasDescuentos;
+﻿using ISL_Service.Application.DTOs.VentasDescuentos;
 using ISL_Service.Application.DTOs.VentasEscrituras;
 
 namespace ISL_Service.Application.Interfaces;
@@ -15,6 +15,34 @@ public interface IVentasDescuentosRepository
     Task<ResultadoLegacyDto> EliminarDescuentoAsync(DescuentoIdRequest request, CancellationToken ct);
     Task<FilasLegacyDto> ConsultarDescuentosAsync(DescuentoIdRequest request, CancellationToken ct);
     Task<ResultadoLegacyDto> SimularDescuentoAsync(DescuentoSimularRequest request, int idUsuario, string equipo, CancellationToken ct);
+
+    /*
+      SI ESE ESQUEMA ES EL BORRADOR DE SIMULACION DE ESTE USUARIO Y ESTE EQUIPO.
+
+      Es la pregunta que deja simular sin regalar el permiso del catalogo de
+      descuentos. El contexto, medido:
+
+      En Mac31, el editor de descuentos abierto desde cualquiera de las dos
+      pantallas de SIMULAR no comprueba permisos: `DetalleDescuentos_Load` hace
+      `if (!this.simular) Globales.ValidaOperadorProcesos(this)`
+      (DetalleDescuentos.cs:81-82), o sea que con la bandera de simulacion los
+      botones de agregar, modificar y eliminar quedan habilitados sin pedir
+      nada. Quien puede simular, puede teclear porcentajes.
+
+      Aqui esos tres botones van contra `api/ventas/descuentos/detalle*`, que es
+      el MISMO endpoint con el que se edita el esquema de un cliente de verdad.
+      Dejar entrar ahi a quien solo tiene permiso de simular seria regalarle la
+      edicion de todos los esquemas: eso no se hace ni para que una funcion
+      pase una prueba.
+
+      Con esto el permiso no se regala, se acota: quien puede simular escribe EN
+      SU PROPIO BORRADOR y en ningun otro. El borrador se identifica por las
+      tres cosas que lo definen en la tabla -EsSimular = 1, IDUsuario y
+      NombreEquipo, que son la llave con la que `sp_n_SimularDescuento` lo busca
+      y lo crea- y el usuario y el equipo salen del token, no del cuerpo.
+    */
+    Task<bool> EsBorradorDeSimulacionAsync(int idDescuento, int idUsuario, string equipo, CancellationToken ct);
+
 
     Task<ResultadoLegacyDto> CrearDetalleAsync(DescuentoDetalleCrearRequest request, int idUsuario, string equipo, CancellationToken ct);
     Task<ResultadoLegacyDto> ActualizarDetalleAsync(DescuentoDetalleActualizarRequest request, int idUsuario, string equipo, CancellationToken ct);
@@ -50,6 +78,11 @@ public interface IVentasDescuentosService
     Task<ResultadoLegacyDto> EliminarDescuentoAsync(DescuentoIdRequest request, CancellationToken ct);
     Task<FilasLegacyDto> ConsultarDescuentosAsync(DescuentoIdRequest request, CancellationToken ct);
     Task<ResultadoLegacyDto> SimularDescuentoAsync(DescuentoSimularRequest request, int idUsuario, string equipo, CancellationToken ct);
+
+    /// Si ese esquema es el borrador de simulacion de ese usuario y ese equipo.
+    /// Ver la nota del repositorio: es lo que deja simular sin regalar el
+    /// permiso de editar el catalogo de descuentos.
+    Task<bool> EsBorradorDeSimulacionAsync(int idDescuento, int idUsuario, string equipo, CancellationToken ct);
 
     Task<ResultadoLegacyDto> CrearDetalleAsync(DescuentoDetalleCrearRequest request, int idUsuario, string equipo, CancellationToken ct);
     Task<ResultadoLegacyDto> ActualizarDetalleAsync(DescuentoDetalleActualizarRequest request, int idUsuario, string equipo, CancellationToken ct);

@@ -122,10 +122,25 @@ public class ReportesCatalogoTests
     public void Un_Permiso_Solo_Se_Comparte_Cuando_MAC31_Comparte_El_NODO()
     {
         /*
-          Regla: un permiso por reporte. La unica excepcion es el nodo
-          "Movimientos Centros" de Mac31, que al imprimirse genera TRES reportes
-          (1410, 1415 y 1420) con el mismo clic; inventarles dos permisos nuevos
-          seria poder apagar en el web algo que alla no se puede apagar aparte.
+          Regla: un permiso por reporte. Hay DOS excepciones, y las dos son
+          excepciones porque compartir es lo correcto, no por descuido.
+
+          1) El nodo "Movimientos Centros" de Mac31, que al imprimirse genera
+             TRES reportes (1410, 1415 y 1420) con el mismo clic; inventarles
+             dos permisos nuevos seria poder apagar en el web algo que alla no
+             se puede apagar aparte.
+
+          2) `empleados.sueldo.ver`, que tapa los DOS reportes de nomina que
+             ensenan importes por empleado: el recibo (1540) y el 1025
+             "Asistencias", que pese al nombre imprime la columna SUELDO y el
+             total al pie (medido en MacZ con el permiso en 'deny': el 1025
+             salia con 520,596.52 al pie mientras el recibo ya daba 403).
+             Aqui compartir es justo lo que hace falta: son la misma llave de
+             dinero por dos puertas, y una clave nueva por reporte no la
+             tendria nadie y los dejaria apagados para todos.
+
+          Lo que esta prueba sigue impidiendo es que aparezca una TERCERA clave
+          compartida sin que alguien lo haya decidido.
         */
         var compartidos = ReportesCatalogo.Reportes
             .Where(x => x.Permiso is not null)
@@ -135,10 +150,21 @@ public class ReportesCatalogoTests
             .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        Assert.Equal(new[] { "reportes.ventas.movimientos_centros.ver" }, compartidos);
+        Assert.Equal(
+            new[] { "empleados.sueldo.ver", "reportes.ventas.movimientos_centros.ver" },
+            compartidos);
         Assert.Equal(
             3,
             ReportesCatalogo.Reportes.Count(x => x.Permiso == "reportes.ventas.movimientos_centros.ver"));
+
+        // Y los que comparten la llave de los sueldos son exactamente esos dos.
+        Assert.Equal(
+            new[] { "nomina_asistencias", "nomina_recibos" },
+            ReportesCatalogo.Reportes
+                .Where(x => string.Equals(x.Permiso, "empleados.sueldo.ver", StringComparison.OrdinalIgnoreCase))
+                .Select(x => x.Clave)
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToArray());
     }
 
     [Fact]

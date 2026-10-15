@@ -21,13 +21,25 @@ namespace ISL_Service.Tests;
 public class PermisosFinosDeEscrituraTests
 {
     [Theory]
-    // AlmacenCascos: 6 escrituras
-    [InlineData(typeof(AlmacenCascosController), "CrearSalida", "perm:almacen_cascos.crear")]
-    [InlineData(typeof(AlmacenCascosController), "AceptarEntrada", "perm:almacen_cascos.crear")]
-    [InlineData(typeof(AlmacenCascosController), "GuardarKilosTarima", "perm:almacen_cascos.editar")]
-    [InlineData(typeof(AlmacenCascosController), "ActualizarSalida", "perm:almacen_cascos.editar")]
-    [InlineData(typeof(AlmacenCascosController), "ActualizarEntrada", "perm:almacen_cascos.editar")]
-    [InlineData(typeof(AlmacenCascosController), "Cancelar", "perm:almacen_cascos.cancelar")]
+    /*
+      AlmacenCascos: 6 escrituras, y cada politica son DOS claves.
+
+      El canal del telefono (`app_movil.almacen_cascos.*`) se agrego para que
+      quitarle el modulo a alguien en la app no se lo quitara tambien en la
+      computadora: antes era el MISMO permiso. Con `|` basta tener una de las
+      dos (PermissionRequirement), asi que el candado no se afloja: quien no
+      tenga ninguna sigue fuera.
+
+      Se fija la cadena COMPLETA y en este orden -web primero- a proposito. Si
+      alguien quita una de las dos mitades, o le cambia el orden al copiar y
+      pegar de otro controlador, se cae aqui. Un `Contains` no lo notaria.
+    */
+    [InlineData(typeof(AlmacenCascosController), "CrearSalida", "perm:almacen_cascos.crear|app_movil.almacen_cascos.crear")]
+    [InlineData(typeof(AlmacenCascosController), "AceptarEntrada", "perm:almacen_cascos.crear|app_movil.almacen_cascos.crear")]
+    [InlineData(typeof(AlmacenCascosController), "GuardarKilosTarima", "perm:almacen_cascos.editar|app_movil.almacen_cascos.editar")]
+    [InlineData(typeof(AlmacenCascosController), "ActualizarSalida", "perm:almacen_cascos.editar|app_movil.almacen_cascos.editar")]
+    [InlineData(typeof(AlmacenCascosController), "ActualizarEntrada", "perm:almacen_cascos.editar|app_movil.almacen_cascos.editar")]
+    [InlineData(typeof(AlmacenCascosController), "Cancelar", "perm:almacen_cascos.cancelar|app_movil.almacen_cascos.cancelar")]
     // Temporadas: 4 escrituras + la puerta nueva del cierre
     [InlineData(typeof(TemporadasController), "Create", "perm:temporadas.crear")]
     [InlineData(typeof(TemporadasController), "Update", "perm:temporadas.editar")]

@@ -59,7 +59,9 @@ public class InventarioTransitoConsultaController : ControllerBase
     /// <response code="200">Inventario en transito consultado</response>
     /// <response code="400">El rango de fechas esta incompleto o al reves</response>
     [HttpGet]
-    [Authorize(Policy = "perm:inventario.transito.ver")]
+    // Web/Mac31 o telefono: con una de las dos alcanza (ver ComprasController
+    // para la de dar entrada, que es la otra mitad de esta pantalla).
+    [Authorize(Policy = "perm:inventario.transito.ver|app_movil.inventario.transito.ver")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Consultar(

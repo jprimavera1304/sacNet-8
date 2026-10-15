@@ -107,7 +107,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Policy = "perm:usuarios.crear")]
+    [Authorize(Policy = "perm:usuarios.crear|app_movil.usuarios.crear")]
     public async Task<IActionResult> Create([FromBody] CreateUserRequest req, CancellationToken ct)
     {
         var result = await _service.CreateUserAsync(req, User, ct);
@@ -115,7 +115,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Policy = "perm:usuarios.ver_modulo")]
+    [Authorize(Policy = "perm:usuarios.ver_modulo|app_movil.usuarios.ver")]
     public async Task<IActionResult> List(CancellationToken ct = default)
     {
         var result = await _service.ListUsersAsync(User, ct);
@@ -123,7 +123,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpGet("roles")]
-    [Authorize(Policy = "perm:usuarios.ver_modulo")]
+    [Authorize(Policy = "perm:usuarios.ver_modulo|app_movil.usuarios.ver")]
     public async Task<IActionResult> ListRoles(CancellationToken ct = default)
     {
         var result = await _service.ListRolesCatalogAsync(User, ct);
@@ -131,7 +131,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = "perm:usuarios.editar")]
+    [Authorize(Policy = "perm:usuarios.editar|app_movil.usuarios.editar")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateUserRequest req, CancellationToken ct)
     {
         var result = await _service.UpdateUserAsync(id, req, User, ct);
@@ -139,7 +139,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPatch("{id:guid}")]
-    [Authorize(Policy = "perm:usuarios.editar")]
+    [Authorize(Policy = "perm:usuarios.editar|app_movil.usuarios.editar")]
     public async Task<IActionResult> PatchUpdate(Guid id, [FromBody] UpdateUserRequest req, CancellationToken ct)
     {
         var result = await _service.UpdateUserAsync(id, req, User, ct);
@@ -147,7 +147,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPut]
-    [Authorize(Policy = "perm:usuarios.editar")]
+    [Authorize(Policy = "perm:usuarios.editar|app_movil.usuarios.editar")]
     public async Task<IActionResult> UpdateWithBodyId([FromBody] UpdateUserWithIdRequest req, CancellationToken ct)
     {
         var result = await _service.UpdateUserAsync(req.Id, req, User, ct);
@@ -155,7 +155,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/estado")]
-    [Authorize(Policy = "perm:usuarios.estado.editar")]
+    [Authorize(Policy = "perm:usuarios.estado.editar|app_movil.usuarios.estado.editar")]
     public async Task<IActionResult> UpdateEstado(Guid id, [FromBody] UpdateUserEstadoRequest req, CancellationToken ct)
     {
         var result = await _service.UpdateEstadoAsync(id, req, User, ct);
@@ -163,7 +163,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPut("{id:guid}/estado")]
-    [Authorize(Policy = "perm:usuarios.estado.editar")]
+    [Authorize(Policy = "perm:usuarios.estado.editar|app_movil.usuarios.estado.editar")]
     public async Task<IActionResult> PutEstado(Guid id, [FromBody] UpdateUserEstadoRequest req, CancellationToken ct)
     {
         var result = await _service.UpdateEstadoAsync(id, req, User, ct);
@@ -171,7 +171,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPut("estado")]
-    [Authorize(Policy = "perm:usuarios.estado.editar")]
+    [Authorize(Policy = "perm:usuarios.estado.editar|app_movil.usuarios.estado.editar")]
     public async Task<IActionResult> PutEstadoWithBodyId([FromBody] UpdateUserEstadoWithIdRequest req, CancellationToken ct)
     {
         var result = await _service.UpdateEstadoAsync(req.Id, req, User, ct);
@@ -179,7 +179,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPut("{id:guid}/inactivar")]
-    [Authorize(Policy = "perm:usuarios.estado.editar")]
+    [Authorize(Policy = "perm:usuarios.estado.editar|app_movil.usuarios.estado.editar")]
     public async Task<IActionResult> Inactivar(Guid id, CancellationToken ct)
     {
         var result = await _service.UpdateEstadoAsync(id, new UpdateUserEstadoRequest { Estado = 2 }, User, ct);
@@ -187,7 +187,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPut("{id:guid}/activar")]
-    [Authorize(Policy = "perm:usuarios.estado.editar")]
+    [Authorize(Policy = "perm:usuarios.estado.editar|app_movil.usuarios.estado.editar")]
     public async Task<IActionResult> Activar(Guid id, CancellationToken ct)
     {
         var result = await _service.UpdateEstadoAsync(id, new UpdateUserEstadoRequest { Estado = 1 }, User, ct);
@@ -246,7 +246,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    [Authorize(Policy = "perm:usuarios.ver")]
+    [Authorize(Policy = "perm:usuarios.ver|app_movil.usuarios.ver")]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
     {
         var result = await _service.GetUserByIdAsync(id, User, ct);

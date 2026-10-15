@@ -1,4 +1,4 @@
-using ISL_Service.Application.Interfaces;
+﻿using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -102,7 +102,7 @@ public class ClientesAnexosController : ControllerBase
     /// bitacora COMPLETA de todos los clientes.
     /// </remarks>
     [HttpGet("{idCliente:int}/log")]
-    [Authorize(Policy = "perm:clientes.log.ver")]
+    [Authorize(Policy = "perm:clientes.log.ver|app_movil.clientes.log.ver")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Log([FromRoute] int idCliente, CancellationToken ct)
@@ -119,8 +119,28 @@ public class ClientesAnexosController : ControllerBase
     /// </summary>
     /// <param name="idStatus">0 = todos (default), 1 = activos, 2 = inactivos.</param>
     /// <param name="exacto">true = igualdad; false = LIKE %texto%.</param>
+    /// <remarks>
+    /// QUIEN FACTURA TAMBIEN PUEDE LEER ESTO, Y NO ES UN AFLOJE.
+    ///
+    /// `clientes.facturacion.ver` se queda y se le suman las dos claves de
+    /// facturar. Medido: `VentasFacturacion._Load` llama a esta consulta
+    /// (`ConsultarClienteFacturacion`, VentasFacturacion.cs:201 y :1150) SIN
+    /// comprobar permiso, y de su resultado sale el RECEPTOR del CFDI: el RFC,
+    /// la razon social, el codigo postal y el regimen fiscal. Sin ella no hay
+    /// factura que timbrar, y la propia pantalla de alla se niega con "INGRESE
+    /// EL RFC DEL CLIENTE." cuando la reja viene vacia.
+    ///
+    /// O sea: con solo `clientes.facturacion.ver`, un usuario que en Mac31
+    /// factura sin problema abria la pantalla del web sin receptor y no podia
+    /// facturar nada.
+    ///
+    /// No se concede nada de mas: lo que se lee son los datos fiscales del
+    /// cliente que se esta facturando, que es exactamente lo que una factura
+    /// necesita. Dar de ALTA o EDITAR esos datos sigue pidiendo
+    /// `clientes.facturacion.editar`, que no se toco.
+    /// </remarks>
+    [Authorize(Policy = "perm:clientes.facturacion.ver|facturacion.timbrar|ventas.facturar|app_movil.clientes.facturacion.ver")]
     [HttpGet("facturacion")]
-    [Authorize(Policy = "perm:clientes.facturacion.ver")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Facturacion(
         [FromQuery] int id = 0,

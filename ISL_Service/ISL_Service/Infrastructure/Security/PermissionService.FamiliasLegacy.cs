@@ -94,7 +94,13 @@ public sealed partial class PermissionService
         new List<PermissionSeed> { new("constantes.ver", "Constantes - Consultar parametros de operacion", "constantes") },
         new List<LegacyModuleBinding>
         {
-            new("constantes", "Constantes", "FECHA DE OPERACIÓN", ConstantesMap, Array.Empty<PermissionSeed>())
+            new("constantes", "Constantes", "FECHA DE OPERACIÓN", ConstantesMap, Array.Empty<PermissionSeed>(),
+                /* La forma NO TIENE NI UN BOTON DE LECTURA en n_Procesos
+                   -comprobado en MacZ y en Produccion_svr el 2026-10-12-, asi
+                   que esta clave era inalcanzable desde Mac31 y habia que darla
+                   a mano encima de los botones que Mac31 ya concede. Ver la
+                   explicacion de ClaveDeLectura en PermissionService.cs. */
+                ClaveDeLectura: "constantes.ver")
         });
 
     /*
@@ -127,7 +133,13 @@ public sealed partial class PermissionService
         },
         new List<LegacyModuleBinding>
         {
-            new("compras", "Compras", "CONSULTA DE COMPRAS", ComprasMap, Array.Empty<PermissionSeed>())
+            new("compras", "Compras", "CONSULTA DE COMPRAS", ComprasMap, Array.Empty<PermissionSeed>(),
+                /* La forma NO TIENE NI UN BOTON DE LECTURA en n_Procesos
+                   -comprobado en MacZ y en Produccion_svr el 2026-10-12-, asi
+                   que esta clave era inalcanzable desde Mac31 y habia que darla
+                   a mano encima de los botones que Mac31 ya concede. Ver la
+                   explicacion de ClaveDeLectura en PermissionService.cs. */
+                ClaveDeLectura: "compras.ver")
         });
 
     /*
@@ -172,8 +184,28 @@ public sealed partial class PermissionService
         },
         new List<LegacyModuleBinding>
         {
-            new("inventario", "Inventario", "AJUSTES AL INVENTARIO", InventarioAjustesMap, Array.Empty<PermissionSeed>()),
-            new("inventario", "Inventario", "INVENTARIO EN TRANSITO", InventarioTransitoMap, Array.Empty<PermissionSeed>())
+            /*
+              CADA UNA ABRE SU PROPIA PANTALLA, Y POR ESO LAS CLAVES VAN AQUI
+              Y NO ARRIBA EN LA FAMILIA.
+
+              AJUSTES AL INVENTARIO tiene en n_Procesos btnNuevo y btnCancelar
+              y NI UN BOTON DE LECTURA -comprobado en las dos empresas el
+              2026-10-12, IDProceso 3064 y 3065 en las dos-, asi que
+              "inventario.ajustes.ver", que es lo que exige
+              InventarioOperacionesController.cs:31, no se podia heredar de
+              ningun sitio. Se deriva de tener cualquiera de los dos botones,
+              que en Mac31 es exactamente lo que pone la forma en tu menu.
+
+              INVENTARIO EN TRANSITO si tiene su btnBuscar y ya mapea
+              "inventario.transito.ver", asi que NO declara ClaveDeLectura: ese
+              permiso tiene que seguir viniendo del boton y no regalarse a quien
+              solo tenga btnAceptar.
+            */
+            new("inventario", "Inventario", "AJUSTES AL INVENTARIO", InventarioAjustesMap, Array.Empty<PermissionSeed>(),
+                ClaveDeEntrada: "inventario_ajustes.ver_modulo",
+                ClaveDeLectura: "inventario.ajustes.ver"),
+            new("inventario", "Inventario", "INVENTARIO EN TRANSITO", InventarioTransitoMap, Array.Empty<PermissionSeed>(),
+                ClaveDeEntrada: "inventario_transito.ver_modulo")
         });
 
     /*
@@ -214,7 +246,34 @@ public sealed partial class PermissionService
         new List<PermissionSeed> { new("garantias.ver_modulo", "Garantias - Ver modulo", "garantias") },
         new List<LegacyModuleBinding>
         {
-            new("garantias", "Garantias", "CONSULTA DE GARANTÍAS", GarantiasMap, Array.Empty<PermissionSeed>()),
+            new("garantias", "Garantias", "CONSULTA DE GARANTÍAS", GarantiasMap, Array.Empty<PermissionSeed>(),
+                /*
+                  LOS SEIS PASOS DEL FLUJO, QUE EL WEB SI TIENE.
+
+                  El comentario de arriba decia que estos botones son "pasos del
+                  flujo que el web todavia no tiene". Ya no es cierto: la
+                  pantalla de garantias los resuelve los seis con
+                  POST api/ventas/garantias/actualizar, que exige
+                  "garantias.editar" (VentasGarantiasController).
+
+                  En Mac31 son botones aparte y quien tiene solo esos no
+                  heredaba nada. Medido: JESY en Tauro tiene los seis y no
+                  btnModificar, asi que podia diagnosticar, ajustar y devolver
+                  al cliente alla y nada de eso aca.
+
+                  Los TRES DE IMPRIMIR siguen fuera, y no por olvido: son los
+                  reportes 1220, 1222 y 1224 de Mac31 y no estan en el catalogo
+                  de reportes del web, asi que no hay accion que autorizar.
+                */
+                ConcesionesExtra: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["btnGarantia"] = "garantias.editar",
+                    ["btnAjuste"] = "garantias.editar",
+                    ["btnDiagnosticar"] = "garantias.editar",
+                    ["btnRegresarCliente"] = "garantias.editar",
+                    ["btnEnviarProveedor"] = "garantias.editar",
+                    ["btnRemisionar"] = "garantias.editar"
+                }),
             new("garantias", "Garantias", "CONSULTA DE GARANTIAS POR ACEPTAR", GarantiasAceptarMap, Array.Empty<PermissionSeed>()),
             new("garantias", "Garantias", "CONSULTA DE REGISTRO DE GARANTÍAS", GarantiasRegistroMap, Array.Empty<PermissionSeed>())
         });
@@ -250,7 +309,29 @@ public sealed partial class PermissionService
         new List<LegacyModuleBinding>
         {
             new("cortes", "Cortes", "CORTES", CortesMap, Array.Empty<PermissionSeed>()),
-            new("cortes", "Cortes", "CORTES CENTRO DE SERVICIO", CortesCsMap, Array.Empty<PermissionSeed>())
+            new("cortes", "Cortes", "CORTES CENTRO DE SERVICIO", CortesCsMap, Array.Empty<PermissionSeed>()),
+
+            /*
+              LA TERCERA FORMA, QUE ANTES SE QUEDO FUERA Y YA NO HACE FALTA.
+
+              DETALLE CORTE CENTRO DE SERVICIO (forma CorteDiarioCS) se habia
+              dejado fuera porque su btnGuardar choca con el btnNuevo de la
+              forma anterior: las dos producian "cortes.cs.crear" y el catalogo
+              guarda un solo IDProceso por clave, asi que una de las dos
+              quedaba muerta en silencio.
+
+              Con el `Prefijo` propio ya no chocan. Deriva
+              "cortes.cs.detalle.guardar" y "cortes.cs.detalle.imprimir", las
+              dos nuevas. Medido en las dos empresas: un solo usuario con
+              cuenta web tiene esos botones en cada una y nadie los tiene
+              guardados en el web, asi que gana uno por empresa y no pierde
+              nadie.
+            */
+            new("cortes", "Cortes", "DETALLE CORTE CENTRO DE SERVICIO",
+                new Dictionary<string, (string Key, string Name)>(StringComparer.OrdinalIgnoreCase),
+                Array.Empty<PermissionSeed>(),
+                FormaExacta: "CorteDiarioCS",
+                Prefijo: "cortes.cs.detalle")
         });
 
     /*
@@ -287,7 +368,19 @@ public sealed partial class PermissionService
         },
         new List<LegacyModuleBinding>
         {
-            new("cambiosvigencia", "Cambios de vigencia", "CONSULTA CAMBIOS DE VIGENCIA", CambiosVigenciaMap, Array.Empty<PermissionSeed>())
+            new("cambiosvigencia", "Cambios de vigencia", "CONSULTA CAMBIOS DE VIGENCIA", CambiosVigenciaMap, Array.Empty<PermissionSeed>(),
+                /* "Entregar" es regresar la pieza al inventario, y el web lo
+                   hace con POST api/cambios-vigencia/{id}/regresar, que exige
+                   "cambiosvigencia.editar", la misma clave que btnModificar.
+                   Medido: REBECA en Zaragoza tiene btnEntregar y no
+                   btnModificar.
+                   btnRechazar NO entra: esta muerto tambien en Mac31 -el
+                   manejador no hace nada y el boton va oculto-, asi que no hay
+                   permiso que heredar. */
+                ConcesionesExtra: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["btnEntregar"] = "cambiosvigencia.editar"
+                })
         });
 
     /*
@@ -310,7 +403,13 @@ public sealed partial class PermissionService
         new List<PermissionSeed> { new("asistencias.ver", "Asistencias - Ver", "asistencias") },
         new List<LegacyModuleBinding>
         {
-            new("asistencias", "Asistencias", "ASISTENCIAS", AsistenciasMap, Array.Empty<PermissionSeed>())
+            new("asistencias", "Asistencias", "ASISTENCIAS", AsistenciasMap, Array.Empty<PermissionSeed>(),
+                /* La forma NO TIENE NI UN BOTON DE LECTURA en n_Procesos
+                   -comprobado en MacZ y en Produccion_svr el 2026-10-12-, asi
+                   que esta clave era inalcanzable desde Mac31 y habia que darla
+                   a mano encima de los botones que Mac31 ya concede. Ver la
+                   explicacion de ClaveDeLectura en PermissionService.cs. */
+                ClaveDeLectura: "asistencias.ver")
         });
 
     /// <summary>
@@ -326,14 +425,97 @@ public sealed partial class PermissionService
         GarantiasFamilia,
         CortesFamilia,
         CambiosVigenciaFamilia,
-        AsistenciasFamilia
+        AsistenciasFamilia,
+        // Las dos de PermissionService.Familias.Proveedores.cs. Van al final a
+        // proposito: ModuloDeFamilia devuelve la PRIMERA familia cuyo prefijo
+        // empate, asi que agregar al final no cambia a quien pertenecia ya
+        // ninguna clave.
+        ProveedoresFamilia,
+        ObraProveedoresFamilia,
+        // De PermissionService.Familias.Facturacion.cs. El orden da igual:
+        // manda el prefijo mas largo (ver EsLaFamiliaMasEspecifica).
+        FacturasFamilia,
+        ConcentradosFamilia,
+        ReasignacionFamilia,
+        ClientesRfcsFamilia,
+        // De PermissionService.Familias.Cobros.cs. CobrosPagosFamilia usa el
+        // prefijo "cobros." y ReasignacionFamilia "cobros.reasignar": se
+        // solapan, y el que manda es el mas largo, no el que este antes.
+        CobranzaFamilia,
+        CobrosPagosFamilia,
+        CobranzasWebFamilia,
+        // De PermissionService.Familias.Clientes.cs. ClientesFamilia usa
+        // "clientes." y ClientesRfcsFamilia (de facturacion) usa
+        // "clientes.facturacion.": se solapan y manda el mas largo.
+        ClientesFamilia,
+        ProductosFamilia,
+        UsuariosFamilia,
+        AgentesFamilia,
+        RepartidoresFamilia,
+        // De PermissionService.Familias.Usados.cs
+        AlmacenCascosFamilia,
+        UsadosTiposFamilia,
+        GasolinasFamilia,
+        TransferenciasFamilia,
+        DescuentosFamilia,
+        ChecadorFamilia,
+        // De PermissionService.Familias.Catalogos.cs
+        CatalogosFamilia,
+        RecordatoriosFamilia,
+        // De PermissionService.Familias.DineroUsados.cs. Su prefijo
+        // ("usados.cobros_dinero.") cuelga del de UsadosTiposFamilia solo en
+        // apariencia: ese es "usados.tipos.", asi que no se solapan.
+        DineroUsadosCobrosFamilia,
+        /*
+          De PermissionService.Familias.CobrosUsados.cs. Su prefijo es
+          "usados.cobros." y NO se solapa con "usados.cobros_dinero.": el guion
+          bajo separa, asi que "cobros_dinero" no empieza por "cobros.". Lee la
+          misma forma que CobranzaFamilia (ConsultarCobros) con otro prefijo,
+          igual que "cobranza." y "cobranzas." se reparten ConsultarCobranzas.
+        */
+        CobrosUsadosFamilia
     };
 
     /// <summary>
     /// Da de alta en WPermiso lo que Mac31 tenga de estas familias y devuelve
     /// el catalogo resuelto, familia por familia.
     /// </summary>
+    /// <summary>
+    /// El catalogo de TODAS las familias de Mac31, memorizado por base y empresa.
+    /// </summary>
+    /// <remarks>
+    /// POR QUE AQUI Y NO BINDING A BINDING. Recorrer las 31 familias y sus ~70
+    /// formas costaba cientos de viajes a SQL en CADA peticion de permisos
+    /// -medido: era el grueso de los 5383 viajes de un bootstrap-, y ademas
+    /// reescribia WModulo y WPermiso por el camino: una lectura que escribe.
+    ///
+    /// Memorizar cada forma por separado se probo y salio mal: la llave tenia
+    /// que capturar todo lo que distingue un binding de otro y se perdieron dos
+    /// permisos reales (`clientes.rfc.crear` y `.editar`). Con UNA llave para
+    /// todo el conjunto no hay nada que confundir.
+    ///
+    /// EL PLAZO es `CatalogoCacheTtl`. Lo que se retrasa es que una forma NUEVA
+    /// de Mac31 aparezca en la pantalla de permisos; lo que cada usuario puede
+    /// se sigue leyendo siempre.
+    /// </remarks>
     private async Task<Dictionary<string, Dictionary<string, VentasPermissionInfo>>> EnsureFamiliasLegacySyncedAsync(
+        SqlConnection conn,
+        int empresaId,
+        CancellationToken ct)
+    {
+        var memorizado = await CatalogoMemorizadoAsync(
+            $"familias|{conn.Database}|{empresaId}",
+            () => EnsureFamiliasLegacySyncedSinMemoriaAsync(conn, empresaId, ct));
+
+        /* Copia profunda: quien lo recibe junta catalogos encima, y escribir en
+           el memorizado contaminaria las peticiones siguientes. */
+        var copia = new Dictionary<string, Dictionary<string, VentasPermissionInfo>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var familia in memorizado)
+            copia[familia.Key] = new Dictionary<string, VentasPermissionInfo>(familia.Value, StringComparer.OrdinalIgnoreCase);
+        return copia;
+    }
+
+    private async Task<Dictionary<string, Dictionary<string, VentasPermissionInfo>>> EnsureFamiliasLegacySyncedSinMemoriaAsync(
         SqlConnection conn,
         int empresaId,
         CancellationToken ct)
@@ -383,6 +565,33 @@ public sealed partial class PermissionService
             var parcial = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, userId, binding, catalogo, ct);
             allow.UnionWith(parcial.Allow);
             deny.UnionWith(parcial.Deny);
+
+            /*
+              LA ENTRADA Y LA LECTURA DE *ESTA* PANTALLA.
+
+              La derivacion de la familia (en AplicarFamiliasLegacyAsync) sirve
+              cuando todas sus formas abren la MISMA pantalla del web. Cuando no
+              -"inventario." alimenta Ajustes y En transito, cada una con su
+              propia entrada- la familia no puede nombrar una sola clave y
+              declaraba null, y entonces nadie heredaba ninguna de las dos.
+
+              La regla es la misma que ya se midio y se acordo para la entrada
+              de familia: CUALQUIER boton de la forma vale. En Mac31 el boton
+              vive dentro de la forma, asi que tenerlo significa que la forma
+              esta en tu menu y la puedes abrir y leer. Lo que se pueda hacer
+              adentro lo siguen decidiendo los permisos finos, uno por uno.
+
+              Las dos claves se conceden solo si la forma le dio ALGO; con
+              Allow vacio no se deriva nada.
+            */
+            if (parcial.Allow.Count == 0)
+                continue;
+
+            if (binding.ClaveDeEntrada is { Length: > 0 } entradaDeForma)
+                allow.Add(entradaDeForma);
+
+            if (binding.ClaveDeLectura is { Length: > 0 } lecturaDeForma)
+                allow.Add(lecturaDeForma);
         }
 
         // Un boton concedido en una forma gana sobre el mismo nombre negado en
@@ -399,7 +608,43 @@ public sealed partial class PermissionService
     /// </summary>
     private static bool LaMandaLegacy(FamiliaLegacy familia, string clave) =>
         clave.StartsWith(familia.Prefijo, StringComparison.OrdinalIgnoreCase)
-        && !familia.SemillasDelWeb.Any(s => s.Key.Equals(clave, StringComparison.OrdinalIgnoreCase));
+        && !familia.SemillasDelWeb.Any(s => s.Key.Equals(clave, StringComparison.OrdinalIgnoreCase))
+        && EsLaFamiliaMasEspecifica(familia, clave);
+
+    /*
+      MANDA EL PREFIJO MAS LARGO, Y POR ESO EL ORDEN DE LA LISTA YA NO IMPORTA.
+
+      Hace falta desde que hay familias cuyo prefijo cuelga de otro:
+      "cobros." y "cobros.reasignar", "clientes." y "clientes.facturacion.".
+      Sin esto, el fallo era de ORDEN y silencioso, porque
+      AplicarFamiliasLegacyAsync recorre la lista haciendo
+      `RemoveAll(LaMandaLegacy(familia, x))` y luego agregando lo suyo:
+
+        * si la ancha va DESPUES, le borra a la especifica las claves que la
+          especifica acababa de poner, y no las vuelve a poner porque sus
+          formas no las producen. La gente perdia el permiso sin que nada
+          fallara.
+        * si la ancha va ANTES, el bucle queda bien, pero entonces
+          ModuloDeFamilia —que devolvia la PRIMERA familia cuyo prefijo
+          empatara— le adjudicaba la clave al modulo equivocado.
+
+      O sea que las dos funciones pedian ordenes contrarios y no habia orden
+      bueno. Con esto, una familia solo gobierna una clave si NINGUNA otra
+      familia tiene un prefijo mas largo que tambien le empate, asi que da
+      igual como esten puestas en la lista.
+    */
+    private static bool EsLaFamiliaMasEspecifica(FamiliaLegacy familia, string clave)
+    {
+        foreach (var otra in FamiliasLegacyAmpliadas)
+        {
+            if (ReferenceEquals(otra, familia))
+                continue;
+            if (otra.Prefijo.Length > familia.Prefijo.Length
+                && clave.StartsWith(otra.Prefijo, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+        return true;
+    }
 
     /// <summary>
     /// Sustituye en <paramref name="permisos"/> todo lo que manden estas
@@ -419,6 +664,21 @@ public sealed partial class PermissionService
         IReadOnlyDictionary<string, Dictionary<string, VentasPermissionInfo>> catalogos,
         CancellationToken ct)
     {
+        /*
+          UN MODULO APAGADO NO DEJA PASAR NI LO QUE VIENE DE MAC31.
+
+          El filtro de modulos apagados vive en LoadEffectivePermissionsAsync,
+          que corre ANTES que esto. Como las familias agregan sus claves
+          despues, se saltaban el filtro enteras: con el modulo apagado, sus
+          permisos heredados seguian saliendo en el snapshot, y la puerta
+          derivada volvia a aparecer sola.
+
+          Apagar el modulo tiene que cerrar la puerta de esta plataforma sin
+          tocar NADA en Mac31, que es justo el escenario 4. Por eso se filtra
+          aqui tambien, con el mismo criterio que usa el resto del snapshot.
+        */
+        var apagados = await LoadInactiveModuleKeysAsync(conn, empresaId, ct);
+
         foreach (var familia in FamiliasLegacyAmpliadas)
         {
             if (!catalogos.TryGetValue(familia.Prefijo, out var catalogo) || catalogo.Count == 0)
@@ -426,7 +686,15 @@ public sealed partial class PermissionService
 
             var legacy = await LoadFamiliaLegacyForUserAsync(conn, empresaId, userId, familia, catalogo, ct);
             permisos.RemoveAll(x => LaMandaLegacy(familia, x));
-            permisos.AddRange(legacy.Allow.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+            // El `Where` de duplicados hace falta desde que los bindings derivan
+            // su propia entrada y su lectura: esas claves son SEMILLAS DEL WEB,
+            // y las semillas sobreviven al RemoveAll de arriba a proposito. Sin
+            // esto, quien ya las tuviera concedidas por el web las veria dos
+            // veces en /api/me.
+            permisos.AddRange(legacy.Allow
+                .Where(x => !EsDeModuloApagado(x, apagados))
+                .Where(x => !permisos.Contains(x, StringComparer.OrdinalIgnoreCase))
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
 
             // QUIEN VE LA FORMA EN MAC31 VE EL MODULO EN EL WEB.
             //
@@ -438,9 +706,45 @@ public sealed partial class PermissionService
             // se exige en el backend (ver EntradasDeModulo): sin derivarla, el
             // puente habria dejado a la gente con permisos finos de Mac31 y sin
             // puerta por donde usarlos.
+            // CUALQUIER boton de la familia abre la puerta, no uno concreto.
+            //
+            // Antes solo se derivaba si el usuario tenia exactamente
+            // `ClaveQueDaLaEntrada`. Eso dejo FUERA a la familia de compras y
+            // se midio el 2026-10-12: ComprasFamilia dice derivar de
+            // "compras.ver", pero su mapa solo produce "compras.editar" y
+            // "compras.cancelar", y la forma CONSULTA DE COMPRAS no tiene
+            // ningun boton de buscar ni de ver en n_Procesos. O sea que
+            // "compras.ver" es INALCANZABLE desde Mac31 y la entrada no se
+            // derivaba nunca.
+            //
+            // No era teorico: 7 usuarios con cuenta web heredaban los botones
+            // de compras y se quedaban sin la puerta -FERNANDA, NORMA,
+            // QA_LEGWEB y RICARDO en MacZ; JANET, JESY y NAOLANY en
+            // Produccion_svr-, asi que el modulo les contestaba 403 aunque
+            // Mac31 se los autorizara.
+            //
+            // Tampoco servia elegir otra clave suelta: FERNANDA solo tiene
+            // btnNuevo, QA_LEGWEB solo btnModificar y JESY ninguno de los dos.
+            // Ninguna clave individual los cubre a todos.
+            //
+            // Por eso la condicion es "tiene ALGO de esta familia en Mac31".
+            // Es lo que dice el titulo de arriba: si Mac31 le deja usar esa
+            // pantalla, puede entrar a ese modulo en el web. La puerta no es
+            // una capacidad; lo que se puede hacer adentro lo siguen decidiendo
+            // los permisos finos, uno por uno.
+            //
+            // MEDIDO QUE NO ENSANCHA NADA MAS: en las dos empresas, las otras
+            // dos familias con entrada -cortes y garantias- no tienen ni un
+            // usuario con algun boton y sin el de origen (btnVer y btnBuscar
+            // respectivamente), asi que para ellas el resultado es identico.
+            //
+            // `ClaveQueDaLaEntrada` se conserva porque sigue documentando de
+            // donde nace la puerta de cada familia, y porque una familia sin
+            // entrada propia (null) tiene que seguir sin derivar nada.
             if (familia.ClaveDeEntrada is { Length: > 0 } entrada
-                && familia.ClaveQueDaLaEntrada is { Length: > 0 } origen
-                && legacy.Allow.Contains(origen)
+                && familia.ClaveQueDaLaEntrada is { Length: > 0 }
+                && legacy.Allow.Count > 0
+                && !EsDeModuloApagado(entrada, apagados)
                 && !permisos.Any(x => string.Equals(x, entrada, StringComparison.OrdinalIgnoreCase)))
             {
                 permisos.Add(entrada);
@@ -495,11 +799,17 @@ public sealed partial class PermissionService
     /// </summary>
     private static (string ModuleKey, string ModuleName) ModuloDeFamilia(string clave)
     {
+        // El prefijo MAS LARGO que empate, no el primero: "clientes.facturacion.x"
+        // es del modulo de facturacion de clientes, no del de clientes, y cual
+        // de las dos familias este antes en la lista no debe decidirlo.
+        FamiliaLegacy? mejor = null;
         foreach (var familia in FamiliasLegacyAmpliadas)
         {
-            if (clave.StartsWith(familia.Prefijo, StringComparison.OrdinalIgnoreCase))
-                return (familia.ModuleKey, familia.ModuleName);
+            if (!clave.StartsWith(familia.Prefijo, StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (mejor is null || familia.Prefijo.Length > mejor.Prefijo.Length)
+                mejor = familia;
         }
-        return (string.Empty, string.Empty);
+        return mejor is null ? (string.Empty, string.Empty) : (mejor.ModuleKey, mejor.ModuleName);
     }
 }

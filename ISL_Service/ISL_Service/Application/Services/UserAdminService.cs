@@ -19,23 +19,26 @@ public class UserAdminService : IUserAdminService
 
     private readonly IUserRepository _repo;
     private readonly IPermissionService _permissionService;
+    private readonly IGuardiaDePermisos _guardia;
 
     private readonly ILogger<UserAdminService> _logger;
 
     public UserAdminService(
         IUserRepository repo,
         IPermissionService permissionService,
+        IGuardiaDePermisos guardia,
         ILogger<UserAdminService> logger)
     {
         _repo = repo;
         _permissionService = permissionService;
+        _guardia = guardia;
         _logger = logger;
     }
 
     public async Task<CreateUserResponse> CreateUserAsync(CreateUserRequest req, ClaimsPrincipal actor, CancellationToken ct)
     {
         var usuarioNombre = NormalizeUsuario(req.Usuario);
-        var rol = await NormalizeRolAsync(req.Rol, actor, ct);
+        var rol = await NormalizeRolAsync(req.Rol, rolActual: null, actor, ct);
 
         if (await _repo.ExistsByUsuarioAsync(usuarioNombre, ct))
             throw new ConflictException("El usuario ya existe.");
@@ -91,6 +94,11 @@ public class UserAdminService : IUserAdminService
                 entity.Id,
                 Array.Empty<string>(),
                 Array.Empty<string>(),
+                // NO sincronizar con Mac31: aqui solo se limpian overrides
+                // residuales del usuario web. Con true, dar de alta la cuenta
+                // web de alguien que ya trabajaba en Mac31 le apagaba todos
+                // sus permisos del escritorio.
+                sincronizarConLegacy: false,
                 ct);
         }
         catch (KeyNotFoundException ex)
@@ -174,7 +182,7 @@ public class UserAdminService : IUserAdminService
         EnsureActorCanManageTarget(actor, user);
 
         var usuarioNuevo = NormalizeUsuario(req.Usuario);
-        var rolNuevo = await NormalizeRolAsync(req.Rol, actor, ct);
+        var rolNuevo = await NormalizeRolAsync(req.Rol, rolActual: user.Rol, actor, ct);
 
         var existing = await _repo.GetByUsuarioAsync(usuarioNuevo, ct);
         if (existing is not null && existing.Id != userId)
@@ -434,7 +442,7 @@ public class UserAdminService : IUserAdminService
         return normalized;
     }
 
-    private async Task<string> NormalizeRolAsync(string rol, ClaimsPrincipal actor, CancellationToken ct)
+    private async Task<string> NormalizeRolAsync(string rol, string? rolActual, ClaimsPrincipal actor, CancellationToken ct)
     {
         var input = (rol ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(input))
@@ -449,7 +457,71 @@ public class UserAdminService : IUserAdminService
         if (match is null)
             throw new ArgumentException("Rol inválido. No existe en catálogo de roles.");
 
-        return ToStoredRolValue(NormalizeRoleCode(match.Code));
+        var codigoFinal = NormalizeRoleCode(match.Code);
+
+        /*
+          SOLO UN SuperAdmin PUEDE NOMBRAR A OTRO SuperAdmin.
+
+          Sin esto habia una escalada total, y se comprobo que las tres piezas
+          estaban puestas el 2026-10-10:
+
+            1. UpdateUserRequest y CreateUserRequest llevan el campo `Rol`, y
+               los PUT/PATCH de UsuariosController solo exigen la politica
+               `perm:usuarios.editar` (crear, `perm:usuarios.crear`).
+            2. "SUPER_ADMIN / SuperAdmin" SI esta en el catalogo de roles de
+               las DOS empresas (WRol de MacZ y de Produccion_svr), asi que la
+               validacion de arriba lo aceptaba sin mas.
+            3. PermissionAuthorizationHandler, en cuanto el rol del token es
+               "SuperAdmin", hace context.Succeed(requirement) y SE VA, sin
+               mirar el snapshot de permisos.
+
+          Encadenadas significan que cualquiera con `usuarios.editar` podia
+          mandar su propio renglon con Rol = "SuperAdmin" y quedarse con TODO,
+          saltandose el modelo de permisos entero.
+
+          EnsureActorCanManageTarget no lo tapaba y conviene entender por que:
+          esa comprobacion mira el rol que el destino tiene YA ("no puedes
+          administrar usuarios SuperAdmin"), no el que se le va a poner. Con el
+          destino siendo un usuario normal —o uno mismo— pasaba limpio.
+
+          La regla es la misma que ya gobierna el reparto de permisos (ver
+          GuardiaDePermisos): nadie concede una autoridad que no tiene. Esta de
+          aqui cubre el unico rol que SALTA el modelo —SuperAdmin pasa la
+          autorizacion sin mirar el snapshot, asi que su paquete de claves no
+          describe lo que puede—; para todos los demas el techo general lo pone
+          ExigirPuedeAsignarRolAsync, unas lineas mas abajo.
+        */
+        if (string.Equals(codigoFinal, "SUPER_ADMIN", StringComparison.OrdinalIgnoreCase)
+            && !CurrentUser.IsSuperAdmin(actor))
+        {
+            throw new UnauthorizedAccessException(
+                "Solo un SuperAdmin puede asignar el rol SuperAdmin.");
+        }
+
+        /*
+          EL TECHO GENERAL: NADIE REPARTE UN ROL QUE LE QUEDE GRANDE.
+
+          Sin esto la pantalla de usuarios era un atajo alrededor de la de
+          permisos. Un rol es un paquete de claves, asi que asignarlo concede
+          todas las que trae: quien no podia concederse una clave suelta se
+          nombraba —o nombraba a alguien de confianza— un rol que ya la
+          incluye, y el guardia de la pantalla de permisos no se enteraba
+          porque ahi no se estaba editando ningun rol.
+
+          Se traduce a UnauthorizedAccessException para que salga el 403 con su
+          mensaje por el mismo camino que la regla de arriba.
+        */
+        try
+        {
+            await _guardia.ExigirPuedeAsignarRolAsync(
+                actor, ResolveEmpresaId(actor), rolActual, codigoFinal, ct);
+        }
+        catch (EscaladaDePermisosException ex)
+        {
+            throw new UnauthorizedAccessException(ex.Message);
+        }
+
+        return ToStoredRolValue(codigoFinal);
     }
 
     private static string NormalizeRoleCode(string roleCode)

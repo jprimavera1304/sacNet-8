@@ -617,6 +617,25 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
               es el punto donde ya estan las plantillas, el logo y las
               constantes (que dicen si esta empresa es Tauro o Zaragoza).
             */
+            /*
+              EL DOCUMENTO DE UNA COMPRA (1015) SE ARMA APARTE, Y AQUI POR LAS
+              MISMAS DOS RAZONES: en este punto ya estan el DataSet con las
+              tres tablas -ExecuteLegacySpAsync recorrio los tres
+              procedimientos de su columna `SP`, que es donde los declara- y
+              las cuatro plantillas 1015. Y va antes del formato normal porque
+              su `Aspx` es "rptCompraDetalle", que no es "3columnas" y caeria
+              alli a buscar un `cuerpo_n` que este reporte no tiene: sus piezas
+              se llaman `cuerpo`, `detalle`, `usados_credito_encabezado` y
+              `usados_credito_detalle`.
+            */
+            else if (idReporte == ReporteComprasDetalle)
+            {
+                reportHtml = CompraHtmlBuilder.Construir(
+                    logo,
+                    config.NombreReporte,
+                    data,
+                    templates);
+            }
             else if (idReporte is ReporteNominaAsistencias or ReporteNominaAsistenciasCorto)
             {
                 var periodoDelRenglon = ReadInt(renglon, "Param3");
@@ -642,7 +661,18 @@ public partial class ReportesVentasRepository : IReportesVentasRepository
                     await ConsultarAsistenciasDelPeriodoAsync(conn, periodoNomina, ct),
                     await ConsultarDiasDelPeriodoAsync(conn, periodoNomina, ct),
                     templates,
-                    template.MaxLineas);
+                    template.MaxLineas,
+                    /*
+                      EL DINERO SOLO VIAJA AL 1025.
+
+                      Los dos reportes piden los MISMOS recibos (con netoPagado
+                      dentro), pero solo el 1025 tiene columna SUELDO y solo el
+                      1025 pide `empleados.sueldo.ver` (ver ReportesCatalogo). Al
+                      1024 se le entrega la tabla con las dos columnas de dinero
+                      en null, asi que no puede imprimir un sueldo ni aunque le
+                      descomenten la celda en `Template_Html`.
+                    */
+                    incluirImportes: idReporte == ReporteNominaAsistencias);
             }
             else if (idReporte == ReporteNominaRecibos)
             {

@@ -1,4 +1,4 @@
-namespace ISL_Service.Application.DTOs.Responses;
+﻿namespace ISL_Service.Application.DTOs.Responses;
 
 public class PermisosWebBootstrapResponse
 {
@@ -35,6 +35,20 @@ public class PermisosWebPermissionItem
     public int? LegacyFormId { get; set; }
     public int? LegacyProcessId { get; set; }
     public bool IsLegacyReport { get; set; }
+
+    /// <summary>
+    /// Si marcar o desmarcar esta casilla cambia algo de verdad.
+    /// </summary>
+    /// <remarks>
+    /// Una clave del catalogo que ningun endpoint comprueba, que no es puerta
+    /// de modulo y que no corresponde a ningun boton de Mac31 se puede marcar
+    /// y desmarcar sin consecuencias: el administrador cree que concedio o
+    /// retiro algo y no concedio ni retiro nada. Las que NADIE tiene
+    /// concedidas no se mandan siquiera (ver GetPermissionCatalogAsync); esta
+    /// bandera es para las que si tiene alguien, que hay que poder ver para
+    /// poder limpiarlas, con el aviso de que no gobiernan nada.
+    /// </remarks>
+    public bool ProtegeAlgo { get; set; } = true;
 }
 
 public class PermisosWebModuleItem

@@ -24,9 +24,40 @@ public class EmpleadosController : PermisoControllerBase
     private static readonly string[] PermisosCrear = { "empleados.crear", "app_movil.empleados.crear" };
     private static readonly string[] PermisosEditar = { "empleados.editar", "app_movil.empleados.editar" };
 
-    // Ver cuanto gana la gente es un permiso APARTE de capturar altas y
-    // corregir un RFC. Sin el, el backend borra los campos de dinero del DTO.
-    private static readonly string[] PermisosSueldo = { "empleados.sueldo.ver", "app_movil.empleados.sueldo.ver" };
+    /*
+      Ver cuanto gana la gente es un permiso APARTE de capturar altas y
+      corregir un RFC. Sin el, el backend borra los campos de dinero del DTO.
+
+      AQUI YA NO VALE LA LLAVE DEL MOVIL, Y ESO SE MIDIO.
+
+      Esta lista se comprueba en OR, asi que mientras incluyo
+      "app_movil.empleados.sueldo.ver" pasaba esto: a quien le quitaras
+      "empleados.sueldo.ver" desde la pantalla web le seguian saliendo los
+      importes si tenia cuenta movil con la llave del movil. Comprobado el
+      2026-10-10 en MacZ: con la llave web en `deny`, GET /api/empleados
+      seguia devolviendo los sueldos; poniendo las DOS en `deny`, salian en
+      null. O sea que la llave web no tapaba nada por si sola.
+
+      Se quita la del movil porque NO PROTEGE NADA QUE LA APP USE, y eso
+      tambien se midio, no se supone: en todo el codigo Dart de
+      Movil\mac-mac-mobile no aparece "/api/empleados" ni una sola vez, ni la
+      palabra "emplead" en ningun archivo. La lista de endpoints que la app
+      llama de verdad es clientes, cortes, inventario, almacen-cascos,
+      catalogos, capacidades y /api/me: empleados no esta. Asi que esto no
+      puede romper la app.
+
+      NO SE TOCA la llave "app_movil.empleados.sueldo.ver" en el catalogo, ni
+      ninguna otra de la familia del movil: sigue existiendo igual. Lo unico
+      que cambia es que este endpoint, que es del WEB, deja de aceptarla.
+
+      OJO, QUEDA IGUAL A PROPOSITO: PermisosVer y PermisosEditar de arriba
+      tienen la misma forma (su par del movil en OR) y por lo mismo tampoco
+      protegen nada que la app use. NO se cambiaron porque la fuga que se
+      midio es la de los importes, y ensanchar el arreglo a los otros dos sin
+      medirlos seria cambiar quien entra a la pantalla. Queda dicho para que
+      se decida aparte.
+    */
+    private static readonly string[] PermisosSueldo = { "empleados.sueldo.ver" };
 
     private readonly IEmpleadosService _service;
 

@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
@@ -59,8 +59,39 @@ public class UsuarioNuevoSinPermisosResidualesTests
         Assert.Equal("la base dijo no", ex.Message);
     }
 
+    /// <summary>
+    /// EL ALTA NO ESCRIBE EN MAC31.
+    ///
+    /// Medido el 2026-10-10 contra la base local: se creo ZZTESTSYNC en
+    /// dbo.Usuarios con 5 botones de ConsultarVentas en IDStatus = 1, se pidio
+    /// POST /api/usuarios con ese mismo nombre, contesto 200 y los 5 botones
+    /// quedaron en IDStatus = 2. Cero encendidos.
+    ///
+    /// La causa es que la limpieza de overrides llamaba al write-back, que
+    /// calcula el efectivo SOLO del web (rol + overrides, sin lo heredado de
+    /// legacy) y apaga lo que no este ahi. Con las listas vacias, apaga todo.
+    /// Es el mismo mecanismo del accidente del 2026-08-26.
+    ///
+    /// Esta prueba fija el contrato en el punto exacto donde se rompia: el
+    /// alta pasa sincronizarConLegacy = false.
+    /// </summary>
+    [Fact]
+    public async Task ElAltaDeUsuarioNoSincronizaConLegacy()
+    {
+        var permisos = new PermisosQueAnotan();
+        var service = NuevoServicio(permisos);
+
+        await service.CreateUserAsync(
+            new CreateUserRequest { Usuario = "NUEVO", Password = "Secreta2026", Rol = "User" },
+            Actor(),
+            CancellationToken.None);
+
+        Assert.True(permisos.SeLlamo);
+        Assert.False(permisos.SincronizoConLegacy);
+    }
+
     private static UserAdminService NuevoServicio(IPermissionService permisos)
-        => new(new RepositorioMinimo(), permisos, NullLogger<UserAdminService>.Instance);
+        => new(new RepositorioMinimo(), permisos, new GuardiaQueDejaPasar(), NullLogger<UserAdminService>.Instance);
 
     private static ClaimsPrincipal Actor()
         => new(new ClaimsIdentity(new[]
@@ -71,18 +102,26 @@ public class UsuarioNuevoSinPermisosResidualesTests
             new Claim(ClaimTypes.Role, "SuperAdmin")
         }, "test"));
 
-    private sealed class PermisosQueFallan : IPermissionService
+    /// <summary>
+    /// Doble que anota como lo llamaron y, si le dieron una excepcion, falla.
+    /// Con <c>null</c> deja pasar el alta y solo sirve para leer los argumentos.
+    /// </summary>
+    private class PermisosQueFallan : IPermissionService
     {
-        private readonly Exception _falla;
+        private readonly Exception? _falla;
 
-        public PermisosQueFallan(Exception falla) => _falla = falla;
+        public PermisosQueFallan(Exception? falla) => _falla = falla;
 
         public bool SeIntento { get; private set; }
+        public bool SeLlamo => SeIntento;
+        public bool SincronizoConLegacy { get; private set; }
 
-        public Task UpsertUserOverridesAsync(int empresaId, Guid userId, IReadOnlyCollection<string> allow, IReadOnlyCollection<string> deny, CancellationToken ct)
+        public Task UpsertUserOverridesAsync(int empresaId, Guid userId, IReadOnlyCollection<string> allow, IReadOnlyCollection<string> deny, bool sincronizarConLegacy, CancellationToken ct)
         {
             SeIntento = true;
-            throw _falla;
+            SincronizoConLegacy = sincronizarConLegacy;
+            if (_falla is not null) throw _falla;
+            return Task.CompletedTask;
         }
 
         public Task<PermissionSnapshot> GetPermissionsAsync(Guid userId, int empresaId, string rolLegacy, CancellationToken ct) => throw new NotImplementedException();
@@ -100,6 +139,20 @@ public class UsuarioNuevoSinPermisosResidualesTests
 
         public Task<PermisosWebSyncCatalogResponse> SyncPermissionCatalogAsync(int empresaId, IReadOnlyCollection<string>? modules, CancellationToken ct) => throw new NotImplementedException();
         public Task<bool> CreatePermissionAsync(int empresaId, string key, string name, string? description, CancellationToken ct) => throw new NotImplementedException();
+
+        // Metodos nuevos del guardia de escalada (ver IGuardiaDePermisos). Este
+        // doble no los usa: la prueba de la que cuelga no toca la pantalla de
+        // permisos. Si alguna llegara a usarlos, es mejor que reviente a que
+        // conteste "no hay nadie administrando" con datos inventados.
+        public Task<IReadOnlyCollection<string>> GetRolePermissionKeysAsync(int empresaId, string roleCode, CancellationToken ct) => throw new NotImplementedException();
+        public Task<(IReadOnlyCollection<string> Allow, IReadOnlyCollection<string> Deny)> GetUserOverrideKeysAsync(int empresaId, Guid userId, CancellationToken ct) => throw new NotImplementedException();
+        public Task<ISL_Service.Application.Models.AdministracionRestante> GetAdministracionRestanteAsync(int empresaId, ISL_Service.Application.Models.SimulacionDePermisos simulacion, CancellationToken ct) => throw new NotImplementedException();
+        public Task<bool> EsRolDeSistemaAsync(int empresaId, string roleCode, CancellationToken ct) => throw new NotImplementedException();
+    }
+
+    private sealed class PermisosQueAnotan : PermisosQueFallan
+    {
+        public PermisosQueAnotan() : base(null) { }
     }
 
     private sealed class RepositorioMinimo : IUserRepository

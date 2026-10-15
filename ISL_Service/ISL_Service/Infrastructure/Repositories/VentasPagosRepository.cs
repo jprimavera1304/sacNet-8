@@ -27,6 +27,14 @@ namespace ISL_Service.Infrastructure.Repositories;
   este archivo, el dia que legacy cambie una regla el web seguiria diciendo el
   numero viejo, sin error y sin aviso.
 */
+/*
+  LA CANCELACION SOLO LLEGA A LAS CONSULTAS.
+
+  Este repositorio escribe: cancelar a media escritura de legacy deja la
+  transaccion abierta y los candados puestos en una conexion que vuelve al pool.
+  Quien decide es CancelacionSegura, leyendo el propio comando; el porque esta
+  explicado ahi.
+*/
 public class VentasPagosRepository : IVentasPagosRepository
 {
     private const int CommandTimeoutSeconds = 500;
@@ -47,7 +55,7 @@ public class VentasPagosRepository : IVentasPagosRepository
             "SELECT TOP 1 UPPER(ISNULL(EsquemaPago,'')) FROM Constantes;", conn)
         { CommandTimeout = CommandTimeoutSeconds };
 
-        var valor = await cmd.ExecuteScalarAsync(ct);
+        var valor = await cmd.ExecuteScalarAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
         return valor as string ?? string.Empty;
     }
 
@@ -88,7 +96,7 @@ public class VentasPagosRepository : IVentasPagosRepository
         cmd.Parameters.Add(new SqlParameter("@IDCobro", SqlDbType.Int) { Value = 0 });
         cmd.Parameters.Add(new SqlParameter("@DineroExcedente", SqlDbType.Int) { Value = 0 });
 
-        await using var rd = await cmd.ExecuteReaderAsync(ct);
+        await using var rd = await cmd.ExecuteReaderAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
 
         /*
           Las columnas se buscan por NOMBRE y tolerando que falten.
@@ -104,7 +112,7 @@ public class VentasPagosRepository : IVentasPagosRepository
         for (var i = 0; i < rd.FieldCount; i++)
             col.TryAdd(rd.GetName(i), i);
 
-        while (await rd.ReadAsync(ct))
+        while (await rd.ReadAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct)))
         {
             lista.Add(new VentasPagoCrudo
             {
@@ -181,7 +189,7 @@ public class VentasPagosRepository : IVentasPagosRepository
         cmd.Parameters.Add(new SqlParameter("@IDUsuario", SqlDbType.Int) { Value = idUsuario });
         cmd.Parameters.Add(new SqlParameter("@Equipo", SqlDbType.VarChar, 1000) { Value = equipo ?? string.Empty });
 
-        await using var rd = await cmd.ExecuteReaderAsync(ct);
+        await using var rd = await cmd.ExecuteReaderAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
 
         /*
           El procedimiento devuelve un solo renglon con result y mensaje, pero
@@ -189,7 +197,7 @@ public class VentasPagosRepository : IVentasPagosRepository
           una de las malas no trae mensaje formateado igual. Se leen por nombre
           y con tolerancia, que es lo unico estable entre las cuatro salidas.
         */
-        if (!await rd.ReadAsync(ct))
+        if (!await rd.ReadAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct)))
             return new VentasPagoCancelacionCrudo { Result = -1, Mensaje = "NO SE PUDO REALIZAR LA OPERACIÓN." };
 
         var col = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);

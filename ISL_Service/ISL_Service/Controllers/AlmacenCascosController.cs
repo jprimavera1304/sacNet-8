@@ -23,6 +23,19 @@ namespace ISL_Service.Controllers;
 /// shared/js/core/module-action-flags.js (almacen_cascos.*); se declaran en
 /// PermissionService.PermissionCatalogSeeds.
 /// </summary>
+/*
+  DOS CANALES, LA MISMA RUTA: `almacen_cascos.X` (web y Mac31) o
+  `app_movil.almacen_cascos.X` (telefono). Basta con tener UNA.
+
+  Antes solo existia la del web, y por eso quitarle el modulo a alguien en el
+  telefono se lo quitaba tambien en la computadora: era el mismo permiso, no
+  dos parecidos. Con el par se puede negar un lado sin tocar el otro, como ya
+  hacen Empleados, Prestamos y Cambio de Cascos.
+
+  El canal movil NO pide entrada de modulo (EntradasDeModulo deja pasar las
+  claves `app_movil.`), asi que una concesion de solo-telefono alcanza por si
+  sola: el telefono no tiene mosaicos de inicio que abrir.
+*/
 [ApiController]
 [Route("api/almacen-cascos")]
 [Authorize]
@@ -44,6 +57,17 @@ public class AlmacenCascosController : ControllerBase
     /// <param name="tipoMovimiento">Opcional: 1=SALIDA, 2=ENTRADA</param>
     /// <param name="fechaInicio">Opcional: filtrar desde fecha</param>
     /// <param name="fechaFin">Opcional: filtrar hasta fecha</param>
+    // LAS LECTURAS TAMBIEN PIDEN PERMISO.
+    //
+    // La cabecera de arriba decia "las lecturas piden solo token, como
+    // antes", y se midio el 2026-10-12 con una cuenta de auditoria sin un
+    // solo permiso: estos cuatro contestaban 200 y entregaban los
+    // movimientos de cascos, su detalle y sus tarimas. De los 220 GET del
+    // servicio eran cuatro de los pocos que dejaban pasar.
+    //
+    // La clave no es nueva: es la que ya exige GET /existencias en este
+    // mismo controlador, y la que el front pide para pintar la pantalla.
+    [Authorize(Policy = "perm:almacen_cascos.ver|app_movil.almacen_cascos.ver")]
     [HttpGet("movimientos")]
     [ProducesResponseType(typeof(List<MovimientoCascoDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMovimientos(
@@ -60,6 +84,7 @@ public class AlmacenCascosController : ControllerBase
     /// <summary>
     /// Obtiene el detalle (líneas de tarimas/piezas) de un movimiento.
     /// </summary>
+    [Authorize(Policy = "perm:almacen_cascos.ver|app_movil.almacen_cascos.ver")]
     [HttpGet("movimientos/{idMovimiento:int}/detalle")]
     [ProducesResponseType(typeof(List<MovimientoCascoDetalleDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDetalle(int idMovimiento, CancellationToken ct)
@@ -71,6 +96,7 @@ public class AlmacenCascosController : ControllerBase
     /// <summary>
     /// Obtiene las tarimas con kilos capturados para una ENTRADA.
     /// </summary>
+    [Authorize(Policy = "perm:almacen_cascos.ver|app_movil.almacen_cascos.ver")]
     [HttpGet("movimientos/{idMovimiento:int}/tarimas")]
     [ProducesResponseType(typeof(List<MovimientoCascoTarimaKilosDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTarimasKilos(int idMovimiento, CancellationToken ct)
@@ -82,6 +108,7 @@ public class AlmacenCascosController : ControllerBase
     /// <summary>
     /// Obtiene detalle agrupado por tarima lógica (numeroTarima) y líneas por tipo de casco.
     /// </summary>
+    [Authorize(Policy = "perm:almacen_cascos.ver|app_movil.almacen_cascos.ver")]
     [HttpGet("movimientos/{idMovimiento:int}/detalle-agrupado")]
     [ProducesResponseType(typeof(MovimientoCascoDetalleAgrupadoDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDetalleAgrupado(int idMovimiento, CancellationToken ct)
@@ -137,7 +164,7 @@ public class AlmacenCascosController : ControllerBase
     /// </remarks>
     /// <response code="200">Existencia por tipo de casco</response>
     [HttpGet("existencias")]
-    [Authorize(Policy = "perm:almacen_cascos.ver")]
+    [Authorize(Policy = "perm:almacen_cascos.ver|app_movil.almacen_cascos.ver")]
     [ProducesResponseType(typeof(List<ExistenciaDeCascoDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetExistencias(CancellationToken ct)
     {
@@ -151,7 +178,7 @@ public class AlmacenCascosController : ControllerBase
     /// <response code="201">Salida creada (devuelve idMovimiento)</response>
     /// <response code="400">Validación fallida o repartidor/tarimas no activos</response>
     [HttpPost("salidas")]
-    [Authorize(Policy = "perm:almacen_cascos.crear")]
+    [Authorize(Policy = "perm:almacen_cascos.crear|app_movil.almacen_cascos.crear")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CrearSalida([FromBody] CreateSalidaRequest request, CancellationToken ct)
@@ -171,7 +198,7 @@ public class AlmacenCascosController : ControllerBase
     /// <response code="400">Validación o salida sin detalle / no registrada</response>
     /// <response code="409">Ya existe entrada para esta salida (índice único)</response>
     [HttpPost("entradas")]
-    [Authorize(Policy = "perm:almacen_cascos.crear")]
+    [Authorize(Policy = "perm:almacen_cascos.crear|app_movil.almacen_cascos.crear")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -189,7 +216,7 @@ public class AlmacenCascosController : ControllerBase
     /// Guarda kilos por tarima para una ENTRADA (inserta o actualiza).
     /// </summary>
     [HttpPost("movimientos/{idMovimiento:int}/tarimas/{numeroTarima:int}/kilos")]
-    [Authorize(Policy = "perm:almacen_cascos.editar")]
+    [Authorize(Policy = "perm:almacen_cascos.editar|app_movil.almacen_cascos.editar")]
     [ProducesResponseType(typeof(MovimientoCascoTarimaKilosResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GuardarKilosTarima(int idMovimiento, int numeroTarima, [FromBody] GuardarKilosTarimaRequest request, CancellationToken ct)
@@ -206,7 +233,7 @@ public class AlmacenCascosController : ControllerBase
     /// Actualiza una SALIDA (repartidor, tarima, cantidad de tarimas, piezas, observaciones).
     /// </summary>
     [HttpPut("salidas/{idMovimiento:int}")]
-    [Authorize(Policy = "perm:almacen_cascos.editar")]
+    [Authorize(Policy = "perm:almacen_cascos.editar|app_movil.almacen_cascos.editar")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ActualizarSalida(int idMovimiento, [FromBody] UpdateSalidaRequest request, CancellationToken ct)
@@ -223,7 +250,7 @@ public class AlmacenCascosController : ControllerBase
     /// Actualiza una ENTRADA (repartidor recibe, observaciones).
     /// </summary>
     [HttpPut("entradas/{idMovimiento:int}")]
-    [Authorize(Policy = "perm:almacen_cascos.editar")]
+    [Authorize(Policy = "perm:almacen_cascos.editar|app_movil.almacen_cascos.editar")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ActualizarEntrada(int idMovimiento, [FromBody] UpdateEntradaRequest request, CancellationToken ct)
@@ -243,7 +270,7 @@ public class AlmacenCascosController : ControllerBase
     /// <response code="400">Motivo vacío o regla de negocio</response>
     /// <response code="409">Ya cancelado o no se puede cancelar</response>
     [HttpPost("movimientos/{idMovimiento:int}/cancelar")]
-    [Authorize(Policy = "perm:almacen_cascos.cancelar")]
+    [Authorize(Policy = "perm:almacen_cascos.cancelar|app_movil.almacen_cascos.cancelar")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]

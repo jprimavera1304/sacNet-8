@@ -47,6 +47,55 @@ public partial class ReportesVentasRepository
     private const int ReporteClientesAcumMotoLubClarios = 121;
     private const int ReporteCompraProductos = 125;
     private const int ReporteComprasFacturas = 130;
+
+    /*
+      LA COMPROBACION DE COMPRAS (1017): NO ES UN NODO DEL ARBOL.
+
+      Es el papel que sacan COMPROBACION PANTALLA y COMPROBACION EXCEL de
+      CONSULTA DE COMPRAS, sobre las facturas MARCADAS en la rejilla
+      (ConsultarCompras.cs:874, :881 y MuestraComprobacion). Por eso no lleva
+      fechas ni filtros: lleva la lista de ids.
+
+      Es `enumReportes.CompraComprobacion` y su renglon en `Reportes` declara
+      `spV2 = sp_n_rptComprasComprobacionGlobales` con `Aspx = rptTemplate`, o
+      sea el camino generico: no necesita armador propio.
+
+      SUS TRES PARAMETROS, como los manda Mac31:
+        Param1 = Equipo[IDUsuario
+        Param2 = IDsCompra unidos con '~'
+        Param3 = Presentacion
+    */
+    private const int ReporteComprasComprobacion = 1017;
+
+    /*
+      EL DOCUMENTO DE UNA COMPRA (1015): TAMPOCO ES UN NODO DEL ARBOL.
+
+      Es lo que saca IMPRIMIR -y el doble clic sobre cualquier columna que no
+      sea la del check- de CONSULTA DE COMPRAS (ConsultarCompras.cs:687, :729).
+      Imprime UNA compra: la fila en la que esta el cursor, no las marcadas.
+
+      ES DE LA GENERACION VIEJA, y por eso no se parece a ningun otro de aqui:
+
+        * `spV2` esta VACIO. Los datos los trae la columna `SP`, con TRES
+          procedimientos: sp_rptCompraDetalle, sp_rptComprasUsadosCargoMultiple
+          y sp_rptComprasUsadosCreditoMultiple.
+        * esos tres NO reciben el `@Params` generico sino
+          `@IDCompra1, @IDCompra2, @IDCompra3`, y Mac31 les manda
+          `<IDCompra>||` metido en la URL, SIN pasar por `dbo.Parametros`
+          (su `URL_REPORTES` es el servidor de reportes viejo).
+        * su papel lo arma CompraHtmlBuilder con las cuatro plantillas 1015 de
+          `Template_Html` (`cuerpo`, `detalle`, `usados_credito_encabezado`,
+          `usados_credito_detalle`).
+
+      AQUI SI PASA POR `dbo.Parametros`, porque el web entra por `psp=` y la
+      URL va firmada: el id de la compra se guarda en Param2 y
+      ArgumentosDelProcedimiento lo vuelve a sacar para armar el `<id>||` que
+      esperan los procedimientos.
+
+        Param2 = IDCompra
+        Param3 = Presentacion
+    */
+    private const int ReporteComprasDetalle = 1015;
     private const int ReporteVentasUtilidadAcumuladores = 140;
     private const int ReporteVentasUtilidadProductos = 145;
     private const int ReporteVentasUsadosCreditos = 150;

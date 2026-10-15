@@ -61,6 +61,9 @@ public interface IVentasFacturacionRepository
     /// </summary>
     Task<ConstantesFacturacion> LeerConstantesAsync(CancellationToken ct);
 
+    /// <summary>La llave de Facturapi y el nombre de la aplicacion, nada mas.</summary>
+    Task<(string? SecretKey, string? AppMac)> LeerLlaveFacturapiAsync(CancellationToken ct);
+
     /// <summary>
     /// Guarda las veinte columnas de parametros del CFDI y devuelve el id del
     /// renglon. Es sp_n_ActualizarParametro.

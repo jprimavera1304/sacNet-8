@@ -241,6 +241,11 @@ public partial class ReportesVentasRepository
             "clientes_acum_moto_lub_clarios" => ReporteClientesAcumMotoLubClarios,
             "compras_acumuladores_y_productos" => request.IDGrupoCategoria == GrupoCategoriaAcumuladores ? ReporteCompraAcumuladores : ReporteCompraProductos,
             "compras_facturas" => ReporteComprasFacturas,
+            // La comprobacion de las facturas MARCADAS. Sus ids van en idsCompra.
+            "compra_comprobacion" => ReporteComprasComprobacion,
+            // El documento de UNA compra: IMPRIMIR y el doble clic. Su id va
+            // tambien en idsCompra, pero uno solo (ver el case del 1015).
+            "compra_detalle" => ReporteComprasDetalle,
             // "inventario_actual" e "inventario_faltante" se resuelven arriba,
             // con las Constantes en la mano: la variante de Filtros es de Tauro.
             "ajustes_al_inventario" => ReporteAjustesInventario,
@@ -560,6 +565,27 @@ public partial class ReportesVentasRepository
     */
     private static string ArgumentosDelProcedimiento(int idReporte, int parametroId, DataRow? row)
     {
+        /*
+          EL 1015 NO RECIBE EL RENGLON DE PARAMETROS: RECIBE EL IDCompra.
+
+          Sus tres procedimientos son de la generacion vieja y declaran
+          `@IDCompra1, @IDCompra2, @IDCompra3`. Mac31 les manda `<id>||`, o sea
+          el id en el primero y los otros dos VACIOS -no nulos-, y los otros
+          dos existen porque los de usados si saben leer listas separadas por
+          '~' aunque nadie se las mande.
+
+          Pasarle `parametroId` seria pedirle la compra numero 313320, que es
+          el numero de renglon de `dbo.Parametros`: no reventaria, devolveria
+          CERO filas, y el papel saldria con "No se encontro informacion". Un
+          reporte vacio sin ningun error es el peor resultado posible, asi que
+          esto va antes que nada.
+        */
+        if (idReporte == ReporteComprasDetalle)
+        {
+            var idCompra = row is null ? 0 : ReadInt(row, "Param2");
+            return string.Create(CultureInfo.InvariantCulture, $"{idCompra}||");
+        }
+
         if (idReporte is not (ReporteNominaAsistencias or ReporteNominaAsistenciasCorto or ReporteNominaRecibos))
             return parametroId.ToString(CultureInfo.InvariantCulture);
 
@@ -597,6 +623,15 @@ public partial class ReportesVentasRepository
             ReporteCompraAcumuladores or
             ReporteCompraProductos or
             ReporteComprasFacturas or
+            // 1017: plantilla rptTemplate y SP que recibe el @Params generico.
+            ReporteComprasComprobacion or
+            /*
+              1015: NO recibe el @Params generico ni lo pinta la plantilla
+              generica (lo arma CompraHtmlBuilder). Entra en esta lista solo
+              por las otras dos cosas que decide: que el reporte esta
+              SOPORTADO, y de que Param sale la presentacion.
+            */
+            ReporteComprasDetalle or
             ReporteInventarioAcumuladores or
             ReporteInventarioProductos or
             ReporteInventarioFiltros or
@@ -1820,6 +1855,70 @@ public partial class ReportesVentasRepository
                 legacy.Param11 = presentacion;
                 break;
 
+            /*
+              COMPROBACION DE COMPRAS (1017): LAS FACTURAS MARCADAS.
+
+              Los tres parametros, copiados de lo que manda Mac31 en
+              `MuestraComprobacion` (ConsultarCompras.cs):
+
+                  Param1 = Equipo[IDUsuario   (ya lo pone BuildLegacyUsuarioParam)
+                  Param2 = IDsCompra
+                  Param3 = Presentacion
+
+              LA LISTA VA UNIDA CON '~' Y NO CON '[' . Mac31 la junta con
+              DELIMITADOR_PARAM_TILDE_SP ('~', Globales.cs:79) y le quita el
+              ultimo separador antes de mandarla. No es intercambiable con el
+              '[' de las liquidaciones: alli el procedimiento hace un REPLACE
+              que aqui no existe.
+
+              SIN NADA MARCADO NO SE IMPRIME, igual que Mac31, que contesta
+              "SELECCIONE UNA FACTURA" y no llama al reporte. Con la cadena
+              vacia el procedimiento no filtra y el papel saldria con todas las
+              compras de la base.
+
+              LO QUE AQUI NO SE COMPRUEBA: que ninguna este cancelada. Mac31 lo
+              hace en la pantalla, antes de llamar, y el web hace lo mismo en
+              ComprasPage: es un aviso de interfaz, y repetirlo aqui obligaria a
+              leer las compras otra vez para contestar un 400 que el usuario ya
+              vio.
+            */
+            case ReporteComprasComprobacion:
+                var compras = (request.IDsCompra ?? new List<int>())
+                    .Where(x => x > 0)
+                    .Distinct()
+                    .Select(x => x.ToString(CultureInfo.InvariantCulture))
+                    .ToList();
+                if (compras.Count == 0)
+                    throw new ArgumentException("La comprobación de compras se imprime de las facturas marcadas: manda al menos una en idsCompra.");
+                legacy.Param2 = string.Join("~", compras);
+                legacy.Param3 = presentacion;
+                break;
+
+            /*
+              EL DOCUMENTO DE UNA COMPRA (1015): UNA SOLA, LA DEL CURSOR.
+
+              Mac31 manda `dataGridView1.CurrentRow`, no las marcadas
+              (ConsultarCompras.cs:702). Y no es un capricho de la pantalla:
+              `sp_rptCompraDetalle` filtra con `WHERE C.IDCompra = @IDCompra1`,
+              una IGUALDAD contra un varchar, asi que con dos ids unidos por
+              '~' SQL Server reventaria al convertir la cadena a entero. Por eso
+              si llegan varios se toma el PRIMERO en vez de juntarlos: es lo
+              unico que puede imprimir, y es lo que imprime Mac31.
+
+              El id se guarda aqui, en Param2, para que
+              ArgumentosDelProcedimiento pueda volver a leerlo cuando el
+              navegador pida el papel con `psp=`. Ese es el unico punto en que
+              nos separamos de Mac31, que no guarda renglon y lleva el id en la
+              URL; la razon esta en la nota del 1015 en Constants.
+            */
+            case ReporteComprasDetalle:
+                var compra = (request.IDsCompra ?? new List<int>()).FirstOrDefault(x => x > 0);
+                if (compra == 0)
+                    throw new ArgumentException("El documento de la compra se imprime de una factura: manda su id en idsCompra.");
+                legacy.Param2 = compra.ToString(CultureInfo.InvariantCulture);
+                legacy.Param3 = presentacion;
+                break;
+
             default:
                 throw new InvalidOperationException("Reporte de ventas no soportado.");
         }
@@ -2675,6 +2774,12 @@ public partial class ReportesVentasRepository
             ReporteVentasUtilidadAcumuladores or ReporteVentasUtilidadProductos => "Param13",
             ReporteCompraAcumuladores or ReporteCompraProductos => "Param10",
             ReporteComprasFacturas => "Param13",
+            // 1017: Param2 lleva los ids marcados y la presentacion queda en
+            // Param3. Sin esto el GET la leeria del Param7 por omision y el
+            // reporte saldria como Excel al re-abrirlo.
+            ReporteComprasComprobacion => "Param3",
+            // 1015: Param2 lleva el IDCompra y la presentacion queda en Param3.
+            ReporteComprasDetalle => "Param3",
             ReporteInventarioAcumuladores or ReporteInventarioProductos or ReporteInventarioFiltros or ReporteInventarioAcumuladoresCosto or ReporteInventarioProductosCosto or ReporteInventarioFiltrosCosto or ReportePedidoAcumuladores or ReportePedidoProductos => "Param7",
             ReporteInventarioFaltanteAcumuladores or ReporteInventarioFaltanteProductos or ReporteInventarioFaltanteFiltros => "Param7",
             ReporteAjustesInventario => "Param8",

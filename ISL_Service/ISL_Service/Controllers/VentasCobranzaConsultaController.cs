@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.VentasCobranza;
+﻿using ISL_Service.Application.DTOs.VentasCobranza;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -59,6 +59,34 @@ public class VentasCobranzaConsultaController : PermisoControllerBase
     */
     private static readonly string[] PermisosVer = { "cobranza.ver" };
 
+    /*
+      LAS TRES PANTALLAS DE LA COBRANZA SON TRES FORMAS DE MAC31, Y MAC31 LAS
+      REPARTE POR SEPARADO.
+
+      `cobranza.ver` sale de ConsultarCobros.btnBuscar. Quien en Mac31 solo
+      tiene CONSULTA DE COBRANZAS o CONSULTA DE CONCENTRADOS -y no CONSULTA DE
+      COBROS- nunca lo recibe, y hasta hoy eso le cerraba las dos pantallas que
+      si usaba. El caso que lo destapo: XOCHITL (Tauro) abre COBRANZAS en Mac31
+      con ConsultarCobranzas.btnVer y el web le contestaba "hace falta
+      cobranza.ver", un permiso de OTRA forma.
+
+      Asi que cada grupo de rutas acepta TAMBIEN la clave de su propia forma:
+
+        cobranzas/*     ConsultarCobranzas    -> cobranzas.{ver,consultar}
+        concentrados/*  ConsultarConcentrados -> cobranza.concentrados.{consultar,ver}
+        cobros/*        ConsultarCobros       -> cobranza.ver (como estaba)
+
+      `cobranza.ver` se queda en las tres listas: quien ya lo tenia configurado
+      no pierde nada. Esto no concede nada nuevo -las claves que se suman son
+      las que Mac31 ya reparte por esas formas-, solo deja de exigir la de una
+      forma ajena.
+    */
+    private static readonly string[] PermisosVerCobranzas =
+        { "cobranza.ver", "cobranzas.ver", "cobranzas.consultar" };
+
+    private static readonly string[] PermisosVerConcentrados =
+        { "cobranza.ver", "cobranza.concentrados.consultar", "cobranza.concentrados.ver" };
+
     private readonly IVentasCobranzaConsultaService _service;
 
     public VentasCobranzaConsultaController(
@@ -89,7 +117,7 @@ public class VentasCobranzaConsultaController : PermisoControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ValidarFolioCobranza([FromBody] CobranzaFolioRequest? body, CancellationToken ct)
     {
-        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        var sinPermiso = await ExigirPermisoAsync(PermisosVerCobranzas, ct);
         if (sinPermiso is not null) return sinPermiso;
 
         var error = ValidarFolio(body?.IDEmpresaVenta ?? 0, body?.FolioVenta);
@@ -109,7 +137,7 @@ public class VentasCobranzaConsultaController : PermisoControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CobranzaDetalle(int idCobranza, [FromQuery] int formato, CancellationToken ct)
     {
-        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        var sinPermiso = await ExigirPermisoAsync(PermisosVerCobranzas, ct);
         if (sinPermiso is not null) return sinPermiso;
 
         if (idCobranza <= 0)
@@ -127,7 +155,7 @@ public class VentasCobranzaConsultaController : PermisoControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ValidarFolioConcentrado([FromBody] ConcentradoFolioRequest? body, CancellationToken ct)
     {
-        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        var sinPermiso = await ExigirPermisoAsync(PermisosVerConcentrados, ct);
         if (sinPermiso is not null) return sinPermiso;
 
         var error = ValidarFolio(body?.IDEmpresaVenta ?? 0, body?.FolioVenta);
@@ -155,7 +183,7 @@ public class VentasCobranzaConsultaController : PermisoControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ConsultarConcentrados([FromBody] ConcentradosConsultaRequest? body, CancellationToken ct)
     {
-        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        var sinPermiso = await ExigirPermisoAsync(PermisosVerConcentrados, ct);
         if (sinPermiso is not null) return sinPermiso;
 
         if (body is null)
@@ -177,7 +205,7 @@ public class VentasCobranzaConsultaController : PermisoControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ConcentradoDetalle(int idConcentrado, CancellationToken ct)
     {
-        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        var sinPermiso = await ExigirPermisoAsync(PermisosVerConcentrados, ct);
         if (sinPermiso is not null) return sinPermiso;
 
         if (idConcentrado <= 0)

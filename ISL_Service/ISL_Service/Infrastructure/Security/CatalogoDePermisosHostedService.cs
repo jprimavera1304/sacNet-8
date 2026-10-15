@@ -58,36 +58,86 @@ public sealed class CatalogoDePermisosHostedService : IHostedService
         _log = log;
     }
 
+    /*
+      CADA CUANTO SE VUELVE A LEER MAC31.
+
+      Cinco minutos: la mitad del plazo con el que se guarda el catalogo
+      (CatalogoCacheTtl), para que nunca haya una ventana en la que lo guardado
+      este vencido y nadie lo haya puesto al dia. Es lo que permite que las
+      peticiones nunca reconstruyan nada.
+
+      Cuesta lo que costaba una reconstruccion -unos cientos de viajes a SQL-
+      pero lo paga un hilo de fondo cada cinco minutos en vez de un agente en
+      medio de un pedido.
+    */
+    private static readonly TimeSpan CadaCuanto = TimeSpan.FromMinutes(5);
+
+    private CancellationTokenSource? _parada;
+
     public Task StartAsync(CancellationToken ct)
     {
+        _parada = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var señal = _parada.Token;
+
         _ = Task.Run(async () =>
         {
-            try
-            {
-                // Se deja respirar al arranque: la primera conexion a SQL Server
-                // compite con el resto de la inicializacion y no hay prisa.
-                await Task.Delay(TimeSpan.FromSeconds(3), ct);
+            // Se deja respirar al arranque: la primera conexion a SQL Server
+            // compite con el resto de la inicializacion y no hay prisa.
+            await Task.Delay(TimeSpan.FromSeconds(3), señal);
 
-                using var ambito = _servicios.CreateScope();
-                var permisos = ambito.ServiceProvider.GetRequiredService<IPermissionService>();
+            var primera = true;
+            while (!señal.IsCancellationRequested)
+            {
+                try
+                {
+                    using var ambito = _servicios.CreateScope();
+                    var permisos = ambito.ServiceProvider.GetRequiredService<IPermissionService>();
 
-                // La empresa del tenant. Este backend corre una instalacion por
-                // empresa (ver el despliegue), asi que es siempre la 1.
-                await permisos.SembrarCatalogoCompletoAsync(1, ct);
-                _log.LogInformation("Catalogo de permisos sembrado.");
+                    /* En modo refresco se reconstruye aunque haya algo guardado.
+                       Sin esto, el refrescador se encontraria su propio catalogo
+                       memorizado y no leeria Mac31 nunca mas. */
+                    using (PermissionService.AbrirRefrescoDeCatalogo())
+                    {
+                        // La empresa del tenant. Este backend corre una
+                        // instalacion por empresa (ver el despliegue), asi que
+                        // es siempre la 1.
+                        await permisos.SembrarCatalogoCompletoAsync(1, señal);
+                    }
+
+                    if (primera)
+                    {
+                        _log.LogInformation("Catalogo de permisos sembrado.");
+                        primera = false;
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    return; // Se esta apagando.
+                }
+                catch (Exception ex)
+                {
+                    /* Que falle un refresco no rompe nada: se sigue sirviendo el
+                       catalogo anterior y se reintenta en el siguiente turno. */
+                    _log.LogWarning(ex, "No se pudo refrescar el catalogo de permisos.");
+                }
+
+                try
+                {
+                    await Task.Delay(CadaCuanto, señal);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
             }
-            catch (OperationCanceledException)
-            {
-                // Se esta apagando.
-            }
-            catch (Exception ex)
-            {
-                _log.LogWarning(ex, "No se pudo sembrar el catalogo de permisos.");
-            }
-        }, ct);
+        }, señal);
 
         return Task.CompletedTask;
     }
 
-    public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
+    public Task StopAsync(CancellationToken ct)
+    {
+        _parada?.Cancel();
+        return Task.CompletedTask;
+    }
 }

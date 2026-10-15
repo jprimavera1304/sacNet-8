@@ -35,6 +35,14 @@ namespace ISL_Service.Infrastructure.Repositories;
   Esos renglones en cero son justo los que permiten AGREGAR un tipo que no
   venia — por eso no se filtran.
 */
+/*
+  LA CANCELACION SOLO LLEGA A LAS CONSULTAS.
+
+  Este repositorio escribe: cancelar a media escritura de legacy deja la
+  transaccion abierta y los candados puestos en una conexion que vuelve al pool.
+  Quien decide es CancelacionSegura, leyendo el propio comando; el porque esta
+  explicado ahi.
+*/
 public class VentasUsadosRepository : IVentasUsadosRepository
 {
     private const int CommandTimeoutSeconds = 500;
@@ -66,8 +74,8 @@ public class VentasUsadosRepository : IVentasUsadosRepository
             conn)
         { CommandTimeout = CommandTimeoutSeconds };
 
-        await using var rd = await cmd.ExecuteReaderAsync(ct);
-        if (!await rd.ReadAsync(ct)) return new ConstantesUsados();
+        await using var rd = await cmd.ExecuteReaderAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
+        if (!await rd.ReadAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct))) return new ConstantesUsados();
 
         return new ConstantesUsados
         {
@@ -255,9 +263,9 @@ public class VentasUsadosRepository : IVentasUsadosRepository
         /* 0 = no se esta corrigiendo un movimiento del log, es uno nuevo. */
         cmd.Parameters.AddWithValue("@IDVentaUsadoCreditoLog", 0);
 
-        await using var rd = await cmd.ExecuteReaderAsync(ct);
+        await using var rd = await cmd.ExecuteReaderAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
 
-        if (!await rd.ReadAsync(ct))
+        if (!await rd.ReadAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct)))
         {
             /* El procedimiento SIEMPRE devuelve un renglon. Si no, algo se rompio. */
             return new VentasUsadosGuardarResultadoDto
@@ -306,7 +314,7 @@ public class VentasUsadosRepository : IVentasUsadosRepository
         foreach (var p in parametros) cmd.Parameters.AddWithValue(p.Key, p.Value);
 
         var tabla = new DataTable();
-        await using var rd = await cmd.ExecuteReaderAsync(ct);
+        await using var rd = await cmd.ExecuteReaderAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
         tabla.Load(rd);
         return tabla;
     }

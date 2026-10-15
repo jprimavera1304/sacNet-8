@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.VentasFacturacion;
+﻿using ISL_Service.Application.DTOs.VentasFacturacion;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -33,20 +33,56 @@ namespace ISL_Service.Controllers;
 [Authorize]
 public class VentasFacturacionController : PermisoControllerBase
 {
-    private static readonly string[] PermisoVer = { "facturacion.ver", "ventas.facturar" };
+    // Ver la lista Y bajar el PDF/XML: el documento viaja con el permiso de ver,
+    // aqui y en el web, asi que la clave del telefono entra por el mismo sitio.
+    private static readonly string[] PermisoVer =
+        { "facturacion.ver", "ventas.facturar", "app_movil.facturacion.ver" };
     private static readonly string[] PermisoTimbrar = { "facturacion.timbrar", "ventas.facturar" };
     private static readonly string[] PermisoCancelar = { "facturacion.cancelar" };
-    private static readonly string[] PermisoEnviar = { "facturacion.enviar" };
+    // Mandar la factura por correo es su propia llave en los dos canales:
+    // manda un correo a un cliente de verdad.
+    private static readonly string[] PermisoEnviar =
+        { "facturacion.enviar", "app_movil.facturacion.enviar" };
 
     private readonly IVentasFacturacionService _service;
+    private readonly ICascosAFacturarRepository _cascos;
 
     public VentasFacturacionController(
         IVentasFacturacionService service,
+        ICascosAFacturarRepository cascos,
         ICurrentUserAccessor currentUser,
         IPermissionService permissionService)
         : base(currentUser, permissionService)
     {
         _service = service;
+        _cascos = cascos;
+    }
+
+    /// <summary>
+    /// Los tipos de casco que se pueden AGREGAR a una factura, con su precio
+    /// con IVA y su clave del SAT.
+    /// </summary>
+    /// <remarks>
+    /// Es el recuadro "CASCOS A FACTURAR" de `VentasFacturacion`, que no sale
+    /// de la remision: sale del catalogo, con las cantidades en cero, para que
+    /// la persona teclee cuantos quiere facturar. El por que no se reusa el
+    /// endpoint de la pantalla de usados esta en ICascosAFacturarRepository.
+    ///
+    /// Va con el permiso de TIMBRAR y no con uno de solo lectura porque solo
+    /// sirve para armar un comprobante: quien no puede facturar no tiene nada
+    /// que hacer con esta lista.
+    /// </remarks>
+    [HttpGet("catalogo-cascos")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> CatalogoDeCascosAsync(CancellationToken ct)
+    {
+        var veto = await ExigirPermisoAsync(PermisoTimbrar, ct);
+        if (veto is not null) return veto;
+
+        var data = await _cascos.ConsultarCatalogoAsync(ct);
+        Response.Headers["Cache-Control"] = "no-store";
+        return Ok(new { ok = true, message = "Catalogo de cascos.", data });
     }
 
     /// <summary>

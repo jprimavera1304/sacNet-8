@@ -126,6 +126,18 @@ public class DocumentoDeFacturaTests
         public Task<ConstantesFacturacion> LeerConstantesAsync(CancellationToken ct)
             => throw new NotSupportedException();
 
+        /*
+          SIN LLAVE DE FACTURAPI, A PROPOSITO.
+
+          Estas pruebas miden lo que pasa cuando el archivo NO esta en el disco.
+          Devolviendo (null, null) el servicio no tiene con que pedirselo a
+          Facturapi y tiene que decirlo con su motivo, que es justo lo que se
+          comprueba. La bajada de verdad no se simula aqui: eso seria probar a
+          HttpClient.
+        */
+        public Task<(string? SecretKey, string? AppMac)> LeerLlaveFacturapiAsync(CancellationToken ct)
+            => Task.FromResult<(string?, string?)>((null, null));
+
         public Task<int> GuardarParametrosAsync(
             int idUsuario, string equipo, IReadOnlyList<string> parametros, CancellationToken ct)
             => throw new NotSupportedException();

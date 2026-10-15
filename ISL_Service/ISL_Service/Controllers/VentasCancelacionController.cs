@@ -16,7 +16,10 @@ namespace ISL_Service.Controllers;
 public class VentasCancelacionController : PermisoControllerBase
 {
     // El mismo permiso que en Mac31 abre btnCancelarVenta (PermissionService).
-    private static readonly string[] PermisosCancelar = { "ventas.cancelar" };
+    // Vale para verificar y para cancelar: en el telefono son el mismo gesto
+    // (se verifica para poder ensenar el motivo antes de preguntar).
+    private static readonly string[] PermisosCancelar =
+        { "ventas.cancelar", "app_movil.ventas.consulta.cancelar" };
 
     private readonly IVentasCancelacionService _service;
 

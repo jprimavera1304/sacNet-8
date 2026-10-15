@@ -29,12 +29,32 @@
 /// se comporta igual que hoy, asi que el movil no se rompe: deja de ensenar el
 /// nodo cuando lo lea.
 /// </param>
+/// <param name="ModuloDueno">
+/// LA PANTALLA DE LA QUE SALE ESTE PAPEL, cuando no sale del arbol.
+///
+/// POR QUE HACE FALTA. `POST legacy/generar` pide `reportes.ver_modulo`, que es
+/// la puerta del MENU DE REPORTES. Para un nodo del arbol eso es exacto. Para
+/// el documento de un boton NO LO ES, y se nota midiendo: en Mac31, IMPRIMIR
+/// de CONSULTA DE COMPRAS es el proceso `btnImprimir` de la forma
+/// `ConsultarCompras`, y quien lo tiene imprime aunque no tenga ni un solo
+/// proceso de `ReportesMenu`. En el web ese mismo usuario recibia un 403 del
+/// atributo, antes de llegar a ninguna comprobacion.
+///
+/// Con el modulo dueno escrito, la entrada de ese papel se pide a SU pantalla
+/// -la misma lectura que exige la pantalla para abrirse- y no al menu de
+/// reportes. No concede nada: quien no puede abrir Compras sigue sin poder
+/// imprimir una compra.
+///
+/// Solo tiene sentido con <c>EnArbol = false</c>. Los nodos del arbol se piden
+/// desde el menu de reportes y su puerta es la de ese menu.
+/// </param>
 public sealed record ReporteCatalogoItem(
     string Clave,
     string Grupo,
     string Etiqueta,
     string? Permiso,
-    bool EnArbol = true);
+    bool EnArbol = true,
+    string? ModuloDueno = null);
 
 /// <summary>
 /// EL CATALOGO DE REPORTES Y SUS PERMISOS, EN UN SOLO LUGAR.
@@ -328,6 +348,34 @@ public static class ReportesCatalogo
         // ----- COMPRAS -----
         new("compras_acumuladores_y_productos", "compras", "Acumuladores y Productos", "reportes.compras.acumuladores_y_productos.ver"),
         new("compras_facturas", "compras", "Facturas", "reportes.compras.facturas.ver"),
+        /*
+          COMPROBACION DE COMPRAS (1017): SALE DE UN BOTON, NO DEL ARBOL.
+
+          Los dos botones COMPROBACION de CONSULTA DE COMPRAS, sobre las
+          facturas marcadas. `EnArbol: false` por lo mismo que la hoja de cobro
+          y los comprobantes de cascos: no tiene filtros que pedir -pide los ids
+          de lo que esta marcado en SU pantalla-, asi que como nodo del arbol
+          seria un renglon que al pulsarlo no sabe que ensenar.
+
+          VA SIN PERMISO PROPIO: su clave por la regla seria
+          `reportes.compras.comprobacion.ver` y NO existe en WPermiso en
+          ninguna de las dos bases (comprobado el 2026-10-12). En Mac31 lo
+          gobierna el permiso del boton de la forma, que ya se hereda como
+          `compras.*`. Inventar la clave aqui bloquearia a quien hoy puede.
+        */
+        new("compra_comprobacion", "compras", "Comprobación de Compras", SinPermiso, EnArbol: false, ModuloDueno: "compras"),
+
+        /*
+          EL DOCUMENTO DE UNA COMPRA (1015): IGUAL QUE EL DE ARRIBA.
+
+          Fuera del arbol porque no tiene filtros que pedir -pide el IDCompra
+          de la fila en la que estas- y sin permiso propio por la misma razon
+          medida que la comprobacion: su clave por la regla seria
+          `reportes.compras.detalle.ver` y no existe en WPermiso en ninguna de
+          las dos bases. En Mac31 lo gobierna el permiso del boton IMPRIMIR de
+          CONSULTA DE COMPRAS, que ya se hereda como `compras.*`.
+        */
+        new("compra_detalle", "compras", "Compra", SinPermiso, EnArbol: false, ModuloDueno: "compras"),
 
         // ----- INVENTARIO -----
         new("inventario_actual", "inventario", "Actual", "reportes.inventario.actual.ver"),
@@ -454,7 +502,41 @@ public static class ReportesCatalogo
           Colgarlos del arbol dibujaria cinco nodos que al pulsarlos no sabrian
           pedir ni el periodo ni los empleados marcados.
         */
-        new("nomina_asistencias", "administracion", "Asistencias", SinPermiso, EnArbol: false),
+        /*
+          EL 1025 LLEVA UNA COLUMNA DE SUELDO, ASI QUE LO PROTEGE LA LLAVE DE LOS
+          SUELDOS, IGUAL QUE EL RECIBO.
+
+          Estaba con `SinPermiso` porque el nombre -"Asistencias"- suena a horas
+          de entrada y salida. NO LO ES: el 1025 pasa por la misma rama que el
+          recibo (ReportesVentasRepository, rama `ReporteNominaAsistencias`), pide
+          los recibos a `sp_n_ConsultaEmpleadosTipoSueldoRecibo` y
+          NominaAsistenciasHtmlBuilder le escribe `#netoPagado#` por empleado y
+          `#totalPagado#` al pie.
+
+          MEDIDO, NO DEDUCIDO. Con `empleados.sueldo.ver` en 'deny' para DEMO en
+          MacZ, backend nuevo (la cache de permisos no se limpia sola), periodo
+          12557 y sus 23 empleados:
+
+              POST /api/reportes/ventas/legacy/generar  reporteKey=nomina_recibos
+                  -> 403 (ya estaba tapado)
+              POST ... reporteKey=nomina_asistencias
+                  -> 200, y el PDF salia con la columna SUELDO llena:
+                     CESAR PINEDA ORTIZ    13,918.26
+                     CLAUDIO ANAYA AYALA   24,090.29
+                     EDDER ROBLES SANCHEZ  26,806.87
+                     ... y al pie  TOTAL 520,596.52
+
+          O sea: tapar el recibo y dejar este abierto daba el mismo dato por otra
+          puerta, y encima en una tabla mas comoda de leer que el recibo.
+
+          Se usa `empleados.sueldo.ver` (id 188 en MacZ, comprobado) y no una
+          clave nueva por lo mismo que el recibo: una clave inventada no la tiene
+          nadie y dejaria el reporte apagado para todos.
+
+          EL 1024 NO SE CIERRA, SE LE QUITA EL DINERO. Ver el comentario de
+          `nomina_solo_asistencias` mas abajo.
+        */
+        new("nomina_asistencias", "administracion", "Asistencias", "empleados.sueldo.ver", EnArbol: false),
         /*
           EL RECIBO DE NOMINA LLEVA SUELDOS, ASI QUE LO PROTEGE LA LLAVE DE LOS
           SUELDOS.
@@ -481,6 +563,33 @@ public static class ReportesCatalogo
         new("nomina_recibos", "administracion", "Recibos de nómina", "empleados.sueldo.ver", EnArbol: false),
         new("nomina_inasistencias", "administracion", "Inasistencias", SinPermiso, EnArbol: false),
         new("nomina_vacaciones", "administracion", "Vacaciones", SinPermiso, EnArbol: false),
+        /*
+          EL 1024 SE QUEDA ABIERTO, PERO YA NO SE LE PASA EL DINERO.
+
+          "SOLO ASISTENCIAS" es, hoy, de verdad solo asistencias: su plantilla
+          `detalle` trae la celda de `#netoPagado#` COMENTADA en HTML
+          (`<!--<td ...>#netoPagado#</td>-->`), y esta igual en las dos bases
+          -comprobado en MacZ y en la copia de Produccion_svr-. Con el permiso en
+          'deny' su PDF sale sin un solo importe: lo unico con punto decimal son
+          los contadores de FALTAS y VACACION (0.00).
+
+          ASI QUE NO SE LE PONE CANDADO. Pedirle `empleados.sueldo.ver` a un
+          reporte que no ensena dinero le quitaria a quien lleva las asistencias
+          el unico papel que le sirve, y por un riesgo que no se ha materializado.
+          Eso es el error contrario al del 1025, no su correccion.
+
+          LO QUE SI SE HACE ES QUITARLE EL DATO. El riesgo real no era la
+          plantilla de hoy: es que la proteccion vivia en un `<!--` de un renglon
+          de `Template_Html`, o sea en un dato que se edita sin pasar por aqui y
+          sin que nadie lo revise. Quien borrara esos cuatro caracteres destapaba
+          los sueldos sin tocar una linea de codigo y sin que saltara nada.
+
+          Por eso el 1024 entra a NominaAsistenciasHtmlBuilder con
+          `incluirImportes: false` (ver ReportesVentasRepository): las columnas
+          `netoPagado` y `totalPagado` van en blanco desde el origen. Si manana
+          alguien descomenta la celda, saldra vacia en vez de con el sueldo. El
+          candado deja de depender de un comentario de HTML.
+        */
         new("nomina_solo_asistencias", "administracion", "Solo asistencias", SinPermiso, EnArbol: false),
         /*
           Y EL SEXTO, QUE NO ES UN BOTON: el reporte que Zaragoza lanza SOLA

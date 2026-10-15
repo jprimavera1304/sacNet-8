@@ -96,7 +96,12 @@ public abstract class SpLegacyRepositoryBase
         };
         parametros(cmd);
 
-        await using var rd = await cmd.ExecuteReaderAsync(ct);
+        /* La señal se calcula UNA vez y se usa en el comando y en toda la
+           lectura: abortar entre dos ReadAsync aborta el lote igual que
+           abortarlo al abrir. Ver SeñalPara. */
+        var señal = SeñalPara(procedimiento, ct);
+
+        await using var rd = await cmd.ExecuteReaderAsync(señal);
         do
         {
             // Un procedimiento que solo ejecuta DML devuelve un conjunto sin
@@ -108,7 +113,7 @@ public abstract class SpLegacyRepositoryBase
             var nombres = new string[rd.FieldCount];
             for (var i = 0; i < rd.FieldCount; i++) nombres[i] = rd.GetName(i);
 
-            while (await rd.ReadAsync(ct))
+            while (await rd.ReadAsync(señal))
             {
                 var fila = new Dictionary<string, object?>(rd.FieldCount, StringComparer.OrdinalIgnoreCase);
                 for (var i = 0; i < rd.FieldCount; i++)
@@ -120,7 +125,7 @@ public abstract class SpLegacyRepositoryBase
             }
             tablas.Add(filas);
         }
-        while (await rd.NextResultAsync(ct));
+        while (await rd.NextResultAsync(señal));
 
         return tablas;
     }
@@ -171,8 +176,24 @@ public abstract class SpLegacyRepositoryBase
         };
         parametros(cmd);
 
-        return await cmd.ExecuteNonQueryAsync(ct);
+        return await cmd.ExecuteNonQueryAsync(SeñalPara(procedimiento, ct));
     }
+
+    /*
+      LO QUE ESCRIBE SE EJECUTA HASTA EL FINAL; LO QUE LEE SE PUEDE CANCELAR.
+
+      Por esta base pasan unas setenta escrituras repartidas en diez
+      repositorios. La decision va aqui y no en cada llamada, porque marcarlas
+      una por una garantiza que tres se queden sin marcar.
+
+      Quien decide es Infrastructure.Data.CancelacionSegura, que es el unico
+      sitio donde vive esa lista; el porque esta explicado largo alla.
+
+      `conn.OpenAsync(ct)` se queda con el token: cancelar ANTES de que el lote
+      arranque es gratis, y es lo que libera el hilo.
+    */
+    private static CancellationToken SeñalPara(string procedimiento, CancellationToken ct)
+        => Infrastructure.Data.CancelacionSegura.SeñalPara(procedimiento, ct);
 
     /// <summary>
     /// El valor de una celda: DBNull se vuelve null de verdad, y los char(n) de

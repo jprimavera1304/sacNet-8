@@ -7,6 +7,14 @@ using Microsoft.Data.SqlClient;
 
 namespace ISL_Service.Infrastructure.Repositories;
 
+/*
+  LA CANCELACION SOLO LLEGA A LAS CONSULTAS.
+
+  Este repositorio escribe: cancelar a media escritura de legacy deja la
+  transaccion abierta y los candados puestos en una conexion que vuelve al pool.
+  Quien decide es CancelacionSegura, leyendo el propio comando; el porque esta
+  explicado ahi.
+*/
 public class ChequesRepository : IChequesRepository
 {
     private readonly IConfiguration _configuration;
@@ -119,7 +127,7 @@ public class ChequesRepository : IChequesRepository
         cmd.Parameters.AddWithValue("@UsuarioId", usuarioId);
 
         Guid createdId;
-        await using (var reader = await cmd.ExecuteReaderAsync(ct))
+        await using (var reader = await cmd.ExecuteReaderAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct)))
         {
             var dt = new DataTable();
             dt.Load(reader);
@@ -151,7 +159,7 @@ public class ChequesRepository : IChequesRepository
         cmd.Parameters.AddWithValue("@ResponsableCobroId", (object?)request.ResponsableCobroId ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@UsuarioId", usuarioId);
 
-        await cmd.ExecuteNonQueryAsync(ct);
+        await cmd.ExecuteNonQueryAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
         return await ConsultarDetalleAsync(chequeId, ct);
     }
 
@@ -178,7 +186,7 @@ public class ChequesRepository : IChequesRepository
         cmd.Parameters.AddWithValue("@FechaMovimiento", (object?)fechaMovimiento ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@UsuarioId", usuarioId);
 
-        await cmd.ExecuteNonQueryAsync(ct);
+        await cmd.ExecuteNonQueryAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
         return await ConsultarDetalleAsync(chequeId, ct);
     }
 }

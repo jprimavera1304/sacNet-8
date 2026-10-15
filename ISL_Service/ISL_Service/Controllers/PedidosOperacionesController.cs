@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.PedidosOperaciones;
+﻿using ISL_Service.Application.DTOs.PedidosOperaciones;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -27,8 +27,39 @@ namespace ISL_Service.Controllers;
 [Authorize]
 public class PedidosOperacionesController : PermisoControllerBase
 {
-    private static readonly string[] PermisoProcesar = { "ventas.pedidos.procesar" };
-    private static readonly string[] PermisoCancelar = { "ventas.pedidos.cancelar" };
+    private static readonly string[] PermisoProcesar =
+        { "ventas.pedidos.procesar", "app_movil.ventas.pedidos.procesar" };
+
+    /*
+      AUTORIZAR Y RECHAZAR SON DECISIONES APARTE, NO BANDERAS DEL CUERPO.
+
+      Hasta el 2026-10-12 este endpoint solo pedia `ventas.pedidos.procesar`, y
+      las banderas `Autorizar` y `Rechazar` del cuerpo no sumaban ninguna
+      comprobacion. O sea que quien podia procesar un pedido podia tambien
+      AUTORIZAR uno retenido por saldo vencido -que es la decision que la
+      retencion existe para pedir- y RECHAZARLO, que es irreversible. El front
+      si distinguia; la decision vivia en el navegador.
+
+      Se piden las dos claves de autorizar porque hay dos pantallas para lo
+      mismo y cada una uso la suya: la captura manda aqui con
+      `ventas.pedidos.autorizar` y la de pendientes llama a otro endpoint con
+      `ventas.pendientes.autorizar` (VentasPedidosController). Aceptar las dos
+      evita elegir un perdedor entre gente que hoy autoriza de verdad, y el par
+      del movil va incluido como en el resto del backend.
+
+      Medido antes de ponerlo, en las dos empresas: todos los que tienen
+      `ventas.pedidos.procesar` tienen ya `autorizar` y `rechazar` -JUAN y DEMO
+      en MacZ, DEMO en Produccion_svr-, asi que esto no le quita la operacion a
+      nadie.
+    */
+    private static readonly string[] PermisoAutorizar =
+    {
+        "ventas.pedidos.autorizar", "ventas.pendientes.autorizar", "app_movil.ventas.autorizar"
+    };
+
+    private static readonly string[] PermisoRechazar = { "ventas.pedidos.rechazar" };
+    private static readonly string[] PermisoCancelar =
+        { "ventas.pedidos.cancelar", "app_movil.ventas.pedidos.cancelar" };
     private static readonly string[] PermisoModificar = { "ventas.pedidos.modificar" };
 
     private readonly IPedidosOperacionesService _service;
@@ -61,6 +92,20 @@ public class PedidosOperacionesController : PermisoControllerBase
         var veto = await ExigirPermisoAsync(PermisoProcesar, ct);
         if (veto is not null) return veto;
         if (request is null) return BadRequest(new { message = "Body requerido." });
+
+        // Se mira el cuerpo DESPUES de comprobar que puede procesar: las dos
+        // banderas amplian lo que se va a hacer, no lo sustituyen.
+        if (request.Autorizar)
+        {
+            var vetoAutorizar = await ExigirPermisoAsync(PermisoAutorizar, ct);
+            if (vetoAutorizar is not null) return vetoAutorizar;
+        }
+
+        if (request.Rechazar)
+        {
+            var vetoRechazar = await ExigirPermisoAsync(PermisoRechazar, ct);
+            if (vetoRechazar is not null) return vetoRechazar;
+        }
 
         var data = await _service.ProcesarVentasAsync(request, IdUsuarioLegacy(), Equipo(), ct);
         return Ok(new

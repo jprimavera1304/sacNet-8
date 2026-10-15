@@ -9,7 +9,13 @@ namespace ISL_Service.Application.Interfaces;
 /// </summary>
 public interface INominaBatchService
 {
-    Task<NominaBatchResponse> CalcularRecibosAsync(CalcularRecibosRequest r, CancellationToken ct);
+    /// <param name="puedeVerSueldo">
+    /// Si el que llama tiene `empleados.sueldo.ver`. Sin esa llave el calculo se
+    /// hace igual (eso lo gobierna `nomina.recibos.calcular`) pero los renglones
+    /// vuelven con las columnas de importe en null. Ver NominaBatchService.
+    /// </param>
+    Task<NominaBatchResponse> CalcularRecibosAsync(
+        CalcularRecibosRequest r, bool puedeVerSueldo, CancellationToken ct);
     Task<NominaBatchResponse> GenerarPeriodosAsync(int idUsuario, CancellationToken ct);
     Task<NominaBatchResponse> DescontarPrestamosAsync(int idUsuario, CancellationToken ct);
 }

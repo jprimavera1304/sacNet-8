@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.CatalogosAdmin;
+﻿using ISL_Service.Application.DTOs.CatalogosAdmin;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ISL_Service.Controllers;
@@ -28,7 +28,7 @@ public partial class CatalogosAdminController
         [FromQuery] DateTime? hasta = null,
         CancellationToken ct = default)
     {
-        var sinPermiso = await ExigirPermisoAsync(new[] { "catalogos.ver" }, ct);
+        var sinPermiso = await ExigirLecturaDeModuloAsync("catalogos", new[] { "catalogos.ver" }, ct);
         if (sinPermiso != null) return sinPermiso;
 
         var data = await _service.ConsultarDiasFestivosAsync(

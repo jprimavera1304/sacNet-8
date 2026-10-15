@@ -40,8 +40,30 @@ public partial class ReportesVentasRepository
         var row = ds.Tables[0].Rows[0];
         var nombre = Convert.ToString(row["NombreReporte"]) ?? "";
         var sp = Convert.ToString(row["SPV2"]) ?? "";
+
+        /*
+          LOS REPORTES DE LA GENERACION VIEJA NO TIENEN `spV2`, Y NO ES UN
+          ERROR DE CONFIGURACION.
+
+          `spV2` se lleno cuando los reportes se rehicieron contra
+          `dbo.Parametros` y el `@Params` generico. Los que nunca se rehicieron
+          -el 1015, el documento de una compra, es el primero que nos toca-
+          siguen declarando sus procedimientos en la columna `SP` de siempre, y
+          desde ahi los lee Mac31 hoy mismo. El formato de la columna es el
+          mismo: uno o varios nombres separados por '|', que
+          ExecuteLegacySpAsync ya sabe recorrer.
+
+          Por eso, en vez de rebotar con "no tiene SPV2 configurado" -que era
+          decirle al usuario que el reporte esta mal dado de alta cuando esta
+          bien-, se cae a `SP`. Lo que cambia entre las dos generaciones no es
+          de donde se lee el procedimiento sino QUE ARGUMENTOS recibe, y eso lo
+          resuelve ArgumentosDelProcedimiento reporte por reporte.
+        */
+        if (string.IsNullOrWhiteSpace(sp) && row.Table.Columns.Contains("SP"))
+            sp = Convert.ToString(row["SP"]) ?? "";
+
         if (string.IsNullOrWhiteSpace(sp))
-            throw new InvalidOperationException("El reporte no tiene SPV2 configurado.");
+            throw new InvalidOperationException("El reporte no tiene procedimiento configurado (ni SPV2 ni SP).");
 
         /*
           Algunos `sp_n_` de reporte estan ROTOS EN LA BASE y no sacan el papel

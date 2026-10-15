@@ -12,6 +12,14 @@ namespace ISL_Service.Infrastructure.Repositories;
 /// validar secuencia) vive en los sp_w_*; aqui solo se arman parametros y se lee
 /// el resultado.
 /// </summary>
+/*
+  LA CANCELACION SOLO LLEGA A LAS CONSULTAS.
+
+  Este repositorio escribe: cancelar a media escritura de legacy deja la
+  transaccion abierta y los candados puestos en una conexion que vuelve al pool.
+  Quien decide es CancelacionSegura, leyendo el propio comando; el porque esta
+  explicado ahi.
+*/
 public class ChecadorRepository : IChecadorRepository
 {
     private const string SpRegistrarComida = "dbo.sp_w_RegistrarChecadaComida";
@@ -109,7 +117,7 @@ public class ChecadorRepository : IChecadorRepository
         cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
         cmd.Parameters.AddWithValue("@Equipo", equipo);
 
-        await cmd.ExecuteNonQueryAsync(ct);
+        await cmd.ExecuteNonQueryAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
     }
 
     public async Task<ChecadaMovimientoRegistradoDto> RegistrarMovimientoAsync(
@@ -263,7 +271,7 @@ public class ChecadorRepository : IChecadorRepository
         cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
         cmd.Parameters.AddWithValue("@Equipo", equipo);
 
-        await cmd.ExecuteNonQueryAsync(ct);
+        await cmd.ExecuteNonQueryAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
     }
 
     private SqlConnection GetConnection()

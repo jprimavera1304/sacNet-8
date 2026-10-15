@@ -39,6 +39,21 @@ public class NadieCierraElDiaAlLeerTests
             /* Las pruebas si pueden nombrarlo: lo nombran para prohibirlo. */
             if (archivo.Contains("ISL_Service.Tests", StringComparison.OrdinalIgnoreCase)) continue;
 
+            /*
+              CancelacionSegura tambien lo nombra para prohibir, no para llamar.
+
+              Ese archivo decide a que procedimientos se les deja llegar la
+              cancelacion: a las consultas si, a las escrituras no. La decision
+              la toma por el nombre, y `sp_n_ConsultaConstantes` se llama
+              "Consulta" y sin embargo escribe -siete sentencias, contadas en la
+              base-, asi que esta en su lista de excepciones. Si se quitara de
+              ahi, una cancelacion podria abortarlo a media transaccion.
+
+              Se exceptua SOLO este archivo. Cualquier otro que escriba el
+              nombre entre comillas sigue reventando la prueba, que es el punto.
+            */
+            if (Path.GetFileName(archivo).Equals("CancelacionSegura.cs", StringComparison.OrdinalIgnoreCase)) continue;
+
             var texto = File.ReadAllText(archivo);
             /*
               Se busca entre comillas, que es como se ejecuta. Los comentarios

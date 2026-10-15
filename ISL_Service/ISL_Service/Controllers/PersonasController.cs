@@ -53,7 +53,12 @@ namespace ISL_Service.Controllers
         /// <param name="idPersona">ID de la persona (opcional)</param>
         /// <param name="idStatus">1 = Activo, 2 = Cancelado (opcional)</param>
         [HttpGet("consultar")]
-        [Authorize(Policy = "perm:proveedores.ver")]
+        /* "modulo:proveedores" = lo que Mac31 hace: CONSULTA DE PROVEEDORES se
+           abre con cualquier boton concedido y el que falta sale en gris. Sin
+           esto, quien solo tiene NUEVO (XOCHITL) o solo ESTADO (JAZMIN) veia la
+           tarjeta y la pantalla la rebotaba. El detalle y las escrituras siguen
+           pidiendo su propia clave. */
+        [Authorize(Policy = "perm:proveedores.ver|modulo:proveedores")]
         public async Task<IActionResult> Consultar(
             [FromQuery] int? idPersona,
             [FromQuery] int? idStatus)

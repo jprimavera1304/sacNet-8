@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.VentasCobranzaOperaciones;
+﻿using ISL_Service.Application.DTOs.VentasCobranzaOperaciones;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -26,6 +26,18 @@ namespace ISL_Service.Controllers;
 public class VentasCobranzaOperacionesController : PermisoControllerBase
 {
     private static readonly string[] PermisoVer = { "cobranza.ver" };
+
+    /*
+      LA LISTA DE COBRANZAS SE LEE CON LA CLAVE DE SU PROPIA FORMA.
+
+      Misma razon que en VentasCobranzaConsultaController: `cobranza.ver` es
+      ConsultarCobros.btnBuscar, y quien en Mac31 solo tiene CONSULTA DE
+      COBRANZAS no lo recibe nunca. Esta es la ruta que llena la pantalla de
+      COBRANZAS del web, asi que acepta tambien lo que esa forma si reparte.
+      `cobranza.ver` sigue valiendo: nadie pierde el acceso que ya tenia.
+    */
+    private static readonly string[] PermisoVerCobranzas =
+        { "cobranza.ver", "cobranzas.ver", "cobranzas.consultar" };
     private static readonly string[] PermisoCobranzaEditar = { "cobranza.cobranzas.editar" };
     private static readonly string[] PermisoCobranzaCancelar = { "cobranza.cobranzas.cancelar" };
     private static readonly string[] PermisoConcentradoEditar = { "cobranza.concentrados.editar" };
@@ -100,7 +112,7 @@ public class VentasCobranzaOperacionesController : PermisoControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ConsultarCobranzasAsync([FromBody] CobranzaConsultaRequest? request, CancellationToken ct)
     {
-        var veto = await ExigirPermisoAsync(PermisoVer, ct);
+        var veto = await ExigirPermisoAsync(PermisoVerCobranzas, ct);
         if (veto is not null) return veto;
 
         var data = await _service.ConsultarCobranzasAsync(

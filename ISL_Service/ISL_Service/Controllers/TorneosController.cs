@@ -46,6 +46,15 @@ public class TorneosController : PermisoControllerBase
         _currentUserAccessor = currentUserAccessor;
     }
 
+    // LAS DOS LECTURAS TAMBIEN PIDEN PERMISO.
+    //
+    // Las escrituras de este controlador si lo pedian; las lecturas se queda-
+    // ron con solo [Authorize], o sea que cualquiera con sesion las leia. No se
+    // pudo medir en Zaragoza ni en Tauro -los SP de la liga no estan desplega-
+    // dos alla y contestan 500-, pero en la base donde el modulo existe seria
+    // una lista abierta. La clave ya esta en el catalogo y la exige la entrada
+    // del modulo (EntradasDeModulo).
+    [Authorize(Policy = "perm:torneos.ver")]
     [HttpGet]
     [ProducesResponseType(typeof(List<TorneoDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -81,6 +90,7 @@ public class TorneosController : PermisoControllerBase
         return Ok(list);
     }
 
+    [Authorize(Policy = "perm:torneos.ver")]
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(TorneoDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

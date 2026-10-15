@@ -52,6 +52,26 @@ internal static class NominaAsistenciasHtmlBuilder
     /// Arma el HTML de los reportes 1024 y 1025 con las siete columnas de dias
     /// resueltas. Devuelve "" si no hubo ni un empleado que cruzara.
     /// </summary>
+    /// <param name="incluirImportes">
+    /// Si las columnas de dinero (`netoPagado` por empleado y `totalPagado` al
+    /// pie) llevan cifra o van en blanco.
+    ///
+    /// VA EN false PARA EL 1024 ("SOLO ASISTENCIAS") Y EN true PARA EL 1025.
+    ///
+    /// Los dos reportes comparten este armador y los dos reciben los recibos
+    /// completos de `sp_n_ConsultaEmpleadosTipoSueldoRecibo`, que trae
+    /// `netoPagado`. Lo unico que hoy impide que el 1024 lo imprima es que su
+    /// plantilla `detalle` tiene la celda de `#netoPagado#` COMENTADA en HTML, y
+    /// una plantilla es un renglon de `Template_Html`: se edita sin pasar por el
+    /// codigo y sin revision. Quien quitara ese comentario destapaba los sueldos
+    /// a todo el que tuviera `reportes.ver_modulo`, porque el 1024 no pide la
+    /// llave de sueldos.
+    ///
+    /// Con la columna en blanco desde el origen, descomentar la celda ya no
+    /// ensena nada: el candado del 1024 deja de ser un comentario de HTML. El
+    /// 1025 SI imprime el sueldo -es su columna SUELDO- y por eso el que pide la
+    /// llave `empleados.sueldo.ver` es el 1025 (ver ReportesCatalogo).
+    /// </param>
     internal static string Construir(
         string logo,
         string reporteNombre,
@@ -60,14 +80,15 @@ internal static class NominaAsistenciasHtmlBuilder
         DataTable asistencias,
         DataTable dias,
         DataTable templates,
-        int maxLineas)
+        int maxLineas,
+        bool incluirImportes)
     {
         var cuerpoTemplate = LeerPlantilla(templates, "cuerpo_n", "cuerpo");
         var detalleTemplate = LeerPlantilla(templates, "detalle");
         var totalesTemplate = LeerPlantilla(templates, "totales");
 
         var encabezadoDias = ArmarEncabezadoDeDias(dias);
-        var detalle = ArmarTablaDeDetalle(nomina, comision, asistencias);
+        var detalle = ArmarTablaDeDetalle(nomina, comision, asistencias, incluirImportes);
 
         if (detalle.Rows.Count == 0)
         {
@@ -187,7 +208,8 @@ internal static class NominaAsistenciasHtmlBuilder
       Es el bucle de ReporteAsistenciaService.cs:150-239, los dos pases, con sus
       mismas columnas y en el mismo orden.
     */
-    private static DataTable ArmarTablaDeDetalle(DataTable nomina, DataTable comision, DataTable asistencias)
+    private static DataTable ArmarTablaDeDetalle(
+        DataTable nomina, DataTable comision, DataTable asistencias, bool incluirImportes)
     {
         var tabla = new DataTable();
         tabla.Columns.Add("nombre", typeof(string));
@@ -222,11 +244,20 @@ internal static class NominaAsistenciasHtmlBuilder
         var cabecera = nomina.Rows.Count > 0 ? nomina.Rows[0] : null;
 
         decimal totalPagado = 0;
-        AgregarPase(nomina, tabla, porEmpleado, cabecera, ref totalPagado);
-        AgregarPase(comision, tabla, porEmpleado, cabecera, ref totalPagado);
+        AgregarPase(nomina, tabla, porEmpleado, cabecera, ref totalPagado, incluirImportes);
+        AgregarPase(comision, tabla, porEmpleado, cabecera, ref totalPagado, incluirImportes);
 
+        /*
+          SIN IMPORTES, LA COLUMNA SE QUEDA EN NULL, NO EN CERO.
+
+          Un 0.00 impreso donde va el sueldo dice "a este empleado no se le pago",
+          que es una afirmacion falsa; el null sale como celda vacia en
+          ReemplazarFila (FormatoFechaLegacy.Celda da "" y FormateaNumero no toca
+          la cadena vacia), que es "este papel no trae ese dato". Es la misma
+          regla que ya sigue la rejilla de asistencias con sus nulos.
+        */
         foreach (DataRow fila in tabla.Rows)
-            fila["totalPagado"] = totalPagado;
+            fila["totalPagado"] = incluirImportes ? totalPagado : (object)DBNull.Value;
 
         if (tabla.Rows.Count == 0)
             return tabla;
@@ -240,7 +271,8 @@ internal static class NominaAsistenciasHtmlBuilder
         DataTable destino,
         Dictionary<string, DataRow> porEmpleado,
         DataRow? cabecera,
-        ref decimal totalPagado)
+        ref decimal totalPagado,
+        bool incluirImportes)
     {
         if (origen.Rows.Count == 0 || !origen.Columns.Contains("idEmpleado"))
             return;
@@ -253,7 +285,9 @@ internal static class NominaAsistenciasHtmlBuilder
 
             var fila = destino.NewRow();
             fila["nombre"] = Convert.ToString(recibo["nombre"]) ?? "";
-            fila["netoPagado"] = ADecimal(recibo, "netoPagado");
+            // El sueldo del empleado solo se copia si este reporte lo imprime.
+            // Ver el parametro `incluirImportes` de Construir.
+            fila["netoPagado"] = incluirImportes ? ADecimal(recibo, "netoPagado") : (object)DBNull.Value;
 
             for (var i = 1; i <= 7; i++)
             {
@@ -272,7 +306,7 @@ internal static class NominaAsistenciasHtmlBuilder
             fila["fechaImpresion"] = cabecera is null ? "" : Convert.ToString(cabecera["fechaImpresion"]) ?? "";
             fila["numeroSemana"] = cabecera is null ? 0 : AEntero(cabecera, "numeroSemana");
             fila["IDAgente"] = 0;
-            fila["totalPagado"] = 0m;
+            fila["totalPagado"] = incluirImportes ? 0m : (object)DBNull.Value;
 
             var neto = ADecimal(recibo, "netoPagado");
             if (neto > 0) totalPagado += neto;

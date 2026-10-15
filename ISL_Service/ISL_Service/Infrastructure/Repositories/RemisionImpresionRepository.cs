@@ -36,6 +36,11 @@ public class RemisionImpresionRepository : IRemisionImpresionRepository
     /// 1001 = Remision en el catalogo de tipos de plantilla de legacy.
     private const int IdTipoTemplateHtmlRemision = 1001;
 
+    /// 1175 = Simular, el papel de los dos botones SIMULAR de consulta de
+    /// ventas. Es el mismo numero de reporte que de tipo de plantilla, igual
+    /// que en la remision.
+    private const int IdTipoTemplateHtmlSimulacion = 1175;
+
     /// 1 = Mac3, la aplicacion de la que cuelgan las plantillas de la remision.
     private const int IdAplicacionMac3 = 1;
 
@@ -78,6 +83,14 @@ public class RemisionImpresionRepository : IRemisionImpresionRepository
                 ["@IDStatus"] = 0
             },
             ct);
+    }
+
+    public async Task<DataTable> ConsultarPlantillasSimulacionAsync(CancellationToken ct)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+
+        return await PlantillasDeAsync(conn, IdTipoTemplateHtmlSimulacion, ct);
     }
 
     public async Task<RemisionDatosVentaResultado> ConsultarDatosVentaAsync(
@@ -124,8 +137,20 @@ public class RemisionImpresionRepository : IRemisionImpresionRepository
             },
             ct);
 
+        /*
+          El id NEGATIVO es un PEDIDO sin emitir, no una venta: asi lo lee
+          `sp_n_VentasInformacion` al simular. El motivo tiene que decirlo con
+          esa palabra o manda a buscar un folio de venta que no existe.
+        */
         if (informacion.Rows.Count == 0)
-            return new RemisionDatosVentaResultado { Mensaje = $"La venta {idVenta} no existe." };
+        {
+            return new RemisionDatosVentaResultado
+            {
+                Mensaje = idVenta < 0
+                    ? $"El pedido {idVenta * -1} no existe."
+                    : $"La venta {idVenta} no existe."
+            };
+        }
 
         var row = informacion.Rows[0];
         if (informacion.Columns.Contains("result") && Convert.ToString(row["result"]) == "0")

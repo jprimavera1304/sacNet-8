@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
@@ -276,7 +276,7 @@ public class CompanyKeyTests
             => Task.FromResult(new PermisosWebRoleItem { Code = roleCode, Name = name });
         public Task UpsertRolePermissionsAsync(int empresaId, string roleCode, IReadOnlyCollection<string> permissions, CancellationToken ct)
             => Task.CompletedTask;
-        public Task UpsertUserOverridesAsync(int empresaId, Guid userId, IReadOnlyCollection<string> allow, IReadOnlyCollection<string> deny, CancellationToken ct)
+        public Task UpsertUserOverridesAsync(int empresaId, Guid userId, IReadOnlyCollection<string> allow, IReadOnlyCollection<string> deny, bool sincronizarConLegacy, CancellationToken ct)
             => Task.CompletedTask;
         // La siembra del arranque: en las pruebas no hace nada.
         public Task SembrarCatalogoCompletoAsync(int empresaId, CancellationToken ct) => Task.CompletedTask;
@@ -285,6 +285,15 @@ public class CompanyKeyTests
             => Task.FromResult(new PermisosWebSyncCatalogResponse());
         public Task<bool> CreatePermissionAsync(int empresaId, string key, string name, string? description, CancellationToken ct)
             => Task.FromResult(false);
+
+        // Metodos nuevos del guardia de escalada (ver IGuardiaDePermisos). Este
+        // doble no los usa: la prueba de la que cuelga no toca la pantalla de
+        // permisos. Si alguna llegara a usarlos, es mejor que reviente a que
+        // conteste "no hay nadie administrando" con datos inventados.
+        public Task<IReadOnlyCollection<string>> GetRolePermissionKeysAsync(int empresaId, string roleCode, CancellationToken ct) => throw new NotImplementedException();
+        public Task<(IReadOnlyCollection<string> Allow, IReadOnlyCollection<string> Deny)> GetUserOverrideKeysAsync(int empresaId, Guid userId, CancellationToken ct) => throw new NotImplementedException();
+        public Task<ISL_Service.Application.Models.AdministracionRestante> GetAdministracionRestanteAsync(int empresaId, ISL_Service.Application.Models.SimulacionDePermisos simulacion, CancellationToken ct) => throw new NotImplementedException();
+        public Task<bool> EsRolDeSistemaAsync(int empresaId, string roleCode, CancellationToken ct) => throw new NotImplementedException();
     }
 }
 

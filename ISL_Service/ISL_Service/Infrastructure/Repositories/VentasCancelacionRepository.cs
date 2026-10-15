@@ -24,6 +24,14 @@ namespace ISL_Service.Infrastructure.Repositories;
   "cancelada / pagada / abonos / facturado" de una lista de ventas sin arrastrar
   la consulta completa de la pantalla, que tarda segundos.
 */
+/*
+  LA CANCELACION SOLO LLEGA A LAS CONSULTAS.
+
+  Este repositorio escribe: cancelar a media escritura de legacy deja la
+  transaccion abierta y los candados puestos en una conexion que vuelve al pool.
+  Quien decide es CancelacionSegura, leyendo el propio comando; el porque esta
+  explicado ahi.
+*/
 public class VentasCancelacionRepository : IVentasCancelacionRepository
 {
     private const int CommandTimeoutSeconds = 500;
@@ -45,8 +53,8 @@ public class VentasCancelacionRepository : IVentasCancelacionRepository
             conn)
         { CommandTimeout = CommandTimeoutSeconds };
 
-        await using var rd = await cmd.ExecuteReaderAsync(ct);
-        if (!await rd.ReadAsync(ct))
+        await using var rd = await cmd.ExecuteReaderAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
+        if (!await rd.ReadAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct)))
             return new ConstantesCancelacion();
 
         return new ConstantesCancelacion
@@ -97,8 +105,8 @@ WHERE V.IDVenta IN ({string.Join(", ", marcadores)});", conn)
         foreach (var id in idsVenta)
             cmd.Parameters.AddWithValue("@id" + i++, id);
 
-        await using var rd = await cmd.ExecuteReaderAsync(ct);
-        while (await rd.ReadAsync(ct))
+        await using var rd = await cmd.ExecuteReaderAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
+        while (await rd.ReadAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct)))
         {
             lista.Add(new VentaParaCancelar
             {
@@ -146,8 +154,8 @@ WHERE V.IDVenta IN ({string.Join(", ", marcadores)});", conn)
         cmd.Parameters.AddWithValue("@FolioFinalVenta", folioVenta);
         cmd.Parameters.AddWithValue("@IDUsuarioActual", 0);
 
-        await using var rd = await cmd.ExecuteReaderAsync(ct);
-        if (!await rd.ReadAsync(ct)) return null;
+        await using var rd = await cmd.ExecuteReaderAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
+        if (!await rd.ReadAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct))) return null;
 
         var fechaCancelacion = LeerTexto(rd, "FechaCancelacionFtm");
         if (fechaCancelacion.Length > 0) return null;
@@ -170,8 +178,8 @@ WHERE V.IDVenta IN ({string.Join(", ", marcadores)});", conn)
         { CommandTimeout = CommandTimeoutSeconds };
         cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
 
-        await using var rd = await cmd.ExecuteReaderAsync(ct);
-        if (!await rd.ReadAsync(ct)) return null;
+        await using var rd = await cmd.ExecuteReaderAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
+        if (!await rd.ReadAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct))) return null;
 
         return rd.GetInt32(0) == 1 ? rd.GetString(1).Trim() : null;
     }
@@ -194,7 +202,7 @@ WHERE V.IDVenta IN ({string.Join(", ", marcadores)});", conn)
         cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
         cmd.Parameters.AddWithValue("@Equipo", equipo);
 
-        await cmd.ExecuteNonQueryAsync(ct);
+        await cmd.ExecuteNonQueryAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
     }
 
     /*
@@ -227,8 +235,8 @@ WHERE V.IDVenta IN ({string.Join(", ", marcadores)});", conn)
             buscar.Parameters.AddWithValue("@IDUsuarioActual", idUsuario);
             buscar.Parameters.AddWithValue("@IDTipoDocumento", venta.IdTipoDocumento);
 
-            await using var rd = await buscar.ExecuteReaderAsync(ct);
-            if (!await rd.ReadAsync(ct)) return;
+            await using var rd = await buscar.ExecuteReaderAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(buscar, ct));
+            if (!await rd.ReadAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(buscar, ct))) return;
             idConcentradoDetalle = LeerEntero(rd, "IDConcentradoDetalle");
         }
 
@@ -259,7 +267,7 @@ WHERE V.IDVenta IN ({string.Join(", ", marcadores)});", conn)
         quitar.Parameters.AddWithValue("@Equipo", equipo);
         quitar.Parameters.AddWithValue("@Observaciones", "");
 
-        await quitar.ExecuteNonQueryAsync(ct);
+        await quitar.ExecuteNonQueryAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(quitar, ct));
     }
 
     public async Task<VentasCancelacionResultado> CancelarAsync(VentaParaCancelar venta, int idUsuario, string equipo, CancellationToken ct)
@@ -276,9 +284,9 @@ WHERE V.IDVenta IN ({string.Join(", ", marcadores)});", conn)
         cmd.Parameters.AddWithValue("@IDUsuarioCancelo", idUsuario);
         cmd.Parameters.AddWithValue("@EquipoCancelo", equipo);
 
-        await using var rd = await cmd.ExecuteReaderAsync(ct);
+        await using var rd = await cmd.ExecuteReaderAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct));
 
-        if (!await rd.ReadAsync(ct))
+        if (!await rd.ReadAsync(Infrastructure.Data.CancelacionSegura.SeñalPara(cmd, ct)))
         {
             // El procedimiento SIEMPRE devuelve un renglon. Si no, algo se rompio.
             return new VentasCancelacionResultado

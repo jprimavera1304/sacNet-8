@@ -1,4 +1,4 @@
-namespace ISL_Service.Application.DTOs.VentasPedidoCaptura;
+﻿namespace ISL_Service.Application.DTOs.VentasPedidoCaptura;
 
 public class PedidoClienteBuscarRequest
 {
@@ -108,6 +108,24 @@ public class PedidoAgregarDetalleRequest
     public int FacturaMayorista { get; set; }
     public int RemisionMayorista { get; set; }
     public decimal DescuentoAdicional { get; set; }
+
+    /*
+      LOS CUATRO DATOS QUE HACEN QUE EL RENGLON SEA DE UNA COMPRA.
+
+      `sp_n_InsertarPedidoDetalle` -el MISMO procedimiento para los dos- los
+      declara desde siempre, y Mac31 los manda llenos desde la forma de captura
+      de compras (Compras.cs:1105, :1115-1117) y vacios desde la de ventas. El
+      web solo tenia captura de ventas, asi que el repositorio los fijaba a mano
+      en 0 y "" y no habia manera de capturar una compra.
+
+      Para un pedido de VENTA siguen valiendo lo de siempre -proveedor 0 y las
+      tres cadenas vacias-, que es justo lo que decia el codigo fijo: quien ya
+      llamaba a este endpoint no cambia de comportamiento.
+    */
+    public int IDProveedor { get; set; }
+    public string? Factura { get; set; }
+    public string? FechaEmision { get; set; }
+    public string? FechaVencimiento { get; set; }
     // Canal que origina el pedido (MOVIL / WEB). Si viene vacio, el backend usa
     // el nombre de usuario/maquina como antes.
     public string? Equipo { get; set; }

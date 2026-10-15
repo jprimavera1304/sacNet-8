@@ -1,4 +1,4 @@
-using ISL_Service.Application.Interfaces;
+﻿using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -60,7 +60,18 @@ public class ProductosController : ControllerBase
     /// Se pidieron a la vez listaRoshfrans y esCarga, o demasiados porcentajes
     /// </response>
     [HttpGet]
-    [Authorize(Policy = "perm:productos.ver")]
+    /* Misma razon que en PersonasController: CONSULTA DE PRODUCTOS se abre en
+       Mac31 con cualquier boton concedido. NAOLANY tiene NUEVO y LISTA DE
+       PRECIOS ROSHFRANS y no tiene VER, y la pantalla la rebotaba entera. */
+    /*
+      DOS CANALES Y DOS PANTALLAS DEL TELEFONO.
+
+      `app_movil.productos` es la del modulo Productos. `app_movil.inventario.
+      ajustes.ver` esta porque el buscador de producto de AJUSTES DE INVENTARIO
+      pega aqui: sin ella, un usuario de solo movil abriria Ajustes y no podria
+      elegir que producto ajustar, que es la pantalla entera.
+    */
+    [Authorize(Policy = "perm:productos.ver|app_movil.productos|app_movil.inventario.ajustes.ver|modulo:productos")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Consultar(
