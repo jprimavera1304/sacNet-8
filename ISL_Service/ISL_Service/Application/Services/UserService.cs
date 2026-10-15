@@ -4,6 +4,7 @@ using System.Text;
 using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
+using ISL_Service.Application.Security;
 using ISL_Service.Domain.Entities;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -77,13 +78,31 @@ public class UserService : IUserService
             Estado = login.Estado
         };
 
-        var token = _jwt.GenerateToken(user, companyKey);
+        /*
+          EL CANAL SE RESUELVE AQUI, EN EL SERVIDOR, Y SE FIRMA.
+
+          Es el unico momento en que el cliente puede opinar sobre su canal, y
+          opinar le CUESTA en las dos direcciones (ver CanalDeAcceso): "movil"
+          le exige `app_movil.acceso`, "web" le apaga las claves `app_movil.*`.
+          Por eso se puede aceptar lo que declare sin abrir nada.
+
+          No se valida aqui si tiene la llave maestra: el token se emite igual.
+          Hace falta que se emita para que la app pueda leer /api/me y pintar
+          "Sin acceso a la app" en vez de un error de red. Lo que se cierra es
+          TODO lo demas, y se cierra en AccesoMovilMiddleware.
+        */
+        // Ya viene normalizado por SesionController (que es quien ve el
+        // User-Agent). Se vuelve a pasar por Normalizar y no se confia en el
+        // texto tal cual por si algun dia entra un login por otro camino: lo
+        // que se firma tiene que ser siempre una de las dos constantes.
+        var canal = CanalDeAcceso.Normalizar(request.Canal);
+        var token = _jwt.GenerateToken(user, companyKey, canal);
 
         // Solo la app pide refresh; el web no lo manda -> se comporta como hoy.
         string? refreshToken = null;
         if (request.IncluirRefresh)
         {
-            var identity = new RefreshTokenIdentity(user.Id, login.LegacyUserId, user.UsuarioNombre, user.Rol, user.EmpresaId, companyKey);
+            var identity = new RefreshTokenIdentity(user.Id, login.LegacyUserId, user.UsuarioNombre, user.Rol, user.EmpresaId, companyKey, canal);
             refreshToken = await IssueRefreshAsync(identity, ct);
         }
 
@@ -113,7 +132,6 @@ public class UserService : IUserService
 
         // Rotación: se revoca el usado y se emite uno nuevo (sliding 60 días).
         await _refresh.RevokeAsync(hash, ct);
-        var nuevoRefresh = await IssueRefreshAsync(identity, ct);
 
         var user = new Usuario
         {
@@ -123,7 +141,26 @@ public class UserService : IUserService
             Rol = identity.Rol,
             EmpresaId = identity.EmpresaId
         };
-        var token = _jwt.GenerateToken(user, identity.CompanyKey);
+        /*
+          EL CANAL SALE DEL RENGLON GUARDADO, NO DEL CLIENTE.
+
+          Si se volviera a preguntar al renovar, el cierre no valdria nada:
+          bastaria con pedir el refresh declarando "web" para salirse del canal
+          movil. El cuerpo de /api/auth/refresh solo trae el refreshToken.
+
+          Un renglon sin canal (los escritos antes de este cambio: el ALTER los
+          deja en NULL) se renueva como MOVIL, no como web. Esta tabla la
+          escribe SOLO la app -el web nunca manda incluirRefresh-, asi que
+          "sin canal" aqui significa "app vieja", y leerlo como web le quitaria
+          sus claves `app_movil.*` a cada repartidor con la app ya instalada.
+        */
+        var canal = identity.CanalSesion == Canal.NoDeclarado ? Canal.Movil : identity.CanalSesion;
+
+        // El refresh nuevo se guarda YA con el canal resuelto, para que el
+        // renglon deje de ser "sin canal" en cuanto la app renueve una vez.
+        var nuevoRefresh = await IssueRefreshAsync(identity with { CanalSesion = canal }, ct);
+
+        var token = _jwt.GenerateToken(user, identity.CompanyKey, canal);
 
         return new LoginResponse
         {

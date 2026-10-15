@@ -143,17 +143,32 @@ public static class ReportesCatalogo
           catalogo es peor que un reporte que no esta, porque alguien lo manda a
           un cliente.
 
+          Y HAY MAS EVIDENCIA EN LA BASE, de la segunda vuelta (2026-10-15):
+          `Template_Html` solo tiene TRES plantillas del tipo 1003 -detalle,
+          totales y cuerpo_n- en MacZ Y en Produccion_svr, frente a las 32 del
+          1001 y las 10 del 1175. No hay encabezado ni pie: no habria ni con que
+          empezar la hoja.
+
           EL CAMINO BUENO YA EXISTE Y ES OTRO: el comprobante no se vuelve a
-          dibujar, se sirve el fichero que genero el timbrado.
+          dibujar, se sirve el fichero que SELLO Facturapi.
 
-              GET /api/ventas/facturas/{id}/documento?formato=pdf
+              GET  /api/ventas/facturas/{id}/documento?formato=pdf
+              POST /api/ventas/facturas/{id}/documento/generar
 
-          Ese endpoint resuelve la misma ruta y entrega el fichero. Medido con el
-          71875 en esta maquina: contesta 409 con la ruta exacta
-          ("NO SE ENCONTRO EL ARCHIVO PDF. (C:\macZ\Facturas\07-2026\...)")
-          porque los PDF viven en el servidor que timbro, no en el equipo de
-          desarrollo. O sea que el endpoint esta bien y lo que falta no es un
-          reporte: es que el fichero exista donde el timbrado lo deja.
+          Y ESO ES, LITERALMENTE, LO QUE HACE EL 1003 EN LEGACY. Medido en
+          Legacy/MacServicios2/.../ReporteV2Service.cs:1132-1214: esa rama no
+          arma ni una linea de HTML; lee la ruta del SP, baja de Facturapi el
+          zip, el xml y el pdf (FacturapiService.downloadFactura) y los ESCRIBE
+          en esa ruta. El 1003 es un descargador con cache en disco, no un
+          reporte, y por eso su sitio es el modulo de facturacion
+          (FacturaDocumentoService, con el porque entero en
+          Application/Interfaces/IFacturaDocumento.cs) y no este catalogo.
+
+          LO QUE FALTABA NO ERA DAR DE ALTA NADA: ERA EL PASO DE GUARDAR. El
+          backend bajaba de Facturapi y no escribia, asi que el fichero no
+          aparecia nunca en disco y POST /api/ventas/facturas/enviar -que
+          adjunta DESDE DISCO, igual que legacy- contestaba 409 con un
+          comprobante perfectamente timbrado. Ya esta hecho.
         */
         Ventas("concentrados", "Concentrados"),
         /*

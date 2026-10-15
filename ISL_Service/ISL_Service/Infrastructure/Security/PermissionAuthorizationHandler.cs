@@ -42,11 +42,50 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
             rolLegacy,
             CancellationToken.None);
 
+        /*
+          LAS CLAVES DEL TELEFONO SOLO CUENTAN EN UN TOKEN DEL TELEFONO.
+
+          Este es el otro lado del cierre del canal movil. AccesoMovilMiddleware
+          cobra la llave maestra a quien se declara movil; aqui se le quitan las
+          claves `app_movil.*` a quien se declara web, para que mentir no sirva
+          en la direccion contraria: un repartidor que inicie sesion como "web"
+          para esquivar `app_movil.acceso` pierde `app_movil.pedidos` y recibe
+          403 en la captura, en vez de ganar nada.
+
+          Esta es la mitad que hace que el diseno cumpla "declarar un canal
+          nunca DA privilegios, solo los quita". Sin ella el canal web seria la
+          puerta de atras del canal movil.
+
+          No toca al canal movil ni a los tokens sin canal (ver Canal.NoDeclarado).
+          A quien hoy entra por el web NO le quita nada: se midio en las dos
+          bases locales (ver CanalDeAcceso.Filtrar) y el web no ofrece ninguna
+          pantalla con una clave `app_movil.*`.
+        */
+        var canal = CanalDeAcceso.De(context.User);
+        var permisos = CanalDeAcceso.Filtrar(snapshot.Permissions, canal);
+
+        /*
+          Y LA LLAVE MAESTRA, TAMBIEN AQUI.
+
+          Se comprueba en los DOS caminos -el middleware y esta politica- por la
+          misma razon que ya obligo a duplicar la entrada de modulo: "la API
+          tiene dos caminos para decidir lo mismo; si solo se cerrara uno, el
+          modulo quedaria abierto por el otro y nadie lo notaria"
+          (ver mas abajo, EntradasDeModulo). Si un dia el middleware se
+          descolocara en Program.cs, las politicas seguirian cerradas.
+        */
+        if (snapshot.PermissionsEnabled
+            && CanalDeAcceso.ExigeLlaveMaestra(canal)
+            && !CanalDeAcceso.TieneLlaveMaestra(permisos))
+        {
+            return;
+        }
+
         // Con cualquiera de los permisos aceptados alcanza (ver PermissionRequirement).
         if (snapshot.PermissionsEnabled)
         {
             bool Tiene(string clave) =>
-                snapshot.Permissions.Any(p => string.Equals(p, clave, StringComparison.OrdinalIgnoreCase));
+                permisos.Any(p => string.Equals(p, clave, StringComparison.OrdinalIgnoreCase));
 
             /*
               "modulo:<clave>": PUEDE ABRIR LA PANTALLA DEL MODULO.
@@ -70,7 +109,11 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
             {
                 if (!Tiene($"{clave}.ver_modulo")) return false;
                 var familia = clave + ".";
-                return snapshot.Permissions.Any(p =>
+                // Sobre `permisos` (los del canal), no sobre el snapshot crudo:
+                // si no, una clave `app_movil.X.y` de un token de canal web
+                // seguiria contando como "trabaja en el modulo" y abriria la
+                // entrada que el filtro de canal acaba de quitar.
+                return permisos.Any(p =>
                     !p.EndsWith(".ver_modulo", StringComparison.OrdinalIgnoreCase)
                     && p.StartsWith(familia, StringComparison.OrdinalIgnoreCase));
             }

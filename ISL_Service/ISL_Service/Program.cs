@@ -393,6 +393,25 @@ builder.Services.AddScoped<IVentasDescuentosService, VentasDescuentosService>();
 builder.Services.AddScoped<IVentasFacturacionRepository, VentasFacturacionRepository>();
 builder.Services.AddScoped<IVentasFacturacionService, VentasFacturacionService>();
 
+/*
+  EL DOCUMENTO DEL CFDI: EL PASO QUE FALTABA DEL REPORTE 1003.
+
+  El 1003 de Legacy no dibuja nada —su rama no arma una sola linea de HTML—:
+  es un DESCARGADOR CON CACHE EN DISCO. Lee donde va el archivo, lo baja de
+  Facturapi si no esta, y lo escribe creando la carpeta del mes.
+
+  Sin ese paso, un comprobante timbrado desde el web o el telefono nunca
+  dejaba archivo, y `POST /facturas/enviar` —que adjunta DESDE DISCO, igual
+  que legacy— contestaba 409 para siempre. En Mac31 funciona porque la
+  pantalla dispara el 1003 antes de mandar el correo.
+
+  Van aqui y no en otro sitio porque `VentasFacturacionController` las pide por
+  el constructor: sin registrarlas, el controlador no se puede instanciar y
+  TODOS sus endpoints contestan 500, no solo los del documento.
+*/
+builder.Services.AddScoped<IFacturaDocumentoAlmacen, FacturaDocumentoAlmacen>();
+builder.Services.AddScoped<IFacturaDocumentoService, FacturaDocumentoService>();
+
 // ARMAR EL COMPROBANTE ANTES DE TIMBRARLO. Va aparte del servicio que timbra a
 // proposito: este solo LEE y cuenta, no habla con Facturapi y no escribe. En una
 // familia donde el error vale un CFDI real, que la pantalla de revision no
@@ -696,6 +715,22 @@ app.UseAuthentication();
   viaja dentro de el. Lo demas lo explica CompanyKeyMiddleware.
 */
 app.UseMiddleware<CompanyKeyMiddleware>();
+
+/*
+  LA LLAVE MAESTRA DE LA APP MOVIL, DEL LADO DEL SERVIDOR.
+
+  Mismo hueco en el pipeline y por las mismas dos razones que el de arriba:
+  necesita el ClaimsPrincipal ya armado (va DESPUES de UseAuthentication, para
+  poder leer el claim `canal`) y tiene que cortar ANTES de que cualquier
+  endpoint corra (va ANTES de UseAuthorization).
+
+  Y va DESPUES de CompanyKeyMiddleware a proposito: primero se comprueba que el
+  token sea de ESTA empresa y luego lo que puede hacer. Al reves se resolverian
+  permisos contra la base equivocada para un token ajeno.
+
+  Lo que hace y que deja pasar lo explica AccesoMovilMiddleware.
+*/
+app.UseMiddleware<AccesoMovilMiddleware>();
 
 app.UseAuthorization();
 

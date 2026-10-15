@@ -1,3 +1,5 @@
+using ISL_Service.Application.Security;
+
 namespace ISL_Service.Application.Interfaces;
 
 // Identidad guardada junto al refresh token para poder re-emitir el access token
@@ -8,7 +10,25 @@ public record RefreshTokenIdentity(
     string UsuarioNombre,
     string Rol,
     int EmpresaId,
-    string CompanyKey);
+    string CompanyKey,
+    /*
+      EL CANAL VIAJA CON EL REFRESH, NO SE VUELVE A PREGUNTAR.
+
+      Si al renovar se tomara el canal de lo que diga el cliente, todo el
+      diseno se cae: bastaria con pedir un refresh diciendo "web" para salir
+      del canal movil y esquivar `app_movil.acceso`. Asi que el canal se guarda
+      en `dbo.WRefreshToken.Canal` al emitirlo y el refresh solo lo ARRASTRA.
+      El cuerpo del /api/auth/refresh no tiene ni donde declararlo.
+
+      `Canal.NoDeclarado` son los renglones escritos antes de este cambio (el
+      ALTER los deja en NULL); se leen como MOVIL, no como web, porque esta
+      tabla la usa SOLO la app: "Almacen de refresh tokens (solo para la app
+      movil)" (RefreshTokenRepository.cs) y el web nunca pide refresh
+      (LoginRequest.IncluirRefresh). Leerlos como web les quitaria sus claves
+      `app_movil.*` y dejaria sin pedidos a cada repartidor que tenga la app
+      instalada, sin que nadie cambiara un permiso.
+    */
+    Canal CanalSesion = Canal.NoDeclarado);
 
 public interface IRefreshTokenRepository
 {

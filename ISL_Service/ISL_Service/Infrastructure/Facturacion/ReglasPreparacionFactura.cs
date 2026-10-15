@@ -282,55 +282,129 @@ public static class ReglasPreparacionFactura
 
     /*
       ══════════════════════════════════════════════════════════════════════
-      DIVERGENCIA MEDIDA ENTRE EL WEB Y MAC31: EL PRECIO QUE VIAJA AL CFDI
+      RESUELTO: EL PRECIO QUE VIAJA AL CFDI Y EL DESCUENTO QUE NO VA
       ══════════════════════════════════════════════════════════════════════
 
-      En la rama de Zaragoza, Mac31 lee el precio del concepto de la columna
-      `FacturaPrecioListaConIva` (VentasFacturacion.cs:1411-1413) y lo manda en
-      `PreciosListaConIvaRndLst` (:1429). El web lee `PrecioListaConIvaRnd`
-      (nucleo/notaDeCredito.ts:289-296, usada por `conceptosDeLasPartidas`).
+      Esto estuvo escrito aqui como "divergencia sin resolver" porque se creia
+      que MacServicios2 no estaba en el repositorio. SI ESTA, en
+      `Legacy/MacServicios2/Mac3Servicios`, y leerlo cierra la pregunta. Lo que
+      sigue es lo que dice el fuente, con las cifras medidas en las dos bases.
 
-      NO SON LA MISMA COLUMNA. Medido en MacZ con
-      `EXEC sp_n_VentasDetalleMultiple @IDsVenta='154134'`, partida 483747:
+      QUIEN ARMA DE VERDAD EL CFDI
+      ----------------------------
+      `VentasFacturaService.cs:525` y `:672` llaman SIEMPRE a
+      `FacturapiService.insertFacturaZara(...)`, para las dos empresas: la
+      variante entra como el parametro `Funcionalidad` ("ZARA" / "TAU").
+      (`insertFacturaTauro` existe pero NADIE lo llama: es codigo muerto.)
 
-          PrecioListaConIvaRnd      =  2,388.68   (ya con el descuento aplicado)
-          FacturaPrecioListaConIva  =  4,480.00   (precio de lista con IVA)
-          MontoDescuento            =  1,747.86
-          ImporteConIvaRnd          =  2,388.68
-          FacturaSubtotalConIva     =  4,480.00
+      Y ahi, los conceptos se arman asi (FacturapiService.cs:860-872):
 
-      O sea: el web manda el precio YA DESCONTADO *y ademas* manda el descuento
-      en el mismo concepto. Mac31 manda el precio de lista y deja que el
-      descuento lo aplique el comprobante. Son dos CFDI distintos para la misma
-      remision.
+          ["price"]        = PrecioConDescuentoSinIva
+          ["tax_included"] = false
+          ["quantity"]     = CantidadesLst[i] * NumPiezas
 
-      POR QUE NO SE CAMBIA AQUI POR CUENTA PROPIA
-      -------------------------------------------
-      Porque quien convierte esas listas en conceptos del CFDI es MacServicios2,
-      que NO esta en este repositorio: desde aqui no se puede leer si aplica el
-      descuento sobre el precio de lista, si usa `SubTotalesConUsadoConIvaLst`
-      para cuadrar, ni como reparte el IVA. Elegir una de las dos columnas a
-      ciegas cambia el importe de comprobantes fiscales REALES, y eso no es una
-      decision que se tome sin ver el otro lado.
+      NO HAY NINGUN CAMPO `discount`. En TODO el proyecto de MacServicios2 no
+      existe: Legacy nunca manda descuento a nivel de concepto.
 
-      QUE SE HACE ENTONCES
-      --------------------
-      `preparar` devuelve el concepto con la columna DEL WEB (para que el cuerpo
-      sea identico al de hoy y nada cambie al conectar el movil) y ADEMAS, en
-      cada concepto, `PrecioListaLegacy` y `SubtotalLegacy` con las columnas que
-      lee Mac31, mas un AVISO que lo nombra. Asi la diferencia esta a la vista en
-      la respuesta en vez de enterrada en dos archivos, y se resuelve con el dato
-      delante cuando haya acceso a MacServicios2.
+      QUE ES CADA NUMERO, ENTONCES
+      ----------------------------
+      Medido con `EXEC sp_n_VentasDetalleMultiple @IDsVenta='154134'` en MacZ,
+      partida 483747 (`PZ`, NumPiezas=1, Cantidad=1):
+
+          PrecioLista               =  3,862.07   precio de lista SIN IVA
+          FacturaPrecioListaConIva  =  4,480.00   = redondea(3,862.07 x 1.16)
+          ImportePartida            =  2,114.21   neto sin IVA ya descontado
+          MontoDescuento            =  1,747.86   = 3,862.07 - 2,114.21
+          PrecioListaConIvaRnd      =  2,388.68   = ImporteConIvaRnd / Cantidad
+          ImporteConIvaRnd          =  2,388.68   lo que el cliente debe del producto
+          CostoUsadoCargoConIva     =    645.00   el casco
+          TotalPagar (remision)     =  3,033.68   = 2,388.68 + 645.00
+
+      O sea:
+        * `PrecioListaConIvaRnd` es el precio NETO por pieza, CON IVA, con el
+          descuento Y la bonificacion del cliente ya aplicados. Es
+          `ImporteConIvaRnd / Cantidad` por definicion del SP (sp_n_VentasDetalleMultiple,
+          el CASE del `AS PrecioListaConIvaRnd`), y `ImporteConIvaRnd` es
+          exactamente lo que suma el total de la remision.
+        * `FacturaPrecioListaConIva` es el precio de LISTA con IVA, por unidad de
+          venta (lleva `* NumPiezas`). NO viaja al CFDI: Mac31 lo mete en
+          `PreciosListaConIvaRndLst` (VentasFacturacion.cs:1411-1413, :1429) y esa
+          lista acaba en `Param11` del procedimiento que GUARDA la factura
+          (VentasFacturaService.cs:740) -> columna `PrecioLista` de
+          `[Ventas Facturas Detalle]`, que es el precio de lista que se imprime.
+          Para el comprobante no se usa NUNCA.
+        * `MontoDescuento` es el descuento SIN IVA que YA esta restado dentro de
+          `ImportePartida` y por tanto dentro de `ImporteConIvaRnd`. Mandarlo
+          como `discount` del concepto lo resta DOS VECES.
+
+      LA CUENTA QUE LO DECIDE (ZARAGOZA, FacturapiService.cs:805-810)
+      --------------------------------------------------------------
+      Cuando se factura el total de la remision:
+
+          price     = PrecioListaConIvaRnd / (1 + IVA)
+          quantity  = CantidadFtm * NumPiezas   == la columna `Cantidad` del SP
+
+      Comprobado en la base: `Cantidad = CantidadFtm * NumPiezas` en todas las
+      partidas medidas (venta 30379, partida 104648: CantidadFtm=2, NumPiezas=360,
+      Cantidad=720). Asi que el importe del concepto CON IVA es
+      `PrecioListaConIvaRnd * Cantidad` = `ImporteConIvaRnd`, y la suma de los
+      conceptos es el total de la remision. Esa es la unica de las tres cuentas
+      que cuadra:
+
+          venta 154134, partida 483747  (remision: 2,388.68 del producto)
+            web de hoy  2,388.68 x 1 - 1,747.86 =   640.82   <- FALTAN 1,747.86
+            la premisa   4,480.00 x 1           = 4,480.00   <- SOBRAN 2,091.32
+            Legacy       2,388.68 x 1           = 2,388.68   <- CUADRA
+
+      TAURO VA POR OTRA COLUMNA (FacturapiService.cs:768-769, :815)
+      -------------------------------------------------------------
+      En Tauro `PrecioListaConIvaRnd` NO es el neto: el SP lo calcula por el ELSE
+      (`redondea(PrecioLista x 1.16) + CostoUsadoCargoConIva`), que es precio de
+      lista. Lo que Legacy usa alli es
+
+          price = ImportePartida / Cantidad        (sin IVA, por pieza)
+
+      mas un ajuste en la ULTIMA partida para que la suma de exactamente el total
+      a facturar (:524-528). Medido contra 12 facturas REALES de Produccion_svr,
+      la columna del web (`PrecioLista`) da el doble: venta 384111, factura
+      T140770, total real 6,006.00 -> con `PrecioLista` saldria 12,010.00.
+
+      COMO SE COMPROBO
+      ----------------
+      Con 24 facturas REALES ya timbradas (12 de MacZ serie Z/ZS y 12 de
+      Produccion_svr serie T), comparando `[Ventas Facturas].TotalFacturarDinero`
+      contra lo que da cada regla. La regla de aqui cuadra al centavo en las 24;
+      la del web no cuadra en NINGUNA. Las pruebas estan en
+      `ISL_Service.Tests/PrepararFacturaReglaFiscalTests.cs` con los numeros
+      dentro, para que no haga falta base para volver a correrlas.
     */
     public static class DivergenciasConLegacy
     {
+        /*
+          EL AVISO QUE NOMBRA LO QUE EL WEB SIGUE HACIENDO MAL.
+
+          `preparar` ya manda el comprobante correcto. Pero el web no pasa por
+          `preparar` todavía: arma los conceptos él mismo y mete `MontoDescuento`
+          en el `discount` del concepto, encima de un precio que ya viene
+          descontado. Mientras eso siga así, el aviso viaja en la respuesta para
+          que quede dicho en el único sitio que los dos clientes leen.
+        */
+        public const string ElWebAplicaElDescuentoDosVeces =
+            "El web manda el descuento (MontoDescuento) en el mismo concepto cuyo precio " +
+            "(PrecioListaConIvaRnd) ya viene descontado, así que lo resta dos veces: en la " +
+            "partida medida el concepto sale en 640.82 en vez de 2,388.68. Legacy no manda " +
+            "descuento de concepto en ningún caso (FacturapiService.cs:860-872 no tiene " +
+            "campo discount). `preparar` ya devuelve Descuento = 0; el web tiene que dejar " +
+            "de calcularlo y pedir `preparar`.";
+
         public const string PrecioDelConcepto =
-            "El precio del concepto sale de PrecioListaConIvaRnd (lo que manda el web). " +
-            "Mac31 manda FacturaPrecioListaConIva, que en la partida medida vale 4,480.00 " +
-            "contra 2,388.68. No se cambia desde aquí porque quien arma el CFDI con esas " +
-            "listas es MacServicios2, que no está en este repositorio: cada concepto trae " +
-            "las dos cifras (precioListaLegacy / subtotalLegacy) para poder decidirlo con " +
-            "el dato delante.";
+            "El precio del concepto es el NETO por pieza con IVA: PrecioListaConIvaRnd en " +
+            "Zaragoza (= ImporteConIvaRnd / Cantidad) y (ImportePartida / Cantidad) × (1+IVA) " +
+            "en Tauro, igual que FacturapiService.cs:805-815. FacturaPrecioListaConIva es el " +
+            "precio de LISTA y no viaja al CFDI: acaba en la columna PrecioLista de " +
+            "[Ventas Facturas Detalle] (VentasFacturaService.cs:740). Cada concepto sigue " +
+            "trayendo precioListaLegacy / subtotalLegacy porque la validación de descuento " +
+            "de Mac31 se calcula con ellos.";
 
         public const string SumaDeListaDelDescuento =
             "La validación de descuento de Zaragoza divide entre la suma de " +
@@ -420,6 +494,33 @@ public static class ReglasPreparacionFactura
         /// El subtotal que leeria Mac31 (`FacturaSubtotalConIva` en Zaragoza).
         /// </summary>
         public decimal SubtotalLegacy { get; set; }
+
+        /*
+          LAS TRES COLUMNAS QUE HACEN FALTA PARA REESCALAR EL PRECIO.
+
+          Cuando se factura un monto DISTINTO del de la remision, Legacy no
+          reparte la diferencia sobre el precio neto: la reparte sobre
+          `(PrecioLista + CostoUsadoCargoConIva/(1+IVA))` en Zaragoza y sobre
+          `ImportePartida / Cantidad` en Tauro (FacturapiService.cs:829-839).
+          Sin estas columnas aqui, `AjustarConceptosAlTotalAFacturar` no puede
+          hacer esa cuenta, y hacerla sobre el neto da otro CFDI.
+
+          No viajan al comprobante: son insumo de la cuenta.
+        */
+
+        /// `PrecioLista` del SP: precio de lista SIN IVA por pieza.
+        public decimal PrecioListaSinIva { get; set; }
+
+        /// `CostoUsadoCargoConIva` del SP: el casco que trae la partida, CON IVA.
+        public decimal CascoConIva { get; set; }
+
+        /// `ImportePartida` del SP: el neto SIN IVA de la partida completa, ya
+        /// con el descuento restado y sin el casco.
+        public decimal ImportePartidaSinIva { get; set; }
+
+        /// `SoloServicios` del SP. Las partidas de servicio no entran en el
+        /// reparto (FacturapiService.cs:793-794 pide `SoloServicios == 0`).
+        public int SoloServicios { get; set; }
     }
 
     /*
@@ -429,25 +530,53 @@ public static class ReglasPreparacionFactura
            sobreescritura de la cantidad de FacturaDeRemisionPage.tsx:465-471.
       mac: VentasFacturacion.cs:1398-1437 (el bucle de `gridDetalles`).
 
-      NO SE CALCULA NINGUN PRECIO: se LEE la columna que ya viene calculada y
-      redondeada por el procedimiento. Redondear por partida es justo donde se
-      van los centavos, y hacerlo dos veces —una en la base y otra aqui— es
-      tener dos reglas sobre el mismo peso.
+      EL PRECIO ES EL NETO POR PIEZA, CON IVA, Y EL DESCUENTO VA EN CERO.
+
+      La regla es la de `FacturapiService.insertFacturaZara`, que es quien arma
+      de verdad los conceptos del CFDI para LAS DOS empresas
+      (VentasFacturaService.cs:525 y :672):
+
+        ZARAGOZA (FacturapiService.cs:805-806)
+          price = PrecioListaConIvaRnd / (1 + IVA)   ->   aqui, con IVA dentro:
+          PrecioUnitarioConIva = PrecioListaConIvaRnd
+          El SP lo define como `ImporteConIvaRnd / Cantidad`, o sea el NETO por
+          pieza con el descuento y la bonificacion ya restados.
+
+        TAURO (FacturapiService.cs:768-769, :815)
+          price = ImportePartida / Cantidad          ->   aqui, con IVA dentro:
+          PrecioUnitarioConIva = (ImportePartida / Cantidad) * (1 + IVA)
+          En Tauro `PrecioListaConIvaRnd` NO es el neto —el SP lo calcula por el
+          ELSE, `redondea(PrecioLista*1.16) + casco`, que es precio de LISTA— y
+          leerlo daria el doble: medido contra la factura real T140770
+          (Produccion_svr, total 6,006.00) la columna del web da 12,010.00.
+
+      `Descuento = 0` SIEMPRE, y no por omision: en todo MacServicios2 no existe
+      el campo `discount` del concepto. `MontoDescuento` ya esta restado dentro
+      de `ImportePartida` y por tanto dentro de `ImporteConIvaRnd`, asi que
+      mandarlo otra vez lo cobra de menos (ver `ElWebAplicaElDescuentoDosVeces`).
+
+      `Cantidad` se lee de la columna `Cantidad`, que es PIEZAS: en la base se
+      cumple `Cantidad = CantidadFtm * NumPiezas`, que es justo el `quantity` que
+      manda Legacy (FacturapiService.cs:798). Por eso una caja de 360 piezas
+      entra como 360 piezas al precio por pieza, y no como 2 cajas.
+
+      Se LEE la columna que ya viene calculada y redondeada por el procedimiento
+      y no se vuelve a redondear: redondear por partida es justo donde se van los
+      centavos, y hacerlo dos veces —una en la base y otra aqui— es tener dos
+      reglas sobre el mismo peso. La unica multiplicacion que se hace es la del
+      IVA de Tauro, que es la que Legacy deja que haga el PAC.
 
       `conIva` es la capacidad `facturacionMuestraPreciosConIva`, que el backend
       ya deriva de `funcionalidad.Contains("ZARA")`
-      (Application/Empresa/MapaDeCapacidades.cs:83). Con ella en false se leen
-      `PrecioLista` e `Importe`, que es la rama que Mac31 tiene en el `else`
-      (:1416-1420). Esa rama NO es verificable hoy: la unica empresa que no
-      muestra precios con IVA es Tauro, y alli esta pantalla se alcanza igual —
-      pero no hay una tercera instalacion con la que comprobar las cifras. Queda
-      implementada porque es la que pide Mac31, y marcada como no medida.
+      (Application/Empresa/MapaDeCapacidades.cs:83). La rama de Tauro SI esta
+      medida ahora, contra 12 facturas timbradas de Produccion_svr.
     */
     public static List<ConceptoPreparado> ConceptosDeLasPartidas(
         IEnumerable<IReadOnlyDictionary<string, object?>> partidas,
         bool conIva,
         IReadOnlyDictionary<int, decimal>? cantidadesCapturadas = null,
-        IReadOnlySet<int>? marcadas = null)
+        IReadOnlySet<int>? marcadas = null,
+        decimal porcentajeIva = 0.16m)
     {
         var salida = new List<ConceptoPreparado>();
 
@@ -472,6 +601,27 @@ public static class ReglasPreparacionFactura
                 cantidad = capturada;
             }
 
+            var precioListaSinIva = Numero(Crudo(p, "PrecioLista", "precioLista"));
+            var importePartida = Numero(Crudo(p, "ImportePartida", "importePartida"));
+
+            /*
+              EL PRECIO UNITARIO NETO, CON IVA DENTRO.
+
+              Zaragoza lee `PrecioListaConIvaRnd` tal cual (ya es neto por pieza
+              con IVA). Tauro calcula `ImportePartida / Cantidad` y le pone el
+              IVA, porque alli `ImportePartida` viene SIN IVA
+              (FacturapiService.cs:768-769).
+
+              La division va contra `cantidadOriginal` —la de la remision— y NO
+              contra la cantidad capturada: el precio unitario no cambia porque
+              se facturen menos piezas.
+            */
+            var precioUnitarioConIva = conIva
+                ? Numero(Crudo(p, "PrecioListaConIvaRnd", "precioListaConIvaRnd"))
+                : (cantidadOriginal > 0m
+                    ? (importePartida / cantidadOriginal) * (1m + porcentajeIva)
+                    : 0m);
+
             salida.Add(new ConceptoPreparado
             {
                 ClaveProdServ = Texto(Crudo(p, "ClaveSAT", "claveSAT", "ClaveProdServ")),
@@ -484,10 +634,21 @@ public static class ReglasPreparacionFactura
                 ClaveUnidad = Texto(Crudo(p, "UnidadMedidaSAT", "UnidadMedidaSat", "unidadMedidaSat")),
 
                 Cantidad = cantidad,
-                PrecioUnitarioConIva = conIva
-                    ? Numero(Crudo(p, "PrecioListaConIvaRnd", "precioListaConIvaRnd"))
-                    : Numero(Crudo(p, "PrecioLista", "precioLista")),
-                Descuento = Numero(Crudo(p, "MontoDescuento", "montoDescuento")),
+                PrecioUnitarioConIva = precioUnitarioConIva,
+
+                /*
+                  CERO, Y ES LA CORRECCION DE FONDO.
+
+                  Legacy no manda `discount` en ningun concepto: el diccionario
+                  que viaja a Facturapi solo lleva sku / description /
+                  product_key / price / tax_included y quantity
+                  (FacturapiService.cs:860-872). `MontoDescuento` ya esta restado
+                  dentro del precio que acabamos de leer, asi que repetirlo en el
+                  comprobante cobra de MENOS: 640.82 en vez de 2,388.68 en la
+                  partida 483747 de la venta 154134 (MacZ).
+                */
+                Descuento = 0m,
+
                 IdProducto = Entero(Crudo(p, "IDProducto", "idProducto")),
                 Codigo = Texto(Crudo(p, "Codigo", "codigo")),
 
@@ -497,14 +658,220 @@ public static class ReglasPreparacionFactura
 
                 PrecioListaLegacy = conIva
                     ? Numero(Crudo(p, "FacturaPrecioListaConIva"))
-                    : Numero(Crudo(p, "PrecioLista", "precioLista")),
+                    : precioListaSinIva,
                 SubtotalLegacy = conIva
                     ? Numero(Crudo(p, "FacturaSubtotalConIva"))
-                    : Numero(Crudo(p, "ImportePartida"))
+                    : importePartida,
+
+                PrecioListaSinIva = precioListaSinIva,
+                CascoConIva = Numero(Crudo(p, "CostoUsadoCargoConIva", "costoUsadoCargoConIva")),
+                ImportePartidaSinIva = importePartida,
+                SoloServicios = Entero(Crudo(p, "SoloServicios", "soloServicios"))
             });
         }
 
         return salida;
+    }
+
+    /*
+      ══════════════════════════════════════════════════════════════════════
+      EL TOTAL EN DINERO DE LAS REMISIONES, COMO LO MIDE MACSERVICIOS2
+      ══════════════════════════════════════════════════════════════════════
+
+      Este numero NO es decorativo: es el que decide, dentro de
+      `insertFacturaZara`, si el precio de cada concepto se manda tal cual o se
+      reescala. La comparacion es `TotalFacturarDinero == SumaImporteConIvaRnd`
+      (FacturapiService.cs:715 y :799).
+
+      Y se mide distinto en cada empresa:
+        ZARAGOZA: Σ `ImporteConIvaRnd` de TODAS las partidas de las remisiones
+                  (FacturapiService.cs:556). Todas, no solo las marcadas.
+        TAURO:    Σ `FacturaSubtotalConIva` tomando UNA partida por remision
+                  (:561-567), porque alli esa columna es de nivel remision
+                  (`MAX(Importe) - MAX(TotalCostoUsadoCargoConIva)` en el SP).
+
+      Comprobado contra las 24 facturas timbradas: con este numero, la rama que
+      elige la regla es la correcta en todas.
+    */
+    public static decimal TotalEnDineroDeLasRemisiones(
+        IEnumerable<IReadOnlyDictionary<string, object?>> partidas,
+        bool esZaragoza)
+    {
+        if (esZaragoza)
+        {
+            return partidas.Sum(p => Numero(Crudo(p, "ImporteConIvaRnd", "importeConIvaRnd")));
+        }
+
+        // TAURO: una sola partida por remision, porque la columna ya es del
+        // total de la remision y sumarla por partida la contaria N veces.
+        return partidas
+            .GroupBy(p => Entero(Crudo(p, "IDVenta", "idVenta")))
+            .Sum(g => Numero(Crudo(g.First(), "FacturaSubtotalConIva", "facturaSubtotalConIva")));
+    }
+
+    /*
+      ══════════════════════════════════════════════════════════════════════
+      QUE EL CFDI SUME EXACTAMENTE LO QUE SE VA A FACTURAR
+      ══════════════════════════════════════════════════════════════════════
+
+      Leer la columna neta solo basta cuando se factura la remision COMPLETA.
+      En cuanto el monto a facturar se mueve —y en esta pantalla se mueve: el
+      campo del total es editable y la gente teclea otra cifra— Legacy NO manda
+      los precios netos: los reescala y ademas corrige la ULTIMA partida para
+      que la suma cuadre al centavo. Sin esto, el CFDI y el cobro no son el
+      mismo numero, que es justo el pecado que se estaba persiguiendo.
+
+      Son las tres ramas de `insertFacturaZara`, en este orden:
+
+      (A) `TotalFacturarDinero == SumaImporteConIvaRnd`  (:799)
+          ZARAGOZA: nada que hacer, el precio neto ya suma el total (:805).
+          TAURO:    el precio es `ImportePartida / Cantidad` y aun asi se
+                    corrige la ultima partida con `diferenciaUnitaria`
+                    (:810-828), porque `ImportePartida` esta redondeado por
+                    partida y la suma puede quedar a centavos del total.
+
+      (B) `TotalFacturarDinero != SumaImporteConIvaRnd`  (:835-...)
+          Se reparte un factor:
+              porcentaje = (TotalFacturarDinero / (1+IVA)) / SumaSubTotalConUsadoSinIva
+          y el precio sale de
+              ZARAGOZA: (PrecioLista + CostoUsadoCargoConIva/(1+IVA)) * porcentaje  (:839)
+              TAURO:    (ImportePartida / Cantidad)             * porcentaje  (:846)
+          mas la correccion de la ultima partida (:852-859).
+          Ojo con la base del factor: NO es la suma de los netos, es la suma de
+          los precios de LISTA mas el casco (:497-504). Hacerlo sobre el neto da
+          otro comprobante.
+
+      (C) ZARAGOZA, total igual pero PIEZAS distintas  (:938-942)
+          Si se factura el total completo pero no todas las piezas de la
+          remision, Legacy tira los precios por partida y pone el MISMO precio a
+          todas: `TotalFacturarDinero / piezasAFacturar`. Es la rama menos obvia
+          y la que mas sorprende al compararla con la remision, pero es la que
+          hace que la suma siga dando el total.
+
+      Las partidas de servicio (`SoloServicios > 0`) y las de precio de lista
+      cero quedan fuera del reparto, igual que en Legacy (:793-794).
+
+      El precio se devuelve CON IVA porque es como viaja desde aqui
+      (`FacturapiCliente` manda `price_includes_tax`), y Facturapi lo vuelve a
+      dividir entre (1+IVA): la cuenta es la misma que la de Legacy, que manda
+      el precio sin IVA y deja que el PAC le sume el impuesto.
+    */
+    public static void AjustarConceptosAlTotalAFacturar(
+        List<ConceptoPreparado> conceptos,
+        bool esZaragoza,
+        decimal totalFacturarDinero,
+        decimal totalEnDineroDeLasRemisiones,
+        decimal porcentajeIva,
+        decimal piezasDeLasRemisiones = 0m)
+    {
+        if (conceptos.Count == 0) return;
+
+        /*
+          SIN DINERO QUE FACTURAR NO SE TOCA NADA.
+
+          Legacy, con `TotalFacturarDinero <= 0`, deja el factor en cero
+          (FacturapiService.cs:718-723) y mandaria precios en cero. Aqui no se
+          reproduce eso porque antes salta el reclamo "EL TOTAL A FACTURAR DEBE
+          SER MAYOR DE CERO." (`PrimerReclamoDeFactura`, mac :1470): la pantalla
+          no deja llegar a timbrar. Dejar los precios netos es lo correcto para
+          lo que la pantalla ensena mientras la persona todavia no teclea el
+          monto; escribir ceros seria ensenar una factura de cero pesos.
+        */
+        if (totalFacturarDinero <= 0m) return;
+
+        // Las que entran al reparto. El resto se queda como esta.
+        var reparto = conceptos
+            .Where(c => c.PrecioListaSinIva > 0m && c.SoloServicios == 0 && c.Cantidad > 0m)
+            .ToList();
+
+        if (reparto.Count == 0) return;
+
+        var iva = 1m + porcentajeIva;
+        var totalSinIva = totalFacturarDinero / iva;
+        var elTotalEsElDeLaRemision = totalFacturarDinero == totalEnDineroDeLasRemisiones;
+
+        var piezasAFacturar = reparto.Sum(c => c.Cantidad);
+
+        // (C) Zaragoza, total completo pero no todas las piezas: precio plano.
+        if (elTotalEsElDeLaRemision
+            && esZaragoza
+            && piezasDeLasRemisiones > 0m
+            && piezasDeLasRemisiones != piezasAFacturar
+            && piezasAFacturar > 0m)
+        {
+            var plano = totalFacturarDinero / piezasAFacturar;
+            foreach (var c in reparto) c.PrecioUnitarioConIva = plano;
+            return;
+        }
+
+        // (A) Zaragoza con el total completo: los precios netos ya cuadran.
+        if (elTotalEsElDeLaRemision && esZaragoza) return;
+
+        // La base del factor, tal como la acumula FacturapiService.cs:497-504.
+        decimal baseSinIva = 0m;
+        foreach (var c in reparto)
+        {
+            baseSinIva += esZaragoza
+                ? (c.PrecioListaSinIva + decimal.Round(c.CascoConIva / iva, 2, MidpointRounding.AwayFromZero))
+                  * c.Cantidad
+                : UnitarioSinIvaDeTauro(c) * c.Cantidad;
+        }
+
+        if (!esZaragoza)
+        {
+            // TAURO: la base se vuelve a pasar a CON IVA antes de comparar
+            // (FacturapiService.cs:577), y el factor se calcula con ella.
+            baseSinIva *= iva;
+        }
+
+        var porcentaje = 1m;
+        if (!elTotalEsElDeLaRemision && totalFacturarDinero > 0m && baseSinIva != 0m)
+        {
+            porcentaje = totalSinIva / baseSinIva;
+        }
+
+        decimal acumulado = 0m;
+        for (var i = 0; i < reparto.Count; i++)
+        {
+            var c = reparto[i];
+
+            decimal precioSinIva;
+            if (elTotalEsElDeLaRemision)
+            {
+                // (A) TAURO con el total completo.
+                precioSinIva = UnitarioSinIvaDeTauro(c);
+            }
+            else if (esZaragoza)
+            {
+                precioSinIva =
+                    (c.PrecioListaSinIva + decimal.Round(c.CascoConIva / iva, 2, MidpointRounding.AwayFromZero))
+                    * porcentaje;
+            }
+            else
+            {
+                precioSinIva = UnitarioSinIvaDeTauro(c) * porcentaje;
+            }
+
+            acumulado += precioSinIva * c.Cantidad;
+
+            // La correccion de la ULTIMA: se le carga la diferencia que falte
+            // para llegar al total (FacturapiService.cs:821-827 y :852-859).
+            if (i == reparto.Count - 1)
+            {
+                precioSinIva += (totalSinIva - acumulado) / c.Cantidad;
+            }
+
+            c.PrecioUnitarioConIva = precioSinIva * iva;
+        }
+    }
+
+    /// El unitario sin IVA de Tauro: `ImportePartida / Cantidad`
+    /// (FacturapiService.cs:768-769). Se divide entre la cantidad ORIGINAL
+    /// porque `ImportePartida` es el importe de la partida completa.
+    private static decimal UnitarioSinIvaDeTauro(ConceptoPreparado c)
+    {
+        var divisor = c.CantidadOriginal > 0m ? c.CantidadOriginal : c.Cantidad;
+        return divisor > 0m ? c.ImportePartidaSinIva / divisor : 0m;
     }
 
     /*

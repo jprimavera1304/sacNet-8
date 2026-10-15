@@ -58,14 +58,35 @@ public class PrepararFacturaEquivaleAlWebTests
         ["ClaveSAT"] = "26111707",
         ["UnidadMedidaSAT"] = "H87",
         ["Cantidad"] = cantidad,
-        ["PrecioLista"] = 2114.21m,
+
+        /*
+          LOS NUMEROS SON LOS DEL RENGLON REAL, copiados de
+          `EXEC sp_n_VentasDetalleMultiple @IDsVenta='154134'` en MacZ, partida
+          483747. Estaban mal puestos antes —`PrecioLista` tenia el valor de
+          `ImportePartida` e `ImportePartida` el del descuento— y con la columna
+          corrida no se puede medir ninguna regla de precio.
+
+              PrecioLista               3,862.07   lista SIN IVA
+              ImportePartida            2,114.21   neto SIN IVA (3,862.07 - 1,747.86)
+              MontoDescuento            1,747.86   descuento SIN IVA, YA restado
+              PrecioListaConIvaRnd      2,388.68   neto por pieza CON IVA
+              FacturaPrecioListaConIva  4,480.00   lista CON IVA = redondea(3,862.07 x 1.16)
+              CostoUsadoCargoConIva       645.00   el casco
+              TotalPagar                3,033.68   = 2,388.68 + 645.00
+        */
+        ["PrecioLista"] = 3862.07m,
         ["PrecioListaConIvaRnd"] = 2388.68m,
         ["FacturaPrecioListaConIva"] = 4480.00m,
         ["ImporteConIvaRnd"] = 2388.68m,
         ["FacturaSubtotalConIva"] = 4480.00m,
-        ["SubTotalConUsadoConIva"] = 3862.07m,
-        ["ImportePartida"] = 1747.86m,
-        ["MontoDescuento"] = 1747.86m
+        ["SubTotalConUsadoConIva"] = 3033.68m,
+        ["ImportePartida"] = 2114.21m,
+        ["MontoDescuento"] = 1747.86m,
+        ["CostoUsadoCargoConIva"] = 645.00m,
+        ["TotalPagar"] = 3033.68m,
+        ["NumPiezas"] = 1,
+        ["CantidadFtm"] = cantidad,
+        ["SoloServicios"] = 0
     };
 
     // ======================================================================
@@ -276,7 +297,10 @@ public class PrepararFacturaEquivaleAlWebTests
         Assert.Equal("H87", c.ClaveUnidad);                        // UnidadMedidaSAT
         Assert.Equal(1m, c.Cantidad);                              // Cantidad
         Assert.Equal(2388.68m, c.PrecioUnitarioConIva);            // PrecioListaConIvaRnd
-        Assert.Equal(1747.86m, c.Descuento);                       // MontoDescuento
+
+        // CERO, no MontoDescuento: el descuento ya esta dentro del precio de
+        // arriba. Ver `El_descuento_del_concepto_va_en_cero...` mas abajo.
+        Assert.Equal(0m, c.Descuento);
         Assert.Equal(198, c.IdProducto);                           // IDProducto
         Assert.Equal("L-47(LN2)-550", c.Codigo);                   // Codigo
     }
@@ -313,29 +337,30 @@ public class PrepararFacturaEquivaleAlWebTests
             new[] { (IReadOnlyDictionary<string, object?>)PartidaDeMacZ() },
             conIva: true));
 
-        Assert.Equal(2388.68m, c.PrecioUnitarioConIva);  // lo que manda el web
-        Assert.Equal(4480.00m, c.PrecioListaLegacy);     // lo que leeria Mac31
+        Assert.Equal(2388.68m, c.PrecioUnitarioConIva);  // el NETO: lo que se timbra
+        Assert.Equal(4480.00m, c.PrecioListaLegacy);     // el precio de LISTA
         Assert.Equal(4480.00m, c.SubtotalLegacy);        // FacturaSubtotalConIva
         Assert.NotEqual(c.PrecioUnitarioConIva, c.PrecioListaLegacy);
 
-        // Y el aviso que la respuesta lleva nombra las dos cifras, para que quien
-        // lo lea no tenga que abrir dos repositorios.
-        Assert.Contains("4,480.00", Reglas.DivergenciasConLegacy.PrecioDelConcepto);
-        Assert.Contains("2,388.68", Reglas.DivergenciasConLegacy.PrecioDelConcepto);
+        // El aviso dice cual de las dos viaja al CFDI y a donde va la otra.
+        Assert.Contains("PrecioListaConIvaRnd", Reglas.DivergenciasConLegacy.PrecioDelConcepto);
+        Assert.Contains("Ventas Facturas Detalle", Reglas.DivergenciasConLegacy.PrecioDelConcepto);
     }
 
     [Fact]
     public void Sin_precios_con_iva_se_leen_las_columnas_de_la_rama_else_de_Mac31()
     {
-        // mac :1416-1420. Rama NO verificada contra una base: la unica empresa
-        // sin precios con IVA es Tauro y no hay una tercera con la que comparar
-        // cifras. Se implementa porque es la que pide Mac31; el aviso de la
+        // La rama de Tauro (mac :1416-1420). YA VERIFICADA contra 12 facturas
+        // timbradas de Produccion_svr: el precio sale de ImportePartida /
+        // Cantidad con el IVA puesto (FacturapiService.cs:768-769), NO de
+        // PrecioLista. Lo que queda del aviso de la
         // respuesta lo dice.
         var c = Assert.Single(Reglas.ConceptosDeLasPartidas(
             new[] { (IReadOnlyDictionary<string, object?>)PartidaDeMacZ() },
             conIva: false));
 
-        Assert.Equal(2114.21m, c.PrecioUnitarioConIva);  // PrecioLista
+        // (ImportePartida / Cantidad) x 1.16 = 2,114.21 x 1.16
+        Assert.Equal(2452.4836m, c.PrecioUnitarioConIva);
     }
 
     [Fact]

@@ -126,7 +126,26 @@ public abstract class PermisoControllerBase : ControllerBase
         if (!snapshot.PermissionsEnabled)
             return new PermisosDelUsuario(true, true, Array.Empty<string>());
 
-        return new PermisosDelUsuario(true, false, snapshot.Permissions);
+        /*
+          LAS CLAVES DEL TELEFONO SOLO CUENTAN EN UN TOKEN DEL TELEFONO.
+
+          Este es el SEGUNDO camino que decide lo mismo (el otro es
+          PermissionAuthorizationHandler). Se filtra en los dos porque es la
+          misma leccion que ya esta escrita arriba en esta clase: el dia que
+          haya que arreglar algo del modelo de permisos hay que acordarse de
+          todos los lugares, y "acordarse" no es un plan. Si solo se filtrara en
+          el handler, los controladores que heredan de aqui -Empleados,
+          Asistencias, Prestamos, Clientes, Cortes...- seguirian aceptando una
+          clave `app_movil.*` presentada desde un token de canal web.
+
+          Ver CanalDeAcceso: filtrar aqui NO le quita nada a quien entra por el
+          web de verdad (medido en las dos bases), y es lo que hace que
+          declararse "web" para esquivar `app_movil.acceso` cueste en vez de
+          regalar.
+        */
+        var permisosDelCanal = CanalDeAcceso.Filtrar(snapshot.Permissions, CanalDeAcceso.De(User));
+
+        return new PermisosDelUsuario(true, false, permisosDelCanal);
     }
 
     /// <summary>

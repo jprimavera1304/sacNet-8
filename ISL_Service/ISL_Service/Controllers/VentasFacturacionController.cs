@@ -100,11 +100,13 @@ public class VentasFacturacionController : PermisoControllerBase
     private readonly IVentasFacturacionService _service;
     private readonly ICascosAFacturarRepository _cascos;
     private readonly IVentasFacturacionPreparacionService _preparacion;
+    private readonly IFacturaDocumentoService _documentos;
 
     public VentasFacturacionController(
         IVentasFacturacionService service,
         ICascosAFacturarRepository cascos,
         IVentasFacturacionPreparacionService preparacion,
+        IFacturaDocumentoService documentos,
         ICurrentUserAccessor currentUser,
         IPermissionService permissionService)
         : base(currentUser, permissionService)
@@ -112,6 +114,7 @@ public class VentasFacturacionController : PermisoControllerBase
         _service = service;
         _cascos = cascos;
         _preparacion = preparacion;
+        _documentos = documentos;
     }
 
     /// <summary>
@@ -409,7 +412,16 @@ public class VentasFacturacionController : PermisoControllerBase
         var veto = await ExigirPermisoAsync(PermisoVer, ct);
         if (veto is not null) return veto;
 
-        var documento = await _service.LeerDocumentoAsync(idVentaFactura, formato, ct);
+        /*
+          PASA POR EL 1003 (FacturaDocumentoService) Y NO POR LeerDocumentoAsync.
+
+          Los dos resuelven la misma ruta y bajan de Facturapi cuando el disco no
+          la tiene; la diferencia es que el 1003 GUARDA lo que baja, que es el
+          paso que le faltaba al backend. Importa para el boton de al lado:
+          `enviar` adjunta DESDE DISCO —igual que legacy—, asi que sin esa copia
+          una factura se podia bajar una y otra vez y seguir sin poderse mandar.
+        */
+        var documento = await _documentos.LeerAsync(idVentaFactura, formato, ct);
 
         /*
           Cache-Control no-store: un CFDI puede cancelarse, y un PDF guardado en
@@ -417,6 +429,61 @@ public class VentasFacturacionController : PermisoControllerBase
         */
         Response.Headers["Cache-Control"] = "no-store";
         return File(documento.Contenido, documento.TipoContenido, documento.NombreArchivo);
+    }
+
+    /// <summary>
+    /// GENERA el PDF y el XML del comprobante y los deja en disco. Es el 1003.
+    /// </summary>
+    /// <remarks>
+    /// EL RECUADRO QUE FALTABA. El reporte 1003 de legacy
+    /// (`enumReportes.FacturaElectronica`) no dibuja nada: baja de Facturapi el
+    /// PDF y el XML del CFDI y los escribe en la carpeta que dicta
+    /// `sp_n_rptFacturaElectronica`. En Mac31 lo dispara la propia pantalla al
+    /// terminar de timbrar y al pulsar IMPRIMIR; desde el web y el movil NADIE lo
+    /// disparaba, asi que un comprobante timbrado desde esos canales se timbraba
+    /// bien y no dejaba archivo, y el correo —que adjunta desde disco, igual que
+    /// legacy— contestaba 409 para siempre. El porque completo, con las lineas de
+    /// legacy y lo medido en las dos bases, esta en
+    /// `Application/Interfaces/IFacturaDocumento.cs`.
+    ///
+    /// ES IDEMPOTENTE: si los dos archivos ya estan, no baja nada y lo dice en
+    /// `origen`. `rehacer=true` fuerza la bajada, que es lo que hay que hacer
+    /// DESPUES DE CANCELAR, porque al cancelar el procedimiento cambia el nombre
+    /// del archivo (le mete "CANCELADA") y el PDF viejo se queda huerfano.
+    ///
+    /// LLEVA EL PERMISO DE VER, no uno nuevo ni el de timbrar. Lo que entrega es
+    /// el mismo documento que ya sirve `GET {id}/documento` con esa misma clave;
+    /// escribir un archivo en la carpeta de facturas no es una decision del
+    /// usuario, es la cache del documento que acaba de pedir. Timbrar es otra cosa
+    /// y tiene su propia llave.
+    /// </remarks>
+    /// <response code="200">Los archivos, con su ruta, su tamano y de donde salieron.</response>
+    /// <response code="404">La factura no existe.</response>
+    /// <response code="409">No esta timbrada, o Facturapi no pudo dar el archivo.</response>
+    [HttpPost("{idVentaFactura:int}/documento/generar")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> GenerarDocumentoAsync(
+        int idVentaFactura,
+        [FromQuery] bool rehacer,
+        CancellationToken ct)
+    {
+        var veto = await ExigirPermisoAsync(PermisoVer, ct);
+        if (veto is not null) return veto;
+
+        var generado = await _documentos.GenerarAsync(idVentaFactura, rehacer, ct);
+
+        return Ok(new
+        {
+            ok = true,
+            message = generado.Cancelada
+                ? "Documentos del comprobante CANCELADO listos."
+                : "Documentos del comprobante listos.",
+            data = generado
+        });
     }
 
     /// <summary>
@@ -437,6 +504,31 @@ public class VentasFacturacionController : PermisoControllerBase
         var veto = await ExigirPermisoAsync(PermisoEnviar, ct);
         if (veto is not null) return veto;
         if (request is null) return BadRequest(new { message = "Body requerido." });
+
+        /*
+          PRIMERO SE GENERA EL DOCUMENTO Y DESPUES SE MANDA. ES EL ORDEN DE MAC31.
+
+          `EnviarCorreoAsync` adjunta el PDF y el XML leyendolos del disco, que es
+          lo que hace legacy (VentasFacturaService.cs:956-980: si no estan,
+          contesta "NO SE ENCONTRO EL ARCHIVO PDF" y la descarga esta comentada).
+          En Mac31 los archivos estan porque la pantalla dispara el reporte 1003
+          ANTES de mandar el correo; desde el web y el movil nadie disparaba el
+          1003, asi que el archivo no existia nunca y este endpoint contestaba 409
+          para un comprobante perfectamente timbrado.
+
+          Aqui se dispara ese mismo paso. No es trabajo de mas: si los archivos ya
+          estan en disco no baja nada —solo los cuenta—, y si no estan, los pone,
+          que es justo lo que el correo necesita.
+
+          `rehacer: false` a proposito: un comprobante no cambia, y volver a bajar
+          dos archivos en cada correo seria pagar dos llamadas a Facturapi por
+          cada cliente al que se le reenvia su factura.
+        */
+        /* Solo si la peticion tiene sentido: las quejas por falta de factura o de
+           correos las da `EnviarCorreoAsync`, y no se baja nada para una peticion
+           que va a ser rechazada de todas formas. */
+        if (request.IdVentaFactura > 0 && !string.IsNullOrWhiteSpace(request.Correos))
+            await _documentos.GenerarAsync(request.IdVentaFactura, rehacer: false, ct);
 
         var destinatarios = await _service.EnviarCorreoAsync(request, ct);
         return Ok(new { ok = true, message = $"Factura enviada a {destinatarios}.", data = new { destinatarios } });

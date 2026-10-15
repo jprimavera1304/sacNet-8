@@ -280,11 +280,28 @@ public class FacturaPreparadaConcepto
     /// <summary>Lo que trae la remision.</summary>
     public decimal CantidadOriginal { get; set; }
 
+    /// <summary>
+    /// El precio NETO por pieza, con IVA dentro, ya reescalado si el monto a
+    /// facturar no es el de la remision. Es el precio que se va a timbrar: la
+    /// pantalla lo ensena, no lo calcula.
+    /// </summary>
     public decimal PrecioUnitarioConIva { get; set; }
+
+    /// <summary>
+    /// SIEMPRE CERO. No es un campo olvidado: Legacy no manda descuento de
+    /// concepto en ningun CFDI (FacturapiService.cs:860-872) porque el descuento
+    /// ya esta dentro de `PrecioUnitarioConIva`. Se deja publicado para que el
+    /// cliente que hoy lo calcula pueda compararlo y dejar de hacerlo.
+    /// </summary>
     public decimal Descuento { get; set; }
+
     public bool Marcada { get; set; }
 
-    /// <summary>El precio que leeria Mac31. Ver los avisos de la respuesta.</summary>
+    /// <summary>
+    /// El precio de LISTA que lee Mac31 (`FacturaPrecioListaConIva`). No viaja
+    /// al CFDI: sirve para la validacion de descuento y para ensenar de cuanto
+    /// fue la rebaja. Ver los avisos de la respuesta.
+    /// </summary>
     public decimal PrecioListaLegacy { get; set; }
 
     /// <summary>El importe de este concepto, para que la pantalla no lo calcule.</summary>

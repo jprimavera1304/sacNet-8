@@ -1,5 +1,6 @@
 using System.Data;
 using ISL_Service.Application.Interfaces;
+using ISL_Service.Application.Security;
 using ISL_Service.Infrastructure.Data;
 using Microsoft.Data.SqlClient;
 
@@ -41,6 +42,25 @@ BEGIN
     );
     CREATE INDEX IX_WRefreshToken_TokenHash ON dbo.WRefreshToken(TokenHash);
     CREATE INDEX IX_WRefreshToken_UserId ON dbo.WRefreshToken(UserId);
+END
+
+/*
+  EL CANAL DE LA SESION, AGREGADO DESPUES.
+
+  ADITIVO y NULL. Las dos bases locales ya tienen la tabla creada (medido el
+  2026-10-15: existe en MacZ y en Produccion_svr, con 13 columnas), asi que el
+  CREATE de arriba ya no corre nunca y sin este ALTER la columna no apareceria.
+
+  NULL significa -renglon de antes de este cambio-, y se lee como canal MOVIL
+  (ver RefreshTokenIdentity): esta tabla la escribe SOLO la app. NO se le pone
+  DEFAULT 'web' precisamente para no convertir en web a los repartidores que ya
+  tienen la app instalada -eso les apagaria sus claves `app_movil.*` y les
+  cerraria la captura-, que es lo unico que este despliegue podria romper.
+*/
+IF OBJECT_ID('dbo.WRefreshToken','U') IS NOT NULL
+   AND COL_LENGTH('dbo.WRefreshToken','Canal') IS NULL
+BEGIN
+    ALTER TABLE dbo.WRefreshToken ADD Canal varchar(10) NULL;
 END";
         await using var cmd = new SqlCommand(sql, conn) { CommandTimeout = 60 };
         await cmd.ExecuteNonQueryAsync(ct);
@@ -53,8 +73,8 @@ END";
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
         const string sql = @"
-INSERT INTO dbo.WRefreshToken (EmpresaId, UserId, LegacyUserId, UsuarioNombre, Rol, CompanyKey, TokenHash, ExpiraEn, Revocado, FechaCreacion)
-VALUES (@EmpresaId, @UserId, @LegacyUserId, @UsuarioNombre, @Rol, @CompanyKey, @TokenHash, @ExpiraEn, 0, SYSUTCDATETIME());";
+INSERT INTO dbo.WRefreshToken (EmpresaId, UserId, LegacyUserId, UsuarioNombre, Rol, CompanyKey, Canal, TokenHash, ExpiraEn, Revocado, FechaCreacion)
+VALUES (@EmpresaId, @UserId, @LegacyUserId, @UsuarioNombre, @Rol, @CompanyKey, @Canal, @TokenHash, @ExpiraEn, 0, SYSUTCDATETIME());";
         await using var cmd = new SqlCommand(sql, conn) { CommandTimeout = 60 };
         cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = identity.EmpresaId });
         cmd.Parameters.Add(new SqlParameter("@UserId", SqlDbType.UniqueIdentifier) { Value = identity.UserId });
@@ -62,6 +82,14 @@ VALUES (@EmpresaId, @UserId, @LegacyUserId, @UsuarioNombre, @Rol, @CompanyKey, @
         cmd.Parameters.Add(new SqlParameter("@UsuarioNombre", SqlDbType.NVarChar, 150) { Value = identity.UsuarioNombre ?? string.Empty });
         cmd.Parameters.Add(new SqlParameter("@Rol", SqlDbType.NVarChar, 100) { Value = identity.Rol ?? string.Empty });
         cmd.Parameters.Add(new SqlParameter("@CompanyKey", SqlDbType.NVarChar, 100) { Value = identity.CompanyKey ?? string.Empty });
+        // El canal con el que se inicio la sesion. Se guarda para que el refresh
+        // lo ARRASTRE en vez de volver a preguntarselo al cliente: si se le
+        // preguntara, declarar "web" al renovar seria la salida facil del canal
+        // movil y con ella la de `app_movil.acceso`.
+        cmd.Parameters.Add(new SqlParameter("@Canal", SqlDbType.VarChar, 10)
+        {
+            Value = (object?)CanalDeAcceso.AClaim(identity.CanalSesion) ?? DBNull.Value
+        });
         cmd.Parameters.Add(new SqlParameter("@TokenHash", SqlDbType.VarBinary, 32) { Value = tokenHash });
         cmd.Parameters.Add(new SqlParameter("@ExpiraEn", SqlDbType.DateTime2) { Value = expiraEnUtc });
         await cmd.ExecuteNonQueryAsync(ct);
@@ -74,7 +102,7 @@ VALUES (@EmpresaId, @UserId, @LegacyUserId, @UsuarioNombre, @Rol, @CompanyKey, @
         await conn.OpenAsync(ct);
         const string sql = @"
 UPDATE dbo.WRefreshToken SET FechaUltimoUso = SYSUTCDATETIME()
-OUTPUT inserted.UserId, inserted.LegacyUserId, inserted.UsuarioNombre, inserted.Rol, inserted.EmpresaId, inserted.CompanyKey
+OUTPUT inserted.UserId, inserted.LegacyUserId, inserted.UsuarioNombre, inserted.Rol, inserted.EmpresaId, inserted.CompanyKey, inserted.Canal
 WHERE TokenHash = @TokenHash AND Revocado = 0 AND ExpiraEn > SYSUTCDATETIME();";
         await using var cmd = new SqlCommand(sql, conn) { CommandTimeout = 60 };
         cmd.Parameters.Add(new SqlParameter("@TokenHash", SqlDbType.VarBinary, 32) { Value = tokenHash });
@@ -86,7 +114,10 @@ WHERE TokenHash = @TokenHash AND Revocado = 0 AND ExpiraEn > SYSUTCDATETIME();";
             reader.GetString(2),
             reader.GetString(3),
             reader.GetInt32(4),
-            reader.GetString(5));
+            reader.GetString(5),
+            // NULL = renglon escrito antes de este cambio -> NoDeclarado, que
+            // UserService resuelve como movil (ver su comentario).
+            reader.IsDBNull(6) ? Canal.NoDeclarado : CanalDeAcceso.DeTexto(reader.GetString(6)));
     }
 
     public async Task RevokeAsync(byte[] tokenHash, CancellationToken ct)

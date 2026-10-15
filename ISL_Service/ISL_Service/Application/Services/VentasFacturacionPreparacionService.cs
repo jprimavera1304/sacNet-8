@@ -225,11 +225,24 @@ public class VentasFacturacionPreparacionService : IVentasFacturacionPreparacion
             cantidades = capturadas.ToDictionary(x => x.Key, x => x.Value.Cantidad);
         }
 
+        /*
+          EL IVA VIAJA A LA REGLA PORQUE TAURO LO NECESITA.
+
+          En Tauro el precio del concepto sale de `ImportePartida / Cantidad`,
+          que viene SIN IVA, y hay que ponerselo (FacturapiService.cs:768-769).
+          Sale de `Constantes.IVA`, igual que lo lee MacServicios2
+          (sp_n_VentasDetalleMultiple arranca con `SELECT @PorcentajeIva = IVA/100
+          FROM Constantes`), y no de una constante nuestra: el dia que una
+          empresa facture a otra tasa, un 0.16 escrito aqui es un CFDI mal hecho.
+        */
+        var porcentajeIva = constantes.PorcentajeIva;
+
         var conceptos = Reglas.ConceptosDeLasPartidas(
             partidas.Select(p => (IReadOnlyDictionary<string, object?>)p),
             esZaragoza,
             cantidades,
-            marcadas);
+            marcadas,
+            porcentajeIva);
 
         // La vista lleva TODAS las partidas —tambien las desmarcadas— porque la
         // pantalla tiene que poder volver a marcarlas. Al CFDI solo van las
@@ -238,25 +251,8 @@ public class VentasFacturacionPreparacionService : IVentasFacturacionPreparacion
             partidas.Select(p => (IReadOnlyDictionary<string, object?>)p),
             esZaragoza,
             cantidades,
-            null);
-
-        salida.Conceptos = todas.Select(c => new FacturaPreparadaConcepto
-        {
-            IdVenta = c.IdVenta,
-            IdVentaDetalle = c.IdVentaDetalle,
-            IdProducto = c.IdProducto,
-            Codigo = c.Codigo,
-            Descripcion = c.Descripcion,
-            ClaveProdServ = c.ClaveProdServ,
-            ClaveUnidad = c.ClaveUnidad,
-            Cantidad = c.Cantidad,
-            CantidadOriginal = c.CantidadOriginal,
-            PrecioUnitarioConIva = c.PrecioUnitarioConIva,
-            Descuento = c.Descuento,
-            PrecioListaLegacy = c.PrecioListaLegacy,
-            Importe = c.PrecioUnitarioConIva * c.Cantidad,
-            Marcada = marcadas is null || marcadas.Contains(c.IdVentaDetalle)
-        }).ToList();
+            null,
+            porcentajeIva);
 
         // ---- los cascos a facturar: catalogo con cantidades en cero ----
         var cascosCapturados = request.Cascos
@@ -315,6 +311,61 @@ public class VentasFacturacionPreparacionService : IVentasFacturacionPreparacion
         var totalDinero = remisiones.Sum(r => r.MontoAFacturar);
         var totalPorFacturar = remisiones.Sum(r => r.PorFacturar);
         var factor = Reglas.FactorDeComision(formaPago);
+
+        /*
+          AQUI SE CIERRA EL COMPROBANTE CONTRA EL COBRO.
+
+          Hasta esta linea cada concepto trae su precio NETO leido de la base,
+          que es lo correcto cuando se factura la remision completa. Pero el
+          total es editable y casi siempre se mueve, y Legacy entonces no manda
+          los netos: reescala los precios y corrige la ultima partida para que la
+          suma de EXACTAMENTE lo que se va a facturar
+          (FacturapiService.cs:799-889). Sin este paso, el CFDI y el cobro
+          difieren —en las ocho facturas reales de MacZ con monto modificado la
+          diferencia va de 1,785.00 a 7,290.00 pesos—, y una factura no se puede
+          corregir, solo cancelar.
+
+          Va DESPUES de `totalDinero` porque necesita el monto a facturar, y se
+          aplica a `conceptos` (los que van al CFDI) y a `todas` (lo que ensena
+          la pantalla) para que el usuario vea el mismo precio que se va a
+          timbrar.
+        */
+        var totalEnDineroDeLasRemisiones = Reglas.TotalEnDineroDeLasRemisiones(
+            partidas.Select(p => (IReadOnlyDictionary<string, object?>)p),
+            esZaragoza);
+
+        // Las piezas que TRAEN las remisiones, para la rama (C) de Zaragoza:
+        // total completo pero no todas las piezas (FacturapiService.cs:938-942).
+        var piezasDeLasRemisiones = partidas
+            .Select(pp => (IReadOnlyDictionary<string, object?>)pp)
+            .Sum(pp => Reglas.Numero(Reglas.Crudo(pp, "Cantidad", "cantidad")));
+
+        Reglas.AjustarConceptosAlTotalAFacturar(
+            conceptos, esZaragoza, totalDinero, totalEnDineroDeLasRemisiones,
+            porcentajeIva, piezasDeLasRemisiones);
+
+        Reglas.AjustarConceptosAlTotalAFacturar(
+            todas, esZaragoza, totalDinero, totalEnDineroDeLasRemisiones,
+            porcentajeIva, piezasDeLasRemisiones);
+
+        salida.Conceptos = todas.Select(c => new FacturaPreparadaConcepto
+        {
+            IdVenta = c.IdVenta,
+            IdVentaDetalle = c.IdVentaDetalle,
+            IdProducto = c.IdProducto,
+            Codigo = c.Codigo,
+            Descripcion = c.Descripcion,
+            ClaveProdServ = c.ClaveProdServ,
+            ClaveUnidad = c.ClaveUnidad,
+            Cantidad = c.Cantidad,
+            CantidadOriginal = c.CantidadOriginal,
+            PrecioUnitarioConIva = c.PrecioUnitarioConIva,
+            Descuento = c.Descuento,
+            PrecioListaLegacy = c.PrecioListaLegacy,
+            Importe = c.PrecioUnitarioConIva * c.Cantidad,
+            Marcada = marcadas is null || marcadas.Contains(c.IdVentaDetalle)
+        }).ToList();
+
 
         // Los cascos se suman COMPLETOS a la primera remision (mac :1578-1582).
         // Esto es lo que se refleja en `MontoAFacturar` de la vista, para que la
@@ -433,6 +484,11 @@ public class VentasFacturacionPreparacionService : IVentasFacturacionPreparacion
                 CorreosDisponibles = disponibles.Count,
                 CorreosMarcados = salida.Correos.Count,
                 EsZaragoza = esZaragoza,
+                // Esta suma se calcula DESPUES del reescalado, asi que es el
+                // importe que va a timbrarse, no una "suma de lista". No decide
+                // nada: la validacion de descuento de Mac31 se resuelve con
+                // `SumaDeListaLegacy` (ver `DescuentoRealDeMac31`). Se deja por
+                // si la pantalla la quiere ensenar.
                 SumaDeListaWeb = conceptos.Sum(c => c.PrecioUnitarioConIva * c.Cantidad),
                 SumaDeListaLegacy = conceptos.Sum(c => c.PrecioListaLegacy * c.Cantidad)
             });
@@ -462,6 +518,12 @@ public class VentasFacturacionPreparacionService : IVentasFacturacionPreparacion
         // ---- los avisos ----
         salida.Avisos.Add(Reglas.DivergenciasConLegacy.PrecioDelConcepto);
         salida.Avisos.Add(Reglas.DivergenciasConLegacy.SumaDeListaDelDescuento);
+
+        // El web sigue armando los conceptos por su cuenta y sigue mandando el
+        // descuento sobre un precio ya descontado. Mientras no pida `preparar`,
+        // el aviso viaja en la respuesta: es el unico sitio que leen los dos
+        // clientes, y lo que esta mal son comprobantes fiscales.
+        salida.Avisos.Add(Reglas.DivergenciasConLegacy.ElWebAplicaElDescuentoDosVeces);
 
         if (esZaragoza)
         {

@@ -224,9 +224,19 @@ public class CompanyKeyTests
     {
         public string LastCompanyKey { get; private set; } = string.Empty;
 
-        public string GenerateToken(Usuario user, string companyKey)
+        /// <summary>El canal que el servidor resolvio en el ultimo login.</summary>
+        /// <remarks>
+        /// Se captura igual que la companyKey para poder comprobar que el canal
+        /// lo decide el SERVIDOR al emitir el token y no una cabecera del
+        /// cliente. Las pruebas del canal viven en CanalDelTokenTests.
+        /// </remarks>
+        public ISL_Service.Application.Security.Canal LastCanal { get; private set; }
+
+        public string GenerateToken(Usuario user, string companyKey,
+            ISL_Service.Application.Security.Canal canal = ISL_Service.Application.Security.Canal.Web)
         {
             LastCompanyKey = companyKey;
+            LastCanal = canal;
             return "fake-token";
         }
     }

@@ -60,27 +60,163 @@ public class VentasPedidoCapturaController : ControllerBase
         return equipo.Length > 100 ? equipo[..100] : equipo;
     }
 
-    private async Task<IActionResult?> ValidarPropiedadPedidoAsync(int idPedido, CancellationToken ct)
+    /// <param name="esModificacion">
+    /// True solo en las rutas que ESCRIBEN sobre el pedido (guardar, agregar o
+    /// quitar un renglon). Es lo que decide si se cobra
+    /// `app_movil.pedidos.editar`.
+    ///
+    /// Las LECTURAS -abrir el pedido, ver su historial- no se cobran, y es
+    /// deliberado: `app_movil.pedidos.editar` gobierna el boton "Editar
+    /// pedido", no la tarjeta de Mis pedidos. Si se cobrara tambien al leer, a
+    /// quien le quitaras la clave dejaria de poder ABRIR sus propios pedidos
+    /// —la pantalla entera se le llenaria de 403— y eso no se lo quito nadie.
+    /// </param>
+    private async Task<IActionResult?> ValidarPropiedadPedidoAsync(int idPedido, CancellationToken ct, bool esModificacion = false)
     {
         if (idPedido <= 0) return null; // pedido nuevo, aun no tiene dueño
-        if (!await EsSoloMovilAsync(ct)) return null; // oficina / super / legacy
+
+        var esSoloMovil = await EsSoloMovilAsync(ct);
+        var hayQueCobrarEdicion = esModificacion && await HayQueCobrarLaClaveDeEditarAsync(ct);
+
+        // Oficina / super / legacy en canal web: igual que hoy, ni una consulta
+        // de mas.
+        if (!esSoloMovil && !hayQueCobrarEdicion) return null;
 
         var propiedad = await _service.ObtenerPropiedadPedidoAsync(idPedido, ct);
         if (propiedad == null)
-            return NotFound(new { ok = false, message = "Pedido no encontrado." });
+        {
+            // Se conserva TAL CUAL el comportamiento de hoy: el 404 solo lo
+            // devolvia el blindaje de propiedad. Para los demas, un idPedido que
+            // no existe lo sigue contestando legacy como siempre.
+            return esSoloMovil
+                ? NotFound(new { ok = false, message = "Pedido no encontrado." })
+                : null;
+        }
 
-        var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
-        // Es mio si legacy lo tiene a mi nombre, O si yo lo cree segun la bitacora
-        // (aunque legacy haya cambiado el usuario al modificarlo). Sin esto, abrir
-        // mi propio pedido reasignado daria 403.
-        if (propiedad.IdUsuario != idUsuario
-            && !await _service.EsCreadorPorBitacoraAsync(idPedido, idUsuario, ct))
-            return StatusCode(403, new { ok = false, message = "Este pedido no es tuyo." });
+        if (esSoloMovil)
+        {
+            var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
+            // Es mio si legacy lo tiene a mi nombre, O si yo lo cree segun la bitacora
+            // (aunque legacy haya cambiado el usuario al modificarlo). Sin esto, abrir
+            // mi propio pedido reasignado daria 403.
+            if (propiedad.IdUsuario != idUsuario
+                && !await _service.EsCreadorPorBitacoraAsync(idPedido, idUsuario, ct))
+                return StatusCode(403, new { ok = false, message = "Este pedido no es tuyo." });
 
-        if (propiedad.IdStatus != 0 && propiedad.IdStatus != 1)
-            return StatusCode(403, new { ok = false, message = "Este pedido ya no se puede modificar." });
+            if (propiedad.IdStatus != 0 && propiedad.IdStatus != 1)
+                return StatusCode(403, new { ok = false, message = "Este pedido ya no se puede modificar." });
+        }
+
+        /*
+          `app_movil.pedidos.editar`, EXIGIDO DE VERDAD.
+
+          QUE PASABA
+          ----------
+          La app esconde el boton "Editar pedido" de Mis pedidos a quien no
+          tiene esta clave (mis_pedidos.dart, `_puedeEditar`), y eso era TODO el
+          control. El endpoint de guardar pedia
+          `perm:ventas.pedidos.crear|app_movil.pedidos`, asi que cualquier
+          repartidor que pudiera capturar podia tambien MODIFICAR un pedido ya
+          guardado llamando al PUT a mano, aunque le hubieran quitado la clave
+          de editar. Esconder el boton no es quitar el permiso.
+
+          COMO SE DISTINGUE "CREAR" DE "MODIFICAR" SIN ROMPER LA CAPTURA
+          --------------------------------------------------------------
+          Por `Pedidos.IDStatusPedido`, que es un dato del SERVIDOR (lectura
+          directa de la tabla, el mismo renglon que ya lee el blindaje de
+          propiedad), no algo que el cliente declare:
+
+            0 = borrador  -> el pedido se esta capturando AHORA. El renglon lo
+                             creo `sp_*_InsertarPedidoDetalle` al agregar el
+                             primer producto, y el PUT que viene despues es la
+                             PRIMERA grabada: eso es CREAR y no se cobra nada.
+            1 = pendiente -> el pedido ya esta guardado. Volver a tocarlo es
+                             MODIFICAR, y es exactamente el caso del boton
+                             Editar de Mis pedidos (la app solo lo ofrece
+                             cuando el estatus es "Pendiente").
+            otros         -> autorizado/procesado/cancelado: ya los rechaza el
+                             blindaje de propiedad mas arriba.
+
+          No se puede usar `idPedido > 0` como senal de "ya existe": el PUT
+          SIEMPRE llega con un idPedido mayor que cero -lo rechaza si no
+          (`"Pedido y domicilio son requeridos"`)- porque el renglon nace al
+          agregar el primer renglon de detalle. Cobrar por `idPedido > 0`
+          habria roto la captura de un pedido NUEVO, que es justo lo que no
+          puede pasar.
+
+          Cubre las tres rutas que modifican: el PUT de guardar y el alta/baja
+          de detalle sobre un pedido ya guardado (las tres pasan por aqui).
+
+          A QUIEN DEJA FUERA: A NADIE, HOY
+          --------------------------------
+          Medido el 2026-10-15 en las dos bases locales, usuario por usuario:
+          TODOS los que tienen `app_movil.pedidos` tienen tambien
+          `app_movil.pedidos.editar`. Zaragoza (MacZ): 19 usuarios con clave
+          movil, los 19 con las dos. Tauro (Produccion_svr): DEMO, con las dos.
+          O sea que esto no le quita hoy la edicion a nadie; lo que cierra es
+          que quitarle la clave a alguien pase a SERVIR de algo.
+
+          Y SE ACEPTA LA CLAVE DE OFICINA. `ventas.pedidos.crear` es la del web
+          y la que lee Mac31 (btnNuevoPedido): quien la tiene ya puede modificar
+          pedidos desde el web por estas mismas rutas, asi que negarselo por
+          venir del telefono seria un candado nuevo, no el cierre de este
+          agujero. Es el mismo OR web|movil que ya tiene la policy del endpoint,
+          con la clave de editar en la casilla del movil.
+
+          SOLO EN CANAL MOVIL. El web y Mac31 no cambian en nada: ver
+          HayQueCobrarLaClaveDeEditarAsync.
+        */
+        if (hayQueCobrarEdicion && propiedad.IdStatus == 1)
+        {
+            return StatusCode(403, new
+            {
+                ok = false,
+                message = "No tienes permiso para editar pedidos (app_movil.pedidos.editar)."
+            });
+        }
 
         return null;
+    }
+
+    /// <summary>
+    /// True si a esta peticion hay que exigirle `app_movil.pedidos.editar`
+    /// para tocar un pedido YA GUARDADO.
+    /// </summary>
+    /// <remarks>
+    /// Solo al CANAL MOVIL, y el canal sale del claim firmado del token, no de
+    /// una cabecera que el cliente pueda inventar (ver CanalDeAcceso).
+    ///
+    /// Queda fuera, y cada exclusion esta medida:
+    ///   * Canal web -> el web usa ESTAS MISMAS rutas para modificar
+    ///     (`pedido.api.js` pega aqui). Gatearlo con una clave `app_movil.*`
+    ///     dejaria fuera a toda la oficina de golpe, porque esa clave no se le
+    ///     da a nadie del web: medido, 0 usuarios de canal web tienen
+    ///     `app_movil.pedidos.editar` sin tener tambien `ventas.pedidos.crear`.
+    ///   * Token sin canal (los emitidos antes de este cambio, 4 h de vida):
+    ///     se comporta como ayer, para no echar fuera a quien tenga la app
+    ///     abierta durante el despliegue.
+    ///   * SuperAdmin: pasa, como en toda la API.
+    ///   * Instalacion sin modelo de permisos: pasa; no hay claves contra las
+    ///     que comparar y negar dejaria muerta una base que hoy funciona.
+    /// </remarks>
+    private async Task<bool> HayQueCobrarLaClaveDeEditarAsync(CancellationToken ct)
+    {
+        if (CanalDeAcceso.De(User) != Canal.Movil) return false;
+        if (CurrentUser.IsSuperAdmin(User)) return false;
+
+        var snapshot = await _permissionService.GetPermissionsAsync(
+            CurrentUser.GetUserId(User),
+            CurrentUser.GetEmpresaId(User),
+            User.FindFirst("rolLegacy")?.Value ?? CurrentUser.GetRol(User),
+            ct);
+
+        if (!snapshot.PermissionsEnabled) return false;
+
+        var puedeEditar = snapshot.Permissions.Any(p =>
+            string.Equals(p, "app_movil.pedidos.editar", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(p, "ventas.pedidos.crear", StringComparison.OrdinalIgnoreCase));
+
+        return !puedeEditar;
     }
 
     // True si quien llama es un usuario "solo movil": no SuperAdmin y sin el
@@ -180,7 +316,7 @@ public class VentasPedidoCapturaController : ControllerBase
         if (request.Cantidad <= 0)
             return BadRequest(new { ok = false, message = "Cantidad invalida." });
 
-        var rechazo = await ValidarPropiedadPedidoAsync(request.IDPedido, ct);
+        var rechazo = await ValidarPropiedadPedidoAsync(request.IDPedido, ct, esModificacion: true);
         if (rechazo != null) return rechazo;
 
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
@@ -196,7 +332,7 @@ public class VentasPedidoCapturaController : ControllerBase
         if (request == null || request.IDPedidoDetalle <= 0)
             return BadRequest(new { ok = false, message = "IDPedidoDetalle requerido." });
 
-        var rechazo = await ValidarPropiedadPedidoAsync(request.IDPedido, ct);
+        var rechazo = await ValidarPropiedadPedidoAsync(request.IDPedido, ct, esModificacion: true);
         if (rechazo != null) return rechazo;
 
         var data = await _service.EliminarDetalleAsync(request, ct);
@@ -213,7 +349,7 @@ public class VentasPedidoCapturaController : ControllerBase
         if (request.IDPedido <= 0 || request.IDDomicilio <= 0)
             return BadRequest(new { ok = false, message = "Pedido y domicilio son requeridos." });
 
-        var rechazo = await ValidarPropiedadPedidoAsync(request.IDPedido, ct);
+        var rechazo = await ValidarPropiedadPedidoAsync(request.IDPedido, ct, esModificacion: true);
         if (rechazo != null) return rechazo;
 
         var idUsuario = _currentUserAccessor.GetLegacyUserId(User);
