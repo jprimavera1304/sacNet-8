@@ -49,11 +49,101 @@ public class CompanyKeyTests
         {
             Usuario = "JUAN",
             Contrasena = "AB123456"
-        }, CancellationToken.None);
+        }, ISL_Service.Application.Security.Canal.Web, CancellationToken.None);
 
         Assert.Equal("tauro", response.CompanyKey);
         Assert.Equal("tauro", jwt.LastCompanyKey);
         Assert.False(string.IsNullOrWhiteSpace(response.Token));
+    }
+
+    /// <summary>
+    /// LA CONTRASENA QUE VA PUBLICADA DENTRO DEL APK.
+    ///
+    /// El APK de la tienda lleva en claro el par con el que se contesta a los
+    /// revisores sin tocar la red (`GOOGLEPLAY` / `REVISIONMAC2026`). Hoy no
+    /// abre nada porque esa cuenta no existe en ninguna de las dos bases de
+    /// produccion, pero es una contrasena publicada: el dia que alguien cree un
+    /// usuario llamado asi —una prueba, un script copiado— pasa a ser un login
+    /// real con contrasena conocida.
+    ///
+    /// Esta prueba vale porque el repositorio FALSO de aqui acepta a
+    /// cualquiera: si el rechazo por nombre no existiera, el login saldria bien.
+    /// Es decir, mide el rechazo y no la ausencia del usuario.
+    /// </summary>
+    [Theory]
+    [InlineData("GOOGLEPLAY")]
+    [InlineData("googleplay")]
+    [InlineData("  GooglePlay  ")]
+    [InlineData("APPSTORE")]
+    public async Task Las_Cuentas_De_Revisor_De_Tienda_No_Pueden_Iniciar_Sesion(string usuario)
+    {
+        var userRepo = new FakeUserRepository
+        {
+            LoginResult = new WebLoginFallbackResult
+            {
+                ResultCode = 1,
+                Source = "WEB",
+                UserId = Guid.NewGuid(),
+                Usuario = usuario.Trim(),
+                ContrasenaHash = BCrypt.Net.BCrypt.HashPassword("REVISIONMAC2026"),
+                Rol = "User",
+                EmpresaId = 1,
+                DebeCambiarContrasena = false,
+                Estado = 1
+            }
+        };
+
+        var service = new UserService(
+            userRepo,
+            new CapturingJwtTokenGenerator(),
+            new FakeEmpresaRepository("tauro"),
+            new MemoryCache(new MemoryCacheOptions()),
+            new FakeRefreshTokenRepository());
+
+        await Assert.ThrowsAsync<System.Security.Authentication.AuthenticationException>(
+            () => service.LoginAsync(
+                new LoginRequest { Usuario = usuario, Contrasena = "REVISIONMAC2026" },
+                Canal.Movil,
+                CancellationToken.None));
+    }
+
+    /// <summary>
+    /// Y el rechazo es por NOMBRE EXACTO, no por parecido: un usuario que
+    /// contenga esa palabra sigue entrando. Un filtro por "contiene" habria
+    /// echado fuera a cuentas legitimas.
+    /// </summary>
+    [Fact]
+    public async Task Un_Nombre_Parecido_Si_Entra()
+    {
+        var userRepo = new FakeUserRepository
+        {
+            LoginResult = new WebLoginFallbackResult
+            {
+                ResultCode = 1,
+                Source = "WEB",
+                UserId = Guid.NewGuid(),
+                Usuario = "GOOGLEPLAYSTORE_OPERACIONES",
+                ContrasenaHash = BCrypt.Net.BCrypt.HashPassword("AB123456"),
+                Rol = "User",
+                EmpresaId = 1,
+                DebeCambiarContrasena = false,
+                Estado = 1
+            }
+        };
+
+        var service = new UserService(
+            userRepo,
+            new CapturingJwtTokenGenerator(),
+            new FakeEmpresaRepository("tauro"),
+            new MemoryCache(new MemoryCacheOptions()),
+            new FakeRefreshTokenRepository());
+
+        var r = await service.LoginAsync(
+            new LoginRequest { Usuario = "GOOGLEPLAYSTORE_OPERACIONES", Contrasena = "AB123456" },
+            Canal.Movil,
+            CancellationToken.None);
+
+        Assert.False(string.IsNullOrWhiteSpace(r.Token));
     }
 
     [Fact]

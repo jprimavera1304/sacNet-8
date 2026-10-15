@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using ISL_Service.Application.DTOs.Requests;
 using ISL_Service.Application.DTOs.Responses;
 using ISL_Service.Application.Interfaces;
@@ -10,10 +10,12 @@ namespace ISL_Service.Controllers;
 public class SesionController : ControllerBase
 {
     private readonly IUserService _users;
+    private readonly ILogger<SesionController> _logger;
 
-    public SesionController(IUserService users)
+    public SesionController(IUserService users, ILogger<SesionController> logger)
     {
         _users = users;
+        _logger = logger;
     }
 
     // RUTA ABSOLUTA (no choca con api/[controller])
@@ -50,16 +52,54 @@ public class SesionController : ControllerBase
           que la app pueda leer /api/me y pintar "Sin acceso a la app" en vez de
           un error de red.
         */
+        var canalResuelto = Canal.Web;
+
         if (request is not null)
         {
-            var canal = CanalDeAcceso.Normalizar(
-                request.Canal,
-                clienteApp: Request.Headers[CanalDeAcceso.CabeceraClienteApp].ToString(),
-                agenteDeUsuario: Request.Headers.UserAgent.ToString());
-            request.Canal = CanalDeAcceso.AClaim(canal);
+            var declarado = request.Canal;
+            var clienteApp = Request.Headers[CanalDeAcceso.CabeceraClienteApp].ToString();
+            var agente = Request.Headers.UserAgent.ToString();
+
+            canalResuelto = CanalDeAcceso.Normalizar(declarado, clienteApp, agente);
+            request.Canal = CanalDeAcceso.AClaim(canalResuelto);
+
+            /*
+              LA MEDICION QUE HACE FALTA PARA PODER RETIRAR EL RESPALDO.
+
+              CanalDeAcceso dice que el User-Agent se podra borrar "cuando no
+              quede ninguna sesion llegando sin X-Cliente-App". Sin esta linea
+              esa semana limpia no se puede medir, y lo que no se puede medir
+              no se retira nunca: el respaldo se quedaria para siempre por
+              falta de un dato, no por falta de decision.
+
+              Se registra SOLO cuando el respaldo fue el que decidio —ni el
+              cuerpo ni la cabecera dijeron nada y el User-Agent mando al canal
+              movil—, que es exactamente el caso que tiene que llegar a cero.
+              Los logins normales no escriben nada: esto no es un log de
+              accesos.
+
+              Va el nombre de usuario para poder avisar al que le falta
+              actualizar la app. NO va la contrasena ni el token, obviamente, y
+              el User-Agent se recorta: es un dato que escribe el cliente y no
+              tiene por que caber entero en el log.
+            */
+            var decidioElRespaldo =
+                CanalDeAcceso.DeTexto(declarado) == Canal.NoDeclarado
+                && CanalDeAcceso.DeClienteApp(clienteApp) is null
+                && canalResuelto == Canal.Movil;
+
+            if (decidioElRespaldo)
+            {
+                _logger.LogInformation(
+                    "Canal movil resuelto por el RESPALDO del User-Agent (sin {Cabecera}): usuario={Usuario} agente={Agente}. "
+                    + "Mientras esto siga apareciendo, el respaldo de CanalDeAcceso no se puede retirar.",
+                    CanalDeAcceso.CabeceraClienteApp,
+                    request.Usuario,
+                    agente.Length > 120 ? agente[..120] : agente);
+            }
         }
 
-        var result = await _users.LoginAsync(request!, ct);
+        var result = await _users.LoginAsync(request!, canalResuelto, ct);
         return Ok(result);
     }
 

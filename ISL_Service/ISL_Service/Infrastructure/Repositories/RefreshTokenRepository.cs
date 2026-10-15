@@ -57,10 +57,47 @@ END
   tienen la app instalada -eso les apagaria sus claves `app_movil.*` y les
   cerraria la captura-, que es lo unico que este despliegue podria romper.
 */
+/*
+  Y POR QUE VA EN UN TRY/CATCH: LA CARRERA DEL PRIMER MINUTO.
+
+  En produccion esta columna NO EXISTE todavia (medido: las dos bases tienen 12
+  columnas y ninguna es `Canal`), asi que este ALTER corre de verdad, una vez,
+  en la PRIMERA peticion que toque la tabla despues del despliegue. Y justo ese
+  es el momento en que puede haber varias a la vez: el despliegue reinicia el
+  proceso y las apps que estaban abiertas reintentan su refresh todas juntas.
+
+  Dos peticiones simultaneas pueden pasar las dos la comprobacion de
+  `COL_LENGTH ... IS NULL` antes de que la primera termine; la segunda se queda
+  esperando el bloqueo de esquema y, cuando entra, el ALTER le revienta con
+  -Column names in each table must be unique- (error 2705). El sintoma seria un
+  login que falla una sola vez, justo tras el despliegue — de los peores de
+  diagnosticar, porque no se reproduce.
+
+  Asi que si el ALTER falla se vuelve a mirar: si la columna YA ESTA, la
+  agrego la otra sesion y no hay nada que arreglar. Si NO esta, el error es
+  real y se relanza tal cual, para que se vea en el log y no se convierta
+  despues en un -Invalid column name 'Canal'- sin explicacion.
+
+  Y EL ALTER VA DENTRO DE UN EXEC, QUE NO ES ADORNO. Un TRY/CATCH a secas NO
+  SIRVE AQUI: el 2705 lo levanta el COMPILADOR del lote, no su ejecucion, y un
+  error de compilacion aborta el lote entero sin pasar por el CATCH. Comprobado
+  en MacZ el 2026-10-15: con el ALTER escrito directo, el CATCH no se ejecuta y
+  el error sale fuera; metido en un EXEC —que se compila aparte, al correr— el
+  CATCH si lo recoge (2705) y un error de verdad sigue saliendo (se probo con
+  una tabla inexistente: 4902 se relanza).
+
+  LO QUE NO HACE FALTA COMPROBAR: permisos. La API se conecta como `sa` con
+  sysadmin, asi que el ALTER no puede fallar por no poder alterar la tabla.
+*/
 IF OBJECT_ID('dbo.WRefreshToken','U') IS NOT NULL
    AND COL_LENGTH('dbo.WRefreshToken','Canal') IS NULL
 BEGIN
-    ALTER TABLE dbo.WRefreshToken ADD Canal varchar(10) NULL;
+    BEGIN TRY
+        EXEC('ALTER TABLE dbo.WRefreshToken ADD Canal varchar(10) NULL;');
+    END TRY
+    BEGIN CATCH
+        IF COL_LENGTH('dbo.WRefreshToken','Canal') IS NULL THROW;
+    END CATCH
 END";
         await using var cmd = new SqlCommand(sql, conn) { CommandTimeout = 60 };
         await cmd.ExecuteNonQueryAsync(ct);

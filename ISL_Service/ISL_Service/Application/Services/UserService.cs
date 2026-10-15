@@ -30,9 +30,39 @@ public class UserService : IUserService
         _refresh = refresh;
     }
 
-    public async Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken ct)
+    /*
+      LOS DOS NOMBRES DE USUARIO QUE EL LOGIN NO ACEPTA NUNCA.
+
+      El APK publicado lleva dentro, en claro, el par con el que contesta a los
+      revisores de tienda sin tocar la red: `GOOGLEPLAY` / `REVISIONMAC2026`
+      (y su equivalente de App Store). Es una cuenta de demostracion que vive
+      ENTERA en el telefono y nunca llama a esta API, asi que publicar su
+      contrasena no abria nada: comprobado, cero filas con ese nombre en las dos
+      bases de produccion.
+
+      EL RIESGO NO ES HOY, ES EL DIA QUE ALGUIEN CREE EL USUARIO. Una prueba, un
+      script copiado, un alta a mano para "ver como lo ve el revisor", y de
+      golpe existe un login real con una contrasena que esta publicada en una
+      tienda de aplicaciones. Nadie se acordaria de que esa contrasena es
+      publica.
+
+      Asi que el nombre se rechaza AQUI, en el servicio y no en el controlador,
+      para que lo cubra cualquier camino de login que exista o llegue a existir.
+      Es gratis —no hay un usuario legitimo que se llame asi— y convierte el par
+      del APK en algo que no puede volverse valido ni por accidente.
+    */
+    private static readonly HashSet<string> NombresDeDemoDeTienda =
+        new(StringComparer.OrdinalIgnoreCase) { "GOOGLEPLAY", "APPSTORE" };
+
+    public async Task<LoginResponse> LoginAsync(LoginRequest request, Canal canal, CancellationToken ct)
     {
         var usuario = request.Usuario.Trim();
+
+        // Se rechaza ANTES de mirar la contrasena: el mensaje es el mismo que
+        // el de unas credenciales malas a proposito, para no confirmar desde
+        // fuera que el nombre tiene un trato especial.
+        if (NombresDeDemoDeTienda.Contains(usuario))
+            throw new AuthenticationException("Credenciales invalidas.");
         var companyKey = await _cache.GetOrCreateAsync("companyKey", async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
@@ -91,11 +121,10 @@ public class UserService : IUserService
           "Sin acceso a la app" en vez de un error de red. Lo que se cierra es
           TODO lo demas, y se cierra en AccesoMovilMiddleware.
         */
-        // Ya viene normalizado por SesionController (que es quien ve el
-        // User-Agent). Se vuelve a pasar por Normalizar y no se confia en el
-        // texto tal cual por si algun dia entra un login por otro camino: lo
-        // que se firma tiene que ser siempre una de las dos constantes.
-        var canal = CanalDeAcceso.Normalizar(request.Canal);
+        // EL CANAL LLEGA YA RESUELTO, COMO TIPO. No se deriva aqui a
+        // proposito: ver IUserService.LoginAsync, donde esta escrito que
+        // volver a derivarlo de `request.Canal` a secas solo podia contestar
+        // WEB y apagaba en silencio las claves del telefono.
         var token = _jwt.GenerateToken(user, companyKey, canal);
 
         // Solo la app pide refresh; el web no lo manda -> se comporta como hoy.

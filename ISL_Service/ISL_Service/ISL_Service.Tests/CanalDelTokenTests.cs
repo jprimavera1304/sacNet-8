@@ -295,7 +295,8 @@ public class CanalDelTokenTests
         string? declarado, bool incluirRefresh, string agente, string? clienteApp = null)
     {
         var espia = new LoginEspia();
-        var controller = new SesionController(espia)
+        var controller = new SesionController(
+            espia, Microsoft.Extensions.Logging.Abstractions.NullLogger<SesionController>.Instance)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -311,6 +312,11 @@ public class CanalDelTokenTests
             Canal = declarado
         }, default);
 
+        // El texto que se deja en el request y el canal TIPADO que recibe el
+        // servicio tienen que ser el mismo: es justo lo que se cerro al hacer
+        // del canal un parametro (ver IUserService.LoginAsync).
+        Assert.Equal(espia.UltimoCanal, CanalDeAcceso.AClaim(espia.CanalTipado!.Value));
+
         return espia.UltimoCanal;
     }
 
@@ -318,9 +324,14 @@ public class CanalDelTokenTests
     {
         public string? UltimoCanal { get; private set; }
 
-        public Task<LoginResponse> LoginAsync(ISL_Service.Application.DTOs.Requests.LoginRequest request, CancellationToken ct)
+        /// <summary>El canal TIPADO que recibio el servicio.</summary>
+        public Canal? CanalTipado { get; private set; }
+
+        public Task<LoginResponse> LoginAsync(
+            ISL_Service.Application.DTOs.Requests.LoginRequest request, Canal canal, CancellationToken ct)
         {
             UltimoCanal = request.Canal;
+            CanalTipado = canal;
             return Task.FromResult(new LoginResponse());
         }
 
@@ -449,6 +460,131 @@ public class CanalDelTokenTests
 
         Assert.IsType<OkObjectResult>(
             await controller.Guardar(PedidoGuardado, new PedidoGuardarRequest { IDDomicilio = 1 }, default));
+    }
+
+    // ------------------------------------------------------------------
+    // app_movil.ventas.pedidos.modificar: la clave que la app ensena y el
+    // servidor no cobraba
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// EL AGUJERO QUE CIERRA: la app gatea su boton "Modificar" de Consulta de
+    /// ventas con `app_movil.ventas.pedidos.modificar`, y esa clave no
+    /// gobernaba ninguna de las rutas que de verdad modifican un pedido. Darla
+    /// sola dibujaba el boton y el PUT contestaba 403.
+    /// </summary>
+    [Fact]
+    public async Task Movil_Con_La_Clave_De_Modificar_Puede_Guardar_Un_Pedido_Ya_Guardado()
+    {
+        var controller = Captura(canal: "movil",
+            permisos: new[] { "app_movil.acceso", "app_movil.pedidos", "app_movil.ventas.pedidos.modificar" });
+
+        Assert.IsType<OkObjectResult>(
+            await controller.Guardar(PedidoGuardado, new PedidoGuardarRequest { IDDomicilio = 1 }, default));
+    }
+
+    /// <summary>
+    /// Y tambien el alta y la baja de renglon, que son la otra forma de
+    /// modificar el mismo pedido.
+    /// </summary>
+    [Fact]
+    public async Task Movil_Con_La_Clave_De_Modificar_Tambien_Puede_Tocar_El_Detalle()
+    {
+        var controller = Captura(canal: "movil",
+            permisos: new[] { "app_movil.acceso", "app_movil.pedidos", "app_movil.ventas.pedidos.modificar" });
+
+        Assert.IsType<OkObjectResult>(await controller.AgregarDetalle(new PedidoAgregarDetalleRequest
+        {
+            IDPedido = PedidoGuardado, IDCliente = 1, IDDomicilio = 1, IDProducto = 1, IDAlmacen = 1, Cantidad = 1
+        }, default));
+
+        Assert.IsType<OkObjectResult>(await controller.EliminarDetalle(new PedidoEliminarDetalleRequest
+        {
+            IDPedido = PedidoGuardado, IDPedidoDetalle = 7
+        }, default));
+    }
+
+    /// <summary>
+    /// LO QUE NO SE PUEDE ROMPER AL SUMARLA: quien edita hoy sigue editando.
+    /// La clave nueva se SUMA con un OR, y un OR no cierra nada.
+    /// </summary>
+    [Theory]
+    [InlineData("app_movil.pedidos.editar")]   // la que ya esta repartida
+    [InlineData("ventas.pedidos.crear")]       // la de oficina / Mac31
+    public async Task Las_Claves_Que_Ya_Editaban_Siguen_Editando(string clave)
+    {
+        var controller = Captura(canal: "movil",
+            permisos: new[] { "app_movil.acceso", "app_movil.pedidos", clave });
+
+        Assert.IsType<OkObjectResult>(
+            await controller.Guardar(PedidoGuardado, new PedidoGuardarRequest { IDDomicilio = 1 }, default));
+    }
+
+    /// <summary>
+    /// LA MITAD QUE NO SE PUEDE OLVIDAR: la policy del endpoint. El cobro de
+    /// la clave de editar y la politica del atributo son DOS sitios que
+    /// deciden, y con uno solo la clave seguiria sin alcanzar.
+    ///
+    /// Se comprueba por reflexion porque una llamada directa al metodo del
+    /// controlador NO pasa por el atributo: lo aplica el pipeline.
+    /// </summary>
+    [Theory]
+    // Rutas que ABREN Y MODIFICAN un pedido que ya existe: aceptan la clave.
+    [InlineData(nameof(VentasPedidoCapturaController.Obtener), true)]
+    [InlineData(nameof(VentasPedidoCapturaController.Historial), true)]
+    [InlineData(nameof(VentasPedidoCapturaController.AgregarDetalle), true)]
+    [InlineData(nameof(VentasPedidoCapturaController.EliminarDetalle), true)]
+    [InlineData(nameof(VentasPedidoCapturaController.Guardar), true)]
+    [InlineData(nameof(VentasPedidoCapturaController.BuscarCliente), true)]
+    [InlineData(nameof(VentasPedidoCapturaController.BuscarProducto), true)]
+    [InlineData(nameof(VentasPedidoCapturaController.BuscarProductoPagina), true)]
+    // Rutas de CREAR: no la aceptan. Modificar no es crear, y quien solo tenga
+    // la clave de modificar no tiene por que poder estrenar pedidos ni tirar
+    // borradores: eso seria alcance que nadie le concedio.
+    [InlineData(nameof(VentasPedidoCapturaController.Bootstrap), false)]
+    [InlineData(nameof(VentasPedidoCapturaController.EliminarBorrador), false)]
+    [InlineData(nameof(VentasPedidoCapturaController.MisPedidos), false)]
+    public void La_Policy_De_Cada_Ruta_De_Captura(string metodo, bool aceptaModificar)
+    {
+        var atributo = typeof(VentasPedidoCapturaController)
+            .GetMethod(metodo)!
+            .GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), false)
+            .Cast<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>()
+            .Single();
+
+        var policy = atributo.Policy!;
+
+        // Lo que funciona hoy no cambia en ninguna de las dos.
+        Assert.Contains("ventas.pedidos.crear", policy);
+        Assert.Contains("app_movil.pedidos", policy);
+
+        Assert.Equal(aceptaModificar, policy.Contains("app_movil.ventas.pedidos.modificar"));
+    }
+
+    /// <summary>
+    /// Y la politica con ese nombre tiene que EXISTIR con las tres claves: un
+    /// nombre mal escrito no es un 403, es un reventon en caliente.
+    /// </summary>
+    [Fact]
+    public async Task La_Politica_De_Modificar_Existe_Con_Las_Tres_Claves()
+    {
+        var policy = typeof(VentasPedidoCapturaController)
+            .GetMethod(nameof(VentasPedidoCapturaController.Guardar))!
+            .GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), false)
+            .Cast<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>()
+            .Single().Policy!;
+
+        var provider = new PermissionPolicyProvider(
+            new Microsoft.Extensions.Options.OptionsWrapper<Microsoft.AspNetCore.Authorization.AuthorizationOptions>(
+                new Microsoft.AspNetCore.Authorization.AuthorizationOptions()));
+
+        var armada = await provider.GetPolicyAsync(policy);
+        Assert.NotNull(armada);
+
+        var requisito = Assert.Single(armada!.Requirements.OfType<PermissionRequirement>());
+        Assert.Contains("ventas.pedidos.crear", requisito.Permissions);
+        Assert.Contains("app_movil.pedidos", requisito.Permissions);
+        Assert.Contains("app_movil.ventas.pedidos.modificar", requisito.Permissions);
     }
 
     /// <summary>
