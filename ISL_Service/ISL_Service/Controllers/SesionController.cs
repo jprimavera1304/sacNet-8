@@ -24,13 +24,21 @@ public class SesionController : ControllerBase
     public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request, CancellationToken ct)
     {
         /*
-          EL CANAL SE RESUELVE AQUI PORQUE AQUI ESTA EL USER-AGENT.
+          EL CANAL SE RESUELVE AQUI PORQUE AQUI ESTAN LAS CABECERAS.
 
-          El canal del token (ver Application/Security/CanalDeAcceso.cs) sale de
-          lo que el cliente declare en `canal`; cuando no declara nada —la app
-          que ya esta instalada en los telefonos no lo manda— se cae a una
-          heuristica sobre el User-Agent, y ese dato solo se ve desde el
-          controlador.
+          El canal del token (ver Application/Security/CanalDeAcceso.cs) se
+          resuelve con tres senales, en este orden:
+
+            1. `canal` en el cuerpo del login — lo que el cliente declara.
+            2. `X-Cliente-App` — el identificador propio de la app
+               ("mac-movil/<version>"). Es el mecanismo bueno: un contrato
+               explicito, con la lista de valores fijada en el servidor.
+            3. El User-Agent — RESPALDO, y solo eso: existe porque los APK ya
+               instalados no mandan ninguna de las dos primeras y pasarlos a
+               canal web les quitaria todas sus claves `app_movil.*`.
+
+          Las tres son datos que el cliente escribe, y las tres son seguras por
+          la misma razon: declarar un canal nunca da permisos, solo los quita.
 
           Se deja YA NORMALIZADO en el request ("movil" o "web") para que el
           servicio no tenga que conocer la peticion HTTP y para que el valor que
@@ -46,6 +54,7 @@ public class SesionController : ControllerBase
         {
             var canal = CanalDeAcceso.Normalizar(
                 request.Canal,
+                clienteApp: Request.Headers[CanalDeAcceso.CabeceraClienteApp].ToString(),
                 agenteDeUsuario: Request.Headers.UserAgent.ToString());
             request.Canal = CanalDeAcceso.AClaim(canal);
         }

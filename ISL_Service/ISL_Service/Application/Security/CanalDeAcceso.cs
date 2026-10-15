@@ -34,6 +34,14 @@ namespace ISL_Service.Application.Security;
 /// firma el resto de la sesion; el refresh lo arrastra desde
 /// `dbo.WRefreshToken.Canal`, no desde lo que diga el cliente al renovar.
 ///
+/// OJO CON LO ANTERIOR: lo que NO se hace es volver a preguntar el canal en
+/// cada peticion. La cabecera <see cref="CanalDeAcceso.CabeceraClienteApp"/> si existe, pero
+/// se lee UNA sola vez, en el login, para DECIDIR que canal se firma — y a
+/// partir de ahi ya no se vuelve a mirar. Ninguna autorizacion la consulta: si
+/// un atacante la manda en una peticion cualquiera, no pasa nada, porque el
+/// canal que gobierna es el del claim firmado. Por eso puede ser un dato que
+/// escribe el cliente sin que eso debilite nada.
+///
 /// LA REGLA QUE HACE QUE ESTO NO SE PUEDA ABUSAR
 /// ---------------------------------------------
 /// DECLARAR UN CANAL NUNCA DA PRIVILEGIOS, SOLO LOS QUITA. Es simetrico a
@@ -93,6 +101,62 @@ public static class CanalDeAcceso
     public const string PrefijoMovil = "app_movil.";
 
     /// <summary>
+    /// LA CABECERA CON LA QUE LA APP SE IDENTIFICA, Y POR QUE NO ES UN AGUJERO.
+    ///
+    /// La app manda <c>X-Cliente-App: mac-movil/&lt;version&gt;</c> en TODAS sus
+    /// peticiones (el login incluido). Es un identificador de cliente, no una
+    /// credencial: lo escribe el cliente y por tanto SOLO se usa para entrar al
+    /// canal que CUESTA (movil exige <see cref="LlaveMaestraMovil"/>). No
+    /// concede nada: no hay valor de esta cabecera que quite un candado.
+    ///
+    /// Es una senal MEJOR que el User-Agent porque es un contrato explicito
+    /// —el valor lo fija el servidor en <see cref="ClientesMoviles"/>, no una
+    /// cadena que cambia cuando el SDK de Dart cambia de version— y porque la
+    /// manda el cliente a proposito, no como efecto secundario de su runtime.
+    /// </summary>
+    public const string CabeceraClienteApp = "X-Cliente-App";
+
+    /// <summary>
+    /// Los identificadores de cliente que el servidor reconoce como la app del
+    /// telefono. Se compara solo el NOMBRE (lo que va antes de '/'), para que
+    /// la app pueda colgar su version detras —"mac-movil/1.4.2"— sin que haya
+    /// que tocar el servidor en cada release.
+    /// </summary>
+    private static readonly HashSet<string> ClientesMoviles =
+        new(StringComparer.OrdinalIgnoreCase) { "mac-movil", "mac-mac-mobile" };
+
+    /// <summary>
+    /// Los identificadores que el servidor reconoce como navegador/oficina.
+    /// Existen por simetria: declararse web QUITA las claves `app_movil.*`.
+    /// </summary>
+    private static readonly HashSet<string> ClientesWeb =
+        new(StringComparer.OrdinalIgnoreCase) { "mac-web", "qr-web" };
+
+    /// <summary>
+    /// El canal que declara un identificador de cliente, o null si no se
+    /// reconoce (y entonces hay que seguir con el respaldo del User-Agent).
+    /// </summary>
+    public static Canal? DeClienteApp(string? clienteApp)
+    {
+        var valor = (clienteApp ?? string.Empty).Trim();
+        if (valor.Length == 0) return null;
+
+        // Se corta en el primer separador: "mac-movil/1.4.2 (android 14)" -> "mac-movil".
+        var corte = valor.IndexOfAny(new[] { '/', ';', ' ', ',' });
+        var nombre = corte >= 0 ? valor[..corte] : valor;
+        if (nombre.Length == 0 || nombre.Length > 64) return null;
+
+        if (ClientesMoviles.Contains(nombre)) return Canal.Movil;
+        if (ClientesWeb.Contains(nombre)) return Canal.Web;
+
+        // Un identificador desconocido NO se interpreta. No se cae a web aqui
+        // a proposito: caer a web seria premiar al que manda basura (el canal
+        // web es el que esquiva la llave maestra). Se deja que decida el
+        // respaldo del User-Agent, que es el que puede mandarlo al canal caro.
+        return null;
+    }
+
+    /// <summary>
     /// Normaliza lo que el cliente declara AL INICIAR SESION. Solo se acepta
     /// "movil"; cualquier otra cosa (vacio, basura, "WEB", "mobile") es web.
     ///
@@ -100,11 +164,28 @@ public static class CanalDeAcceso
     /// claim que se firma es siempre una de las dos constantes de arriba, asi
     /// que no hay forma de colar un tercer canal que ninguna regla contemple.
     /// </summary>
-    public static Canal Normalizar(string? declarado, string? agenteDeUsuario = null)
+    public static Canal Normalizar(string? declarado, string? clienteApp = null, string? agenteDeUsuario = null)
     {
         var valor = (declarado ?? string.Empty).Trim().ToLowerInvariant();
         if (valor == ValorMovil) return Canal.Movil;
         if (valor == ValorWeb) return Canal.Web;
+
+        /*
+          SEGUNDA SENAL, Y LA BUENA: EL IDENTIFICADOR DE CLIENTE.
+
+          Si el cliente no declaro `canal` en el cuerpo pero SI se identifico
+          con `X-Cliente-App` (ver CabeceraClienteApp), eso manda sobre el
+          User-Agent. Es el mecanismo que sustituye a la heuristica: un
+          contrato explicito, con una lista de valores que fija el servidor.
+
+          Sigue siendo un dato que escribe el cliente, y por eso sigue
+          valiendo la regla de siempre: declararse movil CUESTA la llave
+          maestra y declararse web APAGA las claves `app_movil.*`. No hay
+          nada que ganar mintiendo en ninguna de las dos direcciones, asi que
+          no hace falta que la cabecera sea de confianza para que esto cierre.
+        */
+        var porCliente = DeClienteApp(clienteApp);
+        if (porCliente is not null) return porCliente.Value;
 
         /*
           COMPATIBILIDAD CON LA APP YA PUBLICADA, Y EL ERROR QUE SE EVITO AQUI.
@@ -133,9 +214,27 @@ public static class CanalDeAcceso
           nada que ganar mintiendo hacia ese lado, y es justo lo que esta
           heuristica necesita para poder ser una heuristica.
 
-          Sirve solo para la transicion: la app nueva declara `canal` y no
-          depende de esto. Si el User-Agent no se reconoce, WEB, que es el
-          canal sin las claves del telefono — el lado que quita.
+          POR QUE EL USER-AGENT SE QUEDA COMO RESPALDO (Y SOLO COMO RESPALDO).
+
+          Porque hay APK ya instalados en los telefonos de los repartidores
+          que no mandan `canal` NI `X-Cliente-App`: no saben que existen. Esos
+          APK se actualizan cuando el repartidor quiera, no cuando nosotros
+          desplegamos. Si se retira esta rama hoy, cada uno de esos telefonos
+          pasa a canal WEB y pierde TODAS sus claves `app_movil.*` (Filtrar),
+          es decir: deja de poder capturar pedidos. Por eso el respaldo no es
+          una comodidad, es la unica razon de que el despliegue no rompa a
+          nadie.
+
+          CUANDO SE PUEDE RETIRAR. Cuando no quede ninguna sesion llegando sin
+          `X-Cliente-App`. Se comprueba en el log de AccesoMovilMiddleware /
+          en el access log del servidor: si durante una semana completa no hay
+          una sola peticion de canal movil sin esa cabecera, se borra este
+          bloque y la rama de respaldo, y `Normalizar` se queda con las dos
+          primeras senales. Mientras esa medicion no se haya hecho, no se
+          toca.
+
+          Si el User-Agent tampoco se reconoce, WEB, que es el canal sin las
+          claves del telefono — el lado que quita.
         */
         var agente = (agenteDeUsuario ?? string.Empty).ToLowerInvariant();
         if (agente.Contains("dart") || agente.Contains("flutter"))

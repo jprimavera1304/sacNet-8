@@ -57,7 +57,92 @@ public class CanalDelTokenTests
     // Un navegador sin `canal` es web, como siempre.
     [InlineData(null, "Mozilla/5.0 (Windows NT 10.0) Chrome/130", Canal.Web)]
     public void El_Canal_Se_Normaliza_En_El_Servidor(string? declarado, string? agente, Canal esperado)
-        => Assert.Equal(esperado, CanalDeAcceso.Normalizar(declarado, agente));
+        => Assert.Equal(esperado, CanalDeAcceso.Normalizar(declarado, agenteDeUsuario: agente));
+
+    // ------------------------------------------------------------------
+    // X-Cliente-App: el identificador propio de la app
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// La senal buena. La app se identifica y el User-Agent deja de hacer
+    /// falta: con cabecera reconocida, el canal sale de ahi aunque el
+    /// User-Agent sea el de un navegador.
+    /// </summary>
+    [Theory]
+    [InlineData("mac-movil", Canal.Movil)]
+    [InlineData("MAC-MOVIL", Canal.Movil)]
+    [InlineData("mac-movil/1.4.2", Canal.Movil)]
+    [InlineData("mac-movil/1.4.2 (android 14)", Canal.Movil)]
+    [InlineData("mac-mac-mobile", Canal.Movil)]
+    [InlineData("mac-web", Canal.Web)]
+    [InlineData("qr-web/2.0", Canal.Web)]
+    public void El_Identificador_De_Cliente_Dice_El_Canal(string clienteApp, Canal esperado)
+        => Assert.Equal(esperado, CanalDeAcceso.DeClienteApp(clienteApp));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("curl/8.0")]
+    [InlineData("inventado")]
+    [InlineData("/1.0")]
+    public void Un_Identificador_Que_No_Se_Reconoce_No_Decide_Nada(string? clienteApp)
+        => Assert.Null(CanalDeAcceso.DeClienteApp(clienteApp));
+
+    /// <summary>
+    /// Un valor absurdamente largo no se interpreta: se trata como desconocido
+    /// y decide el respaldo.
+    /// </summary>
+    [Fact]
+    public void Un_Identificador_Enorme_No_Decide_Nada()
+        => Assert.Null(CanalDeAcceso.DeClienteApp(new string('x', 500)));
+
+    /// <summary>
+    /// EL ORDEN DE LAS TRES SENALES: cuerpo > cabecera > User-Agent.
+    /// </summary>
+    [Theory]
+    // La app nueva: se identifica, y gana sobre el User-Agent que sea.
+    [InlineData(null, "mac-movil/1.4.2", "Mozilla/5.0 Chrome/130", Canal.Movil)]
+    [InlineData(null, "mac-movil/1.4.2", null, Canal.Movil)]
+    // El APK viejo: no manda cabecera, lo salva el respaldo del User-Agent.
+    [InlineData(null, null, "Dart/3.5 (dart:io)", Canal.Movil)]
+    [InlineData(null, "", "Dart/3.5 (dart:io)", Canal.Movil)]
+    // El navegador: ni cabecera reconocida ni User-Agent de Dart -> web.
+    [InlineData(null, null, "Mozilla/5.0 Chrome/130", Canal.Web)]
+    [InlineData(null, "mac-web/2.0", "Mozilla/5.0 Chrome/130", Canal.Web)]
+    // Lo declarado en el cuerpo sigue mandando sobre todo lo demas.
+    [InlineData("web", "mac-movil/1.4.2", "Dart/3.5 (dart:io)", Canal.Web)]
+    [InlineData("movil", "mac-web", "Mozilla/5.0 Chrome/130", Canal.Movil)]
+    // Cabecera basura: NO cuenta como "soy web". Decide el respaldo, que es el
+    // lado que puede cobrar la llave maestra.
+    [InlineData(null, "soy-lo-que-quiero", "Dart/3.5 (dart:io)", Canal.Movil)]
+    public void Las_Tres_Senales_Se_Aplican_En_Orden(
+        string? declarado, string? clienteApp, string? agente, Canal esperado)
+        => Assert.Equal(esperado, CanalDeAcceso.Normalizar(declarado, clienteApp, agente));
+
+    /// <summary>
+    /// EL CASO DEL QUE MIENTE PARA ESQUIVAR `app_movil.acceso`: un cliente de
+    /// Flutter que se declara web (por cuerpo o por cabecera) se queda en canal
+    /// web... y en canal web las claves del telefono no cuentan. Sale perdiendo:
+    /// se libra de la llave maestra y a cambio pierde TODO lo que la llave
+    /// abria.
+    /// </summary>
+    [Theory]
+    [InlineData("web", null)]
+    [InlineData(null, "mac-web")]
+    public void Mentir_Diciendo_Soy_Web_Esquiva_La_Llave_Maestra_Pero_Pierde_Las_Claves(
+        string? declarado, string? clienteApp)
+    {
+        var canal = CanalDeAcceso.Normalizar(declarado, clienteApp, "Dart/3.5 (dart:io)");
+        Assert.Equal(Canal.Web, canal);
+
+        // Se libra del candado de la llave maestra...
+        Assert.False(CanalDeAcceso.ExigeLlaveMaestra(canal));
+
+        // ...y se queda sin ninguna clave del telefono, que es lo que queria usar.
+        Assert.Empty(CanalDeAcceso.Filtrar(
+            new[] { "app_movil.acceso", "app_movil.pedidos", "app_movil.ventas.facturar" }, canal));
+    }
 
     /// <summary>
     /// LA TRAMPA QUE CASI SE PISA, FIJADA PARA QUE NO VUELVA.
@@ -165,7 +250,49 @@ public class CanalDelTokenTests
         => Assert.Equal("web", await CanalQueEstampaElLogin(
             declarado: "superadmin", incluirRefresh: false, agente: "Mozilla/5.0"));
 
-    private static async Task<string?> CanalQueEstampaElLogin(string? declarado, bool incluirRefresh, string agente)
+    /// <summary>
+    /// EL APK YA INSTALADO, DE PUNTA A PUNTA. No manda `canal` ni
+    /// `X-Cliente-App`: tiene que seguir entrando como movil por el respaldo
+    /// del User-Agent. Si esto se rompe, el repartidor que no actualizo se
+    /// queda sin poder capturar.
+    /// </summary>
+    [Fact]
+    public async Task El_Login_Del_APK_Viejo_Sin_Cabecera_Sigue_Siendo_MOVIL()
+        => Assert.Equal("movil", await CanalQueEstampaElLogin(
+            declarado: null, incluirRefresh: true, agente: "Dart/3.5 (dart:io)", clienteApp: null));
+
+    /// <summary>La app nueva se identifica con la cabecera y no depende del User-Agent.</summary>
+    [Fact]
+    public async Task El_Login_De_La_App_Nueva_Con_Cabecera_Es_MOVIL_Aunque_El_UserAgent_Sea_De_Navegador()
+        => Assert.Equal("movil", await CanalQueEstampaElLogin(
+            declarado: null, incluirRefresh: true,
+            agente: "Mozilla/5.0 (Windows NT 10.0) Chrome/130", clienteApp: "mac-movil/1.4.2"));
+
+    /// <summary>El navegador sigue siendo web, con cabecera propia o sin ninguna.</summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("mac-web/2.0")]
+    public async Task El_Login_Del_Navegador_Sigue_Siendo_WEB(string? clienteApp)
+        => Assert.Equal("web", await CanalQueEstampaElLogin(
+            declarado: null, incluirRefresh: true,
+            agente: "Mozilla/5.0 (Windows NT 10.0; Win64) Chrome/130.0.0.0", clienteApp: clienteApp));
+
+    /// <summary>
+    /// El que miente para esquivar la llave maestra: cliente de Flutter que se
+    /// declara web. Se le firma canal WEB, que es el canal sin claves
+    /// `app_movil.*` (ver la prueba de Filtrar de arriba).
+    /// </summary>
+    [Theory]
+    [InlineData("web", null)]
+    [InlineData(null, "mac-web")]
+    public async Task Un_Cliente_Que_Miente_Diciendo_Soy_Web_Recibe_Un_Token_De_Canal_WEB(
+        string? declarado, string? clienteApp)
+        => Assert.Equal("web", await CanalQueEstampaElLogin(
+            declarado: declarado, incluirRefresh: true,
+            agente: "Dart/3.5 (dart:io)", clienteApp: clienteApp));
+
+    private static async Task<string?> CanalQueEstampaElLogin(
+        string? declarado, bool incluirRefresh, string agente, string? clienteApp = null)
     {
         var espia = new LoginEspia();
         var controller = new SesionController(espia)
@@ -173,6 +300,8 @@ public class CanalDelTokenTests
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
         controller.HttpContext.Request.Headers.UserAgent = agente;
+        if (clienteApp is not null)
+            controller.HttpContext.Request.Headers[CanalDeAcceso.CabeceraClienteApp] = clienteApp;
 
         await controller.Login(new ISL_Service.Application.DTOs.Requests.LoginRequest
         {
