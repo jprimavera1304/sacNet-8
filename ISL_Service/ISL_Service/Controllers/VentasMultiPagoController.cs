@@ -31,7 +31,19 @@ public class VentasMultiPagoController : PermisoControllerBase
       movimiento de una remision y cobrarla son dos cosas, y en Mac31 tambien
       son dos botones con su propio renglon en n_Procesos.
     */
-    private static readonly string[] PermisosMultiPago = { "ventas.pagos.multi" };
+
+    /*
+      LA PAREJA DEL TELEFONO SE SUMA, NO SUSTITUYE.
+
+      "app_movil.ventas.pagos.multi" es la clave propia del canal movil, igual
+      que en los demas controllers (AsistenciasController 24-25,
+      CascosCambioController 34-36, CortesAdminController 26-37): basta con
+      tener UNA de las dos. Asi el cajero de mostrador sigue cobrando con el
+      permiso de Mac31 y al repartidor se le puede dar SOLO el del telefono, sin
+      abrirle la pantalla del escritorio.
+    */
+    private static readonly string[] PermisosMultiPago =
+        { "ventas.pagos.multi", "app_movil.ventas.pagos.multi" };
 
     private readonly IVentasMultiPagoService _service;
 

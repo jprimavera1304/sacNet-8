@@ -72,24 +72,32 @@ public class VentasConsultaController : PermisoControllerBase
         { "ventas.pedidos.faltantes", "app_movil.ventas.consulta.ver" };
 
     /*
-      LOS DOS SIMULADORES, CADA UNO CON SU CLAVE Y SIN PAR DE MOVIL.
+      LOS DOS SIMULADORES, CADA UNO CON SU CLAVE Y YA CON SU PAR DE MOVIL.
 
       Son btnSimular y btnSimularSin de CONSULTA DE VENTAS, y el puente ya
-      traia sus claves de Mac31 (VentasLegacyPermissionMap). Aqui NO van en par
-      con una clave de la app, al contrario que las tres de impresion: la app no
-      llama a estos endpoints -son nuevos- asi que el par no protegeria nada y
-      en cambio le abriria la simulacion a cualquiera que pueda entrar a ventas
-      desde el movil.
+      traia sus claves de Mac31 (VentasLegacyPermissionMap).
+
+      AQUI DECIA QUE NO LLEVABAN PAR DE MOVIL, Y ERA CIERTO HASTA QUE LA APP
+      LLAMO. El motivo de entonces era que la app no pedia estos endpoints, asi
+      que el par no protegia nada y en cambio le habria abierto la simulacion a
+      cualquiera que pudiera entrar a ventas desde el telefono. Desde el
+      2026-10-14 la app SI los pide -`VentasSimulacionScreen`,
+      lib/modules/verticals/ventas_simulacion.dart- y sin el par un usuario con
+      solo claves `app_movil.*` tendria la pantalla y no podria usarla.
+
+      Las parejas son PROPIAS de simular ('...simular.con_remision' /
+      '...simular.sin_remision'), no la clave general del modulo: el canal movil
+      tiene sus permisos y esto no se concede de regalo con "ver ventas".
 
       Cual se exige lo decide el SIGNO de lo que se pide, que es la misma
       frontera que en Mac31: un pedido sin emitir es "sin remision", una venta
       emitida es "con remision". Ver PermisoDeLaSimulacion.
     */
     private static readonly string[] PermisoSimularSinRemision =
-        { "ventas.simular.sin_remision" };
+        { "ventas.simular.sin_remision", "app_movil.ventas.simular.sin_remision" };
 
     private static readonly string[] PermisoSimularConRemision =
-        { "ventas.simular.con_remision" };
+        { "ventas.simular.con_remision", "app_movil.ventas.simular.con_remision" };
 
     /// <summary>
     /// La clave que exige esa accion del reporte.

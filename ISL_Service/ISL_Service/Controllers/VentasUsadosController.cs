@@ -35,14 +35,31 @@ public class VentasUsadosController : PermisoControllerBase
       que Mac31 ya pide para ese boton: a quien lo tiene encendido en Mac31 le
       llega solo, sin capturarlo dos veces, y a quien no, el web deja de dejarle
       guardar — igual que legacy.
+
+      Y LAS DOS TIENEN SU PAREJA DEL TELEFONO
+      ---------------------------------------
+      La pantalla de usados del movil
+      (`Movil/mac-mac-mobile/lib/modules/verticals/ventas_usados.dart`,
+      permisoVer y permisoGuardar) respeta la misma separacion: con
+      "app_movil.ventas.usados" se abre y se consulta, y hace falta
+      "app_movil.ventas.usados.guardar" para escribir. Son claves propias porque
+      el telefono se presta y la computadora de la oficina no — se puede dejar
+      que alguien consulte cascos en la calle sin dejarle moverlos, y sin tocar
+      lo que ese mismo usuario puede hacer en Mac31.
+
+      En cada arreglo van la de legacy y la del movil JUNTAS: con cualquiera se
+      pasa, que es como lo hacen los demas controladores. Exigir las dos
+      dejaria fuera a quien ya tiene el permiso de Mac31.
     */
-    private static readonly string[] PermisosUsados = { "ventas.usados" };
+    private static readonly string[] PermisosUsados =
+        { "ventas.usados", "app_movil.ventas.usados" };
 
     /// <summary>
     /// El boton GUARDAR de Mac31 (btnGuardar de la forma VentasUsados), heredado
     /// por VentasUsadosBinding. Ver el comentario de arriba.
     /// </summary>
-    private static readonly string[] PermisosGuardarUsados = { Infrastructure.Security.PermissionService.UsadosGuardarPermission };
+    private static readonly string[] PermisosGuardarUsados =
+        { Infrastructure.Security.PermissionService.UsadosGuardarPermission, "app_movil.ventas.usados.guardar" };
 
     private readonly IVentasUsadosService _service;
 

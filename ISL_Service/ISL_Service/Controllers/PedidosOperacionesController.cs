@@ -57,10 +57,42 @@ public class PedidosOperacionesController : PermisoControllerBase
         "ventas.pedidos.autorizar", "ventas.pendientes.autorizar", "app_movil.ventas.autorizar"
     };
 
-    private static readonly string[] PermisoRechazar = { "ventas.pedidos.rechazar" };
+    /*
+      RECHAZAR ERA LA UNICA DE LAS NUEVE SIN PAREJA MOVIL, Y ESO SE NOTABA.
+
+      Hasta hoy esta era la clave del web a secas, asi que para que alguien
+      pudiera rechazar desde el telefono habia que darle tambien el rechazo en
+      Mac31 — y rechazar un pedido no se deshace. Medido el 2026-10-14 en las
+      dos bases: cero filas de `app_movil.ventas.pedidos.rechazar` en WPermiso
+      antes de sembrarla.
+
+      Las dos en OR, como el resto del canal movil (`ExigirPermisoAsync` es
+      "tiene ALGUNA"): quien hoy rechaza desde la computadora sigue rechazando
+      igual, y al repartidor se le puede dar solo la del telefono.
+    */
+    private static readonly string[] PermisoRechazar =
+        { "ventas.pedidos.rechazar", "app_movil.ventas.pedidos.rechazar" };
     private static readonly string[] PermisoCancelar =
         { "ventas.pedidos.cancelar", "app_movil.ventas.pedidos.cancelar" };
-    private static readonly string[] PermisoModificar = { "ventas.pedidos.modificar" };
+    /*
+      MODIFICAR LLEVA SU PAREJA DEL MOVIL, COMO EL RESTO DEL CANAL.
+
+      `ventas.pedidos.modificar` es la clave del web (y el btnModificarPedido de
+      Mac31). Se le suma `app_movil.ventas.pedidos.modificar` porque la app ya
+      abre la captura sobre un pedido que existe, y sin la pareja habria que dar
+      el permiso de la computadora para poder modificar en el telefono — el
+      mismo hueco que hoy tiene rechazar y que esta anotado en
+      `ventas_consulta.dart` (_permisosDe, _Accion.rechazar).
+
+      OJO CON EL ALCANCE, Y ESTO ES LO IMPORTANTE: este array protege la unica
+      ruta de ESTE controller que lo usa, `POST usados-credito`. Las rutas que
+      de verdad modifican los renglones de un pedido viven en
+      `VentasPedidoCapturaController` y estan protegidas por la policy
+      `perm:ventas.pedidos.crear|app_movil.pedidos` (lineas 106, 115, 206), no
+      por estas claves. Aqui no se cambia eso.
+    */
+    private static readonly string[] PermisoModificar =
+        { "ventas.pedidos.modificar", "app_movil.ventas.pedidos.modificar" };
 
     private readonly IPedidosOperacionesService _service;
 

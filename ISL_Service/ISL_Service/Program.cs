@@ -393,6 +393,12 @@ builder.Services.AddScoped<IVentasDescuentosService, VentasDescuentosService>();
 builder.Services.AddScoped<IVentasFacturacionRepository, VentasFacturacionRepository>();
 builder.Services.AddScoped<IVentasFacturacionService, VentasFacturacionService>();
 
+// ARMAR EL COMPROBANTE ANTES DE TIMBRARLO. Va aparte del servicio que timbra a
+// proposito: este solo LEE y cuenta, no habla con Facturapi y no escribe. En una
+// familia donde el error vale un CFDI real, que la pantalla de revision no
+// dependa de la clase que puede emitir vale mas que una clase menos.
+builder.Services.AddScoped<IVentasFacturacionPreparacionService, VentasFacturacionPreparacionService>();
+
 // El cliente de Facturapi. Va por HttpClient con nombre y NO por el SDK de
 // legacy (Facturapi.dll es de .NET Framework y no se puede referenciar desde
 // net8.0). El timeout es generoso porque timbrar un CFDI pasa por el PAC y por

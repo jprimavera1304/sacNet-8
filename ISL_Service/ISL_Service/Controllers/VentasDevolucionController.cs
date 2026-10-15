@@ -21,7 +21,24 @@ public class VentasDevolucionController : PermisoControllerBase
       no se inventa ninguno, porque un permiso nuevo es un boton que nadie ve
       hasta que alguien lo da de alta a mano en cada empresa.
     */
-    private static readonly string[] PermisosDevolucion = { "ventas.devolucion" };
+    /*
+      Y SU PAREJA DEL TELEFONO.
+
+      La pantalla de devolucion del movil
+      (`Movil/mac-mac-mobile/lib/modules/verticals/ventas_devolucion.dart`,
+      permisoVer) entra por los mismos dos endpoints. Lleva clave propia por la
+      razon de siempre: el telefono se presta y la computadora de la oficina no,
+      asi que se puede dar o quitar la devolucion en la calle sin tocar lo que
+      esa persona puede hacer en Mac31.
+
+      Van las DOS en el mismo arreglo y no en dos comprobaciones: con cualquiera
+      se pasa, igual que en el resto de los controladores
+      (VentasPagosController, VentasCancelacionController). Exigir las dos
+      dejaria fuera a quien ya tiene el permiso de legacy, que es casi todo el
+      mostrador.
+    */
+    private static readonly string[] PermisosDevolucion =
+        { "ventas.devolucion", "app_movil.ventas.devolucion" };
 
     private readonly IVentasDevolucionService _service;
 

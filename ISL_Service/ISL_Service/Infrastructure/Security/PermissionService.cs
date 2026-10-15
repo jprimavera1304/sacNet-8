@@ -1890,7 +1890,73 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
         new("app_movil.permisos_modulos.activar", "App móvil - Módulos: Encender y apagar", "app_movil"),
         new("app_movil.permisos_roles.ver", "App móvil - Roles: Ver", "app_movil"),
         new("app_movil.permisos_roles.editar", "App móvil - Roles: Repartir permisos", "app_movil"),
-        new("app_movil.permisos_usuarios.editar", "App móvil - Permisos de usuarios: Repartir", "app_movil")
+        new("app_movil.permisos_usuarios.editar", "App móvil - Permisos de usuarios: Repartir", "app_movil"),
+
+        /*
+          LO QUE LE FALTABA A VENTAS EN EL TELEFONO: LAS NUEVE ACCIONES QUE
+          HASTA HOY SOLO EXISTIAN EN LA COMPUTADORA.
+
+          QUE SE ESTA CERRANDO
+          --------------------
+          Facturar, Multi pago, Modificar pedido, Devolucion, Usados (abrir y
+          guardar), los dos simuladores y Rechazar pedido son botones de
+          CONSULTA DE VENTAS y de CONSULTA DE COBROS en Mac31, y sus claves del
+          web ya existian (`ventas.facturar`, `ventas.pagos.multi`,
+          `ventas.pedidos.modificar`, `ventas.devolucion`, `ventas.usados`,
+          `ventas.usados.guardar`, `ventas.simular.con_remision`,
+          `ventas.simular.sin_remision`, `ventas.pedidos.rechazar`). La app las
+          va a estrenar, y sin una clave propia por accion la unica forma de
+          dejar facturar desde el telefono era dejar facturar tambien en la
+          computadora: UN permiso para los dos canales. Es exactamente el
+          problema que ya se resolvio con Almacen de cascos, Ajustes y Transito
+          (ver el bloque de `app_movil.almacen_cascos.*` mas arriba).
+
+          MEDIDO, Y POR ESO ES REAL: el 2026-10-14, en las DOS bases (MacZ y
+          Produccion_svr), de estas nueve parejas existia UNA SOLA
+          -`app_movil.ventas.usados`- y las otras ocho tenian CERO filas en
+          WPermiso. Para `ventas.pedidos.rechazar` no habia ni idea de pareja:
+          `PedidosOperacionesController.PermisoRechazar` era la clave del web a
+          secas, asi que rechazar en el telefono obligaba a poder rechazar en
+          Mac31.
+
+          `app_movil.ventas.usados` NO SE REPITE AQUI. Ya esta declarada entre
+          las primeras del canal movil y declararla dos veces no rompe
+          -SincronizarCatalogoDePermisosAsync compara por clave- pero deja dos
+          renglones que hay que mantener de acuerdo. Lo que si es nuevo es
+          `app_movil.ventas.usados.guardar`: abrir la pantalla de usados y
+          guardar un casco son dos decisiones distintas en Mac31
+          (btnUsados / btnAgregarUsadoCredito) y tenian que seguir siendolo en
+          el telefono.
+
+          POR QUE EL PREFIJO `app_movil.` Y NO UN SUFIJO: el puente de Legacy
+          hace un RemoveAll POR PREFIJO sobre `ventas.` cada vez que calcula
+          permisos —se buscan los RemoveAll que miran `VentasModuleKey` y
+          `VentasWebPermissionSeeds`, en GetPermisosBootstrapAsync y en
+          BuildSnapshotAsync; no se citan por numero de linea porque este
+          archivo se mueve— quedandose solo con las semillas del web. Una clave
+          llamada `ventas.facturar.movil` caeria en
+          ese RemoveAll y se borraria sola en el siguiente calculo;
+          `app_movil.ventas.facturar` no empieza por "ventas." y sobrevive. Esa
+          es la razon tecnica de que el canal movil lleve prefijo y no sufijo, y
+          es tambien lo que garantiza que marcar la casilla del telefono NO
+          escriba en [Usuario Forma Procesos]: a Mac31 solo se le escribe por
+          las claves que estan en `ventasCatalog`, que son las del web con su
+          IDProceso, y ninguna de estas nueve lo tiene.
+
+          SEMBRAR NO ES CONCEDER. Esto solo crea la clave para poder repartirla
+          desde la pestaña Movil de Accesos y permisos. Y la siembra no basta
+          por si sola: el endpoint tiene que ACEPTAR la clave nueva en su
+          arreglo de permisos, o la casilla se marca y el servidor sigue
+          contestando 403. Cada accion lo hace en su controlador.
+        */
+        new("app_movil.ventas.facturar", "App móvil - Facturar la remisión", "app_movil"),
+        new("app_movil.ventas.pagos.multi", "App móvil - Multi pago", "app_movil"),
+        new("app_movil.ventas.pedidos.modificar", "App móvil - Pedidos: Modificar", "app_movil"),
+        new("app_movil.ventas.pedidos.rechazar", "App móvil - Pedidos: Rechazar", "app_movil"),
+        new("app_movil.ventas.devolucion", "App móvil - Devolución", "app_movil"),
+        new("app_movil.ventas.usados.guardar", "App móvil - Usados: Guardar", "app_movil"),
+        new("app_movil.ventas.simular.con_remision", "App móvil - Simular con remisión", "app_movil"),
+        new("app_movil.ventas.simular.sin_remision", "App móvil - Simular sin remisión", "app_movil")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)

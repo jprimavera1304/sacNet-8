@@ -37,25 +37,234 @@ public class VentasFacturacionController : PermisoControllerBase
     // aqui y en el web, asi que la clave del telefono entra por el mismo sitio.
     private static readonly string[] PermisoVer =
         { "facturacion.ver", "ventas.facturar", "app_movil.facturacion.ver" };
-    private static readonly string[] PermisoTimbrar = { "facturacion.timbrar", "ventas.facturar" };
+    /*
+      TIMBRAR ACEPTA TRES CLAVES, Y LA TERCERA ES LA DEL TELEFONO.
+
+      `facturacion.timbrar` es la clave nueva y `ventas.facturar` la de Mac31
+      (btnFacturar de CONSULTA DE VENTAS): las dos juntas para que quien hoy
+      factura siga facturando sin que nadie le de de alta nada.
+
+      `app_movil.ventas.facturar` se AÑADE y es la pareja movil de la segunda,
+      segun la convencion del repo (`PedidosOperacionesController`: cada endpoint
+      que sirve a los dos canales lleva la clave de cada canal). Van separadas a
+      proposito y no es burocracia: EL TELEFONO SE PRESTA Y LA COMPUTADORA DE LA
+      OFICINA NO, asi que se le puede dar a alguien facturar en el escritorio y
+      no en la calle, o al reves. Timbrar es irreversible ante el SAT, y eso es
+      exactamente la clase de accion que merece su propia llave por canal.
+
+      NO se inventa `app_movil.facturacion.timbrar`: la familia `facturacion.*`
+      viene de Mac31 y una clave inventada ahi se borra en el siguiente recalculo
+      del snapshot de permisos. La familia `app_movil.*` SI es nuestra, y
+      `app_movil.ventas.facturar` ya es la forma que usan las demas parejas
+      moviles de ventas.
+    */
+    private static readonly string[] PermisoTimbrar =
+        { "facturacion.timbrar", "ventas.facturar", "app_movil.ventas.facturar" };
+
+    /*
+      PREPARAR LLEVA EL MISMO PERMISO QUE TIMBRAR, Y NO UNO DE LECTURA.
+
+      Parece una lectura —no escribe nada— pero lo que devuelve es un comprobante
+      fiscal armado con el RFC, el domicilio y los importes del cliente, y no
+      sirve para nada mas que para timbrarlo. Quien no puede facturar no tiene
+      nada que hacer con eso. Es el mismo criterio que ya se aplico a
+      `catalogo-cascos`.
+    */
+    private static readonly string[] PermisoPreparar = PermisoTimbrar;
     private static readonly string[] PermisoCancelar = { "facturacion.cancelar" };
     // Mandar la factura por correo es su propia llave en los dos canales:
     // manda un correo a un cliente de verdad.
     private static readonly string[] PermisoEnviar =
         { "facturacion.enviar", "app_movil.facturacion.enviar" };
 
+    /*
+      QUIEN PUEDE PREPARAR SOBRE REMISIONES DE OTROS.
+
+      `preparar` lee las remisiones por el MISMO servicio que la consulta de
+      ventas, y ese servicio acota la lista al usuario del token cuando no se
+      tiene esta clave. Se reusa el array literal de `VentasConsultaController`
+      —incluida la del telefono— porque la alternativa es que la misma remision
+      se vea en la reja y no se pueda preparar, o al reves: dos opiniones sobre
+      el mismo alcance acaban discrepando.
+
+      No es un candado de facturacion: el de facturar ya lo puso
+      `PermisoPreparar`. Esto solo decide SI SE VE la remision de otro agente, y
+      sin la clave no es un 403 — es la lista acotada a las suyas, igual que en
+      la reja.
+    */
+    private static readonly string[] PermisoVerRemisionesDeOtros =
+    {
+        "ventas.consultar", "ventas.ver_modulo", "app_movil.ventas.consulta.ver_de_otros"
+    };
+
     private readonly IVentasFacturacionService _service;
     private readonly ICascosAFacturarRepository _cascos;
+    private readonly IVentasFacturacionPreparacionService _preparacion;
 
     public VentasFacturacionController(
         IVentasFacturacionService service,
         ICascosAFacturarRepository cascos,
+        IVentasFacturacionPreparacionService preparacion,
         ICurrentUserAccessor currentUser,
         IPermissionService permissionService)
         : base(currentUser, permissionService)
     {
         _service = service;
         _cascos = cascos;
+        _preparacion = preparacion;
+    }
+
+    /// <summary>
+    /// Arma y valida una FACTURA de una o varias remisiones, SIN timbrarla.
+    /// </summary>
+    /// <remarks>
+    /// POR QUE EXISTE: `POST /api/ventas/facturas` recibe el CFDI ya armado, asi
+    /// que hasta ahora el que decidia QUE dice el comprobante era el navegador
+    /// (`nucleo/facturarRemision.ts` + `FacturaDeRemisionPage.tsx`). Con un solo
+    /// cliente se aguantaba; con el movil son dos copias de una regla fiscal, y
+    /// dos copias son dos comprobantes distintos para la misma remision. Esto
+    /// mueve la regla al servidor: los clientes ensenan, retocan y confirman.
+    ///
+    /// NO ESCRIBE NADA Y NO TIMBRA. Se puede llamar las veces que haga falta: es
+    /// precisamente lo que permite que la pantalla valide mientras se teclea en
+    /// vez de descubrir el rechazo al pulsar el boton irreversible.
+    ///
+    /// LO QUE DEVUELVE: en `timbrado`, el cuerpo EXACTO para
+    /// `POST /api/ventas/facturas` —el cliente lo reenvia, no lo recompone—; en
+    /// `bloqueo`, lo que impide timbrar con el campo al que llevar el foco; y en
+    /// `avisos`, las divergencias medidas con Mac31 que conviene leer antes de
+    /// cambiar una cifra (ver `ReglasPreparacionFactura.DivergenciasConLegacy`).
+    /// </remarks>
+    /// <response code="200">El comprobante armado. `bloqueo != null` = todavia no se puede timbrar.</response>
+    /// <response code="400">No llegaron remisiones ni pedido, o no existe ninguna de esas remisiones.</response>
+    /*
+      DOS DIRECCIONES PARA LO MISMO, Y SE DICE POR QUE.
+
+      La ruta del controlador es `api/ventas/facturas`, asi que la que sigue la
+      convencion de sus hermanas (`/complemento-pago`, `/cancelar`,
+      `/consultar`, `/enviar`) es `api/ventas/facturas/preparar`. Pero el
+      encargo y los clientes hablan de `api/ventas/facturacion/preparar`, que es
+      como se llama el modulo.
+
+      Se publican LAS DOS, apuntando al mismo metodo, en vez de elegir una y
+      que la otra conteste 404 sin cuerpo. Un 404 de ruta se diagnostica fatal:
+      el sintoma que llega es "la pantalla no carga", que manda a buscar el
+      fallo en la sesion o en la red en vez de en un nombre de ruta. Y no es un
+      alias gratuito: `/facturas/...` es lo que ya usa este controlador y
+      `/facturacion/...` es lo que pide quien lo consume.
+    */
+    [HttpPost("preparar")]
+    [HttpPost("/api/ventas/facturacion/preparar")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> PrepararAsync(
+        [FromBody] FacturaPrepararRequest? request, CancellationToken ct)
+    {
+        var veto = await ExigirPermisoAsync(PermisoPreparar, ct);
+        if (veto is not null) return veto;
+        if (request is null) return BadRequest(new { ok = false, message = "Body requerido." });
+
+        var permisos = await LeerPermisosAsync(ct);
+        var deOtros = permisos.Tiene(PermisoVerRemisionesDeOtros);
+
+        try
+        {
+            var data = await _preparacion.PrepararFacturaAsync(request, IdUsuarioLegacy(), deOtros, ct);
+            // no-store: lo que devuelve lleva el RFC, el domicilio y los importes
+            // del cliente, y los montos cambian con cada factura que se emite.
+            Response.Headers["Cache-Control"] = "no-store";
+            return Ok(new { ok = true, message = "Factura preparada.", data });
+        }
+        catch (InvalidOperationException e)
+        {
+            // El mensaje se respeta TAL CUAL: trae el folio de la remision que
+            // no se pudo, y es lo unico util cuando alguien llama con unos ids
+            // que ya no valen.
+            return BadRequest(new { ok = false, message = e.Message });
+        }
+    }
+
+    /// <summary>
+    /// Arma y valida el ENCABEZADO FISCAL de una nota de credito ya capturada.
+    /// </summary>
+    /// <remarks>
+    /// LAS PARTIDAS NO SALEN DE AQUI. Mac31 las captura en un PEDIDO de verdad y
+    /// manda ese `IDPedido` al timbrado (VentasNotaCredito.cs:1782 y :2864); ese
+    /// pedido se IMPRIME en el comprobante ("APLICA A PEDIDOS 116379",
+    /// comprobado en un PDF real de MacZ). La captura vive en
+    /// `/api/ventas/facturas/nota-credito/*`, que reusa el mismo procedimiento de
+    /// la captura de pedidos y por tanto los descuentos, las existencias, los
+    /// cascos y el IVA ya calculados por la base.
+    ///
+    /// Asi que aqui se prepara lo que falta: el receptor, las claves del SAT, la
+    /// relacion con la factura acreditada, y las validaciones contra el SALDO —
+    /// que lo manda el procedimiento y no se recalcula, porque una resta propia
+    /// podria dejar pasar una nota mayor al saldo por un centavo de redondeo.
+    /// </remarks>
+    [HttpPost("preparar/nota-credito")]
+    [HttpPost("/api/ventas/facturacion/preparar/nota-credito")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> PrepararNotaCreditoAsync(
+        [FromBody] NotaCreditoPrepararRequest? request, CancellationToken ct)
+    {
+        var veto = await ExigirPermisoAsync(PermisoPreparar, ct);
+        if (veto is not null) return veto;
+        if (request is null) return BadRequest(new { ok = false, message = "Body requerido." });
+
+        try
+        {
+            var data = await _preparacion.PrepararNotaCreditoAsync(request, ct);
+            Response.Headers["Cache-Control"] = "no-store";
+            return Ok(new { ok = true, message = "Nota de credito preparada.", data });
+        }
+        catch (InvalidOperationException e)
+        {
+            return BadRequest(new { ok = false, message = e.Message });
+        }
+    }
+
+    /// <summary>Arma y valida un complemento de pago sobre una o varias facturas.</summary>
+    /// <remarks>
+    /// LA PARCIALIDAD, EL SALDO ANTERIOR Y EL SALDO INSOLUTO NO SE CALCULAN AQUI,
+    /// y son justo los tres datos que el SAT exige DENTRO del complemento. Los
+    /// calcula el procedimiento con lo que se paga y los abonos que la factura ya
+    /// tiene: el DTO de Mac31 tiene campos para ellos (`InstallmentsLst`,
+    /// `LastBalancesLst`, `UuidsLst`, `NumComplementosPago`) y la pantalla de
+    /// alla NO LLENA NINGUNO. Repetirlo seria tener dos reglas sobre un dato
+    /// fiscal. Va dicho tambien en los `avisos` de la respuesta, para que quien
+    /// los eche en falta no tenga que leer 1,310 lineas de Mac31 para saberlo.
+    ///
+    /// Lo que SI se hace: el saldo por factura
+    /// (`TotalPagarFactura - Abonos - NotasCredito`), el importe propuesto —el
+    /// saldo completo, que es el caso normal—, y las validaciones por renglon con
+    /// el folio DENTRO del mensaje: con cinco facturas marcadas, un mensaje sin
+    /// folio no dice cual hay que corregir.
+    /// </remarks>
+    [HttpPost("preparar/complemento")]
+    [HttpPost("/api/ventas/facturacion/preparar/complemento")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> PrepararComplementoAsync(
+        [FromBody] ComplementoPrepararRequest? request, CancellationToken ct)
+    {
+        var veto = await ExigirPermisoAsync(PermisoPreparar, ct);
+        if (veto is not null) return veto;
+        if (request is null) return BadRequest(new { ok = false, message = "Body requerido." });
+
+        try
+        {
+            var data = await _preparacion.PrepararComplementoAsync(request, ct);
+            Response.Headers["Cache-Control"] = "no-store";
+            return Ok(new { ok = true, message = "Complemento de pago preparado.", data });
+        }
+        catch (InvalidOperationException e)
+        {
+            return BadRequest(new { ok = false, message = e.Message });
+        }
     }
 
     /// <summary>
