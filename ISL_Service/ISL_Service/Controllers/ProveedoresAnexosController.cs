@@ -1,4 +1,4 @@
-using ISL_Service.Application.Interfaces;
+﻿using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,7 +14,29 @@ namespace ISL_Service.Controllers;
 /// significa exactamente esto: ver la ficha del proveedor. Inventar
 /// `proveedores.apoderados.ver` partiria en tres un permiso que nadie va a
 /// querer dar por partes — quien ve al proveedor ve sus domicilios.
+///
+/// Se le suma la pareja del canal movil (ver la nota del primer atributo).
 /// </summary>
+/// CENTROS DE SERVICIO: ESTE MODULO *NO* LOS SOPORTA. `soportaCentros = false`.
+/// -------------------------------------------------------------------------
+/// Queda declarado para que la capa de conexion conteste **409 con motivo** si
+/// llega `X-Centro != 0`, y NUNCA datos de la matriz.
+///
+/// No es un pendiente, es una decision, y son cuatro razones medidas en las
+/// bases locales:
+///   1. El catalogo es de la MATRIZ. `SELECT COUNT(*) FROM Proveedores` da 52 en
+///      Produccion_svr y 2 en MacZ; en MacZCS1, MacZCS2 y MacZCS7 da 2 en cada
+///      una, que es la misma semilla de MacZ. Listar "los proveedores del
+///      centro" seria ensenar un catalogo vacio, y eso se lee como una averia.
+///   2. Un alta en un centro SE PIERDE: nace en la base del centro, donde nadie
+///      captura compras, y la matriz no la ve.
+///   3. `IDColonia`, `IDCondicionesCredito` e `IDDescuento` son ids DE LA BASE
+///      donde vive el renglon: no cruzan. Y en Tauro hay filas de
+///      CentrosServicio que apuntan a bases de Zaragoza (MacZCS7..MacZCS10).
+///   4. El dinero es de otro modulo: `ProveedoresPagosController`, que tampoco
+///      esta declarado. Partir el catalogo por centro y los pagos no dejaria
+///      media operacion en dos bases.
+
 [ApiController]
 [Route("api/proveedores")]
 [Authorize]
@@ -39,7 +61,17 @@ public class ProveedoresAnexosController : ControllerBase
     /// compara `&lt;&gt; 0` y "los que NO lo son" no se puede pedir.
     /// </param>
     [HttpGet("apoderados")]
-    [Authorize(Policy = "perm:proveedores.ver")]
+    // EL PAR: la clave del web O la del movil. La politica `perm:a|b` se cobra
+    // como un O, asi que sumar la del canal del telefono no le quita el acceso
+    // a nadie: quien hoy entra con `proveedores.ver` sigue entrando igual. Lo
+    // que habilita es lo contrario: poder dar el catalogo en el TELEFONO sin
+    // darlo en la computadora, que es lo que ya hacen clientes y ventas.
+    //
+    // `app_movil.proveedores.ver` TODAVIA NO ESTA en el catalogo de
+    // `PermissionService`: la siembra el agente de permisos (el bloque esta en
+    // Movil/mac-mac-mobile/lib/modules/verticals/proveedores.permisos.md).
+    // Hasta entonces la politica se comporta exactamente como antes.
+    [Authorize(Policy = "perm:proveedores.ver|app_movil.proveedores.ver")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Apoderados(
         [FromQuery] int id = 0,
@@ -68,7 +100,17 @@ public class ProveedoresAnexosController : ControllerBase
     /// El filtro de texto busca por PREFIJO (LIKE 'texto%').
     /// </remarks>
     [HttpGet("domicilios")]
-    [Authorize(Policy = "perm:proveedores.ver")]
+    // EL PAR: la clave del web O la del movil. La politica `perm:a|b` se cobra
+    // como un O, asi que sumar la del canal del telefono no le quita el acceso
+    // a nadie: quien hoy entra con `proveedores.ver` sigue entrando igual. Lo
+    // que habilita es lo contrario: poder dar el catalogo en el TELEFONO sin
+    // darlo en la computadora, que es lo que ya hacen clientes y ventas.
+    //
+    // `app_movil.proveedores.ver` TODAVIA NO ESTA en el catalogo de
+    // `PermissionService`: la siembra el agente de permisos (el bloque esta en
+    // Movil/mac-mac-mobile/lib/modules/verticals/proveedores.permisos.md).
+    // Hasta entonces la politica se comporta exactamente como antes.
+    [Authorize(Policy = "perm:proveedores.ver|app_movil.proveedores.ver")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Domicilios(
         [FromQuery] int id = 0,
@@ -95,7 +137,17 @@ public class ProveedoresAnexosController : ControllerBase
     /// El filtro de texto busca por PREFIJO (LIKE 'texto%').
     /// </remarks>
     [HttpGet("documentos")]
-    [Authorize(Policy = "perm:proveedores.ver")]
+    // EL PAR: la clave del web O la del movil. La politica `perm:a|b` se cobra
+    // como un O, asi que sumar la del canal del telefono no le quita el acceso
+    // a nadie: quien hoy entra con `proveedores.ver` sigue entrando igual. Lo
+    // que habilita es lo contrario: poder dar el catalogo en el TELEFONO sin
+    // darlo en la computadora, que es lo que ya hacen clientes y ventas.
+    //
+    // `app_movil.proveedores.ver` TODAVIA NO ESTA en el catalogo de
+    // `PermissionService`: la siembra el agente de permisos (el bloque esta en
+    // Movil/mac-mac-mobile/lib/modules/verticals/proveedores.permisos.md).
+    // Hasta entonces la politica se comporta exactamente como antes.
+    [Authorize(Policy = "perm:proveedores.ver|app_movil.proveedores.ver")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Documentos(
         [FromQuery] int id = 0,

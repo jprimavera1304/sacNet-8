@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.Maestros;
+﻿using ISL_Service.Application.DTOs.Maestros;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -26,14 +26,55 @@ namespace ISL_Service.Controllers;
 ///    pero no se guardan: ningun procedimiento de escritura los recibe. No se
 ///    exponen, por lo mismo.
 /// </summary>
+/// CENTROS DE SERVICIO: ESTE MODULO *NO* LOS SOPORTA. `soportaCentros = false`.
+/// -------------------------------------------------------------------------
+/// Queda declarado para que la capa de conexion conteste **409 con motivo** si
+/// llega `X-Centro != 0`, y NUNCA datos de la matriz.
+///
+/// No es un pendiente, es una decision, y son cuatro razones medidas en las
+/// bases locales:
+///   1. El catalogo es de la MATRIZ. `SELECT COUNT(*) FROM Proveedores` da 52 en
+///      Produccion_svr y 2 en MacZ; en MacZCS1, MacZCS2 y MacZCS7 da 2 en cada
+///      una, que es la misma semilla de MacZ. Listar "los proveedores del
+///      centro" seria ensenar un catalogo vacio, y eso se lee como una averia.
+///   2. Un alta en un centro SE PIERDE: nace en la base del centro, donde nadie
+///      captura compras, y la matriz no la ve.
+///   3. `IDColonia`, `IDCondicionesCredito` e `IDDescuento` son ids DE LA BASE
+///      donde vive el renglon: no cruzan. Y en Tauro hay filas de
+///      CentrosServicio que apuntan a bases de Zaragoza (MacZCS7..MacZCS10).
+///   4. El dinero es de otro modulo: `ProveedoresPagosController`, que tampoco
+///      esta declarado. Partir el catalogo por centro y los pagos no dejaria
+///      media operacion en dos bases.
+
 [ApiController]
 [Route("api/proveedores")]
 [Authorize]
 public class ProveedoresAdminController : MaestrosControllerBase
 {
-    private static readonly string[] PermisosCrear = { "proveedores.crear" };
-    private static readonly string[] PermisosEditar = { "proveedores.editar" };
-    private static readonly string[] PermisosBaja = { "proveedores.estado.editar" };
+    /*
+      LAS CLAVES VAN EN PAREJA: LA DEL WEB Y LA DEL MOVIL.
+
+      `ExigirPermisoAsync` cobra el array como un O (basta UNA), asi que agregar
+      la clave de `app_movil.*` no le quita el acceso a nadie: quien hoy guarda
+      con `proveedores.editar` sigue guardando igual. Lo que habilita es lo
+      contrario: poder dar el alta en el TELEFONO sin darla en la computadora.
+
+      PermisosEditar MANDA SOBRE CUATRO COSAS, y asi estaba ya: el PUT del
+      proveedor y los POST/PUT de apoderados, domicilios y documentos. No se
+      parte en cuatro permisos nuevos porque nadie va a querer dar uno sin los
+      otros — quien corrige la ficha corrige sus anexos.
+
+      Las tres claves `app_movil.proveedores.*` TODAVIA NO ESTAN en el catalogo
+      de `PermissionService`: las deja sembradas el agente de permisos (el bloque
+      esta en Movil/mac-mac-mobile/lib/modules/verticals/proveedores.permisos.md).
+      Hasta entonces el array se comporta exactamente como antes.
+    */
+    private static readonly string[] PermisosCrear =
+        { "proveedores.crear", "app_movil.proveedores.crear" };
+    private static readonly string[] PermisosEditar =
+        { "proveedores.editar", "app_movil.proveedores.editar" };
+    private static readonly string[] PermisosBaja =
+        { "proveedores.estado.editar", "app_movil.proveedores.estado.editar" };
 
     public ProveedoresAdminController(
         IMaestrosService service,

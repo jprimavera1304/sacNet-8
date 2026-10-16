@@ -1,4 +1,4 @@
-using ISL_Service.Application.Interfaces;
+﻿using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -23,8 +23,29 @@ namespace ISL_Service.Controllers;
 /// son todos con sufijo ("{id:int}", "apoderados", ...), asi que la raiz estaba
 /// libre.
 ///
-/// REUSA `proveedores.ver`, que ya existe y significa exactamente esto.
+/// REUSA `proveedores.ver`, que ya existe y significa exactamente esto, y le
+/// suma la pareja del canal movil (ver la nota del atributo).
 /// </summary>
+/// CENTROS DE SERVICIO: ESTE MODULO *NO* LOS SOPORTA. `soportaCentros = false`.
+/// -------------------------------------------------------------------------
+/// Queda declarado para que la capa de conexion conteste **409 con motivo** si
+/// llega `X-Centro != 0`, y NUNCA datos de la matriz.
+///
+/// No es un pendiente, es una decision, y son cuatro razones medidas en las
+/// bases locales:
+///   1. El catalogo es de la MATRIZ. `SELECT COUNT(*) FROM Proveedores` da 52 en
+///      Produccion_svr y 2 en MacZ; en MacZCS1, MacZCS2 y MacZCS7 da 2 en cada
+///      una, que es la misma semilla de MacZ. Listar "los proveedores del
+///      centro" seria ensenar un catalogo vacio, y eso se lee como una averia.
+///   2. Un alta en un centro SE PIERDE: nace en la base del centro, donde nadie
+///      captura compras, y la matriz no la ve.
+///   3. `IDColonia`, `IDCondicionesCredito` e `IDDescuento` son ids DE LA BASE
+///      donde vive el renglon: no cruzan. Y en Tauro hay filas de
+///      CentrosServicio que apuntan a bases de Zaragoza (MacZCS7..MacZCS10).
+///   4. El dinero es de otro modulo: `ProveedoresPagosController`, que tampoco
+///      esta declarado. Partir el catalogo por centro y los pagos no dejaria
+///      media operacion en dos bases.
+
 [ApiController]
 [Route("api/proveedores")]
 [Authorize]
@@ -48,7 +69,17 @@ public class ProveedoresConsultaController : ControllerBase
     /// <param name="exacto">true = igualdad; false = LIKE.</param>
     /// <response code="200">Proveedores consultados</response>
     [HttpGet]
-    [Authorize(Policy = "perm:proveedores.ver")]
+    // EL PAR: la clave del web O la del movil. La politica `perm:a|b` se cobra
+    // como un O, asi que sumar la del canal del telefono no le quita el acceso
+    // a nadie: quien hoy entra con `proveedores.ver` sigue entrando igual. Lo
+    // que habilita es lo contrario: poder dar el catalogo en el TELEFONO sin
+    // darlo en la computadora, que es lo que ya hacen clientes y ventas.
+    //
+    // `app_movil.proveedores.ver` TODAVIA NO ESTA en el catalogo de
+    // `PermissionService`: la siembra el agente de permisos (el bloque esta en
+    // Movil/mac-mac-mobile/lib/modules/verticals/proveedores.permisos.md).
+    // Hasta entonces la politica se comporta exactamente como antes.
+    [Authorize(Policy = "perm:proveedores.ver|app_movil.proveedores.ver")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Consultar(
         [FromQuery] int idProveedor = 0,
