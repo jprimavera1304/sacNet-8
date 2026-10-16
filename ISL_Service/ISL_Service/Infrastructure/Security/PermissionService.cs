@@ -1957,6 +1957,28 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
         new("app_movil.proveedores.estado.editar", "App móvil - Proveedores: Habilitar e inhabilitar", "app_movil"),
 
         /*
+          GARANTIAS Y REASIGNAR AGENTE, tambien sembradas sin conceder.
+
+          Las de garantias van SEPARADAS de las de la bandeja de aceptar
+          (`app_movil.garantias.aceptar*`) a proposito: aceptar es una pantalla
+          distinta, y juntarlas abriria la familia entera con una sola clave.
+          Lo mismo con los registros, que son su propio sub-permiso.
+
+          `app_movil.reasignacion.ver` no lleva entrada de modulo: la del web
+          (`reasignacion.ver_modulo`) ya esta derivada de `cobros.reasignar` en
+          EntradasDeModulo, con cero afectados medidos en las dos empresas.
+          Y conviene recordar al repartirla que quien la tiene puede mover de
+          dueno la cartera de cualquier cliente.
+        */
+        new("app_movil.garantias.ver", "App móvil - Garantías: Ver", "app_movil"),
+        new("app_movil.garantias.editar", "App móvil - Garantías: Capturar y corregir", "app_movil"),
+        new("app_movil.garantias.registros.ver", "App móvil - Garantías: Ver registros previos", "app_movil"),
+        new("app_movil.garantias.registros.editar", "App móvil - Garantías: Capturar registro previo", "app_movil"),
+        new("app_movil.garantias.registros.cancelar", "App móvil - Garantías: Cancelar registro previo", "app_movil"),
+
+        new("app_movil.reasignacion.ver", "App móvil - Reasignar agente y cartera", "app_movil"),
+
+        /*
           LAS CUATRO QUE LA APP PIDE Y QUE NADIE SEMBRABA. LA PRIMERA ES LA
           LLAVE MAESTRA.
 
