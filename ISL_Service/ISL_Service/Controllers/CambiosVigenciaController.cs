@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.OperacionMac;
+﻿using ISL_Service.Application.DTOs.OperacionMac;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -15,10 +15,62 @@ namespace ISL_Service.Controllers;
 [Authorize]
 public class CambiosVigenciaController : PermisoControllerBase
 {
-    private static readonly string[] PermisosVer = { "cambiosvigencia.ver" };
-    private static readonly string[] PermisosCrear = { "cambiosvigencia.crear" };
-    private static readonly string[] PermisosEditar = { "cambiosvigencia.editar" };
-    private static readonly string[] PermisosCancelar = { "cambiosvigencia.cancelar" };
+    /*
+      CADA PERMISO, CON SU PAREJA DEL MOVIL.
+
+      `ExigirPermisoAsync` acepta VARIAS claves y basta con tener una (ver
+      PermisoControllerBase): un endpoint sirve a los dos canales y cada canal
+      tiene su propia clave. Son permisos separados a proposito — el telefono se
+      presta y la computadora de la oficina no— y `EntradasDeModulo` no le pide
+      puerta de modulo a ninguna clave `app_movil.*`, asi que anadirlas no gatea
+      nada nuevo.
+
+      ES ADITIVO: quien hoy entra con `cambiosvigencia.*` sigue entrando igual.
+    */
+    private static readonly string[] PermisosVer =
+    {
+        "cambiosvigencia.ver",
+        "app_movil.cambiosvigencia.ver",
+    };
+
+    private static readonly string[] PermisosCrear =
+    {
+        "cambiosvigencia.crear",
+        "app_movil.cambiosvigencia.crear",
+    };
+
+    private static readonly string[] PermisosEditar =
+    {
+        "cambiosvigencia.editar",
+        "app_movil.cambiosvigencia.editar",
+    };
+
+    private static readonly string[] PermisosCancelar =
+    {
+        "cambiosvigencia.cancelar",
+        "app_movil.cambiosvigencia.cancelar",
+    };
+
+    /*
+      REGRESAR AL INVENTARIO TIENE SU PROPIA CLAVE, Y HACIA FALTA.
+
+      Hasta ahora regresar pedia el permiso de EDITAR, que mide otra cosa:
+      editar cambia un texto, regresar MUEVE EXISTENCIAS —`Existencia + 1` por
+      renglon en el almacen principal, leido de `sp_n_RegresarCambioVigencia`—
+      y cierra el documento como ENTREGADA. No tiene por que poderlo quien solo
+      corrige una vigencia.
+
+      Las claves de editar se QUEDAN en la lista para que nadie pierda el acceso
+      el dia del despliegue: en cuanto `cambiosvigencia.regresar` se reparta, se
+      puede quitar la pareja de editar de aqui.
+    */
+    private static readonly string[] PermisosRegresar =
+    {
+        "cambiosvigencia.regresar",
+        "app_movil.cambiosvigencia.regresar",
+        "cambiosvigencia.editar",
+        "app_movil.cambiosvigencia.editar",
+    };
 
     private readonly IOperacionMacService _service;
 
@@ -125,6 +177,30 @@ public class CambiosVigenciaController : PermisoControllerBase
     /// <summary>
     /// Modifica UN renglon del cambio de vigencia.
     ///
+    /// AVISO MEDIDO: HOY ESTA RUTA NO PUEDE FUNCIONAR.
+    /// `sp_n_ActualizarCambioVigencia` apunta a columnas que `dbo.CambiosVigencia`
+    /// ya no tiene. Comprobado contra MacZ el 2026-10-15 pidiendole a SQL Server
+    /// las dependencias del procedimiento (`sys.dm_sql_referenced_entities`), que
+    /// contesto cuatro veces el error 207: `IDRepartidor`, `Ticket`, `Vigencia` y
+    /// `Garantia`. Esas cuatro viven en `CambiosVigenciaDetalle`, no en la
+    /// cabecera: el procedimiento se escribio contra un esquema anterior y nadie
+    /// lo volvio a correr.
+    ///
+    /// Y hay dos trampas mas para quien vaya a arreglarlo. Primera: toma el
+    /// almacen de `Constantes.IDAlmacenCambiosVigencia`, que NO es el
+    /// `Almacenes.EsPrincipal = 1` que usan insertar, cancelar y regresar.
+    /// Segunda: para los estatus 2, 3 y 4 hace `Existencia - 1`, el sentido
+    /// CONTRARIO al de cancelar y regresar, que suman. Arreglar solo las columnas
+    /// descuadra el almacen por partida doble.
+    ///
+    /// Lo correcto es un `sp_w_ActualizarCambioVigencia` —uno por empresa— que
+    /// escriba en el detalle y NO toque inventario: los cambios de estatus ya
+    /// tienen sus rutas (`/cancelar`, `/regresar`), que son las que mueven
+    /// existencias bien. El `sp_n_` no se edita.
+    ///
+    /// La ruta se deja publicada y sin cambiar: quitarla rompe a quien ya la
+    /// llame, y el cliente del movil la tiene apagada con su motivo a la vista.
+    ///
     /// Es un producto por llamada porque asi lo recibe el procedimiento
     /// (@IDProducto en singular). En legacy el cliente llamaba N veces sin
     /// transaccion para cambiar varios renglones, y si fallaba a la mitad quedaban
@@ -171,14 +247,31 @@ public class CambiosVigenciaController : PermisoControllerBase
     }
 
     /// <summary>
-    /// Devuelve el cambio de vigencia al estado anterior. Mismo caso que cancelar:
-    /// el procedimiento no guarda motivo.
+    /// REGRESA EL PRODUCTO AL INVENTARIO y cierra el documento como ENTREGADA.
+    ///
+    /// NO ES UNA CANCELACION SUAVE, y la diferencia esta medida sobre los dos
+    /// procedimientos (leidos de MacZ el 2026-10-15):
+    ///
+    /// * Lo que hacen LOS DOS: recorren `CambiosVigenciaDetalle` con un cursor,
+    ///   hacen `Existencia + 1` en el `AlmacenProducto` del almacen
+    ///   `EsPrincipal = 1` —una pieza por renglon— y escriben
+    ///   `AlmacenProductoLog`.
+    /// * REGRESAR deja estatus 3 (ENTREGADA), sella el bloque de entrega en la
+    ///   cabecera Y en cada renglon, y NO TOCA Ventas.
+    /// * CANCELAR deja estatus 2 y ademas hace
+    ///   `UPDATE Ventas SET [Fecha Cancelacion] ... WHERE IDVenta = @IDVenta`:
+    ///   cancela el COBRO ligado que la consulta publica como `FolioCobroFtm`.
+    ///
+    /// O sea: regresar es el final bueno y cancelar mueve dinero. Por eso son
+    /// dos rutas, dos permisos y dos avisos distintos en el cliente.
+    ///
+    /// Mismo caso que cancelar en una cosa: el procedimiento no guarda motivo.
     /// </summary>
     [HttpPost("{id:int}/regresar")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Regresar([FromRoute] int id, CancellationToken ct)
     {
-        var sinPermiso = await ExigirPermisoAsync(PermisosEditar, ct);
+        var sinPermiso = await ExigirPermisoAsync(PermisosRegresar, ct);
         if (sinPermiso != null) return sinPermiso;
 
         return Responder(
