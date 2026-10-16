@@ -40,8 +40,24 @@ public class VentasCobranzaOperacionesController : PermisoControllerBase
         { "cobranza.ver", "cobranzas.ver", "cobranzas.consultar" };
     private static readonly string[] PermisoCobranzaEditar = { "cobranza.cobranzas.editar" };
     private static readonly string[] PermisoCobranzaCancelar = { "cobranza.cobranzas.cancelar" };
-    private static readonly string[] PermisoConcentradoEditar = { "cobranza.concentrados.editar" };
-    private static readonly string[] PermisoConcentradoCancelar = { "cobranza.concentrados.cancelar" };
+    /*
+      LOS DOS DE CONCENTRADO LLEVAN TAMBIEN LA CLAVE DEL CANAL MOVIL.
+
+      Misma razon que en VentasCobranzaConsultaController: un endpoint sirve a
+      los dos canales y cada canal tiene su propia clave, porque el telefono se
+      presta y la computadora de la oficina no. `CanalDeAcceso.Filtrar` tira las
+      `app_movil.*` cuando el token es de canal web, asi que esto no abre nada
+      en el navegador.
+
+      SIGUEN SIENDO DOS PERMISOS Y NO UNO: armar un concentrado y DESHACER uno
+      que ya salio a reparto no son la misma decision. Las claves todavia no
+      existen en ninguna base (ver `concentrados.permisos.md` en el movil), asi
+      que hoy no se las tiene nadie.
+    */
+    private static readonly string[] PermisoConcentradoEditar =
+        { "cobranza.concentrados.editar", "app_movil.concentrados.editar" };
+    private static readonly string[] PermisoConcentradoCancelar =
+        { "cobranza.concentrados.cancelar", "app_movil.concentrados.cancelar" };
     private static readonly string[] PermisoCobroEditar = { "cobranza.cobros.editar" };
     private static readonly string[] PermisoCobroCerrar = { "cobranza.cobros.cerrar" };
     private static readonly string[] PermisoCobroAbrir = { "cobranza.cobros.abrir" };

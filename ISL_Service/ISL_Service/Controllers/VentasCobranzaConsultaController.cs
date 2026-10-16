@@ -84,8 +84,31 @@ public class VentasCobranzaConsultaController : PermisoControllerBase
     private static readonly string[] PermisosVerCobranzas =
         { "cobranza.ver", "cobranzas.ver", "cobranzas.consultar" };
 
+    /*
+      Y EL CANAL MOVIL TRAE SU PROPIA CLAVE: `app_movil.concentrados.ver`.
+
+      No es un duplicado por gusto: el telefono se presta y la computadora de la
+      oficina no, asi que la consulta de concentrados se puede dar en una y no
+      en la otra. Es la misma regla que ya siguen `app_movil.ventas.ver`,
+      `app_movil.facturacion.ver` y las otras 17 claves del canal, y la propia
+      PermisoControllerBase lo dice: "un endpoint sirve a los dos canales y cada
+      canal tiene su propia clave".
+
+      NO CONCEDE NADA A NADIE DEL WEB: `CanalDeAcceso.Filtrar` tira las claves
+      `app_movil.*` cuando el token es de canal web, asi que presentarla desde el
+      navegador no sirve de nada. Y `app_movil.*` no se gatea con ninguna entrada
+      de modulo (`EntradasDeModulo`: el telefono no tiene tarjetas de inicio),
+      asi que basta con tenerla.
+
+      LA CLAVE TODAVIA NO EXISTE EN NINGUNA BASE. Hasta que se siembre, no la
+      tiene nadie y esta linea no cambia el comportamiento de nadie. El script
+      queda propuesto en el movil, en `concentrados.permisos.md`.
+    */
     private static readonly string[] PermisosVerConcentrados =
-        { "cobranza.ver", "cobranza.concentrados.consultar", "cobranza.concentrados.ver" };
+    {
+        "cobranza.ver", "cobranza.concentrados.consultar", "cobranza.concentrados.ver",
+        "app_movil.concentrados.ver"
+    };
 
     private readonly IVentasCobranzaConsultaService _service;
 
