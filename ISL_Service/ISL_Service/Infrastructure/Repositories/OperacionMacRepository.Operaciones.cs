@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using ISL_Service.Application.DTOs.Empleados;
 using ISL_Service.Application.DTOs.OperacionMac;
 using ISL_Service.Utils;
@@ -564,10 +564,24 @@ public partial class OperacionMacRepository
     /// llamada antes de ejecutar nada, asi que cancelar una transferencia desde
     /// MacServicios2 no funciona. El nombre del procedimiento confunde, pero lo
     /// que cancela es un movimiento.
+    ///
+    /// LLAMA AL `sp_w_`, NO AL `sp_n_`, Y ES A PROPOSITO. Leyendo
+    /// `sp_n_CancelarBancoTransferencia` entero aparecieron dos defectos peores
+    /// que el del parametro: (1) termina en `SELECT 1` sin mirar `@@ROWCOUNT`,
+    /// asi que contesta EXITO aunque no cancele nada -- comprobado con un id
+    /// inventado; y (2) junta los pagos con cuatro inserciones de SQL dinamico
+    /// usando `Constantes.BDZara` y `BDLuro`, que en Produccion_svr estan LAS
+    /// DOS VACIAS: la misma base dos veces, el mismo pago cancelado dos veces y
+    /// los importes en NEGATIVO (18022 -> 0 -> -18022), contestando exito las
+    /// dos. `sp_w_CancelarBancoTransferenciaMovimiento` toma los prefijos sin
+    /// repetir, cuenta los pagos que de verdad quedaron cancelados ANTES del
+    /// commit y deshace si quedo alguno vivo. Los tres parametros son los
+    /// mismos y con el mismo nombre. Mac31 y MacServicios2 siguen con el
+    /// `sp_n_`, que no se toco.
     /// </summary>
     public Task<ResultadoLegacy> CancelarMovimientoTransferenciaAsync(
         int idMovimiento, int idUsuario, string equipo, CancellationToken ct)
-        => EjecutarAsync("dbo.sp_n_CancelarBancoTransferencia", cmd =>
+        => EjecutarAsync("dbo.sp_w_CancelarBancoTransferenciaMovimiento", cmd =>
         {
             cmd.Parameters.AddWithValue("@IDBancoTransferenciaMovimiento", idMovimiento);
             cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
