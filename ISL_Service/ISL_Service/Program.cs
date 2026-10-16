@@ -203,6 +203,16 @@ builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
+
+/*
+  LA PREFERENCIA DE CENTRO VIVE EN EL SERVIDOR.
+
+  Scoped porque lee la conexion de AppDbContext, que es de la peticion: la base
+  depende de la empresa de la sesion. Si la tabla dbo.WCentroPreferido todavia no
+  esta en esa base, el servicio contesta "sin preferencia" y no tira nada; ver
+  IPreferenciaDeCentro.
+*/
+builder.Services.AddScoped<IPreferenciaDeCentro, PreferenciaDeCentroService>();
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddSingleton<ICurrentUserAccessor, CurrentUserAccessor>();

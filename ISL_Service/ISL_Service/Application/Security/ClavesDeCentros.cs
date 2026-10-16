@@ -1,4 +1,4 @@
-namespace ISL_Service.Application.Security;
+﻿namespace ISL_Service.Application.Security;
 
 /// <summary>
 /// LA FAMILIA DE PERMISOS DE CENTROS DEL CONTRATO, Y SU COMPATIBILIDAD.

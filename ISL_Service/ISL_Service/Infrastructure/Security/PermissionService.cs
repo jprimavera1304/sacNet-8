@@ -107,8 +107,36 @@ public sealed partial class PermissionService : IPermissionService
       hay nada que permitir—, asi que el reemplazo por lo de legacy tampoco debe
       llevarselos. Se comparan por PREFIJO y no uno a uno porque son tantos como
       centros haya, y aparecen solos cuando se da de alta uno nuevo.
+
+      ES LA FAMILIA VIEJA LA QUE HAY QUE EXIMIR, Y ESA ES TODA LA GRACIA.
+      La familia nueva ('centros.*') no empieza con "reportes.", asi que a ella
+      este reemplazo no la alcanza nunca. La que si empieza asi es la vieja, y es
+      justo la que la gente tiene concedida hoy: el dia que esta constante deje
+      de apuntar a 'reportes.centros.' esas claves vuelven a caer en el
+      reemplazo, el recalculo del snapshot se las lleva todas, y el selector de
+      centros se apaga para todo el mundo sin un solo error en el log. Lo vigila
+      CompatibilidadDeCentrosTests.
     */
     private const string CentrosPermissionPrefix = PermisosDeCentros.Prefijo;
+
+    /*
+      EL MODULO DE LA FAMILIA NUEVA DE CENTROS.
+
+      No es "reportes": el centro dejo de ser un asunto de reportes el dia que se
+      puede ESCRIBIR en el. Con su propio modulo, la pantalla de Accesos y
+      permisos del web pinta una tarjeta "Centros" con las casillas de consultar
+      y operar de cada centro, en vez de esconderlas dentro de Reportes.
+
+      No hace falta que exista fila en dbo.WModulo: un modulo sin renglon NO
+      cuenta como apagado (ver LoadInactiveModuleKeysAsync, "se excluye solo lo
+      que esta apagado a proposito"). Y no lleva '.ver_modulo' a proposito,
+      porque Centros no es una pantalla del inicio: es la dimension con la que se
+      mira el resto. Por eso tampoco aparece en EntradasDeModulo.
+    */
+    private const string CentrosModuleKey = "centros";
+
+    /* El tramo que identifica a la matriz dentro de la clave: "centros.matriz.ver". */
+    private const string SegmentoMatriz = "matriz";
 
     /* True si esta clave de reportes la manda Mac31 y hay que reemplazarla. */
     private static bool EsReporteQueMandaLegacy(string clave) =>
@@ -1834,7 +1862,66 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
         new("app_movil.clientes.estado.editar", "App móvil - Clientes: Dar de baja y reactivar", "app_movil"),
         new("app_movil.clientes.facturacion.ver", "App móvil - Clientes: Ver los RFC para facturar", "app_movil"),
         new("app_movil.clientes.log.ver", "App móvil - Clientes: Ver la bitácora", "app_movil"),
-        new("app_movil.cortes.cs.ver", "App móvil - Cortes de centro de servicio: Ver", "app_movil"),
+        new("app_movil.cortes.cs.ver", "App móvil - Cortes de centro de servicio: Ver", "app_movil"),
+
+        /*
+          GARANTIAS ACEPTADAS EN EL TELEFONO: DOS CLAVES, Y SON DOS A PROPOSITO.
+
+          La bandeja de la matriz —las garantias que registraron los centros y
+          faltan por aceptar— la estrena la app, y
+          VentasGarantiasController.cs:51,:54 ya exige cualquiera de las dos
+          formas (la del web O la del telefono). Sin estas semillas la clave del
+          telefono no existe en WPermiso, no se puede conceder a nadie, y la
+          tarjeta no sale para NADIE menos el SuperAdmin: es el mismo fallo
+          silencioso que esta casa ya se encontro tres veces, y el que vigila
+          ClavesDePermisoSembradasTests.
+
+          POR QUE DOS Y NO UNA. Leer la bandeja cuelga en el web de
+          `garantias.ver`, que es la llave de LAS CUATRO pantallas de garantias;
+          con una sola clave de telefono se habria abierto la familia entera.
+          Y aceptar es otra gente: quien captura garantias en el centro no es
+          quien las acepta en la matriz.
+
+          NACEN SIN CONCEDER A NADIE, y aqui esa es la decision. El bloque del
+          movil (garantias_aceptadas.permisos.md) pide un script que le copie
+          estas claves a quien ya tenga las del web; NO se hizo, y el motivo es
+          el precedente de Querrys/49: ahi se midio y se decidio que para una
+          accion que el telefono ESTRENA no se copia la concesion del web,
+          porque nadie pierde nada —esa pantalla no existe hoy en el telefono— y
+          copiarla le daria a cualquiera que acepte garantias en la computadora
+          la facultad de aceptarlas DESDE UN TELEFONO sin que nadie lo haya
+          revisado. Aceptar una garantia ESCRIBE EN LA BASE DEL CENTRO. Se
+          reparten a mano desde Accesos y permisos -> pestaña Movil.
+          (Querrys/48 si copiaba, y por el motivo contrario: alla el telefono
+          empezaba a pedir una clave nueva para pantallas que la gente YA USABA.)
+        */
+        new("app_movil.garantias.aceptar.ver", "App móvil - Garantías por aceptar: Ver", "app_movil"),
+        new("app_movil.garantias.aceptar", "App móvil - Garantías por aceptar: Aceptar", "app_movil"),
+
+        /*
+          GASOLINA EN EL TELEFONO. Canal propio, como el resto del movil.
+
+          GasolinasController.cs:73-76 ya exige la pareja (la del web O la del
+          telefono) y su propio comentario dice que estas cuatro las siembra el
+          agente de permisos; el bloque esta en
+          Movil/mac-mac-mobile/lib/modules/verticals/gasolina.permisos.md.
+
+          Sin canal propio la pantalla del telefono tendria que pedir
+          `gasolinas.*` —los mismos codigos que usan el web y Mac31— y quitarle
+          gasolina a alguien en el telefono se la quitaria tambien en la
+          computadora: no serian dos permisos parecidos, seria el mismo. Es el
+          problema que ya se arreglo en almacen de cascos, ajustes e inventario
+          en transito.
+
+          Tampoco se conceden al sembrar, por el mismo motivo que las de
+          garantias aceptadas: la pantalla la ESTRENA el telefono, nadie pierde
+          nada, y copiar la concesion del web repartiria de golpe la captura y la
+          cancelacion de recibos desde un telefono sin que nadie lo revisara.
+        */
+        new("app_movil.gasolinas.ver", "App móvil - Gasolina: Ver recibos", "app_movil"),
+        new("app_movil.gasolinas.crear", "App móvil - Gasolina: Capturar recibo", "app_movil"),
+        new("app_movil.gasolinas.editar", "App móvil - Gasolina: Corregir recibo", "app_movil"),
+        new("app_movil.gasolinas.cancelar", "App móvil - Gasolina: Cancelar recibo", "app_movil"),
 
         /*
           LAS CUATRO QUE LA APP PIDE Y QUE NADIE SEMBRABA. LA PRIMERA ES LA
@@ -3492,6 +3579,32 @@ WHERE t.name = 'WUsuarioPermiso';";
         var catalogosDeFamilias = await EnsureFamiliasLegacySyncedAsync(conn, empresaId, ct);
         await AplicarFamiliasLegacyAsync(conn, empresaId, userId, permissions, catalogosDeFamilias, ct);
 
+        /*
+          LA COMPATIBILIDAD DE CENTROS NO SE APLICA AQUI, Y ES UNA DECISION.
+
+          Se escribio primero en este sitio -traducir la clave vieja a la nueva
+          dentro del snapshot, y conceder la matriz a todo el mundo- y se quito al
+          integrar con la capa de centros, que ya la resuelve AL CONSUMIR
+          (Application/Centros/CapacidadesDeCentros.cs). Dos capas haciendo lo
+          mismo no es una redundancia inofensiva:
+
+            * La de alla acepta la clave vieja al PREGUNTAR, asi que traducir
+              aqui no le agrega acceso a nadie.
+            * Y conceder `centros.matriz.*` a todo el mundo desde aqui ROMPERIA
+              su regla de la matriz, que es "mientras nadie le configure una
+              clave de matriz, la matriz se comporta como hoy; el dia que se le
+              configure una, esa clave gobierna". Con la concesion automatica
+              puesta, todos tendrian las dos siempre y ese interruptor no se
+              podria volver a usar: restringir la matriz solo seria posible con
+              una negacion explicita, que no es lo que la pantalla ofrece.
+
+          Lo que SI es de aqui son las dos cosas sin las que esa capa no sirve de
+          nada: que las claves EXISTAN en el catalogo
+          (EnsureCentrosPermissionsSyncedAsync) y que la familia vieja NO se borre
+          del snapshot (CentrosPermissionPrefix, arriba). Las dos las vigilan
+          pruebas que se rompieron a proposito.
+        */
+
         return new PermissionSnapshot
         {
             UserId = userId,
@@ -4190,9 +4303,46 @@ VALUES ({string.Join(", ", insertValues)});";
         if (!await TableExistsAsync(conn, "CentrosServicio", ct))
             return;
 
+        /*
+          SE SIEMBRAN LAS DOS FAMILIAS, Y LA VIEJA NO SE BORRA.
+
+          La vieja ('reportes.centros.*') es la que la gente TIENE HOY
+          concedida: doce centros repartidos a mano en Zaragoza. Dejar de
+          sembrarla no le quitaria el permiso a nadie —las filas de concesion ya
+          estan en la base— pero si la escondería de la pantalla de permisos,
+          porque el catalogo solo ofrece lo que esta en WPermiso: quedaria
+          concedida y no se podria ni ver ni quitar. Por eso se siguen sembrando
+          las dos, y la equivalencia la aplica CompatibilidadDeCentros sobre el
+          juego de permisos.
+
+          LA NUEVA VA EN SU PROPIO MODULO 'centros' Y NO EN 'reportes'.
+          Porque ya no es un asunto de reportes: el centro es donde se trabaja.
+          En la pantalla de Accesos y permisos del web eso sale como una tarjeta
+          propia "Centros" —el modulo lo deduce ExtractModuleFromPermissionKey
+          del primer segmento de la clave—, en vez de enterrar doce casillas de
+          escritura dentro de la tarjeta de Reportes, que es donde nadie las
+          buscaria.
+        */
         var semillas = new List<PermissionSeed>
         {
-            new(PermisosDeCentros.Cambiar, "Reportes - Cambiar de centro", ReportesModuleKey)
+            // La familia vieja: el selector. Se mantiene tal cual estaba.
+            new(PermisosDeCentros.Cambiar, "Reportes - Cambiar de centro", ReportesModuleKey),
+
+            // La familia nueva. Los nombres de pantalla son los que declara
+            // Application/Centros/CLAVES-DE-PERMISO.md, que es el bloque que dejo
+            // la capa de centros justo para que se sembraran desde aqui.
+            new(ClavesDeCentros.Cambiar, "Centros - Cambiar de centro", CentrosModuleKey),
+            /*
+              LA MATRIZ TAMBIEN SE RIGE POR PERMISO, y sus dos claves se siembran
+              aunque la empresa no tenga ningun centro activo: la matriz existe
+              siempre. Nacen sembradas y SIN CONCEDER, igual que todas; quien las
+              reparte el dia del despliegue es CompatibilidadDeCentros, que se
+              las da a todo el mundo porque hoy la matriz no la gobierna ninguna
+              clave de centros. Ahi esta explicado por que, y por que no hacerlo
+              dejaria al sistema entero sin contestar.
+            */
+            new(ClavesDeCentros.MatrizVer, "Centros - Consultar la matriz", CentrosModuleKey),
+            new(ClavesDeCentros.MatrizOperar, "Centros - Operar en la matriz", CentrosModuleKey)
         };
 
         await using (var cmd = new SqlCommand(@"
@@ -4207,15 +4357,41 @@ ORDER BY Numero;", conn))
                 var numero = reader.GetInt32(0);
                 var nombre = (reader.IsDBNull(1) ? "" : reader.GetString(1)).Trim();
                 if (numero <= 0) continue;
+
+                var legible = nombre.Length > 0 ? nombre : numero.ToString(CultureInfo.InvariantCulture);
+
+                // La vieja, intacta: su Nombre es el que ya esta en la base.
                 semillas.Add(new PermissionSeed(
                     PermisosDeCentros.Ver(numero),
-                    $"Reportes - Centro {(nombre.Length > 0 ? nombre : numero.ToString())}",
+                    $"Reportes - Centro {legible}",
                     ReportesModuleKey));
+
+                // Las dos nuevas. `operar` se siembra pero NO se concede ni se
+                // deduce de `ver`: se reparte a mano desde el web.
+                semillas.Add(new PermissionSeed(
+                    ClavesDeCentros.Ver(numero),
+                    $"Centros - Consultar {legible}",
+                    CentrosModuleKey));
+                semillas.Add(new PermissionSeed(
+                    ClavesDeCentros.Operar(numero),
+                    $"Centros - Operar en {legible}",
+                    CentrosModuleKey));
             }
         }
 
+        /*
+          La descripcion sigue siendo la etiqueta de procedencia que guarda el
+          sembrador, y para las claves nuevas es 'centros' para que case con el
+          modulo. No se lee para decidir nada (ver el comentario largo de
+          SincronizarCatalogoDePermisosAsync): quien agrupa en la pantalla es
+          ModuleKey, que se deduce de la clave.
+        */
         await SincronizarCatalogoDePermisosAsync(
-            conn, empresaId, semillas, _ => "reportes.centros", ct);
+            conn,
+            empresaId,
+            semillas,
+            seed => seed.Module == CentrosModuleKey ? CentrosModuleKey : "reportes.centros",
+            ct);
     }
 
     /// <summary>
@@ -5407,6 +5583,41 @@ WHERE t.name = @TableName
             };
         }
 
+        /*
+          LA FAMILIA NUEVA DE CENTROS, CON SU TARJETA Y UN GRUPO POR CENTRO.
+
+          Sin esto funcionaba igual de bien a medias: el web deduce el modulo del
+          primer tramo de la clave, asi que la tarjeta "Centros" ya salia, pero
+          la CATEGORIA tambien se deduce del segundo tramo (ver
+          categoriaSegunLaClave en permisosWeb.ts) y los grupos se titulaban
+          "2004", "2007"... Doce encabezados que son numeros es exactamente la
+          pantalla que nadie sabe leer: el que reparte permisos conoce ORIENTE y
+          XOLA, no el 2004 y el 2005.
+
+          El nombre del centro sale del Nombre que dejo la siembra —"Centros -
+          ORIENTE: consultar"—, que lo escribe EnsureCentrosPermissionsSyncedAsync
+          en este mismo archivo. Es un acuerdo interno entre dos metodos vecinos,
+          no un formato que venga de fuera; si no casa, se cae al numero y la
+          pantalla sigue funcionando.
+
+          LA FAMILIA VIEJA NO ENTRA AQUI: se queda donde esta, en la tarjeta de
+          Reportes, porque ahi es donde la gente lleva años encontrandola y
+          moverla seria pedirle que vuelva a aprenderse la pantalla.
+        */
+        if (code.StartsWith(ClavesDeCentros.Prefijo, StringComparison.OrdinalIgnoreCase))
+        {
+            var (categoriaClave, categoriaNombre) = CategoriaDeCentro(code, name);
+            return new PermisosWebPermissionItem
+            {
+                Code = code,
+                Name = name,
+                ModuleKey = CentrosModuleKey,
+                ModuleName = "Centros",
+                CategoryKey = categoriaClave,
+                CategoryName = categoriaNombre
+            };
+        }
+
         return new PermisosWebPermissionItem
         {
             Code = code,
@@ -5414,6 +5625,63 @@ WHERE t.name = @TableName
             ModuleKey = ExtractModuleFromPermissionKey(code),
             ModuleName = string.Empty
         };
+    }
+
+    /// <summary>
+    /// El grupo al que pertenece una clave de centros dentro de su tarjeta.
+    /// </summary>
+    /// <remarks>
+    /// "centros.cambiar" contesta vacio A PROPOSITO: no es de un centro, es el
+    /// interruptor de arriba, y el grupo sin titulo va primero en la tarjeta (lo
+    /// ordena asi agruparEnTarjetas). Un encabezado "Cambiar" con un solo
+    /// renglon debajo seria una linea que no distingue nada.
+    /// </remarks>
+    private static (string CategoryKey, string CategoryName) CategoriaDeCentro(string code, string name)
+    {
+        var cuerpo = code[ClavesDeCentros.Prefijo.Length..];
+        var punto = cuerpo.IndexOf('.');
+        if (punto <= 0) return (string.Empty, string.Empty);   // centros.cambiar
+
+        var tramo = cuerpo[..punto];
+
+        if (string.Equals(tramo, SegmentoMatriz, StringComparison.OrdinalIgnoreCase))
+            return (SegmentoMatriz, "Matriz");
+
+        return (tramo, NombreDelCentroEnElPermiso(name) ?? $"Centro {tramo}");
+    }
+
+    /// <summary>
+    /// Saca "ORIENTE" de "Centros - Consultar ORIENTE" o de "Centros - Operar en
+    /// ORIENTE". <c>null</c> si el Nombre no tiene esa forma, para caer al numero
+    /// en vez de inventarse un rotulo.
+    /// </summary>
+    /// <remarks>
+    /// Es un acuerdo entre dos metodos vecinos de este mismo archivo: los
+    /// Nombres los escribe EnsureCentrosPermissionsSyncedAsync unas lineas mas
+    /// arriba, con los textos que declara
+    /// Application/Centros/CLAVES-DE-PERMISO.md. No es un formato que venga de
+    /// fuera, y si algun dia deja de casar el unico efecto es que el grupo de la
+    /// tarjeta se titula "Centro 2004" en vez de "ORIENTE". Por eso no se valida
+    /// mas duro: equivocarse aqui no puede costar un permiso.
+    /// </remarks>
+    private static string? NombreDelCentroEnElPermiso(string? name)
+    {
+        var texto = (name ?? string.Empty).Trim();
+        const string prefijo = "Centros - ";
+        if (!texto.StartsWith(prefijo, StringComparison.OrdinalIgnoreCase)) return null;
+
+        var resto = texto[prefijo.Length..].Trim();
+
+        foreach (var verbo in new[] { "Consultar ", "Operar en " })
+        {
+            if (resto.StartsWith(verbo, StringComparison.OrdinalIgnoreCase))
+            {
+                var nombre = resto[verbo.Length..].Trim();
+                return nombre.Length > 0 ? nombre : null;
+            }
+        }
+
+        return null;
     }
 
     private static (string CategoryKey, string CategoryName, string ReportName) SplitLegacyReportName(string description, string processCode)
@@ -5795,7 +6063,7 @@ WHERE EmpresaId = @EmpresaId
                 EnsureCatalogoSembradoAsync            seed => seed.Module    ("cobranza")
                 EnsureLegacyModulePermissionsSyncedAsync  "cobranza.legacy" / "cobranza.web"
                 EnsureLegacyReportPermissionsSyncedAsync  "reportes.legacy" / "reportes.web"
-                EnsureCentrosPermissionsSyncedAsync       "reportes.centros"
+                EnsureCentrosPermissionsSyncedAsync       "reportes.centros" / "centros"
 
               Con `Descripcion` dentro de la comparacion, cada pasada veia la
               descripcion que habia dejado la pasada anterior, la declaraba
