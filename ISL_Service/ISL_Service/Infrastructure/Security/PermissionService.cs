@@ -1896,7 +1896,32 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
           empezaba a pedir una clave nueva para pantallas que la gente YA USABA.)
         */
         new("app_movil.garantias.aceptar.ver", "App móvil - Garantías por aceptar: Ver", "app_movil"),
-        new("app_movil.garantias.aceptar", "App móvil - Garantías por aceptar: Aceptar", "app_movil"),
+        new("app_movil.garantias.aceptar", "App móvil - Garantías por aceptar: Aceptar", "app_movil"),
+
+        /*
+          GASOLINA EN EL TELEFONO. Canal propio, como el resto del movil.
+
+          GasolinasController.cs:73-76 ya exige la pareja (la del web O la del
+          telefono) y su propio comentario dice que estas cuatro las siembra el
+          agente de permisos; el bloque esta en
+          Movil/mac-mac-mobile/lib/modules/verticals/gasolina.permisos.md.
+
+          Sin canal propio la pantalla del telefono tendria que pedir
+          `gasolinas.*` —los mismos codigos que usan el web y Mac31— y quitarle
+          gasolina a alguien en el telefono se la quitaria tambien en la
+          computadora: no serian dos permisos parecidos, seria el mismo. Es el
+          problema que ya se arreglo en almacen de cascos, ajustes e inventario
+          en transito.
+
+          Tampoco se conceden al sembrar, por el mismo motivo que las de
+          garantias aceptadas: la pantalla la ESTRENA el telefono, nadie pierde
+          nada, y copiar la concesion del web repartiria de golpe la captura y la
+          cancelacion de recibos desde un telefono sin que nadie lo revisara.
+        */
+        new("app_movil.gasolinas.ver", "App móvil - Gasolina: Ver recibos", "app_movil"),
+        new("app_movil.gasolinas.crear", "App móvil - Gasolina: Capturar recibo", "app_movil"),
+        new("app_movil.gasolinas.editar", "App móvil - Gasolina: Corregir recibo", "app_movil"),
+        new("app_movil.gasolinas.cancelar", "App móvil - Gasolina: Cancelar recibo", "app_movil"),
 
         /*
           LAS CUATRO QUE LA APP PIDE Y QUE NADIE SEMBRABA. LA PRIMERA ES LA

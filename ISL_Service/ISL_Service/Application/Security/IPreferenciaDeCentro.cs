@@ -38,7 +38,7 @@ public interface IPreferenciaDeCentro
     /// </summary>
     /// <remarks>
     /// Quien llame tiene que haber comprobado el permiso ANTES
-    /// (<see cref="GuardiaDeCentros.PuedeVer"/>): este metodo guarda lo que le
+    /// (con <c>CapacidadesDeCentros.PuedeVer</c>): este metodo guarda lo que le
     /// digan. Guardar aqui una preferencia no autorizada no abre ninguna puerta
     /// —la lectura la vuelve a cruzar contra los permisos— pero deja un valor
     /// que no significa nada y confunde al que lo lea en la base.
