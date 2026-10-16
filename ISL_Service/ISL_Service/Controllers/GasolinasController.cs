@@ -26,6 +26,24 @@ namespace ISL_Service.Controllers;
   control del repartidor.
 
   LA CONSULTA ES UN GET Y YA NO TOCA Constantes: ver GasolinasRepository.
+
+  CENTROS DE SERVICIO: ESTE MODULO *NO* LOS SOPORTA. `soportaCentros = false`.
+  -------------------------------------------------------------------------
+  Queda declarado aqui para que la capa de conexion conteste **409 con motivo**
+  si llega `X-Centro != 0`, y NUNCA datos de la matriz.
+
+  No es un pendiente, es una decision:
+    1. `GasolinasRepository.GetConnection()` arma la cadena desde
+       `ConnectionString("Main")` a mano; no pasa por la capa unica.
+    2. Y aunque pasara, los dos desplegables de la pantalla salen de
+       `/api/catalogos/autos` y `/api/catalogos/repartidores`, que tampoco
+       pasan. Un alta "en el centro" tomaria un `idAuto` del catalogo de la
+       MATRIZ y lo insertaria en la base del centro, donde ese id es otro coche
+       o no existe; y como `sp_n_ConsultarGasolinas` hace INNER JOIN con
+       `[Catalogo Autos]`, ese recibo no volveria a salir en ninguna consulta.
+
+  Un gasto cargado al coche equivocado —o directamente invisible— es peor que
+  no tener la funcion en los centros.
 */
 [ApiController]
 [Route("api/gasolinas")]
@@ -34,10 +52,28 @@ public class GasolinasController : PermisoControllerBase
 {
     private readonly IGasolinasService _service;
 
-    private static readonly string[] Ver = { "gasolinas.ver" };
-    private static readonly string[] Crear = { "gasolinas.crear" };
-    private static readonly string[] Editar = { "gasolinas.editar" };
-    private static readonly string[] Cancelar = { "gasolinas.cancelar" };
+    /*
+      LAS CLAVES VAN EN PAREJA: LA DEL WEB Y LA DEL MOVIL.
+
+      `ExigirPermisoAsync` cobra el array como un O (basta UNA), asi que agregar
+      la clave de `app_movil.*` no le quita el acceso a nadie: quien hoy entra
+      con `gasolinas.ver` sigue entrando igual. Lo que habilita es lo contrario:
+      poder dar el modulo en el TELEFONO sin darlo en la computadora, que es lo
+      que ya hacen ventas y reportes.
+
+      Las cuatro claves `app_movil.gasolinas.*` TODAVIA NO ESTAN en el catalogo
+      de `PermissionService`: las deja sembradas el agente de permisos (el
+      bloque esta en
+      Movil/mac-mac-mobile/lib/modules/verticals/gasolina.permisos.md). Hasta
+      entonces este array se comporta exactamente como antes.
+
+      La pantalla del telefono cobra las mismas dos claves por permiso, para que
+      no haya un sitio donde el candado sea mas flojo que en el otro.
+    */
+    private static readonly string[] Ver = { "gasolinas.ver", "app_movil.gasolinas.ver" };
+    private static readonly string[] Crear = { "gasolinas.crear", "app_movil.gasolinas.crear" };
+    private static readonly string[] Editar = { "gasolinas.editar", "app_movil.gasolinas.editar" };
+    private static readonly string[] Cancelar = { "gasolinas.cancelar", "app_movil.gasolinas.cancelar" };
 
     public GasolinasController(
         IGasolinasService service,

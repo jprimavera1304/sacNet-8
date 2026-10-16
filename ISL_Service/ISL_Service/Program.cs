@@ -333,6 +333,21 @@ builder.Services.AddScoped<IReportesVentasRepository, ReportesVentasRepository>(
 builder.Services.AddScoped<ICentrosServicioRepository, CentrosServicioRepository>();
 builder.Services.AddScoped<IReportesVentasService, ReportesVentasService>();
 
+/*
+  LA CAPA DE CENTROS. UN solo sitio resuelve a que base se le pregunta.
+
+  Alcance de PETICION (AddScoped) porque el centro es un dato de la peticion, no
+  del proceso: dos usuarios en dos sucursales distintas estan dentro del mismo
+  w3wp al mismo tiempo. Ver Infrastructure/Centros/ConexionDelCentro.cs.
+
+  IHttpContextAccessor hace falta para leer la cabecera X-Centro desde fuera de
+  un controlador: la capa la usan los REPOSITORIOS, que no heredan de
+  ControllerBase. No estaba registrado porque hasta ahora nadie lo necesitaba.
+*/
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IIdentidadDeEmpresaRepository, IdentidadDeEmpresaRepository>();
+builder.Services.AddScoped<IConexionDelCentro, ISL_Service.Infrastructure.Centros.ConexionDelCentro>();
+
 builder.Services.AddScoped<IVentasPedidosRepository, VentasPedidosRepository>();
 builder.Services.AddScoped<IVentasPedidosService, VentasPedidosService>();
 builder.Services.AddSingleton<IAutorizarPedidosAsyncCoordinator, AutorizarPedidosAsyncCoordinator>();
