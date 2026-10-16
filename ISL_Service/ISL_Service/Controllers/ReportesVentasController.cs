@@ -446,7 +446,7 @@ public class ReportesVentasController : PermisoControllerBase
 
         var respuesta = new CentrosServicioResponse
         {
-            PuedeCambiar = GuardiaDeCentros.PuedeCambiar(c => puede.Tiene(c)),
+            PuedeCambiar = puede.Tiene(PermisosDeCentros.Cambiar),
             NombrePrincipal = "Principal"
         };
 
@@ -454,7 +454,7 @@ public class ReportesVentasController : PermisoControllerBase
         {
             var centros = await _centros.ListarAsync(ct);
             respuesta.Centros = centros
-                .Where(c => GuardiaDeCentros.PuedeVer(c.Numero, k => puede.Tiene(k)))
+                .Where(c => puede.Tiene(PermisosDeCentros.Ver(c.Numero)))
                 .Select(c => new CentroServicioOpcion
                 {
                     IdCentro = c.IdCentro,
@@ -604,7 +604,7 @@ public class ReportesVentasController : PermisoControllerBase
         if (!puede.TokenValido)
             return Unauthorized(new { ok = false, message = "Token invalido." });
 
-        if (!GuardiaDeCentros.PuedeCambiar(c => puede.Tiene(c)))
+        if (!puede.Tiene(PermisosDeCentros.Cambiar))
             return StatusCode(StatusCodes.Status403Forbidden, new
             {
                 ok = false,
@@ -615,7 +615,7 @@ public class ReportesVentasController : PermisoControllerBase
         if (centro is null)
             return BadRequest(new { ok = false, message = "Centro de servicio desconocido." });
 
-        if (!GuardiaDeCentros.PuedeVer(centro.Numero, k => puede.Tiene(k)))
+        if (!puede.Tiene(PermisosDeCentros.Ver(centro.Numero)))
             return StatusCode(StatusCodes.Status403Forbidden, new
             {
                 ok = false,

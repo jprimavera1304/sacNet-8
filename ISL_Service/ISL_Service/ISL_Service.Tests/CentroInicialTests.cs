@@ -1,3 +1,4 @@
+﻿using ISL_Service.Application.Centros;
 using ISL_Service.Application.Security;
 
 namespace ISL_Service.Tests;
@@ -122,24 +123,29 @@ public class CentroInicialTests
     /// EL DIA DEL DESPLIEGUE, EN LA CUENTA REAL. Alguien de Zaragoza con sus doce
     /// centros viejos y sin preferencia guardada abre en la matriz, igual que
     /// ayer. Es la prueba de que las reglas de arriba, juntas y con la
-    /// compatibilidad puesta, no le cambian el sitio a nadie.
+    /// compatibilidad de la capa de centros puesta, no le cambian el sitio a
+    /// nadie.
     /// </summary>
     [Fact]
     public void El_Dia_Del_Despliegue_Nadie_Cambia_De_Sitio()
     {
-        var permisos = new List<string> { PermisosDeCentros.CambiarLegado };
-        permisos.AddRange(Enumerable.Range(2001, 12).Select(PermisosDeCentros.VerLegado));
-        CompatibilidadDeCentros.Aplicar(permisos);
+        var viejas = new List<string> { PermisosDeCentros.Cambiar };
+        viejas.AddRange(Enumerable.Range(2001, 12).Select(PermisosDeCentros.Ver));
 
-        var matriz = GuardiaDeCentros.PuedeVer(GuardiaDeCentros.Matriz, permisos.Contains);
+        var puede = new CapacidadesDeCentros(
+            todoPermitido: false,
+            permisos: viejas,
+            tiene: c => viejas.Contains(c, StringComparer.OrdinalIgnoreCase));
+
         // IDCentro 1..12 para los numeros 2001..2012 en las dos bases.
         var centros = Enumerable.Range(1, 12)
-            .Where(id => GuardiaDeCentros.PuedeVer(2000 + id, permisos.Contains))
+            .Where(id => puede.PuedeVer(2000 + id))
             .ToList();
 
-        Assert.True(matriz, "se quedaria sin matriz");
+        Assert.True(puede.PuedeVerLaMatriz, "se quedaria sin matriz");
         Assert.Equal(12, centros.Count);
-        Assert.Equal(CentroInicial.Matriz, CentroInicial.Elegir(matriz, centros, preferencia: null));
+        Assert.Equal(CentroInicial.Matriz,
+            CentroInicial.Elegir(puede.PuedeVerLaMatriz, centros, preferencia: null));
     }
 
     /// <summary>

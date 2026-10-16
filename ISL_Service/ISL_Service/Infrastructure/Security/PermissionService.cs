@@ -108,16 +108,16 @@ public sealed partial class PermissionService : IPermissionService
       llevarselos. Se comparan por PREFIJO y no uno a uno porque son tantos como
       centros haya, y aparecen solos cuando se da de alta uno nuevo.
 
-      ES EL PREFIJO **LEGADO** Y NO EL NUEVO, Y LA DIFERENCIA ES UN APAGON.
+      ES LA FAMILIA VIEJA LA QUE HAY QUE EXIMIR, Y ESA ES TODA LA GRACIA.
       La familia nueva ('centros.*') no empieza con "reportes.", asi que a ella
-      este reemplazo no la alcanza nunca. La que hay que eximir a mano es la
-      VIEJA, que si empieza asi. El dia que alguien ponga aqui
-      PermisosDeCentros.Prefijo —el nuevo— las claves viejas volverian a caer en
-      el reemplazo, el recalculo del snapshot las borraria todas y el selector de
-      centros se apagaria para todo el mundo sin un solo error en el log. Lo
-      vigila CompatibilidadDeCentrosTests.
+      este reemplazo no la alcanza nunca. La que si empieza asi es la vieja, y es
+      justo la que la gente tiene concedida hoy: el dia que esta constante deje
+      de apuntar a 'reportes.centros.' esas claves vuelven a caer en el
+      reemplazo, el recalculo del snapshot se las lleva todas, y el selector de
+      centros se apaga para todo el mundo sin un solo error en el log. Lo vigila
+      CompatibilidadDeCentrosTests.
     */
-    private const string CentrosPermissionPrefix = PermisosDeCentros.PrefijoLegado;
+    private const string CentrosPermissionPrefix = PermisosDeCentros.Prefijo;
 
     /*
       EL MODULO DE LA FAMILIA NUEVA DE CENTROS.
@@ -134,6 +134,9 @@ public sealed partial class PermissionService : IPermissionService
       mira el resto. Por eso tampoco aparece en EntradasDeModulo.
     */
     private const string CentrosModuleKey = "centros";
+
+    /* El tramo que identifica a la matriz dentro de la clave: "centros.matriz.ver". */
+    private const string SegmentoMatriz = "matriz";
 
     /* True si esta clave de reportes la manda Mac31 y hay que reemplazarla. */
     private static bool EsReporteQueMandaLegacy(string clave) =>
@@ -1859,7 +1862,41 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
         new("app_movil.clientes.estado.editar", "App móvil - Clientes: Dar de baja y reactivar", "app_movil"),
         new("app_movil.clientes.facturacion.ver", "App móvil - Clientes: Ver los RFC para facturar", "app_movil"),
         new("app_movil.clientes.log.ver", "App móvil - Clientes: Ver la bitácora", "app_movil"),
-        new("app_movil.cortes.cs.ver", "App móvil - Cortes de centro de servicio: Ver", "app_movil"),
+        new("app_movil.cortes.cs.ver", "App móvil - Cortes de centro de servicio: Ver", "app_movil"),
+
+        /*
+          GARANTIAS ACEPTADAS EN EL TELEFONO: DOS CLAVES, Y SON DOS A PROPOSITO.
+
+          La bandeja de la matriz —las garantias que registraron los centros y
+          faltan por aceptar— la estrena la app, y
+          VentasGarantiasController.cs:51,:54 ya exige cualquiera de las dos
+          formas (la del web O la del telefono). Sin estas semillas la clave del
+          telefono no existe en WPermiso, no se puede conceder a nadie, y la
+          tarjeta no sale para NADIE menos el SuperAdmin: es el mismo fallo
+          silencioso que esta casa ya se encontro tres veces, y el que vigila
+          ClavesDePermisoSembradasTests.
+
+          POR QUE DOS Y NO UNA. Leer la bandeja cuelga en el web de
+          `garantias.ver`, que es la llave de LAS CUATRO pantallas de garantias;
+          con una sola clave de telefono se habria abierto la familia entera.
+          Y aceptar es otra gente: quien captura garantias en el centro no es
+          quien las acepta en la matriz.
+
+          NACEN SIN CONCEDER A NADIE, y aqui esa es la decision. El bloque del
+          movil (garantias_aceptadas.permisos.md) pide un script que le copie
+          estas claves a quien ya tenga las del web; NO se hizo, y el motivo es
+          el precedente de Querrys/49: ahi se midio y se decidio que para una
+          accion que el telefono ESTRENA no se copia la concesion del web,
+          porque nadie pierde nada —esa pantalla no existe hoy en el telefono— y
+          copiarla le daria a cualquiera que acepte garantias en la computadora
+          la facultad de aceptarlas DESDE UN TELEFONO sin que nadie lo haya
+          revisado. Aceptar una garantia ESCRIBE EN LA BASE DEL CENTRO. Se
+          reparten a mano desde Accesos y permisos -> pestaña Movil.
+          (Querrys/48 si copiaba, y por el motivo contrario: alla el telefono
+          empezaba a pedir una clave nueva para pantallas que la gente YA USABA.)
+        */
+        new("app_movil.garantias.aceptar.ver", "App móvil - Garantías por aceptar: Ver", "app_movil"),
+        new("app_movil.garantias.aceptar", "App móvil - Garantías por aceptar: Aceptar", "app_movil"),
 
         /*
           LAS CUATRO QUE LA APP PIDE Y QUE NADIE SEMBRABA. LA PRIMERA ES LA
@@ -3518,29 +3555,30 @@ WHERE t.name = 'WUsuarioPermiso';";
         await AplicarFamiliasLegacyAsync(conn, empresaId, userId, permissions, catalogosDeFamilias, ct);
 
         /*
-          LA COMPATIBILIDAD DE CENTROS, Y VA DE ULTIMA A PROPOSITO.
+          LA COMPATIBILIDAD DE CENTROS NO SE APLICA AQUI, Y ES UNA DECISION.
 
-          Traduce lo viejo a lo nuevo —`reportes.centros.cambiar` vale como
-          `centros.cambiar`, `reportes.centros.<n>.ver` como `centros.<n>.ver`—
-          y concede la matriz, para que nadie pierda el dia del despliegue un
-          acceso que ya tenia. El por que de cada regla esta en
-          CompatibilidadDeCentros; aqui solo esta el POR QUE AL FINAL.
+          Se escribio primero en este sitio -traducir la clave vieja a la nueva
+          dentro del snapshot, y conceder la matriz a todo el mundo- y se quito al
+          integrar con la capa de centros, que ya la resuelve AL CONSUMIR
+          (Application/Centros/CapacidadesDeCentros.cs). Dos capas haciendo lo
+          mismo no es una redundancia inofensiva:
 
-          Porque los bloques de arriba BORRAN y vuelven a calcular familias
-          enteras (`permissions.RemoveAll(...)` en reportes, ventas, empleados y
-          prestamos). Si la equivalencia se aplicara antes, el bloque de reportes
-          -que borra todo lo que empieza con "reportes." y no esta exento- correria
-          despues y ya no habria nada que traducir para quien tuviera sus centros
-          por rol. Lo ultimo que se escribe tiene que ser esto.
+            * La de alla acepta la clave vieja al PREGUNTAR, asi que traducir
+              aqui no le agrega acceso a nadie.
+            * Y conceder `centros.matriz.*` a todo el mundo desde aqui ROMPERIA
+              su regla de la matriz, que es "mientras nadie le configure una
+              clave de matriz, la matriz se comporta como hoy; el dia que se le
+              configure una, esa clave gobierna". Con la concesion automatica
+              puesta, todos tendrian las dos siempre y ese interruptor no se
+              podria volver a usar: restringir la matriz solo seria posible con
+              una negacion explicita, que no es lo que la pantalla ofrece.
 
-          Las negaciones se leen aparte porque a esta altura ya no estan:
-          LoadEffectivePermissionsAsync las resta y entrega solo lo permitido, asi
-          que desde aqui "no la tiene" y "se la quitaron a proposito" se ven
-          iguales. Sin preguntarlo, negarle la matriz a alguien no serviria de
-          nada: la equivalencia se la devolveria en la siguiente lectura.
+          Lo que SI es de aqui son las dos cosas sin las que esa capa no sirve de
+          nada: que las claves EXISTAN en el catalogo
+          (EnsureCentrosPermissionsSyncedAsync) y que la familia vieja NO se borre
+          del snapshot (CentrosPermissionPrefix, arriba). Las dos las vigilan
+          pruebas que se rompieron a proposito.
         */
-        var negadasDeCentros = await LoadDeniedCentrosKeysAsync(conn, schema, userId, empresaId, ct);
-        CompatibilidadDeCentros.Aplicar(permissions, negadasDeCentros);
 
         return new PermissionSnapshot
         {
@@ -3693,58 +3731,6 @@ ORDER BY pu.Clave;";
         return permissions
             .Where(clave => !EsDeModuloApagado(clave, apagados))
             .ToList();
-    }
-
-    /// <summary>
-    /// Las claves de CENTROS que este usuario tiene negadas a proposito.
-    /// </summary>
-    /// <remarks>
-    /// Se pregunta SOLO por las de centros, con el filtro en el WHERE, por dos
-    /// razones. La primera es que es lo unico que se usa: la compatibilidad de
-    /// centros es la unica capa que agrega claves por equivalencia, asi que es la
-    /// unica que puede pisar una negacion. La segunda es el costo: este metodo
-    /// corre una vez por armado de snapshot, y traerse las negaciones enteras de
-    /// alguien seria pagar filas que nadie mira.
-    ///
-    /// Los mismos valores de Tipo que usa LoadEffectivePermissionsAsync, y no un
-    /// 'deny' a secas: las dos bases de produccion no nacieron iguales y hay
-    /// filas con 'block' y con 'd'. Escribirlo distinto aqui haria que una
-    /// negacion guardada con otra palabra se ignorara en silencio.
-    /// </remarks>
-    private static async Task<HashSet<string>> LoadDeniedCentrosKeysAsync(
-        SqlConnection conn,
-        CapabilitySchema schema,
-        Guid userId,
-        int empresaId,
-        CancellationToken ct)
-    {
-        var negadas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        var sql = $@"
-SELECT p.Clave
-FROM dbo.WUsuarioPermiso up
-INNER JOIN dbo.WPermiso p
-    ON p.EmpresaId = up.EmpresaId
-   AND p.{Q(schema.PermissionIdColumn)} = up.{Q(schema.UserPermPermissionIdColumn)}
-WHERE up.EmpresaId = @EmpresaId
-  AND up.{Q(schema.UserPermUserIdColumn)} = @UsuarioWebId
-  AND LOWER(up.Tipo) IN ('deny','block','d')
-  AND (p.Clave LIKE @PrefijoNuevo OR p.Clave LIKE @PrefijoLegado);";
-
-        await using var cmd = new SqlCommand(sql, conn);
-        cmd.Parameters.Add(new SqlParameter("@EmpresaId", SqlDbType.Int) { Value = empresaId });
-        cmd.Parameters.Add(new SqlParameter("@UsuarioWebId", SqlDbType.UniqueIdentifier) { Value = userId });
-        cmd.Parameters.Add(new SqlParameter("@PrefijoNuevo", SqlDbType.NVarChar, 200) { Value = PermisosDeCentros.Prefijo + "%" });
-        cmd.Parameters.Add(new SqlParameter("@PrefijoLegado", SqlDbType.NVarChar, 200) { Value = PermisosDeCentros.PrefijoLegado + "%" });
-
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
-        while (await reader.ReadAsync(ct))
-        {
-            var clave = reader.GetString(0);
-            if (!string.IsNullOrWhiteSpace(clave)) negadas.Add(clave.Trim());
-        }
-
-        return negadas;
     }
 
     /// Si una clave de permiso pertenece a alguno de los modulos apagados.
@@ -4315,10 +4301,12 @@ VALUES ({string.Join(", ", insertValues)});";
         var semillas = new List<PermissionSeed>
         {
             // La familia vieja: el selector. Se mantiene tal cual estaba.
-            new(PermisosDeCentros.CambiarLegado, "Reportes - Cambiar de centro", ReportesModuleKey),
+            new(PermisosDeCentros.Cambiar, "Reportes - Cambiar de centro", ReportesModuleKey),
 
-            // La familia nueva.
-            new(PermisosDeCentros.Cambiar, "Centros - Cambiar de centro", CentrosModuleKey),
+            // La familia nueva. Los nombres de pantalla son los que declara
+            // Application/Centros/CLAVES-DE-PERMISO.md, que es el bloque que dejo
+            // la capa de centros justo para que se sembraran desde aqui.
+            new(ClavesDeCentros.Cambiar, "Centros - Cambiar de centro", CentrosModuleKey),
             /*
               LA MATRIZ TAMBIEN SE RIGE POR PERMISO, y sus dos claves se siembran
               aunque la empresa no tenga ningun centro activo: la matriz existe
@@ -4328,8 +4316,8 @@ VALUES ({string.Join(", ", insertValues)});";
               clave de centros. Ahi esta explicado por que, y por que no hacerlo
               dejaria al sistema entero sin contestar.
             */
-            new(PermisosDeCentros.MatrizVer, "Centros - Matriz: consultar", CentrosModuleKey),
-            new(PermisosDeCentros.MatrizOperar, "Centros - Matriz: operar", CentrosModuleKey)
+            new(ClavesDeCentros.MatrizVer, "Centros - Consultar la matriz", CentrosModuleKey),
+            new(ClavesDeCentros.MatrizOperar, "Centros - Operar en la matriz", CentrosModuleKey)
         };
 
         await using (var cmd = new SqlCommand(@"
@@ -4349,19 +4337,19 @@ ORDER BY Numero;", conn))
 
                 // La vieja, intacta: su Nombre es el que ya esta en la base.
                 semillas.Add(new PermissionSeed(
-                    PermisosDeCentros.VerLegado(numero),
+                    PermisosDeCentros.Ver(numero),
                     $"Reportes - Centro {legible}",
                     ReportesModuleKey));
 
                 // Las dos nuevas. `operar` se siembra pero NO se concede ni se
                 // deduce de `ver`: se reparte a mano desde el web.
                 semillas.Add(new PermissionSeed(
-                    PermisosDeCentros.Ver(numero),
-                    $"Centros - {legible}: consultar",
+                    ClavesDeCentros.Ver(numero),
+                    $"Centros - Consultar {legible}",
                     CentrosModuleKey));
                 semillas.Add(new PermissionSeed(
-                    PermisosDeCentros.Operar(numero),
-                    $"Centros - {legible}: operar",
+                    ClavesDeCentros.Operar(numero),
+                    $"Centros - Operar en {legible}",
                     CentrosModuleKey));
             }
         }
@@ -5591,7 +5579,7 @@ WHERE t.name = @TableName
           Reportes, porque ahi es donde la gente lleva años encontrandola y
           moverla seria pedirle que vuelva a aprenderse la pantalla.
         */
-        if (code.StartsWith(PermisosDeCentros.Prefijo, StringComparison.OrdinalIgnoreCase))
+        if (code.StartsWith(ClavesDeCentros.Prefijo, StringComparison.OrdinalIgnoreCase))
         {
             var (categoriaClave, categoriaNombre) = CategoriaDeCentro(code, name);
             return new PermisosWebPermissionItem
@@ -5625,32 +5613,50 @@ WHERE t.name = @TableName
     /// </remarks>
     private static (string CategoryKey, string CategoryName) CategoriaDeCentro(string code, string name)
     {
-        var cuerpo = code[PermisosDeCentros.Prefijo.Length..];
+        var cuerpo = code[ClavesDeCentros.Prefijo.Length..];
         var punto = cuerpo.IndexOf('.');
         if (punto <= 0) return (string.Empty, string.Empty);   // centros.cambiar
 
         var tramo = cuerpo[..punto];
 
-        if (string.Equals(tramo, PermisosDeCentros.SegmentoMatriz, StringComparison.OrdinalIgnoreCase))
-            return (PermisosDeCentros.SegmentoMatriz, "Matriz");
+        if (string.Equals(tramo, SegmentoMatriz, StringComparison.OrdinalIgnoreCase))
+            return (SegmentoMatriz, "Matriz");
 
         return (tramo, NombreDelCentroEnElPermiso(name) ?? $"Centro {tramo}");
     }
 
     /// <summary>
-    /// Saca "ORIENTE" de "Centros - ORIENTE: consultar". <c>null</c> si el Nombre
-    /// no tiene esa forma, para caer al numero en vez de inventarse un rotulo.
+    /// Saca "ORIENTE" de "Centros - Consultar ORIENTE" o de "Centros - Operar en
+    /// ORIENTE". <c>null</c> si el Nombre no tiene esa forma, para caer al numero
+    /// en vez de inventarse un rotulo.
     /// </summary>
+    /// <remarks>
+    /// Es un acuerdo entre dos metodos vecinos de este mismo archivo: los
+    /// Nombres los escribe EnsureCentrosPermissionsSyncedAsync unas lineas mas
+    /// arriba, con los textos que declara
+    /// Application/Centros/CLAVES-DE-PERMISO.md. No es un formato que venga de
+    /// fuera, y si algun dia deja de casar el unico efecto es que el grupo de la
+    /// tarjeta se titula "Centro 2004" en vez de "ORIENTE". Por eso no se valida
+    /// mas duro: equivocarse aqui no puede costar un permiso.
+    /// </remarks>
     private static string? NombreDelCentroEnElPermiso(string? name)
     {
         var texto = (name ?? string.Empty).Trim();
         const string prefijo = "Centros - ";
         if (!texto.StartsWith(prefijo, StringComparison.OrdinalIgnoreCase)) return null;
 
-        var resto = texto[prefijo.Length..];
-        var dosPuntos = resto.LastIndexOf(':');
-        var nombre = (dosPuntos > 0 ? resto[..dosPuntos] : resto).Trim();
-        return nombre.Length > 0 ? nombre : null;
+        var resto = texto[prefijo.Length..].Trim();
+
+        foreach (var verbo in new[] { "Consultar ", "Operar en " })
+        {
+            if (resto.StartsWith(verbo, StringComparison.OrdinalIgnoreCase))
+            {
+                var nombre = resto[verbo.Length..].Trim();
+                return nombre.Length > 0 ? nombre : null;
+            }
+        }
+
+        return null;
     }
 
     private static (string CategoryKey, string CategoryName, string ReportName) SplitLegacyReportName(string description, string processCode)

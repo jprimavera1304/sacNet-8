@@ -1,4 +1,5 @@
 using System.Reflection;
+using ISL_Service.Application.Centros;
 using ISL_Service.Application.Security;
 using ISL_Service.Infrastructure.Security;
 
@@ -12,126 +13,134 @@ namespace ISL_Service.Tests;
 /// autorizado debe perderlo por la actualizacion" y "no elimines los permisos
 /// actuales ni obligues a configurarlos nuevamente".
 ///
-/// Las pruebas de aqui son las que convierten eso en algo comprobable. CADA UNA
-/// SE ROMPIO A PROPOSITO antes de darla por buena —se quita la linea de
-/// compatibilidad que vigila y se comprueba que la prueba FALLA—, porque una
-/// prueba que pasa con el codigo roto no vigila nada. En el comentario de cada
-/// bloque esta QUE se rompio y COMO fallo.
+/// LA COMPATIBILIDAD SE SOSTIENE EN TRES COSAS, Y LAS TRES SON DE DISTINTO DUENO
+/// -----------------------------------------------------------------------------
+///   1. Que la clave VIEJA valga al preguntar. Lo hace
+///      <see cref="CapacidadesDeCentros"/> (capa de centros).
+///   2. Que la clave vieja NO SE BORRE del juego de permisos. Lo hace
+///      PermissionService con CentrosPermissionPrefix (permisos).
+///   3. Que las dos familias ESTEN en el catalogo, o no se pueden ni ver ni
+///      repartir. Lo hace EnsureCentrosPermissionsSyncedAsync (permisos).
 ///
-/// La mitad de las pruebas mira el otro lado: que la compatibilidad NO REGALE
-/// `operar`. Esa es la decision de negocio que no se ablanda, y es tan
-/// importante que no falte acceso como que no sobre.
+/// Las tres se prueban aqui juntas a proposito: cada una por separado se ve
+/// bien, y basta que falle UNA para que a alguien se le apague el selector sin
+/// un error en el log. Dos de las tres viven en archivos de dueños distintos, y
+/// esta clase es el unico sitio donde se comprueba que casan.
+///
+/// CADA PRUEBA SE ROMPIO A PROPOSITO antes de darla por buena: se quita o se
+/// invierte la linea que vigila y se comprueba que FALLA. En el comentario de
+/// cada una esta que se rompio y como fallo. Una prueba que pasa con el codigo
+/// roto no vigila nada.
 /// </remarks>
 public class CompatibilidadDeCentrosTests
 {
     private const int Centro = 2004;   // ORIENTE, en las dos empresas
+
+    /// <summary>
+    /// Lo que puede alguien con ese juego de permisos. Es la MISMA clase que usa
+    /// el backend al contestar, no una copia de la regla: una copia acabaria
+    /// opinando distinto y las dos se verian verdes.
+    /// </summary>
+    private static CapacidadesDeCentros Puede(params string[] permisos)
+    {
+        var juego = permisos.ToList();
+        return new CapacidadesDeCentros(
+            todoPermitido: false,
+            permisos: juego,
+            tiene: clave => juego.Contains(clave, StringComparer.OrdinalIgnoreCase));
+    }
 
     /* ================================================================== */
     /* 1. LA EQUIVALENCIA: QUIEN HOY PUEDE, MAÑANA PUEDE                  */
     /* ================================================================== */
 
     /// <summary>
-    /// ROTA A PROPOSITO: quitando el bloque `if (tiene.Contains(CambiarLegado))`
-    /// de CompatibilidadDeCentros, esta prueba falla con
-    /// "no se tradujo el selector".
+    /// EL FALLO QUE ESTA PRUEBA EXISTE PARA CAZAR, Y QUE YA PASO DE VERDAD.
+    ///
+    /// `ClavesDeCentros.CambiarCompatible` no es un literal: vale
+    /// `PermisosDeCentros.Cambiar`. Al integrar las dos familias se intento
+    /// meterlas en la MISMA clase, con `Cambiar` pasando a significar la nueva y
+    /// `CambiarLegado` la vieja. Resultado: `CambiarCompatible` se quedo
+    /// apuntando a `centros.cambiar` —la clave nueva, que nadie tiene— el codigo
+    /// siguio compilando, las pruebas de la capa de centros siguieron verdes, y
+    /// la compatibilidad dejo de existir en silencio.
+    ///
+    /// ROTA A PROPOSITO: con esa version, esta prueba falla diciendo
+    /// "la clave compatible dejo de ser la vieja". Es la unica que lo caza, y por
+    /// eso compara contra el TEXTO y no contra otra constante: comparar dos
+    /// constantes que cambian juntas no prueba nada.
     /// </summary>
     [Fact]
-    public void El_Selector_Viejo_Vale_Como_El_Nuevo()
+    public void La_Clave_Compatible_Es_La_Vieja()
     {
-        var permisos = new List<string> { PermisosDeCentros.CambiarLegado };
+        Assert.Equal("reportes.centros.cambiar", ClavesDeCentros.CambiarCompatible);
+        Assert.Equal($"reportes.centros.{Centro}.ver", ClavesDeCentros.VerCompatible(Centro));
 
-        CompatibilidadDeCentros.Aplicar(permisos);
+        Assert.Equal("centros.cambiar", ClavesDeCentros.Cambiar);
+        Assert.Equal($"centros.{Centro}.ver", ClavesDeCentros.Ver(Centro));
 
-        Assert.Contains(PermisosDeCentros.Cambiar, permisos);
-
-        // Y el guardia, que es quien pregunta de verdad, abre.
-        Assert.True(GuardiaDeCentros.PuedeCambiar(permisos.Contains));
+        Assert.NotEqual(ClavesDeCentros.Cambiar, ClavesDeCentros.CambiarCompatible);
     }
 
     /// <summary>
-    /// ROTA A PROPOSITO: quitando el bucle que recorre las claves viejas de ver,
-    /// esta prueba falla con "no se tradujo el centro 2004".
+    /// ROTA A PROPOSITO: quitando `|| _tiene(ClavesDeCentros.CambiarCompatible)`
+    /// de CapacidadesDeCentros.PuedeCambiar, esta prueba falla.
     /// </summary>
     [Fact]
-    public void El_Permiso_Viejo_De_Un_Centro_Vale_Como_El_Nuevo()
+    public void El_Selector_Viejo_Sigue_Abriendo_El_Selector()
     {
-        var permisos = new List<string>
-        {
-            PermisosDeCentros.CambiarLegado,
-            PermisosDeCentros.VerLegado(Centro)
-        };
-
-        CompatibilidadDeCentros.Aplicar(permisos);
-
-        Assert.Contains(PermisosDeCentros.Ver(Centro), permisos);
-        Assert.True(GuardiaDeCentros.PuedeVer(Centro, permisos.Contains));
+        Assert.True(Puede(PermisosDeCentros.Cambiar).PuedeCambiar);
     }
 
     /// <summary>
-    /// LOS DOCE DE ZARAGOZA, DE GOLPE. Es el caso real: 2001..2012 repartidos a
-    /// mano, y ninguno se puede quedar fuera.
+    /// ROTA A PROPOSITO: quitando `|| _tiene(ClavesDeCentros.VerCompatible(numero))`
+    /// de PuedeVer, esta prueba falla.
     /// </summary>
-    /// <remarks>
-    /// MIRA LA CLAVE TRADUCIDA Y NO AL GUARDIA, Y ES A PROPOSITO. Se descubrio
-    /// rompiendo: al quitar la traduccion, una version de esta prueba que
-    /// preguntaba por GuardiaDeCentros SEGUIA PASANDO, porque el guardia acepta
-    /// ademas la clave vieja. Esa red esta puesta a proposito —ver
-    /// GuardiaDeCentros— pero convierte a esta prueba en un adorno: taparia
-    /// justo el fallo que tiene que cazar. Quien vigila el acceso de punta a
-    /// punta es El_Dia_Del_Despliegue_Nadie_Cambia_De_Sitio; esta vigila la
-    /// traduccion.
-    /// </remarks>
     [Fact]
-    public void Los_Doce_Centros_De_Zaragoza_Se_Traducen_Todos()
+    public void El_Permiso_Viejo_De_Un_Centro_Sigue_Abriendo_Ese_Centro()
+    {
+        Assert.True(Puede(PermisosDeCentros.Ver(Centro)).PuedeVer(Centro));
+    }
+
+    /// <summary>
+    /// LOS DOCE DE ZARAGOZA, DE GOLPE, CON SOLO LAS CLAVES VIEJAS. Es el caso
+    /// real: 2001..2012 repartidos a mano, y ninguno se puede quedar fuera.
+    /// </summary>
+    [Fact]
+    public void Los_Doce_Centros_De_Zaragoza_Siguen_Abriendo()
     {
         var numeros = Enumerable.Range(2001, 12).ToArray();
+        var viejas = new[] { PermisosDeCentros.Cambiar }
+            .Concat(numeros.Select(PermisosDeCentros.Ver))
+            .ToArray();
 
-        var permisos = new List<string> { PermisosDeCentros.CambiarLegado };
-        permisos.AddRange(numeros.Select(PermisosDeCentros.VerLegado));
+        var puede = Puede(viejas);
 
-        CompatibilidadDeCentros.Aplicar(permisos);
-
-        var sinTraducir = numeros
-            .Where(n => !permisos.Contains(PermisosDeCentros.Ver(n), StringComparer.OrdinalIgnoreCase))
-            .ToList();
-
-        Assert.True(sinTraducir.Count == 0,
-            "estos centros los tiene hoy y su clave nueva no se genero: "
-            + string.Join(", ", sinTraducir));
+        Assert.True(puede.PuedeCambiar, "se queda sin selector");
+        var fuera = numeros.Where(n => !puede.PuedeVer(n)).ToList();
+        Assert.True(fuera.Count == 0,
+            "estos centros los tiene hoy y se quedarian sin acceso: " + string.Join(", ", fuera));
     }
 
     /// <summary>
-    /// LO QUE NO SE TENIA NO SE REGALA. La equivalencia traduce, no reparte: el
-    /// centro 2007 que nunca estuvo concedido sigue sin estarlo.
+    /// LO QUE NO SE TENIA NO SE REGALA. La compatibilidad traduce, no reparte.
     /// </summary>
     [Fact]
-    public void No_Se_Traduce_Un_Centro_Que_Nadie_Le_Dio()
+    public void No_Se_Abre_Un_Centro_Que_Nadie_Le_Dio()
     {
-        var permisos = new List<string>
-        {
-            PermisosDeCentros.CambiarLegado,
-            PermisosDeCentros.VerLegado(2004)
-        };
+        var puede = Puede(PermisosDeCentros.Cambiar, PermisosDeCentros.Ver(2004));
 
-        CompatibilidadDeCentros.Aplicar(permisos);
-
-        Assert.DoesNotContain(PermisosDeCentros.Ver(2007), permisos);
-        Assert.False(GuardiaDeCentros.PuedeVer(2007, permisos.Contains));
+        Assert.False(puede.PuedeVer(2007));
     }
 
     /// <summary>
-    /// SIN EL SELECTOR VIEJO NO HAY SELECTOR NUEVO. Quien hoy no puede cambiar de
-    /// centro tampoco podra mañana: la compatibilidad no abre puertas nuevas.
+    /// SIN EL SELECTOR VIEJO NO HAY SELECTOR NUEVO: la compatibilidad no abre
+    /// puertas que hoy esten cerradas.
     /// </summary>
     [Fact]
-    public void Sin_El_Selector_Viejo_No_Se_Concede_El_Nuevo()
+    public void Sin_Ninguna_Clave_De_Selector_No_Se_Puede_Cambiar()
     {
-        var permisos = new List<string> { "reportes.ver_modulo" };
-
-        CompatibilidadDeCentros.Aplicar(permisos);
-
-        Assert.DoesNotContain(PermisosDeCentros.Cambiar, permisos);
-        Assert.False(GuardiaDeCentros.PuedeCambiar(permisos.Contains));
+        Assert.False(Puede("reportes.ver_modulo").PuedeCambiar);
     }
 
     /* ================================================================== */
@@ -139,79 +148,71 @@ public class CompatibilidadDeCentrosTests
     /* ================================================================== */
 
     /// <summary>
-    /// ROTA A PROPOSITO: quitando los dos `Agregar(Matriz...)` de
-    /// CompatibilidadDeCentros, esta prueba falla con "se quedaria fuera de la
-    /// matriz".
+    /// QUIEN HOY TRABAJA EN LA MATRIZ SIGUE TRABAJANDO, SIN QUE NADIE LE
+    /// CONFIGURE NADA.
     ///
-    /// POR QUE SE PRUEBA CON LA LISTA MAS POBRE QUE HAY. Si la concesion de la
-    /// matriz dependiera de tener algo —cualquier cosa—, el dia del despliegue
-    /// habria alguien, en algun rol raro, que no lo tendria, y a esa persona el
-    /// sistema entero dejaria de contestarle. Que funcione con un solo permiso
-    /// cualquiera es exactamente lo que hay que vigilar.
-    /// </summary>
-    [Fact]
-    public void Quien_Hoy_Entra_A_La_Matriz_Sigue_Entrando()
-    {
-        var permisos = new List<string> { "ventas.ver_modulo" };
-
-        CompatibilidadDeCentros.Aplicar(permisos);
-
-        Assert.Contains(PermisosDeCentros.MatrizVer, permisos);
-        Assert.True(GuardiaDeCentros.PuedeVer(GuardiaDeCentros.Matriz, permisos.Contains));
-    }
-
-    /// <summary>
-    /// Y SIGUE PUDIENDO GUARDAR. La otra mitad, y la que de olvidarse deja a la
-    /// empresa entera sin poder escribir nada: hoy todo el que guarda, guarda en
-    /// la matriz.
+    /// Hoy la matriz no la gobierna ninguna clave de centros: nadie tiene
+    /// `centros.matriz.*` porque no existian. Si la matriz empezara a exigirlas,
+    /// el dia del despliegue la aplicacion se queda en blanco PARA TODO EL MUNDO
+    /// —y no por un permiso que alguien decidiera, sino por una regla nueva—.
     ///
-    /// ROTA A PROPOSITO: quitando `Agregar(MatrizOperar)`, falla con "no podria
-    /// guardar en la matriz".
+    /// ROTA A PROPOSITO: cambiando `return !TieneAlgunaClaveDeMatriz;` por
+    /// `return false;` en CapacidadesDeCentros, las dos aserciones de aqui
+    /// fallan. Es el apagon general, y lo caza esta prueba.
+    ///
+    /// Se prueba con la lista mas pobre que hay a proposito: si el acceso a la
+    /// matriz dependiera de tener algo —cualquier cosa—, habria alguien en algun
+    /// rol raro que no lo tendria, y a esa persona el sistema entero dejaria de
+    /// contestarle.
     /// </summary>
     [Fact]
-    public void Quien_Hoy_Guarda_En_La_Matriz_Sigue_Guardando()
+    public void Quien_Hoy_Usa_La_Matriz_Sigue_Usandola()
     {
-        var permisos = new List<string> { "ventas.pedidos.crear" };
+        var puede = Puede("ventas.ver_modulo");
 
-        CompatibilidadDeCentros.Aplicar(permisos);
-
-        Assert.Contains(PermisosDeCentros.MatrizOperar, permisos);
-        Assert.True(GuardiaDeCentros.PuedeOperar(GuardiaDeCentros.Matriz, permisos.Contains));
+        Assert.True(puede.PuedeVerLaMatriz, "se queda sin poder consultar la matriz");
+        Assert.True(puede.PuedeOperarEnLaMatriz, "se queda sin poder guardar en la matriz");
     }
 
     /// <summary>
-    /// LO QUE SE NIEGA A MANO SE RESPETA. Sin esto, apagarle la matriz a alguien
-    /// a proposito seria imposible y la pantalla de permisos mentiria.
+    /// Y TAMBIEN QUIEN NO TIENE ABSOLUTAMENTE NADA. El juego de permisos vacio
+    /// pasa de verdad: un usuario nuevo, o una lectura en la que todavia no
+    /// entro ninguna familia. Lo que decide si puede hacer algo son sus permisos
+    /// finos; la matriz no puede ser el candado que lo deje fuera antes.
     /// </summary>
     [Fact]
-    public void Una_Negacion_Explicita_De_La_Matriz_Manda()
+    public void Un_Juego_De_Permisos_Vacio_Sigue_Viendo_La_Matriz()
     {
-        var permisos = new List<string> { "ventas.ver_modulo" };
-        var negadas = new[] { PermisosDeCentros.MatrizVer };
+        var puede = Puede();
 
-        CompatibilidadDeCentros.Aplicar(permisos, negadas);
-
-        Assert.DoesNotContain(PermisosDeCentros.MatrizVer, permisos);
-        // La de operar no se negó, asi que esa si queda.
-        Assert.Contains(PermisosDeCentros.MatrizOperar, permisos);
+        Assert.True(puede.PuedeVerLaMatriz);
+        Assert.True(puede.PuedeOperarEnLaMatriz);
     }
 
     /// <summary>
-    /// Y tambien se respeta sobre una clave traducida: negar `centros.2004.ver`
-    /// gana sobre tener el permiso viejo de ese centro.
+    /// PERO EL INTERRUPTOR SE PUEDE ENCENDER. El dia que alguien le configura UNA
+    /// clave de matriz, esa clave gobierna: con solo `matriz.ver`, consulta y no
+    /// guarda.
+    ///
+    /// Es la otra mitad y hay que probarla, porque es lo que distingue "la matriz
+    /// se rige por permiso" de "la matriz esta abierta para siempre". Tambien es
+    /// la razon por la que la siembra NO concede estas dos claves a nadie: si se
+    /// repartieran solas, este interruptor no se podria volver a usar.
+    ///
+    /// ROTA A PROPOSITO: cambiando `return !TieneAlgunaClaveDeMatriz;` por
+    /// `return true;`, esta prueba falla —la matriz quedaria abierta aunque
+    /// alguien la hubiera restringido a proposito— mientras las dos de arriba
+    /// siguen pasando. Esa es la pareja: una caza el apagon, la otra caza que el
+    /// candado no sirva.
     /// </summary>
     [Fact]
-    public void Una_Negacion_Explicita_De_Un_Centro_Manda()
+    public void Configurarle_Una_Clave_De_Matriz_La_Pone_A_Gobernar()
     {
-        var permisos = new List<string>
-        {
-            PermisosDeCentros.CambiarLegado,
-            PermisosDeCentros.VerLegado(Centro)
-        };
+        var soloConsulta = Puede(ClavesDeCentros.MatrizVer);
 
-        CompatibilidadDeCentros.Aplicar(permisos, new[] { PermisosDeCentros.Ver(Centro) });
-
-        Assert.DoesNotContain(PermisosDeCentros.Ver(Centro), permisos);
+        Assert.True(soloConsulta.PuedeVerLaMatriz);
+        Assert.False(soloConsulta.PuedeOperarEnLaMatriz,
+            "le configuraron solo consulta en la matriz y aun asi puede guardar");
     }
 
     /* ================================================================== */
@@ -221,11 +222,10 @@ public class CompatibilidadDeCentrosTests
     /// <summary>
     /// LA PRUEBA QUE VIGILA QUE NADIE "AYUDE" AL USUARIO.
     ///
-    /// ROTA A PROPOSITO AL REVES: se agrego a CompatibilidadDeCentros un
-    /// `Agregar(PermisosDeCentros.Operar(numero))` dentro del bucle de
-    /// traduccion —que es exactamente el atajo que alguien escribiria para que
-    /// "funcione"— y esta prueba fallo con "se regalo el permiso de ESCRIBIR en
-    /// el centro 2004". Despues se quito.
+    /// ROTA A PROPOSITO AL REVES: se le agrego a
+    /// CapacidadesDeCentros.PuedeOperar un `|| PuedeVer(numero)` —que es
+    /// exactamente el atajo que alguien escribiria para que "funcione"— y esta
+    /// prueba fallo con "se regalo el permiso de ESCRIBIR". Despues se quito.
     ///
     /// Si esta prueba pasa con ese atajo puesto, no sirve y hay que arreglarla,
     /// no borrarla: lo que estaria mal es el candado, no el aviso.
@@ -233,153 +233,92 @@ public class CompatibilidadDeCentrosTests
     [Fact]
     public void Ver_Un_Centro_No_Concede_Escribir_En_El()
     {
-        var permisos = new List<string>
-        {
-            PermisosDeCentros.CambiarLegado,
-            PermisosDeCentros.VerLegado(Centro),
-            PermisosDeCentros.Ver(Centro)
-        };
+        var puede = Puede(
+            PermisosDeCentros.Cambiar,
+            PermisosDeCentros.Ver(Centro),
+            ClavesDeCentros.Ver(Centro));
 
-        CompatibilidadDeCentros.Aplicar(permisos);
-
-        Assert.DoesNotContain(PermisosDeCentros.Operar(Centro), permisos);
-        Assert.False(
-            GuardiaDeCentros.PuedeOperar(Centro, permisos.Contains),
+        Assert.True(puede.PuedeVer(Centro));
+        Assert.False(puede.PuedeOperar(Centro),
             "se regalo el permiso de ESCRIBIR en el centro 2004 a quien solo puede consultarlo");
     }
 
     /// <summary>
-    /// LA COMPATIBILIDAD NO PUEDE PRODUCIR NINGUN `operar` DE CENTRO, con
-    /// cualquier combinacion de claves viejas. Es la version general de la de
-    /// arriba: la de arriba vigila un centro, esta vigila la regla.
-    /// </summary>
-    [Fact]
-    public void La_Compatibilidad_No_Produce_Ningun_Operar_De_Centro()
-    {
-        var todoLoViejo = new List<string> { PermisosDeCentros.CambiarLegado };
-        todoLoViejo.AddRange(Enumerable.Range(2001, 12).Select(PermisosDeCentros.VerLegado));
-
-        var agregadas = CompatibilidadDeCentros.ClavesQueSeAgregan(todoLoViejo);
-
-        var regalados = agregadas
-            .Where(k => k.EndsWith(".operar", StringComparison.OrdinalIgnoreCase))
-            .Where(k => !string.Equals(k, PermisosDeCentros.MatrizOperar, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        Assert.True(regalados.Count == 0,
-            "la compatibilidad esta repartiendo permisos de ESCRIBIR en centros: "
-            + string.Join(", ", regalados));
-    }
-
-    /// <summary>
-    /// Y escribir en un centro NO lo abre la familia vieja. No hay clave vieja de
-    /// escribir —alla los centros solo servian para sacar reportes—, asi que no
-    /// hay nada de donde heredar.
+    /// Y LA FAMILIA VIEJA TAMPOCO ABRE `operar`. No existe clave vieja de
+    /// escribir -alla los centros solo servian para sacar reportes-, asi que no
+    /// hay nada de donde heredar. Aceptar la vieja aqui seria deducir `operar` de
+    /// `ver` por la puerta de atras.
+    ///
+    /// ROTA A PROPOSITO: agregando `|| _tiene(ClavesDeCentros.VerCompatible(numero))`
+    /// a PuedeOperar, esta prueba falla.
     /// </summary>
     [Fact]
     public void El_Permiso_Viejo_No_Abre_Escribir_En_El_Centro()
     {
-        var permisos = new List<string>
-        {
-            PermisosDeCentros.CambiarLegado,
-            PermisosDeCentros.VerLegado(Centro)
-        };
+        var puede = Puede(PermisosDeCentros.Cambiar, PermisosDeCentros.Ver(Centro));
 
-        CompatibilidadDeCentros.Aplicar(permisos);
-
-        Assert.False(GuardiaDeCentros.PuedeOperar(Centro, permisos.Contains));
+        Assert.False(puede.PuedeOperar(Centro));
     }
 
     /// <summary>
-    /// CONCEDIDO A MANO SI FUNCIONA: lo que se reparte desde el web se respeta
-    /// tal cual. Sin esta, el candado de arriba podria estar cerrando la puerta
-    /// para siempre y nadie se enteraria.
+    /// NINGUNA COMBINACION DE CLAVES VIEJAS PRODUCE UN `operar`. Es la version
+    /// general: las de arriba vigilan un centro, esta vigila la regla con los
+    /// doce de Zaragoza puestos.
+    /// </summary>
+    [Fact]
+    public void Con_Todo_Lo_Viejo_Puesto_No_Se_Puede_Escribir_En_Ningun_Centro()
+    {
+        var numeros = Enumerable.Range(2001, 12).ToArray();
+        var viejas = new[] { PermisosDeCentros.Cambiar }
+            .Concat(numeros.Select(PermisosDeCentros.Ver))
+            .ToArray();
+
+        var puede = Puede(viejas);
+        var regalados = numeros.Where(puede.PuedeOperar).ToList();
+
+        Assert.True(regalados.Count == 0,
+            "se puede escribir en estos centros sin que nadie lo haya concedido: "
+            + string.Join(", ", regalados));
+    }
+
+    /// <summary>
+    /// CONCEDIDO A MANO SI FUNCIONA. Sin esta, el candado de arriba podria estar
+    /// cerrando la puerta para siempre y nadie se enteraria.
     /// </summary>
     [Fact]
     public void Operar_Concedido_A_Mano_Abre()
     {
-        var permisos = new List<string>
-        {
-            PermisosDeCentros.Cambiar,
-            PermisosDeCentros.Ver(Centro),
-            PermisosDeCentros.Operar(Centro)
-        };
+        var puede = Puede(
+            ClavesDeCentros.Cambiar,
+            ClavesDeCentros.Ver(Centro),
+            ClavesDeCentros.Operar(Centro));
 
-        CompatibilidadDeCentros.Aplicar(permisos);
-
-        Assert.True(GuardiaDeCentros.PuedeOperar(Centro, permisos.Contains));
-        Assert.True(GuardiaDeCentros.PuedeVer(Centro, permisos.Contains));
+        Assert.True(puede.PuedeVer(Centro));
+        Assert.True(puede.PuedeOperar(Centro));
     }
 
     /* ================================================================== */
-    /* 4. LA COMPATIBILIDAD SOLO SUMA                                     */
+    /* 4. EL CANDADO QUE, SI SE SUELTA, APAGA EL SELECTOR PARA TODOS      */
     /* ================================================================== */
 
     /// <summary>
-    /// NO BORRA NADA. Ni las claves viejas —que siguen en el catalogo y hay que
-    /// poder quitarlas desde la pantalla— ni nada de lo demas.
-    /// </summary>
-    [Fact]
-    public void No_Quita_Ninguna_Clave()
-    {
-        var antes = new List<string>
-        {
-            "reportes.ver_modulo",
-            PermisosDeCentros.CambiarLegado,
-            PermisosDeCentros.VerLegado(Centro),
-            "ventas.facturar"
-        };
-        var copia = antes.ToList();
-
-        CompatibilidadDeCentros.Aplicar(antes);
-
-        foreach (var clave in copia)
-            Assert.Contains(clave, antes);
-    }
-
-    /// <summary>
-    /// CORRERLA DOS VECES NO DUPLICA. El snapshot se arma mas de una vez por
-    /// sesion y una lista con la misma clave repetida se ve igual de bien hasta
-    /// que alguien la cuenta.
-    /// </summary>
-    [Fact]
-    public void Aplicarla_Dos_Veces_No_Agrega_Nada_La_Segunda()
-    {
-        var permisos = new List<string>
-        {
-            PermisosDeCentros.CambiarLegado,
-            PermisosDeCentros.VerLegado(Centro)
-        };
-
-        var primera = CompatibilidadDeCentros.Aplicar(permisos);
-        var segunda = CompatibilidadDeCentros.Aplicar(permisos);
-
-        Assert.True(primera > 0, "la primera pasada no agrego nada");
-        Assert.Equal(0, segunda);
-        Assert.Equal(permisos.Count, permisos.Distinct(StringComparer.OrdinalIgnoreCase).Count());
-    }
-
-    /* ================================================================== */
-    /* 5. EL CANDADO QUE, SI SE SUELTA, APAGA EL SELECTOR PARA TODOS      */
-    /* ================================================================== */
-
-    /// <summary>
-    /// QUE LAS CLAVES VIEJAS SIGAN EXENTAS DEL REEMPLAZO POR LO DE MAC31.
+    /// QUE LAS CLAVES VIEJAS NO LAS BORRE EL PUENTE DE REPORTES.
     ///
     /// `reportes.centros.*` empieza con "reportes." pero NO existe en Mac31. El
     /// snapshot borra todo lo que empieza con "reportes." y no esta exento, y lo
     /// vuelve a calcular desde los procesos de Mac31; sin la exencion, las claves
     /// viejas de centros desaparecen en la primera lectura y el selector se apaga
-    /// para todo el mundo, sin un error en el log.
+    /// para todo el mundo, sin un error en el log. Toda la compatibilidad de
+    /// arriba da igual si la clave ya no esta en el juego de permisos.
     ///
     /// ROTA A PROPOSITO: se puso
-    /// `CentrosPermissionPrefix = PermisosDeCentros.Prefijo` —el nuevo, que es el
-    /// despiste natural ahora que hay dos— y esta prueba fallo con
-    /// "reportes.centros.2004.ver caeria en el reemplazo por lo de Mac31".
+    /// `CentrosPermissionPrefix = ClavesDeCentros.Prefijo` —el de la familia
+    /// nueva, que es el despiste natural ahora que hay dos— y esta prueba fallo
+    /// con "reportes.centros.2004.ver caeria en el reemplazo por lo de Mac31".
     ///
-    /// Se llega por reflexion porque el metodo es privado y estatico, y porque lo
-    /// que hay que vigilar es justo esa decision y no un camino que pase por la
-    /// base: contra la base, este fallo solo se ve cuando ya le paso a alguien.
+    /// Se llega por reflexion porque el metodo es privado y estatico, y porque es
+    /// justo esa decision lo que hay que vigilar: contra la base, este fallo solo
+    /// se ve cuando ya le paso a alguien.
     /// </summary>
     [Fact]
     public void Las_Claves_Viejas_De_Centros_No_Las_Borra_El_Puente_De_Reportes()
@@ -392,9 +331,9 @@ public class CompatibilidadDeCentrosTests
 
         bool MandaLegacy(string clave) => (bool)metodo!.Invoke(null, new object[] { clave })!;
 
-        Assert.False(MandaLegacy(PermisosDeCentros.CambiarLegado),
+        Assert.False(MandaLegacy(PermisosDeCentros.Cambiar),
             "reportes.centros.cambiar caeria en el reemplazo por lo de Mac31 y se borraria del snapshot");
-        Assert.False(MandaLegacy(PermisosDeCentros.VerLegado(Centro)),
+        Assert.False(MandaLegacy(PermisosDeCentros.Ver(Centro)),
             "reportes.centros.2004.ver caeria en el reemplazo por lo de Mac31 y se borraria del snapshot");
 
         // Y la red sigue puesta para lo que SI manda Mac31, que es el otro lado
@@ -405,49 +344,50 @@ public class CompatibilidadDeCentrosTests
 
     /// <summary>
     /// Y QUE LOS DOS PREFIJOS NO SE CONFUNDAN. El viejo tiene que seguir siendo
-    /// exactamente "reportes.centros." y el nuevo "centros.": el primero se
-    /// compara contra el reemplazo de reportes y el segundo contra el modulo de
-    /// la pantalla de permisos.
+    /// exactamente "reportes.centros." y el nuevo "centros.": el primero es el
+    /// que se exime del reemplazo de reportes y el segundo el que decide la
+    /// tarjeta de la pantalla de permisos.
     /// </summary>
     [Fact]
     public void Los_Dos_Prefijos_Son_Los_Que_Se_Esperan()
     {
-        Assert.Equal("reportes.centros.", PermisosDeCentros.PrefijoLegado);
-        Assert.Equal("centros.", PermisosDeCentros.Prefijo);
-        Assert.StartsWith("reportes.", PermisosDeCentros.PrefijoLegado, StringComparison.Ordinal);
-        Assert.False(PermisosDeCentros.Prefijo.StartsWith("reportes.", StringComparison.Ordinal));
+        Assert.Equal("reportes.centros.", PermisosDeCentros.Prefijo);
+        Assert.Equal("centros.", ClavesDeCentros.Prefijo);
+        Assert.StartsWith("reportes.", PermisosDeCentros.Prefijo, StringComparison.Ordinal);
+        Assert.False(ClavesDeCentros.Prefijo.StartsWith("reportes.", StringComparison.Ordinal));
     }
 
     /* ================================================================== */
-    /* 6. QUE LA PANTALLA DEL WEB LAS PUEDA REPARTIR                      */
+    /* 5. QUE LA PANTALLA DEL WEB LAS PUEDA REPARTIR                      */
     /* ================================================================== */
 
     /// <summary>
-    /// QUE LAS CLAVES NUEVAS NO SE ESCONDAN EN LA PANTALLA DE PERMISOS.
+    /// QUE LAS CLAVES DE CENTROS NO SE ESCONDAN EN LA PANTALLA DE PERMISOS.
     ///
     /// El catalogo del web solo ofrece lo que "protege algo", y eso se calcula
     /// por reflexion sobre el ensamblado. `centros.2004.ver` NO esta como literal
     /// en ningun sitio: se compone en tiempo de ejecucion con el Numero que esta
     /// en la base. Sin el renglon de centros en ClavesQueProtegenAlgo, las 24
-    /// casillas de los doce centros de Zaragoza —incluidas las de ESCRIBIR— se
-    /// esconderian y no habria forma de repartirlas.
+    /// casillas de los doce centros de Zaragoza —incluidas las de ESCRIBIR, que
+    /// son las que mas importa poder revisar— se esconderian y no habria forma de
+    /// repartirlas.
     ///
     /// ROTA A PROPOSITO: se quito `EsDeCentros(k)` de
-    /// ClavesQueProtegenAlgo.Protege y esta prueba fallo nombrando las cinco
-    /// claves escondidas.
+    /// ClavesQueProtegenAlgo.Protege y esta prueba fallo nombrando las claves
+    /// escondidas.
     /// </summary>
     [Fact]
-    public void La_Pantalla_De_Permisos_Ofrece_Las_Claves_Nuevas()
+    public void La_Pantalla_De_Permisos_Ofrece_Las_Claves_De_Centros()
     {
         var deben = new[]
         {
+            ClavesDeCentros.Cambiar,
+            ClavesDeCentros.MatrizVer,
+            ClavesDeCentros.MatrizOperar,
+            ClavesDeCentros.Ver(Centro),
+            ClavesDeCentros.Operar(Centro),
             PermisosDeCentros.Cambiar,
-            PermisosDeCentros.MatrizVer,
-            PermisosDeCentros.MatrizOperar,
-            PermisosDeCentros.Ver(Centro),
-            PermisosDeCentros.Operar(Centro),
-            PermisosDeCentros.CambiarLegado,
-            PermisosDeCentros.VerLegado(Centro)
+            PermisosDeCentros.Ver(Centro)
         };
 
         var escondidas = deben.Where(k => !ClavesQueProtegenAlgo.Protege(k)).ToList();
@@ -459,25 +399,27 @@ public class CompatibilidadDeCentrosTests
 
     /// <summary>
     /// Y QUE NO SE GATEEN DETRAS DE UNA PUERTA QUE NO EXISTE. La familia nueva no
-    /// tiene `centros.ver_modulo` —Centros no es una pantalla del inicio—, asi
-    /// que si alguien la metiera en EntradasDeModulo, todas sus claves pedirian
-    /// una entrada que nadie sembro y contestarian 403 a todo el mundo menos al
-    /// SuperAdmin. Es el fallo que esta casa ya se encontro tres veces.
+    /// tiene `centros.ver_modulo` —Centros no es una pantalla del inicio, es el
+    /// contexto en el que se abren las demas—, asi que si alguien la metiera en
+    /// EntradasDeModulo, todas sus claves pedirian una entrada que nadie sembro y
+    /// contestarian 403 a todo el mundo menos al SuperAdmin. Es el fallo que esta
+    /// casa ya se encontro tres veces.
     /// </summary>
     [Fact]
     public void Las_Claves_Nuevas_No_Piden_Una_Entrada_Que_No_Existe()
     {
         foreach (var clave in new[]
                  {
-                     PermisosDeCentros.Cambiar,
-                     PermisosDeCentros.MatrizVer,
-                     PermisosDeCentros.MatrizOperar,
-                     PermisosDeCentros.Ver(Centro),
-                     PermisosDeCentros.Operar(Centro)
+                     ClavesDeCentros.Cambiar,
+                     ClavesDeCentros.MatrizVer,
+                     ClavesDeCentros.MatrizOperar,
+                     ClavesDeCentros.Ver(Centro),
+                     ClavesDeCentros.Operar(Centro)
                  })
         {
             var entradas = EntradasDeModulo.Requeridas(clave);
-            var existen = entradas.All(e => EntradasDeModulo.TodasLasEntradas.Contains(e, StringComparer.OrdinalIgnoreCase));
+            var existen = entradas.All(e =>
+                EntradasDeModulo.TodasLasEntradas.Contains(e, StringComparer.OrdinalIgnoreCase));
 
             Assert.True(entradas.Count == 0 || existen,
                 $"{clave} pide la entrada {string.Join("/", entradas)}, que no esta declarada");
@@ -485,32 +427,19 @@ public class CompatibilidadDeCentrosTests
     }
 
     /* ================================================================== */
-    /* 7. RECONOCER LAS CLAVES                                            */
+    /* 6. RECONOCER LAS CLAVES                                            */
     /* ================================================================== */
-
-    [Theory]
-    [InlineData("centros.cambiar", null)]
-    [InlineData("centros.matriz.ver", null)]          // la matriz no tiene Numero
-    [InlineData("centros.matriz.operar", null)]
-    [InlineData("centros.2004.operar", null)]         // no es clave de VER
-    [InlineData("centros.2004.ver", 2004)]
-    [InlineData("reportes.centros.2004.ver", 2004)]
-    [InlineData("reportes.centros.cambiar", null)]
-    [InlineData("ventas.facturar", null)]
-    [InlineData("centros.abc.ver", null)]
-    [InlineData("", null)]
-    public void El_Numero_De_La_Clave_Se_Lee_Bien(string clave, int? esperado)
-    {
-        Assert.Equal(esperado, PermisosDeCentros.NumeroDeClaveDeVer(clave));
-    }
 
     [Theory]
     [InlineData("centros.cambiar", true)]
     [InlineData("centros.2004.operar", true)]
+    [InlineData("centros.matriz.ver", true)]
     [InlineData("reportes.centros.2004.ver", true)]
+    [InlineData("reportes.centros.cambiar", true)]
     [InlineData("clientes.centros.editar", false)]   // existe y NO es de centros
     [InlineData("cortes.cs.ver", false)]
     [InlineData("centroscostos.ver", false)]         // empieza parecido y no lo es
+    [InlineData("", false)]
     public void Se_Reconoce_Lo_Que_Es_De_Centros_Y_Lo_Que_No(string clave, bool esperado)
     {
         Assert.Equal(esperado, PermisosDeCentros.EsDeCentros(clave));

@@ -1,3 +1,4 @@
+﻿using ISL_Service.Application.Centros;
 using ISL_Service.Application.Security;
 using ISL_Service.Infrastructure.Data;
 using ISL_Service.Infrastructure.Security;
@@ -104,16 +105,16 @@ ORDER BY Numero;", conn))
            por cada centro activo la vieja de ver mas las dos nuevas. */
         var esperadas = new List<string>
         {
-            PermisosDeCentros.CambiarLegado,
             PermisosDeCentros.Cambiar,
-            PermisosDeCentros.MatrizVer,
-            PermisosDeCentros.MatrizOperar
+            ClavesDeCentros.Cambiar,
+            ClavesDeCentros.MatrizVer,
+            ClavesDeCentros.MatrizOperar
         };
         foreach (var (numero, _) in centros)
         {
-            esperadas.Add(PermisosDeCentros.VerLegado(numero));
             esperadas.Add(PermisosDeCentros.Ver(numero));
-            esperadas.Add(PermisosDeCentros.Operar(numero));
+            esperadas.Add(ClavesDeCentros.Ver(numero));
+            esperadas.Add(ClavesDeCentros.Operar(numero));
         }
 
         var faltan = esperadas.Where(k => !enLaBase.Contains(k)).ToList();
@@ -129,7 +130,7 @@ ORDER BY Numero;", conn))
            desde la pantalla. */
         foreach (var (numero, _) in centros)
         {
-            Assert.Contains(PermisosDeCentros.VerLegado(numero), enLaBase);
+            Assert.Contains(PermisosDeCentros.Ver(numero), enLaBase);
         }
 
         /* Y EL CATALOGO DEL WEB LAS OFRECE, que es la diferencia entre "esta en la
@@ -154,7 +155,7 @@ ORDER BY Numero;", conn))
            ESCRIBIR en un centro quedarian enterradas dentro de Reportes, que es
            donde nadie las buscaria. */
         var enModuloEquivocado = esperadas
-            .Where(k => k.StartsWith(PermisosDeCentros.Prefijo, StringComparison.OrdinalIgnoreCase))
+            .Where(k => k.StartsWith(ClavesDeCentros.Prefijo, StringComparison.OrdinalIgnoreCase))
             .Where(k => !string.Equals(ofrecidas[k].ModuleKey, "centros", StringComparison.OrdinalIgnoreCase))
             .Select(k => $"{k} -> {ofrecidas[k].ModuleKey}")
             .ToList();
