@@ -1,4 +1,4 @@
-using ISL_Service.Application.Centros;
+﻿using ISL_Service.Application.Centros;
 using ISL_Service.Application.DTOs.Centros;
 using ISL_Service.Application.Exceptions;
 using ISL_Service.Application.Interfaces;
@@ -67,7 +67,8 @@ public class ConexionDelCentro : IConexionDelCentro
 
             var crudo = _http.HttpContext?.Request.Headers[Cabecera.Cabecera].ToString();
             if (!Cabecera.Interpretar(crudo, out var id))
-                throw new ConflictException(
+                throw new CentroException(
+                    CentroException.PeticionInvalida,
                     "El centro pedido no es valido.",
                     Cabecera.Cabecera + " tiene que ser un numero entero mayor o igual a 0 (0 = matriz).");
 
@@ -132,12 +133,14 @@ public class ConexionDelCentro : IConexionDelCentro
         {
             var declarado = ModulosConCentros.Buscar(modulo);
             if (declarado is null || !declarado.SoportaCentros)
-                throw new ConflictException(
+                throw new CentroException(
+                    CentroException.ModuloNoSoporta,
                     "Esta pantalla todavia no funciona por centro de servicio. Vuelve a la matriz para usarla.",
                     "El modulo no esta declarado en ModulosConCentros. Se contesta 409 a proposito: con el centro puesto, devolver datos de la matriz seria ensenar un sitio diciendo que es otro.");
 
             if (escribe && !declarado.Escribe(operacion))
-                throw new ConflictException(
+                throw new CentroException(
+                    CentroException.OperacionSoloMatriz,
                     "Esta accion solo se puede hacer en la matriz.",
                     "El modulo no declara esa operacion como escribible fuera de la matriz (ModulosConCentros).");
         }
@@ -151,7 +154,8 @@ public class ConexionDelCentro : IConexionDelCentro
         if (idCentro == Cabecera.Matriz)
         {
             if (escribe && !puede.PuedeOperarEnLaMatriz)
-                throw new ConflictException(
+                throw new CentroException(
+                    CentroException.MatrizSinOperar,
                     "Tu usuario no tiene permiso para escribir en la matriz.",
                     "Falta " + ClavesDeCentros.MatrizOperar + ".");
 
@@ -160,7 +164,8 @@ public class ConexionDelCentro : IConexionDelCentro
 
         // ---- 4 (primera mitad). Puede usar el selector.
         if (!puede.PuedeCambiar)
-            throw new ConflictException(
+            throw new CentroException(
+                CentroException.SinCambiar,
                 "Tu usuario no puede cambiar de centro de servicio.",
                 "Falta " + ClavesDeCentros.Cambiar + " (o la clave equivalente " + ClavesDeCentros.CambiarCompatible + ").");
 
@@ -171,7 +176,8 @@ public class ConexionDelCentro : IConexionDelCentro
         // "no existe": simplemente no esta aqui, y eso basta.
         var centro = await _centros.BuscarAsync(idCentro, ct);
         if (centro is null || string.IsNullOrWhiteSpace(centro.Base))
-            throw new ConflictException(
+            throw new CentroException(
+                CentroException.NoExiste,
                 "Ese centro de servicio no existe o esta dado de baja.",
                 "Ese IDCentro no esta activo en dbo.CentrosServicio de esta empresa.");
 
@@ -189,18 +195,20 @@ public class ConexionDelCentro : IConexionDelCentro
                 "Centro rechazado por pertenencia: IDCentro {Id} ({Nombre}) apunta a la base {Base}, que no es de esta empresa. {Motivo}",
                 centro.IdCentro, centro.Nombre, centro.Base, veredicto.Motivo);
 
-            throw new ConflictException(veredicto.Motivo,
+            throw new CentroException(CentroException.DeOtraEmpresa, veredicto.Motivo,
                 "Ese centro apunta a una base que no pertenece a la empresa de la sesion. Se protege en codigo: los datos de dbo.CentrosServicio NO se corrigen desde aqui.");
         }
 
         // ---- 4. VER PARA LEER, OPERAR PARA ESCRIBIR.
         if (!puede.PuedeVer(centro.Numero))
-            throw new ConflictException(
+            throw new CentroException(
+                CentroException.SinVer,
                 "Tu usuario no tiene permiso para consultar el centro " + centro.Nombre + ".",
                 "Falta " + ClavesDeCentros.Ver(centro.Numero) + " (o la clave equivalente " + ClavesDeCentros.VerCompatible(centro.Numero) + ").");
 
         if (escribe && !puede.PuedeOperar(centro.Numero))
-            throw new ConflictException(
+            throw new CentroException(
+                CentroException.SinOperar,
                 "Tu usuario puede consultar el centro " + centro.Nombre + " pero no escribir en el.",
                 "Falta " + ClavesDeCentros.Operar(centro.Numero) + ". Escribir en un centro se concede a mano: NO se deduce de poder verlo.");
 
