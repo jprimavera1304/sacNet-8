@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using ISL_Service.Application.Centros;
 using ISL_Service.Application.DTOs.Reportes;
 using ISL_Service.Application.Exceptions;
@@ -34,6 +34,17 @@ namespace ISL_Service.Tests;
 /// </remarks>
 public class CentrosLaCapaDeConexionTests
 {
+    /* POR QUE `CentroException` Y NO `ConflictException`
+       ---------------------------------------------------------------
+       Los dos son 409 -`CentroException` hereda de `ConflictException`- pero
+       `Assert.ThrowsAsync` exige el tipo EXACTO, y eso aqui es lo que
+       queremos: cada rechazo de centros tiene que traer su propio `Code`
+       (`CENTRO_...`), porque el telefono lo usa para distinguir "esta
+       pantalla todavia no sabe de centros" de cualquier otro 409 de los que
+       ya habia. Antes el cliente lo adivinaba mirando si el mensaje hablaba
+       de "centro"; una frase reescrita lo rompia en silencio.
+       Por eso cada prueba comprueba ademas que el codigo empieza por CENTRO. */
+
     private const string BaseMatriz = "MacZ";
     private const string NombreZaragoza = "Distribuidora de Acumuladores Zaragoza";
     private const string NombreTauro = "Refacciones Automotrices TAURO";
@@ -67,8 +78,10 @@ public class CentrosLaCapaDeConexionTests
     {
         var capa = Capa(cabecera: "MacZCS7", permisos: Array.Empty<string>());
 
-        var ex = await Assert.ThrowsAsync<ConflictException>(
+        var ex = await Assert.ThrowsAsync<CentroException>(
             () => capa.BaseValidadaParaLeerAsync("reportes", capa.CentroPedido));
+
+        Assert.StartsWith("CENTRO", ex.Code);
         Assert.Equal(409, ex.StatusCode);
     }
 
@@ -82,8 +95,10 @@ public class CentrosLaCapaDeConexionTests
             ClavesDeCentros.Cambiar, ClavesDeCentros.Ver(2002)
         });
 
-        var ex = await Assert.ThrowsAsync<ConflictException>(
+        var ex = await Assert.ThrowsAsync<CentroException>(
             () => capa.BaseValidadaParaLeerAsync("ventas", 2));
+
+        Assert.StartsWith("CENTRO", ex.Code);
 
         Assert.Equal(409, ex.StatusCode);
         Assert.Contains("todavia no funciona por centro", ex.Message);
@@ -98,8 +113,10 @@ public class CentrosLaCapaDeConexionTests
            tiene por que saberlo — y costaria un viaje a SQL por nada. */
         var capa = Capa(cabecera: "99", permisos: new[] { ClavesDeCentros.Cambiar });
 
-        var ex = await Assert.ThrowsAsync<ConflictException>(
+        var ex = await Assert.ThrowsAsync<CentroException>(
             () => capa.BaseValidadaParaLeerAsync("cortes", 99));
+
+        Assert.StartsWith("CENTRO", ex.Code);
         Assert.Contains("todavia no funciona por centro", ex.Message);
     }
 
@@ -113,8 +130,10 @@ public class CentrosLaCapaDeConexionTests
 
         /* Reportes esta declarado y el usuario tiene hasta `operar`: el freno es
            que el MODULO no declara ninguna operacion de escritura. */
-        var ex = await Assert.ThrowsAsync<ConflictException>(
+        var ex = await Assert.ThrowsAsync<CentroException>(
             () => capa.AbrirParaEscribirAsync("reportes", "generar"));
+
+        Assert.StartsWith("CENTRO", ex.Code);
         Assert.Contains("solo se puede hacer en la matriz", ex.Message);
     }
 
@@ -125,8 +144,10 @@ public class CentrosLaCapaDeConexionTests
     {
         var capa = Capa(cabecera: "2", permisos: new[] { ClavesDeCentros.Ver(2002) });
 
-        var ex = await Assert.ThrowsAsync<ConflictException>(
+        var ex = await Assert.ThrowsAsync<CentroException>(
             () => capa.BaseValidadaParaLeerAsync("reportes", 2));
+
+        Assert.StartsWith("CENTRO", ex.Code);
         Assert.Contains("no puede cambiar de centro", ex.Message);
     }
 
@@ -138,8 +159,10 @@ public class CentrosLaCapaDeConexionTests
             ClavesDeCentros.Cambiar, ClavesDeCentros.Ver(2003)   // otro centro
         });
 
-        var ex = await Assert.ThrowsAsync<ConflictException>(
+        var ex = await Assert.ThrowsAsync<CentroException>(
             () => capa.BaseValidadaParaLeerAsync("reportes", 2));
+
+        Assert.StartsWith("CENTRO", ex.Code);
         Assert.Contains("no tiene permiso para consultar el centro", ex.Message);
     }
 
@@ -170,8 +193,10 @@ public class CentrosLaCapaDeConexionTests
     {
         var capa = Capa(cabecera: "77", permisos: new[] { ClavesDeCentros.Cambiar });
 
-        var ex = await Assert.ThrowsAsync<ConflictException>(
+        var ex = await Assert.ThrowsAsync<CentroException>(
             () => capa.BaseValidadaParaLeerAsync("reportes", 77));
+
+        Assert.StartsWith("CENTRO", ex.Code);
         Assert.Contains("no existe o esta dado de baja", ex.Message);
     }
 
@@ -189,8 +214,10 @@ public class CentrosLaCapaDeConexionTests
             ClavesDeCentros.Cambiar, ClavesDeCentros.Ver(2007)
         });
 
-        var ex = await Assert.ThrowsAsync<ConflictException>(
+        var ex = await Assert.ThrowsAsync<CentroException>(
             () => capa.BaseValidadaParaLeerAsync("reportes", 7));
+
+        Assert.StartsWith("CENTRO", ex.Code);
 
         Assert.Equal(409, ex.StatusCode);
         Assert.Contains("OTRA empresa", ex.Message);

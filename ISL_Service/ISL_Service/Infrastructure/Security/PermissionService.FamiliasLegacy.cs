@@ -364,7 +364,16 @@ public sealed partial class PermissionService
         new List<PermissionSeed>
         {
             new("cambiosvigencia.ver_modulo", "Cambios de vigencia - Ver modulo", "cambiosvigencia"),
-            new("cambios_vigencia.ver_modulo", "Cambios de vigencia - Ver modulo", "cambiosvigencia")
+            new("cambios_vigencia.ver_modulo", "Cambios de vigencia - Ver modulo", "cambiosvigencia"),
+            /* REGRESAR AL INVENTARIO, COMO SEMILLA DEL WEB.
+               En Mac31 no hay un boton que de solo esto: btnModificar se
+               llama "Modificar / regresar" y btnEntregar cuelga de el. Como
+               no mapea a ningun boton, sin declararla aqui el borrado por
+               prefijo se la llevaria en la siguiente lectura y el endpoint
+               de regresar se quedaria en 403 permanente.
+               Existe aparte de editar porque miden cosas distintas: editar
+               cambia un texto y regresar MUEVE EXISTENCIAS. */
+            new("cambiosvigencia.regresar", "Cambios de vigencia - Regresar al inventario", "cambiosvigencia")
         },
         new List<LegacyModuleBinding>
         {
@@ -379,7 +388,11 @@ public sealed partial class PermissionService
                    permiso que heredar. */
                 ConcesionesExtra: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["btnEntregar"] = "cambiosvigencia.editar"
+                    /* btnEntregar ES regresar: ahora da la clave de regresar y
+                       no la de editar. Antes le regalaba MODIFICAR a quien solo
+                       tiene entregar -el caso medido arriba: btnEntregar sin
+                       btnModificar-, que es una autorizacion que Mac31 no le da. */
+                    ["btnEntregar"] = "cambiosvigencia.regresar"
                 })
         });
 

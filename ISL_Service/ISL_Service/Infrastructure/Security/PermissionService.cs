@@ -1862,7 +1862,8 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
         new("app_movil.clientes.estado.editar", "App móvil - Clientes: Dar de baja y reactivar", "app_movil"),
         new("app_movil.clientes.facturacion.ver", "App móvil - Clientes: Ver los RFC para facturar", "app_movil"),
         new("app_movil.clientes.log.ver", "App móvil - Clientes: Ver la bitácora", "app_movil"),
-        new("app_movil.cortes.cs.ver", "App móvil - Cortes de centro de servicio: Ver", "app_movil"),
+        new("app_movil.cortes.cs.ver", "App móvil - Cortes de centro de servicio: Ver", "app_movil"),
+
 
         /*
           GARANTIAS ACEPTADAS EN EL TELEFONO: DOS CLAVES, Y SON DOS A PROPOSITO.
@@ -1896,7 +1897,8 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
           empezaba a pedir una clave nueva para pantallas que la gente YA USABA.)
         */
         new("app_movil.garantias.aceptar.ver", "App móvil - Garantías por aceptar: Ver", "app_movil"),
-        new("app_movil.garantias.aceptar", "App móvil - Garantías por aceptar: Aceptar", "app_movil"),
+        new("app_movil.garantias.aceptar", "App móvil - Garantías por aceptar: Aceptar", "app_movil"),
+
 
         /*
           GASOLINA EN EL TELEFONO. Canal propio, como el resto del movil.
@@ -1922,6 +1924,37 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
         new("app_movil.gasolinas.crear", "App móvil - Gasolina: Capturar recibo", "app_movil"),
         new("app_movil.gasolinas.editar", "App móvil - Gasolina: Corregir recibo", "app_movil"),
         new("app_movil.gasolinas.cancelar", "App móvil - Gasolina: Cancelar recibo", "app_movil"),
+
+        /*
+          LAS TRES PANTALLAS QUE ESTRENA EL TELEFONO EN ESTA ENTREGA.
+
+          Mismo criterio que gasolina y que garantias aceptadas: se SIEMBRAN
+          -para que existan en el catalogo y se puedan repartir desde Web- pero
+          NO SE CONCEDEN. Nadie pierde nada porque ninguna de las tres existe
+          hoy en el telefono, y copiar la concesion del web repartiria de golpe
+          la captura y la cancelacion desde un movil sin que nadie lo revisara.
+
+          `cambiosvigencia.regresar` es la unica que NO es del movil: la pide el
+          endpoint de regresar, que hasta ahora se cobraba con la de editar.
+          Separarla es lo correcto -entregar no es corregir- y para que nadie
+          pierda el acceso el dia del despliegue el controlador sigue aceptando
+          tambien la de editar.
+        */
+        new("app_movil.cambiosvigencia.ver", "App móvil - Cambios de vigencia: Ver", "app_movil"),
+        new("app_movil.cambiosvigencia.crear", "App móvil - Cambios de vigencia: Capturar", "app_movil"),
+        new("app_movil.cambiosvigencia.editar", "App móvil - Cambios de vigencia: Corregir", "app_movil"),
+        new("app_movil.cambiosvigencia.cancelar", "App móvil - Cambios de vigencia: Cancelar", "app_movil"),
+        new("app_movil.cambiosvigencia.regresar", "App móvil - Cambios de vigencia: Regresar al inventario", "app_movil"),
+        new("cambiosvigencia.regresar", "Cambios de vigencia - Regresar al inventario", "cambiosvigencia"),
+
+        new("app_movil.concentrados.ver", "App móvil - Concentrados: Ver", "app_movil"),
+        new("app_movil.concentrados.editar", "App móvil - Concentrados: Capturar y corregir", "app_movil"),
+        new("app_movil.concentrados.cancelar", "App móvil - Concentrados: Cancelar", "app_movil"),
+
+        new("app_movil.proveedores.ver", "App móvil - Proveedores: Ver", "app_movil"),
+        new("app_movil.proveedores.crear", "App móvil - Proveedores: Dar de alta", "app_movil"),
+        new("app_movil.proveedores.editar", "App móvil - Proveedores: Modificar", "app_movil"),
+        new("app_movil.proveedores.estado.editar", "App móvil - Proveedores: Habilitar e inhabilitar", "app_movil"),
 
         /*
           LAS CUATRO QUE LA APP PIDE Y QUE NADIE SEMBRABA. LA PRIMERA ES LA

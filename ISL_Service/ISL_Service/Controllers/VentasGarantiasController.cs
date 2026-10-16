@@ -28,8 +28,47 @@ namespace ISL_Service.Controllers;
 [Authorize]
 public class VentasGarantiasController : PermisoControllerBase
 {
-    private static readonly string[] PermisoVer = { "garantias.ver" };
-    private static readonly string[] PermisoEditar = { "garantias.editar" };
+    /*
+      LA PAREJA WEB/MOVIL DE LA PANTALLA PRINCIPAL DE GARANTIAS.
+
+      `PermisoVer` SI lleva la clave del movil, y aqui la razon es la contraria
+      que en la bandeja de aceptar (ver la nota de `PermisoAceptarVer`): esta
+      clave abre `catalogos` y `consultar`, que son los DOS endpoints de la
+      pantalla de garantias del telefono, y ninguno de los dos es de otra
+      pantalla. `app_movil.garantias.ver` por tanto NO ensancha nada: los
+      registros previos tienen su propia pareja mas abajo y la bandeja de
+      aceptar ya tiene la suya.
+
+      Los `app_movil.*` hay que sembrarlos en el catalogo; el bloque esta en
+      `Movil/mac-mac-mobile/lib/modules/verticals/garantias.permisos.md`.
+      Mientras no esten, esto se porta exactamente como antes.
+    */
+    private static readonly string[] PermisoVer =
+        { "garantias.ver", "app_movil.garantias.ver" };
+
+    private static readonly string[] PermisoEditar =
+        { "garantias.editar", "app_movil.garantias.editar" };
+
+    /*
+      CANCELAR NO LLEVA CLAVE DE MOVIL, Y ES A PROPOSITO.
+
+      Este endpoint llama a `sp_n_CancelarGarantia`, y ese procedimiento NO
+      cancela: pone `IDStatusGarantia = 5` —ENVIADA AL PROVEEDOR— con el
+      comentario `-- 5 - CANCELADA` al lado (el 4 es Cancelada,
+      `Utils/Enums.cs:329`), y ademas cancela la Venta y el Pedido ligados sin
+      una sola comprobacion. Mac31 nunca lo usa: cancela mandando el estatus 4
+      a `actualizar`, que es la rama correcta.
+
+      Asi que el movil NO pasa por aqui: cancela por `actualizar` con el estatus
+      4, como Mac31, y exige la clave `app_movil.garantias.cancelar` EN EL
+      CLIENTE para no perder la separacion de permisos. Darle aqui la clave del
+      telefono seria invitarlo a usar el camino roto.
+
+      Lo que falta para cerrarlo de verdad es un `sp_w_CancelarGarantia` (que
+      ponga el 4, mire @@ROWCOUNT y no toque la venta sin los cinco frenos de
+      `ValidaCancelarVenta`), uno por empresa. Queda en
+      `garantias.permisos.md`.
+    */
     private static readonly string[] PermisoCancelar = { "garantias.cancelar" };
     /*
       LA PAREJA WEB/MOVIL DE **ESTA** BANDEJA, Y SOLO DE ESTA.
@@ -53,8 +92,23 @@ public class VentasGarantiasController : PermisoControllerBase
 
     private static readonly string[] PermisoAceptarVer =
         { "garantias.ver", "app_movil.garantias.aceptar.ver" };
-    private static readonly string[] PermisoRegistroEditar = { "garantias.registro.editar" };
-    private static readonly string[] PermisoRegistroCancelar = { "garantias.registro.cancelar" };
+    private static readonly string[] PermisoRegistroEditar =
+        { "garantias.registro.editar", "app_movil.garantias.registros.editar" };
+
+    private static readonly string[] PermisoRegistroCancelar =
+        { "garantias.registro.cancelar", "app_movil.garantias.registros.cancelar" };
+
+    /*
+      LA CONSULTA DE REGISTROS PREVIOS LLEVA SU PROPIA LISTA.
+
+      Exigia `PermisoVer`, que en el web es el permiso de la familia. Para el
+      telefono eso significaba que la clave de ver garantias abria tambien los
+      registros previos, y son otra tabla y otra tarea: el movil pide
+      `app_movil.garantias.registros.ver` para esto y nada mas. La clave del web
+      sigue valiendo, asi que nadie pierde la pantalla el dia del despliegue.
+    */
+    private static readonly string[] PermisoRegistroVer =
+        { "garantias.ver", "app_movil.garantias.registros.ver" };
 
     private readonly IVentasGarantiasService _service;
 
@@ -238,7 +292,9 @@ public class VentasGarantiasController : PermisoControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ConsultarRegistroAsync([FromBody] GarantiaRegistroConsultaRequest? request, CancellationToken ct)
     {
-        var veto = await ExigirPermisoAsync(PermisoVer, ct);
+        // La lista PROPIA de los registros previos, no la de toda la familia.
+        // Ver la nota de PermisoRegistroVer arriba.
+        var veto = await ExigirPermisoAsync(PermisoRegistroVer, ct);
         if (veto is not null) return veto;
 
         var data = await _service.ConsultarRegistroAsync(request ?? new GarantiaRegistroConsultaRequest(), ct);
