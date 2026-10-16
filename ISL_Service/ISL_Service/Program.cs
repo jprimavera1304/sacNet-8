@@ -409,6 +409,10 @@ builder.Services.AddScoped<IInventarioOperacionesRepository, InventarioOperacion
 builder.Services.AddScoped<IInventarioOperacionesService, InventarioOperacionesService>();
 builder.Services.AddScoped<IVentasPagosOperacionesRepository, VentasPagosOperacionesRepository>();
 builder.Services.AddScoped<IVentasPagosOperacionesService, VentasPagosOperacionesService>();
+// La LECTURA de la pantalla de reasignar cartera. La escritura sigue siendo
+// VentasPagosOperaciones: aqui no se escribe nada.
+builder.Services.AddScoped<IVentasReasignacionRepository, VentasReasignacionRepository>();
+builder.Services.AddScoped<IVentasReasignacionService, VentasReasignacionService>();
 builder.Services.AddScoped<IPedidosOperacionesRepository, PedidosOperacionesRepository>();
 builder.Services.AddScoped<IPedidosOperacionesService, PedidosOperacionesService>();
 builder.Services.AddScoped<IVentasConsultasLegacyRepository, VentasConsultasLegacyRepository>();
