@@ -151,33 +151,67 @@ public class VentasPagosOperacionesService : IVentasPagosOperacionesService
         request.IdsVenta = FiltrosLegacy.LimpiarIds(request.IdsVenta);
 
         /*
-          LA LISTA DE REMISIONES ES OBLIGATORIA, Y LEGACY NO LA PEDIA.
+          ══════════════════════════════════════════════════════════════════════
+          QUE HACE DE VERDAD `sp_n_VentasReasignacion`. LEIDO DE MacZ EL
+          2026-10-15, PORQUE LO QUE DECIA AQUI ESTABA MAL.
+          ══════════════════════════════════════════════════════════════════════
+          El procedimiento NO cambia el cliente de una remision. Nunca. En todo
+          su cuerpo no hay un solo `UPDATE Ventas SET IDCliente`. Lo que hace es:
 
-          Su controlador valida cliente, agente, usuario, equipo y motivo, y deja
-          pasar IDsVenta vacio. Con la lista vacia el procedimiento no reasigna
-          nada y contesta igual: la pantalla dice que reasigno y nada cambio de
-          dueno.
+            1. Para cada id de @IDsVenta:  UPDATE Ventas SET IDAgente = @IDAgente
+               (SIEMPRE, sin mirar @CambiarCliente) + una fila de auditoria en
+               `[Ventas Reasignacion]`.
+            2. Si @CambiarCliente = 1:     UPDATE Clientes SET IDAgente = @IDAgente
+               para @IDCliente + su fila de auditoria con IDVenta = 0.
+
+          O sea: @CambiarCliente = 1 significa "cambiale tambien el agente al
+          CLIENTE", y @IDCliente solo se usa para saber A QUE CLIENTE. El nombre
+          del campo es heredado y enganoso; se conserva porque es el parametro de
+          legacy, pero las validaciones de aqui ya no se guian por el nombre.
+
+          Son los tres botones de Mac31 (`VentasReasignacion.cs`):
+              REASIGNAR NOTAS Y AGENTE  CambiarCliente=1  IDsVenta = los marcados
+              REASIGNAR SOLO NOTAS      CambiarCliente=0  IDsVenta = los marcados
+              REASIGNAR AGENTE          CambiarCliente=1  IDsVenta = (vacio)
+
+          ══════════════════════════════════════════════════════════════════════
+          LO QUE SE CORRIGE, Y ES UN MODO ENTERO QUE ESTABA MUERTO
+          ══════════════════════════════════════════════════════════════════════
+          Antes se exigia `IdsVenta.Count > 0` SIEMPRE, asi que el tercer boton
+          —"REASIGNAR AGENTE", que manda la lista vacia a proposito— contestaba
+          400 y no se podia usar por API. No es un modo exotico: en MacZ es EL
+          MAS USADO. De las 793 filas de `[Ventas Reasignacion]`, 557 (70%)
+          tienen IDVenta = 0, que es exactamente la firma de ese modo. El front
+          del web lo ofrece (`ventasReasignacion.ts`, modo "solo-agente") y
+          siempre fallaba.
+
+          La preocupacion original sigue cubierta y era buena: con las DOS cosas
+          vacias (lista vacia Y CambiarCliente = 0) el procedimiento no escribe
+          nada y contesta exito. Eso es lo que se rechaza, y solo eso.
+
+          ══════════════════════════════════════════════════════════════════════
+          Y SE EXIGE EL AGENTE SIEMPRE, QUE ES LO QUE DE VERDAD PROTEGE ALGO
+          ══════════════════════════════════════════════════════════════════════
+          Antes, con CambiarCliente = 1 solo se exigia el cliente. Pero el
+          procedimiento escribe `IDAgente = @IDAgente` en las dos ramas, y
+          @IDAgente por omision es 0. O sea que un cuerpo con
+          `{cambiarCliente:1, idCliente:N, idsVenta:[...]}` y sin agente PASABA
+          la validacion y dejaba las notas y el cliente apuntando al agente 0.
+          `Ventas.IDAgente` NO tiene llave ajena (comprobado en
+          `sys.foreign_keys` de MacZ), asi que la base lo acepta, el
+          procedimiento contesta exito, y esa cartera desaparece de cualquier
+          consulta que cruce con `Agentes`: queda sin dueno y sin error.
         */
-        if (request.IdsVenta.Count == 0)
-            throw new ArgumentException("Hay que indicar al menos una remision.");
+        if (request.IdAgente <= 0)
+            throw new ArgumentException("Hay que indicar el agente que recibe la cartera.");
 
-        /*
-          SEGUN LO QUE SE CAMBIA, SE PIDE LO QUE HACE FALTA.
+        if (request.CambiarCliente == 1 && request.IdCliente <= 0)
+            throw new ArgumentException("Para cambiar el agente del cliente hace falta el cliente.");
 
-          Legacy exige cliente Y agente siempre, aunque solo vaya a usar uno: con
-          CambiarCliente = 1 el procedimiento mueve el cliente y con 0 mueve el
-          agente. Exigir el que no se va a usar obliga a mandar un numero de
-          relleno, y un numero de relleno en un campo que decide de quien es una
-          remision es una mala idea.
-        */
-        if (request.CambiarCliente == 1)
+        if (request.CambiarCliente != 1 && request.IdsVenta.Count == 0)
         {
-            if (request.IdCliente <= 0)
-                throw new ArgumentException("Para cambiar el cliente hace falta el cliente.");
-        }
-        else if (request.IdAgente <= 0)
-        {
-            throw new ArgumentException("Para cambiar el agente hace falta el agente.");
+            throw new ArgumentException(
+                "Hay que indicar al menos una remision, o cambiar tambien el agente del cliente.");
         }
 
         return await _repository.ReasignarAsync(request, idUsuario, equipo, ct);
