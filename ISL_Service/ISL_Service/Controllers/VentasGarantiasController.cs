@@ -31,7 +31,28 @@ public class VentasGarantiasController : PermisoControllerBase
     private static readonly string[] PermisoVer = { "garantias.ver" };
     private static readonly string[] PermisoEditar = { "garantias.editar" };
     private static readonly string[] PermisoCancelar = { "garantias.cancelar" };
-    private static readonly string[] PermisoAceptar = { "garantias.aceptar" };
+    /*
+      LA PAREJA WEB/MOVIL DE **ESTA** BANDEJA, Y SOLO DE ESTA.
+
+      `PermisoVer` ("garantias.ver") lo comparten las TRES pantallas de
+      garantias: catalogos, consulta, registros previos y esta. Agregarle la
+      clave del movil habria dado, con un solo permiso de telefono, la lectura
+      de la familia entera.
+
+      Asi que la bandeja de aceptacion lleva sus propias dos listas. Las claves
+      del web siguen valiendo —nadie pierde la pantalla el dia del despliegue— y
+      las del movil solo abren esto. `ExigirPermisoAsync` pide CUALQUIERA de la
+      lista.
+
+      Las dos de `app_movil.` hay que sembrarlas en el catalogo; el bloque esta
+      en `Movil/mac-mac-mobile/lib/modules/verticals/garantias_aceptadas.permisos.md`.
+      Mientras no esten, esto se porta exactamente como antes.
+    */
+    private static readonly string[] PermisoAceptar =
+        { "garantias.aceptar", "app_movil.garantias.aceptar" };
+
+    private static readonly string[] PermisoAceptarVer =
+        { "garantias.ver", "app_movil.garantias.aceptar.ver" };
     private static readonly string[] PermisoRegistroEditar = { "garantias.registro.editar" };
     private static readonly string[] PermisoRegistroCancelar = { "garantias.registro.cancelar" };
 
@@ -170,7 +191,9 @@ public class VentasGarantiasController : PermisoControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ConsultarAceptarAsync([FromBody] GarantiaConsultaRequest? request, CancellationToken ct)
     {
-        var veto = await ExigirPermisoAsync(PermisoVer, ct);
+        // La lista PROPIA de esta bandeja, no la de toda la familia. Ver la nota
+        // de PermisoAceptarVer arriba.
+        var veto = await ExigirPermisoAsync(PermisoAceptarVer, ct);
         if (veto is not null) return veto;
 
         var data = await _service.ConsultarAceptarAsync(request ?? new GarantiaConsultaRequest(), IdUsuarioLegacy(), ct);
