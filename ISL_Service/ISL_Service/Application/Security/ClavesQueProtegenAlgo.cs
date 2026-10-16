@@ -70,7 +70,7 @@ public static class ClavesQueProtegenAlgo
     {
         var k = (clave ?? string.Empty).Trim();
         if (k.Length == 0) return false;
-        return EsDeReportes(k) || EsPuertaDeModulo(k) || _claves.Value.Contains(k);
+        return EsDeReportes(k) || EsDeCentros(k) || EsPuertaDeModulo(k) || _claves.Value.Contains(k);
     }
 
     /// <summary>
@@ -95,6 +95,26 @@ public static class ClavesQueProtegenAlgo
     /// </remarks>
     public static bool EsPuertaDeModulo(string? clave) =>
         (clave ?? string.Empty).TrimEnd().EndsWith(".ver_modulo", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Las claves de los centros de servicio, de las dos familias.
+    /// </summary>
+    /// <remarks>
+    /// MISMO MOTIVO QUE REPORTES, Y HABIA QUE DECIRLO O LA PANTALLA LAS ESCONDE.
+    ///
+    /// `centros.2004.ver` no aparece como literal en ningun sitio del
+    /// ensamblado: se COMPONE en tiempo de ejecucion con el Numero que esta en
+    /// dbo.CentrosServicio de cada empresa (PermisosDeCentros.Ver). La reflexion
+    /// no puede verla, asi que sin este renglon las 24 claves de los doce centros
+    /// de Zaragoza se reportarian como "no protege nada" y el catalogo las
+    /// esconderia — justo las casillas que hay que repartir, y encima el permiso
+    /// de ESCRIBIR en un centro, que es el que mas importa revisar.
+    ///
+    /// Su comprobacion existe y es GuardiaDeCentros (PuedeVer / PuedeOperar /
+    /// PuedeCambiar); cual clave aplica lo dice el catalogo de centros de la
+    /// empresa, que aqui no se puede leer.
+    /// </remarks>
+    public static bool EsDeCentros(string? clave) => PermisosDeCentros.EsDeCentros(clave);
 
     /// <summary>
     /// Las claves del arbol de reportes, que se autorizan por otra via.
