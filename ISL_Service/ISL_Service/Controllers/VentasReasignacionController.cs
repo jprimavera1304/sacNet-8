@@ -79,12 +79,17 @@ public class VentasReasignacionController : PermisoControllerBase
         "app_movil.reasignacion.ver",
     };
 
-    /// <summary>Lo que se le dice a quien pide esto desde un centro.</summary>
+    /// <summary>
+    /// Lo que se le dice a quien pide esto desde un centro.
+    ///
+    /// SE ESCRIBE PARA QUIEN LO VA A LEER, QUE NO ES UN PROGRAMADOR: este
+    /// texto llega tal cual a la pantalla del telefono. Las cifras de los
+    /// catalogos que sostienen la decision —28 de los 59 agentes no existen en
+    /// la base del centro y 4 identificadores apuntan a otra persona— estan en
+    /// el comentario de la cabecera, que es donde sirven.
+    /// </summary>
     public const string MotivoSinCentros =
-        "Reasignar cartera todavía solo se puede en la matriz. El catálogo de agentes " +
-        "de la matriz no coincide con el de los centros —28 de los 59 agentes no existen " +
-        "en la base del centro y 4 identificadores apuntan a otra persona—, así que una " +
-        "reasignación hecha desde aquí podría entregarle la cartera a quien no es.";
+        "Reasignar cartera solo se puede desde la matriz.";
 
     private readonly IVentasReasignacionService _service;
 

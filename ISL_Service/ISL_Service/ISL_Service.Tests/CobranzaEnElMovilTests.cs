@@ -144,7 +144,15 @@ public class CobranzaEnElMovilTests
         var motivo = (string)campo.GetRawConstantValue()!;
 
         Assert.Contains("matriz", motivo, System.StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Vuelve", motivo, System.StringComparison.OrdinalIgnoreCase);
+
+        /*
+          Y CORTO. Antes se exigia que dijera "vuelve a la matriz", y el motivo
+          crecio explicando como arma su conexion el procedimiento. Eso esta en
+          el comentario de arriba. Volver ya no se pide a mano: la app resuelve
+          sola en que centro se puede trabajar.
+        */
+        Assert.True(motivo.Length <= 90, $"el motivo se alargo: {motivo}");
+        Assert.DoesNotContain("procedimiento", motivo, System.StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

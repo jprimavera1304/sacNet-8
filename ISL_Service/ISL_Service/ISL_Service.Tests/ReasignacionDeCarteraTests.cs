@@ -342,7 +342,17 @@ public class ReasignacionDeCarteraTests
 
         Assert.False(string.IsNullOrWhiteSpace(motivo));
         Assert.Contains("matriz", motivo, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("agentes", motivo, StringComparison.OrdinalIgnoreCase);
+
+        /*
+          Y SE ESCRIBE PARA QUIEN LO LEE, QUE NO ES UN PROGRAMADOR.
+
+          Antes aqui se exigia que el motivo hablara de "agentes", y por eso
+          crecio hasta cuatro renglones con las cifras de los catalogos. Ese
+          por que vive en el comentario de la cabecera del controlador; lo que
+          llega al telefono dice que no se puede y donde si, en una frase.
+        */
+        Assert.True(motivo.Length <= 90, $"el motivo se alargo: {motivo}");
+        Assert.DoesNotContain("base del centro", motivo, StringComparison.OrdinalIgnoreCase);
     }
 
     // ───────────────────────── LOS ESPIAS ─────────────────────────

@@ -113,12 +113,16 @@ public class CobranzasController : PermisoControllerBase
       la matriz, pero un APK viejo —o cualquier modulo futuro que comparta el
       `ApiClient`, que pone `X-Centro` en TODAS las peticiones— si lo haria.
     */
+    /*
+      SE ESCRIBE PARA QUIEN LO VA A LEER, QUE NO ES UN PROGRAMADOR.
+
+      Este texto llega tal cual a la pantalla del telefono. El motivo tecnico
+      —el procedimiento arma su conexion por su cuenta y no sabe de centros,
+      asi que una cobranza "del centro" se guardaria en la matriz sin avisar—
+      esta explicado arriba, en el comentario, que es donde sirve.
+    */
     private const string MotivoSinCentros =
-        "La cobranza todavía solo funciona en la matriz. El procedimiento que " +
-        "la guarda arma su conexión por su cuenta y no sabe de centros de " +
-        "servicio: una cobranza capturada \"en el centro\" se guardaría en la " +
-        "matriz sin que nada avisara. Vuelve a la matriz para armar o cancelar " +
-        "cobranzas.";
+        "La cobranza solo se lleva en la matriz.";
 
     public CobranzasController(
         ICobranzasService service,
