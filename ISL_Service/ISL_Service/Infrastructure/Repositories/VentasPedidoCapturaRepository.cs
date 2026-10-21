@@ -15,6 +15,10 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
 {
     private const int CommandTimeoutSeconds = 500;
 
+    /*  Documento 11 = COMPRA. Una compra toma la tarifa del PROVEEDOR y manda
+        IDCliente = 0 a proposito, asi que el candado de cliente no le aplica.  */
+    private const int TipoDocumentoCompra = 11;
+
     private readonly ILogger<VentasPedidoCapturaRepository> _logger;
 
     /*
@@ -948,6 +952,36 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
 
+        /*  EL CLIENTE DEL PEDIDO LO PONE LA BASE, NO QUIEN LLAMA.
+
+            `sp_n_InsertarPedidoDetalle` calcula el descuento con el @IDCliente que
+            recibe en CADA renglon -lee Clientes.IDDescuento y de ahi
+            [Detalle Descuentos]- y NO lo compara nunca contra Pedidos.IDCliente.
+            Una llamada con otro cliente guarda el renglon en el pedido correcto
+            pero con la lista de descuentos de otro.
+
+            Paso de verdad: en el pedido 88729 (17-sep-2026) el cliente 1264 recibio
+            45 % en dos aceites donde NO tiene ninguna fila de tarifa -cero filas y
+            cero movimientos en la bitacora-; ese 45 solo pudo salir de otra lista.
+            Son 2,341 pesos en un solo pedido. La auditoria completa esta en
+            `Querrys/58 Descuento De Mas En Pedidos/`.
+
+            Va aqui y no en la app a proposito: el telefono manda el cliente desde
+            su estado en memoria, y una version vieja de la app no se puede arreglar
+            hacia atras. Con el candado en el servidor quedan protegidos todos los
+            telefonos, incluidos los que nunca actualicen.  */
+        var clienteEnviado = request.IDCliente;
+        var clienteDelPedido = await ClienteDelPedidoAsync(conn, request, ct);
+        if (clienteDelPedido > 0 && clienteDelPedido != clienteEnviado)
+        {
+            await RegistrarRenglonAsync(conn, request, idUsuario, equipo,
+                clienteDelPedido, clienteEnviado, null, 0, "rechazado", ct);
+            throw new ArgumentException(
+                "Este pedido es de otro cliente. Cierralo y vuelve a abrirlo para agregar productos.");
+        }
+        if (clienteDelPedido > 0)
+            request.IDCliente = clienteDelPedido;   // manda la base, no el cuerpo de la peticion
+
         DataSet result;
         try
         {
@@ -968,6 +1002,7 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
         InvalidarComprometido();
 
         var idPedido = request.IDPedido;
+        var idDescuento = 0;
         if (result.Tables.Count > 0 && result.Tables[0].Rows.Count > 0)
         {
             var row = result.Tables[0].Rows[0];
@@ -975,14 +1010,99 @@ public class VentasPedidoCapturaRepository : IVentasPedidoCapturaRepository
             if (legacyResult == 0)
             {
                 var message = ReadString(row, "mensaje", "Mensaje");
+                await RegistrarRenglonAsync(conn, request, idUsuario, equipo,
+                    clienteDelPedido, clienteEnviado, null, 0, "rechazado por legacy", ct);
                 if (!string.IsNullOrWhiteSpace(message))
                     throw new ArgumentException(message.Replace("@@@@", Environment.NewLine + Environment.NewLine));
             }
 
             idPedido = ReadInt(row, "IDPedido", "idPedido");
+            /* El procedimiento devuelve la lista que uso para calcular. */
+            idDescuento = ReadInt(row, "IDDescuento", "idDescuento");
         }
 
+        /*  Queda constancia de con que cliente y con que lista se calculo este
+            renglon. Antes no habia forma de saberlo: ni [Pedidos Detalle] ni
+            ninguna bitacora guardaban quien agrego un renglon ni a que hora, y por
+            eso la auditoria de 2026 no pudo reconstruir el origen de 8 renglones.  */
+        await RegistrarRenglonAsync(conn, request, idUsuario, equipo,
+            clienteDelPedido > 0 ? clienteDelPedido : request.IDCliente, clienteEnviado,
+            await PorcentajesDelRenglonAsync(conn, idPedido, request.IDProducto, ct),
+            idDescuento, "agregado", ct);
+
         return await ConsultarPedidoAsync(conn, idPedido, ct);
+    }
+
+    /*  El cliente dueño del pedido, leido de la base.
+
+        Devuelve 0 -y entonces no hay nada que validar- en tres casos legitimos:
+        cuando el pedido todavia no existe (el primer renglon lo crea, y ahi el
+        cliente solo puede venir de quien llama), cuando es una COMPRA (documento
+        11, que toma la tarifa del proveedor y manda IDCliente = 0 a proposito), y
+        cuando el pedido no se encuentra, que el procedimiento ya rechaza por su
+        cuenta con su propio mensaje.  */
+    private static async Task<int> ClienteDelPedidoAsync(
+        SqlConnection conn, PedidoAgregarDetalleRequest request, CancellationToken ct)
+    {
+        if (request.IDPedido <= 0) return 0;
+        if (request.IDTipoDocumento == TipoDocumentoCompra) return 0;
+
+        await using var cmd = new SqlCommand(
+            "SELECT ISNULL(IDCliente, 0) FROM dbo.Pedidos WHERE IDPedido = @IDPedido;", conn);
+        cmd.Parameters.AddWithValue("@IDPedido", request.IDPedido);
+        var valor = await cmd.ExecuteScalarAsync(ct);
+        return valor is null || valor == DBNull.Value
+            ? 0
+            : Convert.ToInt32(valor, CultureInfo.InvariantCulture);
+    }
+
+    /* La cadena de porcentajes que legacy acaba de escribir ('42@-42'), para la bitacora. */
+    private static async Task<string?> PorcentajesDelRenglonAsync(
+        SqlConnection conn, int idPedido, int idProducto, CancellationToken ct)
+    {
+        if (idPedido <= 0 || idProducto <= 0) return null;
+        await using var cmd = new SqlCommand(@"
+SELECT TOP 1 Porcentajes FROM dbo.[Pedidos Detalle]
+ WHERE IDPedido = @IDPedido AND IDProducto = @IDProducto
+ ORDER BY IDPedidoDetalle DESC;", conn);
+        cmd.Parameters.AddWithValue("@IDPedido", idPedido);
+        cmd.Parameters.AddWithValue("@IDProducto", idProducto);
+        var valor = await cmd.ExecuteScalarAsync(ct);
+        return valor is null || valor == DBNull.Value ? null : Convert.ToString(valor);
+    }
+
+    /*  Bitacora de renglones (tabla propia WPedidoRenglonBitacora, no toca legacy).
+        Nunca debe tumbar la captura: si falla al escribir, el renglon ya se guardo
+        y lo que se pierde es el rastro, no la venta.  */
+    private static async Task RegistrarRenglonAsync(
+        SqlConnection conn, PedidoAgregarDetalleRequest request, int idUsuario, string equipo,
+        int clienteDelPedido, int clienteEnviado, string? porcentajes, int idDescuento,
+        string resultado, CancellationToken ct)
+    {
+        try
+        {
+            await using var cmd = new SqlCommand(@"
+INSERT INTO dbo.WPedidoRenglonBitacora
+       (IDPedido, IDUsuario, Equipo, IDClientePedido, IDClienteEnviado,
+        IDProducto, Cantidad, Porcentajes, IDDescuento, Resultado)
+VALUES (@IDPedido, @IDUsuario, @Equipo, @IDClientePedido, @IDClienteEnviado,
+        @IDProducto, @Cantidad, @Porcentajes, @IDDescuento, @Resultado);", conn);
+            cmd.Parameters.AddWithValue("@IDPedido", request.IDPedido);
+            cmd.Parameters.AddWithValue("@IDUsuario", idUsuario);
+            cmd.Parameters.AddWithValue("@Equipo", (object?)equipo ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@IDClientePedido", clienteDelPedido);
+            cmd.Parameters.AddWithValue("@IDClienteEnviado", clienteEnviado);
+            cmd.Parameters.AddWithValue("@IDProducto", request.IDProducto);
+            cmd.Parameters.AddWithValue("@Cantidad", request.Cantidad);
+            cmd.Parameters.AddWithValue("@Porcentajes", (object?)porcentajes ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@IDDescuento", idDescuento);
+            cmd.Parameters.AddWithValue("@Resultado", resultado);
+            await cmd.ExecuteNonQueryAsync(ct);
+        }
+        catch (SqlException)
+        {
+            /* Sin bitacora se sigue vendiendo. Al reves no. */
+        }
     }
 
     public async Task<PedidoSnapshotDto> EliminarDetalleAsync(PedidoEliminarDetalleRequest request, CancellationToken ct)
@@ -1331,8 +1451,20 @@ ORDER BY Fecha;";
         cmd.Parameters.AddWithValue("@SoloServicios", request.SoloServicios);
         cmd.Parameters.AddWithValue("@SoloLogistica", request.SoloLogistica);
         cmd.Parameters.AddWithValue("@Facturar", request.Facturar);
-        cmd.Parameters.AddWithValue("@Simular", request.Simular);
-        cmd.Parameters.AddWithValue("@IDDescuentoSimular", request.IDDescuentoSimular);
+        /*  SIMULAR NO SIMULA: ESCRIBE.
+
+            En `sp_n_InsertarPedidoDetalle` el INSERT en [Pedidos Detalle] y el
+            COMMIT no estan condicionados por @Simular, y en `sp_w_` ese parametro
+            solo sirve para SALTARSE el candado de apartado de inventario. Es decir:
+            una llamada marcada como simulacion graba un renglon real, con la lista
+            que le pasen en @IDDescuentoSimular y sin validar existencias.
+
+            Ninguna pantalla nuestra lo usa -el movil manda 0 fijo- asi que aqui van
+            en cero siempre, sin mirar el cuerpo de la peticion. Si algun dia hace
+            falta simular de verdad, va por un camino propio de solo lectura, no
+            por el que escribe.  */
+        cmd.Parameters.AddWithValue("@Simular", 0);
+        cmd.Parameters.AddWithValue("@IDDescuentoSimular", 0);
         cmd.Parameters.AddWithValue("@PedidoSinCascosCambio", request.PedidoSinCascosCambio);
         cmd.Parameters.AddWithValue("@Tipo", request.Tipo);
         cmd.Parameters.AddWithValue("@IDEmpresaCS", request.IDEmpresaCS);
