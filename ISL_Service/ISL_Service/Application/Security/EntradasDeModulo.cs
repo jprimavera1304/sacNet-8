@@ -145,6 +145,7 @@ public static class EntradasDeModulo
         ("cobranzas.",          new[] { "cobranzas.ver_modulo" }),
         ("almacen_cascos.",     new[] { "almacen_cascos.ver_modulo" }),
         ("cascos_cambio.",      new[] { "cascos_cambio.ver_modulo" }),
+        ("recepcion_cascos.",   new[] { "recepcion_cascos.ver_modulo" }),
         ("gasolinas.",          new[] { "gasolinas.ver_modulo" }),
         ("transferencias.",     new[] { "transferencias.ver_modulo" }),
         ("recordatorios.",      new[] { "recordatorios.ver_modulo" }),

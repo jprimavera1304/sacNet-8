@@ -1734,6 +1734,24 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
         new("cascos_cambio.crear", "Cambio de Cascos - Registrar cambio", "cascos_cambio"),
         new("cascos_cambio.cancelar", "Cambio de Cascos - Cancelar cambio", "cascos_cambio"),
 
+        /*
+          Recepcion de cascos usados (Tauro). Van en esta lista y no solo en el
+          script de SQL porque el catalogo se siembra solo al arrancar: sin
+          renglon aqui, la clave no existiria en una base nueva y el backend
+          contestaria 403 hasta al administrador.
+
+          El historial es la unica que NO tiene pareja movil: es una pantalla de
+          revision que el telefono no abre, y una clave que no abre nada promete
+          algo que no ocurre.
+        */
+        new("recepcion_cascos.ver_modulo", "Recepcion de cascos usados - Ver modulo", "recepcion_cascos"),
+        new("recepcion_cascos.ver", "Recepcion de cascos usados - Ver", "recepcion_cascos"),
+        new("recepcion_cascos.crear", "Recepcion de cascos usados - Registrar recepcion", "recepcion_cascos"),
+        new("recepcion_cascos.editar", "Recepcion de cascos usados - Corregir recepcion", "recepcion_cascos"),
+        new("recepcion_cascos.cancelar", "Recepcion de cascos usados - Cancelar recepcion", "recepcion_cascos"),
+        new("recepcion_cascos.imprimir", "Recepcion de cascos usados - Imprimir la relacion", "recepcion_cascos"),
+        new("recepcion_cascos.historial", "Recepcion de cascos usados - Ver el historial de cambios", "recepcion_cascos"),
+
         new("asistencias.ver", "Asistencias - Ver", "asistencias"),
         new("asistencias.editar", "Asistencias - Editar", "asistencias"),
 
@@ -1748,6 +1766,12 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
         new("app_movil.cascos_cambio.ver", "App mÃ³vil - Cambio de cascos: Ver", "app_movil"),
         new("app_movil.cascos_cambio.crear", "App mÃ³vil - Cambio de cascos: Registrar", "app_movil"),
         new("app_movil.cascos_cambio.cancelar", "App mÃ³vil - Cambio de cascos: Cancelar", "app_movil"),
+
+        new("app_movil.recepcion_cascos.ver", "App movil - Recepcion de cascos usados: Ver", "app_movil"),
+        new("app_movil.recepcion_cascos.crear", "App movil - Recepcion de cascos usados: Registrar", "app_movil"),
+        new("app_movil.recepcion_cascos.editar", "App movil - Recepcion de cascos usados: Corregir", "app_movil"),
+        new("app_movil.recepcion_cascos.cancelar", "App movil - Recepcion de cascos usados: Cancelar", "app_movil"),
+        new("app_movil.recepcion_cascos.imprimir", "App movil - Recepcion de cascos usados: Imprimir", "app_movil"),
         new("app_movil.asistencias.ver", "App mÃ³vil - Asistencias: Ver", "app_movil"),
         new("app_movil.asistencias.editar", "App mÃ³vil - Asistencias: Editar", "app_movil"),
         new("app_movil.empleados.ver", "App mÃ³vil - Empleados: Ver", "app_movil"),
@@ -5997,6 +6021,7 @@ WHERE EmpresaId = @EmpresaId
             // Devolver "/cascos_cambio/index.html" daba "Cannot GET": la
             // carpeta no existe ni va a existir.
             "cascos_cambio" => "/cascos-cambio",
+            "recepcion_cascos" => "/recepcion-cascos",
             _ => $"/{moduleKey}/index.html"
         };
     }

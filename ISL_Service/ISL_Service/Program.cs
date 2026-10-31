@@ -484,6 +484,12 @@ builder.Services.AddScoped<IPrestamosService, PrestamosService>();
 builder.Services.AddScoped<ICascosCambioRepository, CascosCambioRepository>();
 builder.Services.AddScoped<ICascosCambioService, CascosCambioService>();
 
+// Recepcion de cascos usados (Tauro): la hoja de papel de los cascos que
+// entregan los agentes. Escribe solo en tablas propias (WRecepcionCasco*) con
+// sp_w_; de legacy nada mas lee [Catalogo TiposUsados] y Agentes.
+builder.Services.AddScoped<IRecepcionCascosRepository, RecepcionCascosRepository>();
+builder.Services.AddScoped<IRecepcionCascosService, RecepcionCascosService>();
+
 // Version minima/recomendada de la app movil (endpoint anonimo api/app/version).
 builder.Services.AddScoped<IAppVersionRepository, AppVersionRepository>();
 
