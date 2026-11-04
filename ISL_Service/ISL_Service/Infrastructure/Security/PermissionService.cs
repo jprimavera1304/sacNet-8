@@ -2122,7 +2122,77 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
         new("app_movil.ventas.devolucion", "App móvil - Devolución", "app_movil"),
         new("app_movil.ventas.usados.guardar", "App móvil - Usados: Guardar", "app_movil"),
         new("app_movil.ventas.simular.con_remision", "App móvil - Simular con remisión", "app_movil"),
-        new("app_movil.ventas.simular.sin_remision", "App móvil - Simular sin remisión", "app_movil")
+        new("app_movil.ventas.simular.sin_remision", "App móvil - Simular sin remisión", "app_movil"),
+
+        /*
+          EL CANAL DEL TELEFONO PARA LOS DOCE MOSAICOS QUE TODAVIA ENTRABAN CON
+          LA LLAVE DEL WEB.
+
+          EL PROBLEMA QUE CIERRA. Doce pantallas del telefono pedian como
+          permiso de entrada la clave del WEB (`compras.ver`, `cobranzas.ver`,
+          `transferencias.ver`, `usados.ver`, `cobranza.ver`,
+          `descuentos.ajustes.ver`...). Mientras sea asi no hay dos canales:
+          dar compras en la computadora la enciende tambien en el bolsillo, y
+          quitarla del telefono se la quita de la computadora. No son dos
+          permisos parecidos, es EL MISMO.
+
+          Y no se podia cambiar de golpe, porque la clave del telefono no
+          existia en WPermiso: exigir una clave que el catalogo no tiene no
+          apaga el mosaico, lo ESCONDE PARA SIEMPRE (ya paso con
+          `pedidos.capturar`). Primero existe, luego se reparte, y solo
+          entonces manda. Mientras tanto la app acepta las dos (ver
+          `ModuloDelTelefono.permisos`), asi que el efecto HOY es cero.
+
+          CINCO DE LOS DOCE YA ESTABAN SEMBRADOS mas arriba
+          (`app_movil.proveedores.ver`, `.cambiosvigencia.ver`,
+          `.concentrados.ver`, `.garantias.ver`, `.gasolinas.ver`) y
+          `app_movil.reasignacion.ver` tambien. Aqui van los que faltaban.
+
+          LAS ACCIONES VAN CON SU PANTALLA, no solo el `ver`: las cuatro
+          familias de abajo ya las comprueba el codigo Dart (compras,
+          cobranzas, dinero de usados) y sin semilla no se pueden conceder a
+          nadie, asi que solo le funcionaban al SuperAdmin — el mismo fallo
+          silencioso de siempre.
+
+          POR QUE `app_movil.liquidaciones_cobros.ver` NO SE LLAMA
+          `app_movil.cobranza.ver`, que seria su pareja exacta del web: en el
+          catalogo ya vive `app_movil.cobranzas.ver` (modulo Cobranzas, otra
+          pantalla) y las dos juntas se leen como la misma cosa escrita con y
+          sin ese. Quien reparte permisos no puede distinguirlas de un vistazo.
+          Hay precedente de no copiar el nombre del web cuando confunde: cobros
+          ingresos pide `usados.ver` en la computadora y
+          `app_movil.dinero_usados.ver` en el telefono.
+
+          NO SE CONCEDEN AL SEMBRAR. La concesion la reparte
+          Querrys/63 a quien HOY tiene la clave del web y entra a la app, que
+          es lo unico que evita que alguien pierda su mosaico el dia del
+          despliegue.
+        */
+        new("app_movil.compras.ver", "App móvil - Compras: Ver", "app_movil"),
+        new("app_movil.compras.editar", "App móvil - Compras: Marcar como factura", "app_movil"),
+        new("app_movil.compras.cancelar", "App móvil - Compras: Cancelar", "app_movil"),
+
+        new("app_movil.cobranzas.ver", "App móvil - Cobranza: Ver", "app_movil"),
+        new("app_movil.cobranzas.crear", "App móvil - Cobranza: Armar cobranza", "app_movil"),
+        new("app_movil.cobranzas.editar", "App móvil - Cobranza: Cambiar contenido", "app_movil"),
+        new("app_movil.cobranzas.cancelar", "App móvil - Cobranza: Cancelar", "app_movil"),
+        new("app_movil.cobranzas.pendientes.ver", "App móvil - Cobranza: Pendiente y vencida", "app_movil"),
+
+        new("app_movil.dinero_usados.ver", "App móvil - Cobros ingresos: Ver", "app_movil"),
+        new("app_movil.dinero_usados.editar", "App móvil - Cobros ingresos: Capturar y corregir", "app_movil"),
+        new("app_movil.dinero_usados.aplicar", "App móvil - Cobros ingresos: Aplicar", "app_movil"),
+        new("app_movil.dinero_usados.cancelar", "App móvil - Cobros ingresos: Cancelar", "app_movil"),
+
+        new("app_movil.transferencias.ver", "App móvil - Bancos transferencias: Ver", "app_movil"),
+        new("app_movil.descuentos.ajustes.ver", "App móvil - Liquidaciones de descuento: Ver", "app_movil"),
+        new("app_movil.liquidaciones_cobros.ver", "App móvil - Liquidaciones cobros: Ver", "app_movil"),
+
+        /*
+          `app_movil.garantias.cancelar` la pide `garantias.dart` desde que la
+          pantalla dejo cancelar, y nadie la sembro. Va aqui con sus hermanas y
+          no arriba, para que se vea que entra en esta tanda.
+        */
+        new("app_movil.garantias.cancelar", "App móvil - Garantías: Cancelar", "app_movil")
     };
 
     public bool IsAllowedByLegacy(string rolLegacy, string permission)

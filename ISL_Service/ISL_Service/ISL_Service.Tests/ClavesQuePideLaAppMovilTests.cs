@@ -50,6 +50,12 @@ public class ClavesQuePideLaAppMovilTests
     ///
     /// `app_movil.productos` NO esta en esta lista a proposito: alli el nombre
     /// del mosaico y el del permiso coinciden, y el permiso SI existe.
+    ///
+    /// COMO SE DECIDE SI UNA CLAVE ENTRA AQUI: se mira en el codigo Dart para
+    /// que se usa. Si es el valor de `clave:` de un `ModuloDelTelefono`, es el
+    /// nombre del mosaico y entra. Si alguien la pasa a `hasPermission` o a
+    /// `hasAnyPermission`, es un PERMISO y tiene que estar sembrada — meterla
+    /// aqui seria tapar justo el fallo que esta prueba busca.
     /// </summary>
     private static readonly HashSet<string> ClavesDeMosaico = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -61,6 +67,23 @@ public class ClavesQuePideLaAppMovilTests
         "app_movil.almacen_cascos",
         "app_movil.inventario.ajustes",
         "app_movil.inventario.transito",
+        /*
+          Los mosaicos de las pantallas que la app estreno despues. Ninguno se
+          concede: son el identificador del mosaico, y el permiso que SI se
+          concede es su `.ver` (`app_movil.gasolinas.ver`,
+          `app_movil.cobranzas.ver`...), que va sembrado por separado.
+        */
+        "app_movil.asistencias",
+        "app_movil.bancos_transferencias",
+        "app_movil.cambios_vigencia",
+        "app_movil.cobranzas",
+        "app_movil.concentrados",
+        "app_movil.dinero_usados",
+        "app_movil.garantias",
+        "app_movil.garantias_aceptadas",
+        "app_movil.gasolinas",
+        "app_movil.reasignacion",
+        "app_movil.recepcion_cascos",
         // El prefijo del canal, que se usa suelto en comparaciones y filtros.
         "app_movil"
     };
@@ -118,12 +141,41 @@ public class ClavesQuePideLaAppMovilTests
     /// <summary>Las carpetas de codigo de la app, si este repo las tiene al lado.</summary>
     private static List<string> CarpetasDeLaApp()
     {
-        // bin/Debug/net8.0 -> proyecto de pruebas -> ISL_Service -> sacNet-8 -> MAC
-        var mac = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
-            "..", "..", "..", "..", "..", ".."));
-        var app = Path.Combine(mac, "Movil", "mac-mac-mobile");
+        /*
+          SE BUSCA SUBIENDO, NO CON UNA CUENTA DE ".." ESCRITA A MANO.
+
+          Antes eran seis `..` con un comentario que decia
+          "bin/Debug/net8.0 -> proyecto de pruebas -> ISL_Service -> sacNet-8 ->
+          MAC". La cuenta estaba MAL: el repo tiene ISL_Service DOS veces
+          (ISL_Service\ISL_Service), asi que seis saltos llegan a `sacNet-8` y no
+          a `MAC`, y `sacNet-8\Movil\mac-mac-mobile` no existe.
+
+          Resultado: `CarpetasDeLaApp` devolvia vacio y la prueba se saltaba
+          SIEMPRE, en verde, sin medir nada. Es exactamente el fallo que su
+          propio `Assert` de "al menos diez claves" venia a impedir — y no lo
+          impedia, porque ese Assert queda despues del `return` de arriba.
+          Medido: con la cuenta corregida aparecieron diecisiete claves que la
+          app pide y nadie habia sembrado.
+
+          Subiendo hasta encontrar la carpeta no hay cuenta que equivocar, y
+          sigue funcionando si alguien mueve el proyecto de sitio.
+        */
+        var app = string.Empty;
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory);
+             dir is not null;
+             dir = dir.Parent)
+        {
+            var candidata = Path.Combine(dir.FullName, "Movil", "mac-mac-mobile");
+            if (Directory.Exists(candidata))
+            {
+                app = candidata;
+                break;
+            }
+        }
 
         var carpetas = new List<string>();
+        if (app.Length == 0) return carpetas; // La app no esta al lado de este repo.
+
         foreach (var sub in new[]
                  {
                      Path.Combine(app, "lib"),
