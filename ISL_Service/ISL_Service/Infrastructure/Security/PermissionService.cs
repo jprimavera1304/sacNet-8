@@ -2350,6 +2350,22 @@ WHERE up.EmpresaId = @EmpresaId;";
 
         foreach (var user in response.Users)
         {
+            /*
+              A QUIEN YA SE LE COPIARON SUS PERMISOS, LA PANTALLA LE ENSENA LOS
+              SUYOS Y NO LOS DE MAC31.
+
+              Sin esto, la pantalla seguiria pintando lo que dice el escritorio
+              encima de lo que esta guardado, y al administrador le daria la
+              razon el espejo: marcaria "quitado", guardaria, y al volver a
+              abrir lo veria otra vez puesto. Las filas que ya se leyeron de
+              WUsuarioPermiso mas arriba son justo lo que hay que ensenarle.
+
+              Mientras nadie este copiado -que es el estado de hoy- esta
+              condicion nunca es cierta y el bucle hace lo mismo que antes.
+            */
+            if (await TienePermisosPropiosAsync(conn, empresaId, user.UserId, ct))
+                continue;
+
             var legacyReports = await LoadLegacyReportPermissionsForUserAsync(conn, empresaId, user.UserId, reportCatalog, ct);
             var legacyVentas = await LoadVentasPermissionsForUserAsync(conn, empresaId, user.UserId, ventasCatalog, ct);
             var legacyEmpleados = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, user.UserId, EmpleadosBinding, empleadosCatalog, ct);
@@ -3142,6 +3158,26 @@ WHERE EmpresaId = @EmpresaId
           llamarlo con las listas vacias desde el alta de usuarios revocaba
           todos los permisos de Mac31 de quien ya existia en el escritorio.
         */
+        /*
+          Y NO SE ESCRIBE EN MAC31 SI A ESTA PERSONA SE LE COPIARON SUS PERMISOS.
+
+          Es la mitad que le da sentido a la copia, y la que el usuario pidio
+          con estas palabras: "quitarle algo en el web NO se lo quita en
+          Mac31". Mientras el web es un espejo, el write-back es lo correcto
+          -lo que se desmarca aqui se apaga alla-. En cuanto esa persona tiene
+          sus propios permisos, el web dejo de hablar por el escritorio: apagar
+          una clave aqui solo puede significar "aqui no", nunca "ni aqui ni
+          alla".
+
+          Sin este candado la copia seria peor que no tenerla: el primer
+          guardado despues de copiar apagaria en Mac31 todo lo que el web no
+          conceda, o sea que tocar el web romperia el escritorio.
+
+          Para quien NO esta copiado no cambia nada: sigue sincronizando igual.
+        */
+        if (sincronizarConLegacy && await TienePermisosPropiosAsync(conn, empresaId, userId, ct))
+            sincronizarConLegacy = false;
+
         if (sincronizarConLegacy)
         {
             var userRole = await GetUserRoleAsync(conn, empresaId, userId, ct);
@@ -3490,7 +3526,25 @@ WHERE t.name = 'WUsuarioPermiso';";
         var ventasCatalog = await EnsureVentasPermissionsSyncedAsync(conn, empresaId, ct);
         var empleadosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, EmpleadosBinding, ct);
         var prestamosCatalog = await EnsureLegacyModulePermissionsSyncedAsync(conn, empresaId, PrestamosBinding, ct);
-        if (reportCatalog.Count > 0)
+
+        /*
+          Y SI A ESTA PERSONA YA SE LE COPIARON SUS PERMISOS, NO HEREDA.
+
+          Es el unico interruptor de todo el cambio: mientras nadie pulse el
+          boton de "copiar permisos de Mac31", esto vale `true` para todo el
+          mundo y los cinco bloques de abajo corren EXACTAMENTE como antes.
+          Con la copia hecha, los cinco se saltan y lo que la persona puede sale
+          solo del web (su rol y sus ajustes, que es donde la copia quedo
+          escrita). Ver PermissionService.CopiaDeMac31.cs.
+
+          LOS CATALOGOS SE SIGUEN SEMBRANDO ARRIBA, copiados o no: son "que
+          claves existen" en la empresa, los comparte todo el mundo y de ellos
+          vive la pantalla de permisos. Lo que se salta es la herencia de ESTA
+          persona, no el catalogo de la empresa.
+        */
+        var heredaDeMac31 = !await TienePermisosPropiosAsync(conn, empresaId, userId, ct);
+
+        if (heredaDeMac31 && reportCatalog.Count > 0)
         {
             var legacyReports = await LoadLegacyReportPermissionsForUserAsync(conn, empresaId, userId, reportCatalog, ct);
             permissions.RemoveAll(EsReporteQueMandaLegacy);
@@ -3523,7 +3577,7 @@ WHERE t.name = 'WUsuarioPermiso';";
                 permissions.Add(ReportesViewPermission);
             }
         }
-        if (ventasCatalog.Count > 0)
+        if (heredaDeMac31 && ventasCatalog.Count > 0)
         {
             var legacyVentas = await LoadVentasPermissionsForUserAsync(conn, empresaId, userId, ventasCatalog, ct);
             permissions.RemoveAll(x => x.StartsWith($"{VentasModuleKey}.", StringComparison.OrdinalIgnoreCase) && !VentasWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
@@ -3574,7 +3628,7 @@ WHERE t.name = 'WUsuarioPermiso';";
         // alta, empleadosCatalog viene vacio y NO se borra nada — asi una base
         // sin ese modulo se queda con lo que diga el web, en vez de quedarse
         // sin permisos de empleados de golpe.
-        if (empleadosCatalog.Count > 0)
+        if (heredaDeMac31 && empleadosCatalog.Count > 0)
         {
             var legacyEmpleados = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, userId, EmpleadosBinding, empleadosCatalog, ct);
             permissions.RemoveAll(x => x.StartsWith($"{EmpleadosModuleKey}.", StringComparison.OrdinalIgnoreCase) && !EmpleadosWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
@@ -3616,7 +3670,7 @@ WHERE t.name = 'WUsuarioPermiso';";
         // tiene la forma dada de alta, prestamosCatalog viene vacio y NO se
         // borra nada — una base sin ese modulo se queda con lo que diga el web
         // en vez de quedarse sin permisos de prestamos de golpe.
-        if (prestamosCatalog.Count > 0)
+        if (heredaDeMac31 && prestamosCatalog.Count > 0)
         {
             var legacyPrestamos = await LoadLegacyModulePermissionsForUserAsync(conn, empresaId, userId, PrestamosBinding, prestamosCatalog, ct);
             permissions.RemoveAll(x => x.StartsWith($"{PrestamosModuleKey}.", StringComparison.OrdinalIgnoreCase) && !PrestamosWebPermissionSeeds.Any(seed => seed.Key.Equals(x, StringComparison.OrdinalIgnoreCase)));
@@ -3656,7 +3710,9 @@ WHERE t.name = 'WUsuarioPermiso';";
         // cuatro de arriba, lo de Mac31 de esta vuelta tiene que ser lo
         // ultimo que se escriba, no lo primero que otro bloque borre.
         var catalogosDeFamilias = await EnsureFamiliasLegacySyncedAsync(conn, empresaId, ct);
-        await AplicarFamiliasLegacyAsync(conn, empresaId, userId, permissions, catalogosDeFamilias, ct);
+        // Con la copia hecha, esta persona ya no hereda: ver `heredaDeMac31`.
+        if (heredaDeMac31)
+            await AplicarFamiliasLegacyAsync(conn, empresaId, userId, permissions, catalogosDeFamilias, ct);
 
         /*
           LA COMPATIBILIDAD DE CENTROS NO SE APLICA AQUI, Y ES UNA DECISION.

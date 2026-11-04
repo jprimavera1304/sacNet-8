@@ -205,6 +205,18 @@ builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
 
 /*
+  COPIAR LOS PERMISOS DE MAC31 ES EL MISMO SERVICIO, OTRA PUERTA.
+
+  Lo implementa PermissionService (ver PermissionService.CopiaDeMac31.cs) porque
+  necesita el calculo entero del puente: el snapshot con la herencia puesta, el
+  catalogo de cada familia y el vocabulario de la columna Tipo. Se resuelve
+  contra la MISMA instancia de la peticion y no con una segunda, para que las
+  dos compartan la memoria de peticion y no se pregunte todo dos veces.
+*/
+builder.Services.AddScoped<ICopiaDeMac31Service>(sp =>
+    (PermissionService)sp.GetRequiredService<IPermissionService>());
+
+/*
   LA PREFERENCIA DE CENTRO VIVE EN EL SERVIDOR.
 
   Scoped porque lee la conexion de AppDbContext, que es de la peticion: la base
