@@ -130,6 +130,21 @@ public class DiagnosticoFamiliasContraLaBase
         foreach (var f in formasVacias)
             _out.WriteLine($"  [forma sin procesos activos] {f}");
 
+        /*
+          EL SUELO, QUE AQUI NO ES PARA EVITAR UN VERDE FALSO SINO UN ROJO QUE
+          MIENTE.
+
+          Si la consulta a `n_Procesos` se rompe, `producidas` sale vacia y
+          entonces NADIE produce nada: los dos asertos de abajo fallan con una
+          lista de trescientas claves "que se borrarian y nadie repone", y quien
+          lo lea va a buscar el problema en las familias en vez de en la
+          consulta. Afirmarlo aqui convierte ese rojo confuso en un diagnostico.
+        */
+        Assert.True(producidas.Count >= 50,
+            $"[{baseDatos}] Mac31 solo produjo {producidas.Count} claves. Se abrio la base pero no "
+            + "se leyeron sus procesos: el problema esta en la consulta o en la reflexion, NO en "
+            + "las familias. Lo que diga el resto de esta prueba no vale.");
+
         // La familia que gobierna una clave es la del prefijo MAS LARGO, igual
         // que EsLaFamiliaMasEspecifica.
         bool SeBorraYNoVuelve(string clave)

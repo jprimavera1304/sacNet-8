@@ -75,10 +75,22 @@ public class VentasDescuentosController : PermisoControllerBase
     private static readonly string[] PermisoSimularVentas =
         { "ventas.simular.con_remision", "ventas.simular.sin_remision",
           "app_movil.ventas.simular.con_remision", "app_movil.ventas.simular.sin_remision" };
-    private static readonly string[] PermisoAjusteVer = { "descuentos.ajustes.ver", "descuentos.ver" };
-    private static readonly string[] PermisoAjusteCrear = { "descuentos.ajustes.crear" };
-    private static readonly string[] PermisoAjusteAutorizar = { "descuentos.ajustes.autorizar" };
-    private static readonly string[] PermisoAjusteAplicar = { "descuentos.ajustes.aplicar" };
+    /*
+      LOS CUATRO DE AJUSTES LLEVAN TAMBIEN SU CLAVE DEL MOVIL.
+
+      Misma razon y mismo mecanismo que transferencias y hojas de cobro: hasta
+      hoy la bandeja del telefono se encendia con la clave del web y no se
+      podian separar. Aplicar MUEVE EL DINERO, asi que conviene poder darlo en
+      la computadora y no en el bolsillo.
+    */
+    private static readonly string[] PermisoAjusteVer =
+        { "descuentos.ajustes.ver", "descuentos.ver", "app_movil.descuentos.ajustes.ver" };
+    private static readonly string[] PermisoAjusteCrear =
+        { "descuentos.ajustes.crear", "app_movil.descuentos.ajustes.crear" };
+    private static readonly string[] PermisoAjusteAutorizar =
+        { "descuentos.ajustes.autorizar", "app_movil.descuentos.ajustes.autorizar" };
+    private static readonly string[] PermisoAjusteAplicar =
+        { "descuentos.ajustes.aplicar", "app_movil.descuentos.ajustes.aplicar" };
 
     private readonly IVentasDescuentosService _service;
 

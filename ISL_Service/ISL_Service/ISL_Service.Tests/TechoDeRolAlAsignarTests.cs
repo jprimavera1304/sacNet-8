@@ -153,6 +153,10 @@ public class TechoDeRolAlAsignarTests
         public Task UpsertRolePermissionsAsync(int e, string c, IReadOnlyCollection<string> p, CancellationToken ct) => throw new NotImplementedException();
         public Task UpsertUserOverridesAsync(int e, Guid u, IReadOnlyCollection<string> a, IReadOnlyCollection<string> d, bool s, CancellationToken ct) => throw new NotImplementedException();
         public Task SembrarCatalogoCompletoAsync(int e, CancellationToken ct) => throw new NotImplementedException();
+        /* Tirar la cache no es parte de lo que esta prueba mide: este doble
+           no tiene cache que tirar. */
+        public void InvalidarCacheDeUsuario(int empresaId, Guid userId) { }
+        public void InvalidarCacheDeEmpresa(int empresaId) { }
         public Task<PermisosWebSyncCatalogResponse> SyncPermissionCatalogAsync(int e, IReadOnlyCollection<string>? m, CancellationToken ct) => throw new NotImplementedException();
         public Task<bool> CreatePermissionAsync(int e, string k, string n, string? d, CancellationToken ct) => throw new NotImplementedException();
         public Task<(IReadOnlyCollection<string> Allow, IReadOnlyCollection<string> Deny)> GetUserOverrideKeysAsync(int e, Guid u, CancellationToken ct) => throw new NotImplementedException();

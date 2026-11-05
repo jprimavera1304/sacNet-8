@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Text.RegularExpressions;
 using ISL_Service.Infrastructure.Security;
 
@@ -91,11 +91,49 @@ public class ClavesQuePideLaAppMovilTests
     [Fact]
     public void Cada_Clave_Que_Pide_La_App_Esta_Sembrada()
     {
+        /*
+          SALTARSE LA PRUEBA SOLO SE PERMITE SI DE VERDAD NO HAY APP AL LADO.
+
+          El `return` de antes se tragaba los dos casos a la vez:
+
+            1. nadie clono el movil (CI del backend solo) -> saltar es correcto;
+            2. la carpeta del movil se renombro o se movio  -> saltar es el bug
+               que esta clase vino a corregir, y saltar es MENTIR.
+
+          Se distinguen porque el caso 2 deja huella: si se encuentra la raiz del
+          monorepo —la carpeta que contiene `sacNet-8`— entonces el movil DEBERIA
+          estar ahi, y no encontrarlo es un renombre, no una ausencia. Entonces
+          falla, con la ruta exacta en la que lo busco.
+        */
         var raices = CarpetasDeLaApp();
         if (raices.Count == 0)
-            return; // La app no esta al lado de este repo. Ver el resumen.
+        {
+            var raizDelMonorepo = SubiendoHasta("sacNet-8");
+            Assert.True(raizDelMonorepo is null,
+                $"Se encontro la raiz del repo ({raizDelMonorepo}) pero no "
+                + $"'Movil{Path.DirectorySeparatorChar}mac-mac-mobile' dentro. Si la carpeta de la app "
+                + "se renombro o se movio, hay que seguirla aqui: saltarse la prueba en "
+                + "silencio es como se colaron diecisiete claves sin semilla.");
+            return; // La app no esta clonada al lado. Ver el resumen de la clase.
+        }
 
         var sembradas = ClavesSembradas();
+
+        /*
+          LAS CLAVES DE JORNADA NO SE SIEMBRAN AQUI, Y NO ES UN OLVIDO.
+
+          `lib/modules/jornada/` es otro producto: otro servidor, otra base,
+          otro catalogo de permisos. Sus claves (`app_movil.jornada.*`) se
+          siembran en `Jornada/db/empresa/03_Permisos_Semilla.sql`, no en
+          `PermissionCatalogSeeds`, y sembrarlas aqui las pondria en WPermiso de
+          MAC —una casilla en el panel que no abre absolutamente nada—.
+
+          Asi que se comparan contra SU semilla. Lo que NO se hace es saltarselas:
+          una clave de Jornada que nadie siembre en ningun sitio sigue siendo el
+          mismo fallo silencioso de siempre, y si el archivo de semillas de
+          Jornada no aparece, esta prueba FALLA con la ruta en la que lo busco.
+        */
+        var sembradasEnJornada = ClavesSembradasEnJornada();
         var faltantes = new SortedDictionary<string, string>(StringComparer.Ordinal);
         var halladas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -103,13 +141,15 @@ public class ClavesQuePideLaAppMovilTests
         {
             foreach (var archivo in Directory.EnumerateFiles(raiz, "*.dart", SearchOption.AllDirectories))
             {
-                var texto = File.ReadAllText(archivo);
+                var texto = SinComentarios(File.ReadAllText(archivo));
                 foreach (Match m in Regex.Matches(texto, @"'(app_movil[A-Za-z0-9_.]*)'"))
                 {
                     var clave = m.Groups[1].Value;
                     halladas.Add(clave);
                     if (ClavesDeMosaico.Contains(clave)) continue;
                     if (sembradas.Contains(clave)) continue;
+                    if (clave.StartsWith("app_movil.jornada.", StringComparison.OrdinalIgnoreCase)
+                        && sembradasEnJornada.Contains(clave)) continue;
                     if (!faltantes.ContainsKey(clave))
                         faltantes[clave] = Path.GetFileName(archivo);
                 }
@@ -138,6 +178,30 @@ public class ClavesQuePideLaAppMovilTests
             + string.Join(", ", faltantes.Select(f => $"{f.Key} ({f.Value})")));
     }
 
+    /// <summary>
+    /// El codigo Dart sin sus comentarios.
+    ///
+    /// NOMBRAR UNA CLAVE EN UN COMENTARIO NO ES PEDIRLA.
+    ///
+    /// El regex de abajo busca literales `'app_movil...'` en el texto crudo, y
+    /// el texto crudo incluye los comentarios. Este repo documenta MUCHO: cada
+    /// pantalla explica arriba que claves usa y —lo que lo hizo evidente—
+    /// `proveedores.dart` explica el bug de `app_movil.proveedores` nombrando la
+    /// clave MALA. Con los comentarios dentro, escribir "antes pedia 'x'" basta
+    /// para que esta prueba exija sembrar 'x': la prueba empieza a cobrar por la
+    /// documentacion y el unico arreglo que acepta es borrar la explicacion.
+    ///
+    /// Se quitan `/* ... */` y `// ...` antes de buscar. No es un analizador de
+    /// Dart y no hace falta que lo sea: lo unico que se puede confundir es una
+    /// clave dentro de una CADENA que lleve `//` adentro, y una clave de permiso
+    /// nunca los lleva.
+    /// </summary>
+    private static string SinComentarios(string dart)
+    {
+        var sinBloque = Regex.Replace(dart, @"/\*.*?\*/", " ", RegexOptions.Singleline);
+        return Regex.Replace(sinBloque, @"//[^\n]*", " ");
+    }
+
     /// <summary>Las carpetas de codigo de la app, si este repo las tiene al lado.</summary>
     private static List<string> CarpetasDeLaApp()
     {
@@ -160,21 +224,10 @@ public class ClavesQuePideLaAppMovilTests
           Subiendo hasta encontrar la carpeta no hay cuenta que equivocar, y
           sigue funcionando si alguien mueve el proyecto de sitio.
         */
-        var app = string.Empty;
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory);
-             dir is not null;
-             dir = dir.Parent)
-        {
-            var candidata = Path.Combine(dir.FullName, "Movil", "mac-mac-mobile");
-            if (Directory.Exists(candidata))
-            {
-                app = candidata;
-                break;
-            }
-        }
+        var app = SubiendoHasta(Path.Combine("Movil", "mac-mac-mobile"));
 
         var carpetas = new List<string>();
-        if (app.Length == 0) return carpetas; // La app no esta al lado de este repo.
+        if (app is null) return carpetas; // La app no esta clonada al lado.
 
         foreach (var sub in new[]
                  {
@@ -186,6 +239,24 @@ public class ClavesQuePideLaAppMovilTests
         }
 
         return carpetas;
+    }
+
+    /// <summary>
+    /// La primera carpeta, subiendo desde el binario de las pruebas, que
+    /// contenga <paramref name="relativa"/>. Devuelve la ruta completa de
+    /// <paramref name="relativa"/>, o <c>null</c> si no aparece en ningun nivel.
+    /// </summary>
+    private static string? SubiendoHasta(string relativa)
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory);
+             dir is not null;
+             dir = dir.Parent)
+        {
+            var candidata = Path.Combine(dir.FullName, relativa);
+            if (Directory.Exists(candidata)) return candidata;
+        }
+
+        return null;
     }
 
     /// <summary>Las claves de <c>PermissionCatalogSeeds</c>, leidas por reflexion.</summary>
@@ -209,6 +280,34 @@ public class ClavesQuePideLaAppMovilTests
         }
 
         Assert.True(claves.Count > 0, "PermissionCatalogSeeds no entrego ni una clave.");
+        return claves;
+    }
+
+    /// Las claves `app_movil.*` que siembra el catalogo de JORNADA, leidas de
+    /// su propio script de semillas.
+    ///
+    /// Si el script no esta, devuelve vacio y el aserto de arriba denuncia las
+    /// claves como no sembradas, con el nombre del archivo en el mensaje. Es
+    /// deliberado: un `return` silencioso aqui seria otra vez una prueba que
+    /// aprueba sin mirar.
+    private static HashSet<string> ClavesSembradasEnJornada()
+    {
+        var claves = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var raiz = SubiendoHasta("sacNet-8");
+        if (raiz is null) return claves;
+
+        var semilla = Path.Combine(
+            Path.GetDirectoryName(raiz)!, "Jornada", "db", "empresa", "03_Permisos_Semilla.sql");
+        if (!File.Exists(semilla)) return claves;
+
+        foreach (Match m in Regex.Matches(
+                     File.ReadAllText(semilla),
+                     @"jp_Permiso_Guardar\s+'(app_movil[A-Za-z0-9_.]*)'"))
+        {
+            claves.Add(m.Groups[1].Value);
+        }
+
         return claves;
     }
 }

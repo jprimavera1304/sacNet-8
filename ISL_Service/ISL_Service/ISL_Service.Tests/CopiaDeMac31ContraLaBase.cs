@@ -174,12 +174,22 @@ SELECT CASE WHEN OBJECT_ID('dbo.WPermisoCopiaMac31','U') IS NOT NULL
             Assert.Equal(1, await EstadoEnMac31Async(conn, legacyA, "btnCancelar"));
             _out.WriteLine("  4 OK  quitado en el web y SEGUIDO AUTORIZADO en Mac31: dos sistemas, no un espejo");
 
-            // ── 4b. Y para quien NO esta copiado, el espejo sigue siendo espejo
+            // ── 4b. Y a quien NO esta copiado, guardar TAMPOCO le apaga nada ─
+            //
+            // Esto media lo contrario —que sin copia el web seguia siendo un
+            // espejo y guardar apagaba en Mac31— hasta el 2026-11-04, cuando
+            // ese espejo le quito 46 permisos de Mac31 a tres personas de
+            // Tauro sin que nadie los tocara. Desde el arreglo, el write-back
+            // SOLO OTORGA para todo el mundo, copiado o no; la copia sigue
+            // sirviendo para lo que se hizo (poder QUITAR en el web sin que
+            // eso signifique nada en Mac31), no para protegerse de esto.
+            var fotoMac31B = await FotoDeMac31Async(conn, legacyB);
             await Servicio(baseDatos).UpsertUserOverridesAsync(
                 EmpresaId, webB, Array.Empty<string>(), Array.Empty<string>(),
                 sincronizarConLegacy: true, CancellationToken.None);
-            Assert.Equal(2, await EstadoEnMac31Async(conn, legacyB, "btnModificar"));
-            _out.WriteLine("  4b OK  sin copia, guardar sigue apagando en Mac31 como siempre");
+            Assert.Equal(1, await EstadoEnMac31Async(conn, legacyB, "btnModificar"));
+            Assert.Equal(fotoMac31B, await FotoDeMac31Async(conn, legacyB));
+            _out.WriteLine("  4b OK  sin copia, guardar tampoco baja ningun IDStatus de Mac31");
 
             // ── 5. Deshacer devuelve la herencia ────────────────────────────
             Assert.True(await Servicio(baseDatos).DeshacerCopiaDeMac31Async(EmpresaId, webA, CancellationToken.None));

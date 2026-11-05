@@ -157,6 +157,10 @@ public class PermisoNuevoSeExigeDeVerdadTests
         public Task UpsertUserOverridesAsync(int empresaId, Guid userId, IReadOnlyCollection<string> allow, IReadOnlyCollection<string> deny, bool sincronizarConLegacy, CancellationToken ct) => throw new NotImplementedException();
         // La siembra del arranque: en las pruebas no hace nada.
         public Task SembrarCatalogoCompletoAsync(int empresaId, CancellationToken ct) => Task.CompletedTask;
+        /* Tirar la cache no es parte de lo que esta prueba mide: este doble
+           no tiene cache que tirar. */
+        public void InvalidarCacheDeUsuario(int empresaId, Guid userId) { }
+        public void InvalidarCacheDeEmpresa(int empresaId) { }
 
         public Task<PermisosWebSyncCatalogResponse> SyncPermissionCatalogAsync(int empresaId, IReadOnlyCollection<string>? modules, CancellationToken ct) => throw new NotImplementedException();
         public Task<bool> CreatePermissionAsync(int empresaId, string key, string name, string? description, CancellationToken ct) => throw new NotImplementedException();

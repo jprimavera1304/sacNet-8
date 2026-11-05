@@ -85,8 +85,37 @@ public class VentasPedidoCapturaController : ControllerBase
       Las dos siguen aceptando `ventas.pedidos.crear` (oficina/Mac31) y
       `app_movil.pedidos` (la app), que es lo que funciona hoy.
     */
+    /*
+      LA TERCERA CLAVE DE CREAR, Y POR QUE HIZO FALTA INVENTARLA.
+
+      `app_movil.pedidos` abre DOS cosas que no tienen por que ir juntas: el
+      boton "+ Nuevo pedido" de dentro de Consulta de ventas, y la tarjeta
+      "Pedidos" con el PORTAL DE REPARTIDOR completo. Quien solo necesita
+      levantar un pedido desde el telefono se llevaba el portal entero de
+      propina, y no habia forma de dar una cosa sin la otra.
+
+      Y LA OTRA CLAVE QUE LA POLITICA ACEPTA NO SE PUEDE CONCEDER POR BASE:
+      `ventas.pedidos.crear` sale del `btnNuevoPedido` de Mac31, y el puente
+      legacy hace `RemoveAll(empieza por "ventas." y no es semilla del web)` en
+      CADA calculo de permisos (PermissionService.cs, el RemoveAll que mira
+      `VentasModuleKey`). Una fila metida a mano queda escrita y sin efecto: se
+      borra del snapshot antes de que nadie la lea. Medido el 2026-11-04.
+
+      Asi que la unica salida limpia es una clave PROPIA DEL MOVIL, que no
+      empieza por "ventas." y por tanto ningun puente se la lleva.
+
+      SE SUMA CON UN OR Y NO SUSTITUYE A NADIE. Un OR no puede cerrar lo que
+      estaba abierto: quien hoy captura con `ventas.pedidos.crear` (oficina) o
+      con `app_movil.pedidos` (repartidor) sigue exactamente igual. El efecto el
+      dia del despliegue es CERO, y pasa a ser util en cuanto alguien marque la
+      casilla nueva.
+
+      NO VA EN PoliticaModificar: crear un pedido y modificar uno que ya existe
+      son dos decisiones, y esta clave es la de crear. Modificar ya tiene la
+      suya (`app_movil.ventas.pedidos.modificar`).
+    */
     private const string PoliticaCaptura =
-        "perm:ventas.pedidos.crear|app_movil.pedidos";
+        "perm:ventas.pedidos.crear|app_movil.pedidos|app_movil.ventas.pedidos.crear";
 
     private const string PoliticaModificar =
         "perm:ventas.pedidos.crear|app_movil.pedidos|app_movil.ventas.pedidos.modificar";

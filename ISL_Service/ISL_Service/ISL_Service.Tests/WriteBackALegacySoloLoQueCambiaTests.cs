@@ -29,6 +29,14 @@ namespace ISL_Service.Tests;
   correcto lo mide `SincronizacionBidireccionalDeTodasLasFamiliasTests`, que
   corre las cuatro direcciones contra las dos empresas de verdad.
 
+  Y DESDE EL 2026-11-04, UNA REGLA MAS QUE SE VE AQUI
+  ---------------------------------------------------
+  De este write-back ya no sale NINGUNA baja: guardar permisos desde el web
+  solo puede OTORGAR en Mac31. Varias pruebas de este archivo afirmaban antes
+  lo contrario y se cambiaron, porque lo que afirmaban es exactamente lo que
+  apago 46 permisos a tres personas. El por que esta entero en
+  GuardarEnElWebNuncaRevocaEnMac31Tests.
+
   LO QUE **NO** ES ESTE ARREGLO
   -----------------------------
   No es guardado optimista: cuando la pantalla diga "guardado", la escritura
@@ -67,18 +75,18 @@ public class WriteBackALegacySoloLoQueCambiaTests
         var deseado = new Dictionary<int, int>();
         for (var proceso = 1; proceso <= 330; proceso++)
         {
-            actual[proceso] = 1;
-            deseado[proceso] = 1;
+            actual[proceso] = 2;
+            deseado[proceso] = 2;
         }
 
-        // Se le quita UNO de los 330.
-        deseado[200] = 2;
+        // Se le concede UNO de los 330.
+        deseado[200] = 1;
 
         var cambios = Cambios(deseado, actual);
 
         var unico = Assert.Single(cambios);
         Assert.Equal(200, unico.Key);
-        Assert.Equal(2, unico.Value);
+        Assert.Equal(1, unico.Value);
     }
 
     [Fact]
@@ -91,14 +99,19 @@ public class WriteBackALegacySoloLoQueCambiaTests
         Assert.Equal(new[] { new KeyValuePair<int, int>(10, 1) }, cambios);
     }
 
+    /// <summary>
+    /// QUITAR LO QUE ESTABA ACTIVO **YA NO SE ESCRIBE**, y es el cambio del
+    /// 2026-11-04: el guardado del web no puede bajar un IDStatus por ningun
+    /// camino. Antes esta prueba afirmaba lo contrario; lo que afirmaba es
+    /// justo lo que apago 46 permisos de Mac31 a tres personas. Ver
+    /// GuardarEnElWebNuncaRevocaEnMac31Tests para el porque completo.
+    /// </summary>
     [Fact]
-    public void Quitar_Lo_Que_Estaba_Activo_Si_Se_Escribe()
+    public void Quitar_Lo_Que_Estaba_Activo_Ya_No_Se_Escribe()
     {
-        var cambios = Cambios(
+        Assert.Empty(Cambios(
             deseado: new Dictionary<int, int> { [10] = 2 },
-            actual: new Dictionary<int, int> { [10] = 1 });
-
-        Assert.Equal(new[] { new KeyValuePair<int, int>(10, 2) }, cambios);
+            actual: new Dictionary<int, int> { [10] = 1 }));
     }
 
     /// <summary>
@@ -165,22 +178,23 @@ public class WriteBackALegacySoloLoQueCambiaTests
     /// secuencia: con el estado al dia, la ultima sigue mandando.
     /// </summary>
     [Fact]
-    public void Con_El_Estado_Al_Dia_La_Ultima_Pasada_Sigue_Mandando()
+    public void Con_El_Estado_Al_Dia_No_Se_Reescribe_Lo_Ya_Escrito()
     {
-        // En la base el proceso 7 esta ACTIVO.
-        var estado = new Dictionary<int, int> { [7] = 1 };
+        // En la base el proceso 7 esta DE BAJA.
+        var estado = new Dictionary<int, int> { [7] = 2 };
 
-        // Primera pasada: un catalogo dice que hay que apagarlo.
-        var primera = Cambios(new Dictionary<int, int> { [7] = 2 }, estado);
-        Assert.Equal(new[] { new KeyValuePair<int, int>(7, 2) }, primera);
+        // Primera pasada: un catalogo lo concede.
+        var primera = Cambios(new Dictionary<int, int> { [7] = 1 }, estado);
+        Assert.Equal(new[] { new KeyValuePair<int, int>(7, 1) }, primera);
 
         // Se escribe, y el estado recordado se pone al dia (es lo que hace
         // EscribirCambiosLegacyAsync al final).
         foreach (var c in primera) estado[c.Key] = c.Value;
 
-        // Ultima pasada: la familia dice que va ENCENDIDO. Tiene que escribir.
-        var ultima = Cambios(new Dictionary<int, int> { [7] = 1 }, estado);
-        Assert.Equal(new[] { new KeyValuePair<int, int>(7, 1) }, ultima);
+        // Las otras cuatro pasadas del mismo guardado ya no tienen nada que
+        // hacer: la fila dice lo que tiene que decir. Sin poner al dia el
+        // estado recordado, cada una habria vuelto a escribirla.
+        Assert.Empty(Cambios(new Dictionary<int, int> { [7] = 1 }, estado));
     }
 
     /// <summary>
@@ -193,10 +207,7 @@ public class WriteBackALegacySoloLoQueCambiaTests
     {
         var estado = new Dictionary<int, int> { [7] = 1 };
 
-        var primera = Cambios(new Dictionary<int, int> { [7] = 2 }, estado);
-        foreach (var c in primera) estado[c.Key] = c.Value;
-
-        Assert.Empty(Cambios(new Dictionary<int, int> { [7] = 2 }, estado));
+        Assert.Empty(Cambios(new Dictionary<int, int> { [7] = 1 }, estado));
     }
 
     /// <summary>
@@ -206,9 +217,9 @@ public class WriteBackALegacySoloLoQueCambiaTests
     [Fact]
     public void Lo_Que_No_Esta_En_Lo_Deseado_No_Se_Toca()
     {
-        var actual = new Dictionary<int, int> { [10] = 1, [11] = 1, [12] = 1 };
+        var actual = new Dictionary<int, int> { [10] = 1, [11] = 2, [12] = 1 };
 
-        var cambios = Cambios(new Dictionary<int, int> { [11] = 2 }, actual);
+        var cambios = Cambios(new Dictionary<int, int> { [11] = 1 }, actual);
 
         var unico = Assert.Single(cambios);
         Assert.Equal(11, unico.Key);

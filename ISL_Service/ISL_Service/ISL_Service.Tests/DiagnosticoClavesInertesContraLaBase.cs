@@ -48,6 +48,19 @@ ORDER BY p.Clave;";
             while (await r.ReadAsync()) catalogo.Add((r.GetString(0).Trim(), r.GetInt32(1)));
         }
 
+        /*
+          EL SUELO. Esta prueba solo imprime —no tiene ni un aserto— y por eso
+          pasa en verde pase lo que pase. Lo que si puede romperse es que deje de
+          LEER: si `WPermiso` cambia de nombre, si `EmpresaId = 1` deja de ser la
+          empresa de estas bases o si el JOIN empieza a devolver cero, el informe
+          sale vacio y el diagnostico sigue diciendo "correcto".
+
+          Cien es un suelo bajo a proposito: el catalogo real pasa de cuatrocientas.
+        */
+        Assert.True(catalogo.Count >= 100,
+            $"{baseDatos}: la consulta devolvio {catalogo.Count} claves de WPermiso. "
+            + "Abrio la base pero no midio nada, asi que este diagnostico no vale.");
+
         var inertes = catalogo.Where(x => !ClavesQueProtegenAlgo.Protege(x.Clave)).ToList();
         var conTenedor = inertes.Where(x => x.Tenedores > 0).ToList();
 

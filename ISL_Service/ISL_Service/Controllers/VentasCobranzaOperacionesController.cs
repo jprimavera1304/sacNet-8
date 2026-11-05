@@ -25,7 +25,8 @@ namespace ISL_Service.Controllers;
 [Authorize]
 public class VentasCobranzaOperacionesController : PermisoControllerBase
 {
-    private static readonly string[] PermisoVer = { "cobranza.ver" };
+    private static readonly string[] PermisoVer =
+        { "cobranza.ver", "app_movil.liquidaciones_cobros.ver" };
 
     /*
       LA LISTA DE COBRANZAS SE LEE CON LA CLAVE DE SU PROPIA FORMA.
@@ -58,10 +59,26 @@ public class VentasCobranzaOperacionesController : PermisoControllerBase
         { "cobranza.concentrados.editar", "app_movil.concentrados.editar" };
     private static readonly string[] PermisoConcentradoCancelar =
         { "cobranza.concentrados.cancelar", "app_movil.concentrados.cancelar" };
-    private static readonly string[] PermisoCobroEditar = { "cobranza.cobros.editar" };
-    private static readonly string[] PermisoCobroCerrar = { "cobranza.cobros.cerrar" };
-    private static readonly string[] PermisoCobroAbrir = { "cobranza.cobros.abrir" };
-    private static readonly string[] PermisoCobroCancelar = { "cobranza.cobros.cancelar" };
+    /*
+      LOS CUATRO DE LA HOJA DE COBRO LLEVAN TAMBIEN SU CLAVE DEL MOVIL.
+
+      Misma razon que los de concentrado, arriba. Cerrar la hoja es lo que
+      cuadra el dinero del dia y reabrir es deshacer ese cuadre: son dos
+      decisiones distintas y cada una lleva la suya, en los dos canales.
+
+      La clave del movil NO se llama `app_movil.cobranza.cobros.*` sino
+      `app_movil.liquidaciones_cobros.*`, por lo mismo que su `ver`: en el
+      catalogo ya vive `app_movil.cobranzas.*` (otra pantalla) y las dos juntas
+      se leen como la misma cosa escrita con y sin ese.
+    */
+    private static readonly string[] PermisoCobroEditar =
+        { "cobranza.cobros.editar", "app_movil.liquidaciones_cobros.editar" };
+    private static readonly string[] PermisoCobroCerrar =
+        { "cobranza.cobros.cerrar", "app_movil.liquidaciones_cobros.cerrar" };
+    private static readonly string[] PermisoCobroAbrir =
+        { "cobranza.cobros.abrir", "app_movil.liquidaciones_cobros.abrir" };
+    private static readonly string[] PermisoCobroCancelar =
+        { "cobranza.cobros.cancelar", "app_movil.liquidaciones_cobros.cancelar" };
 
     private readonly IVentasCobranzaOperacionesService _service;
 

@@ -27,6 +27,23 @@ namespace ISL_Service.Tests;
 /// Y SOLO EN Produccion_svr. Este modulo es de Tauro; la ultima prueba
 /// comprueba justamente que en MacZ (Zaragoza) no existe nada de esto.
 /// </summary>
+/*
+  ESTA CLASE TIENE QUE IR EN LA MISMA COLECCION QUE LAS DEMAS DE BASE.
+
+  Era la unica `*ContraLaBase` sin `[Collection]`, asi que xUnit la corria EN
+  PARALELO con las que si estan en ella, las dos contra Produccion_svr. Y esta
+  clase no solo lee: crea recepciones, las cancela y las borra, en transacciones.
+
+  Lo que eso producia, medido el 5-nov: rojos que aparecian solo en la corrida
+  completa y nunca al correr la clase sola. `Si_La_Conexion_Muere_...` fallaba en
+  su propio suelo —"el juguete no dejo la transaccion abierta"— porque alguien
+  mas estaba tocando la base mientras; y el papel del PDF salia con dos hojas,
+  con una o con ninguna segun quien hubiera llegado antes.
+
+  Un rojo que depende del orden es peor que un hueco: ensena a correr la prueba
+  sola hasta que pase, y eso es lo mismo que no tenerla.
+*/
+[Collection(PruebasContraLaBase.Nombre)]
 public class RecepcionCascosContraLaBaseTests
 {
     private const string BaseTauro = "Produccion_svr";
@@ -64,6 +81,21 @@ public class RecepcionCascosContraLaBaseTests
 
     private static RecepcionCascosService Servicio(string firma)
         => new(Repositorio(BaseTauro, firma));
+
+    /// <summary>
+    /// La fecha de la recepcion mas reciente que hay en la base, o <c>null</c> si
+    /// no hay ninguna. Sirve para que las pruebas del papel se apoyen en datos
+    /// que EXISTEN en vez de en el calendario.
+    /// </summary>
+    private static async Task<DateTime?> UltimaFechaConRecepcionAsync(string firma)
+    {
+        await using var conn = new SqlConnection(Cadena(BaseTauro, firma));
+        await conn.OpenAsync();
+        await using var cmd = new SqlCommand(
+            "SELECT MAX(Fecha) FROM dbo.WRecepcionCasco WHERE Estatus = 1;", conn);
+        var valor = await cmd.ExecuteScalarAsync();
+        return valor is DateTime f ? f : null;
+    }
 
     // ==================================================================
     // 1. EL CASO BUENO
@@ -822,8 +854,31 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
     {
         var servicio = Servicio("zzQaRecepcionPdf");
 
-        var hasta = DateTime.Today;
+        /*
+          LA VENTANA SE ANCLA A LA ULTIMA RECEPCION DE LA BASE, NO A `Today`.
+
+          Esto pedia "los ultimos cinco dias" y por eso se rompia sola de dos
+          maneras, las dos medidas el 5-nov:
+
+            - la base local es una copia que se queda en una fecha; cuando el
+              calendario la deja atras, "los ultimos cinco dias" no tienen NADA
+              y el `Assert.NotEmpty` falla sin que nada este mal (es la misma
+              trampa que vacia las pantallas que abren en "hoy");
+            - y mientras tenia algo, lo que tenia eran las recepciones que
+              ACABABAN DE CREAR sus pruebas hermanas con `Fecha = DateTime.Today`.
+              O sea que medía la basura de otra prueba, y segun el orden salia
+              con dos hojas, con una o con ninguna. Medido: primero fallo con "1
+              hoja(s)" y despues con "Collection was empty", sin tocar el codigo.
+
+          Anclando a `MAX(Fecha)` el periodo siempre cae donde hay papel de
+          verdad, pase lo que pase con el reloj y con el orden de las pruebas.
+        */
+        var ultima = await UltimaFechaConRecepcionAsync("zzQaRecepcionPdf");
+        Assert.NotNull(ultima);
+
+        var hasta = ultima!.Value.Date;
         var desde = hasta.AddDays(-4);
+        _out.WriteLine($"periodo del papel: {desde:yyyy-MM-dd} a {hasta:yyyy-MM-dd}");
 
         var datos = await servicio.ConsultarDatosDeReporteAsync(desde, hasta);
         Assert.NotEmpty(datos.Renglones);

@@ -43,9 +43,39 @@ namespace ISL_Service.Tests;
 /// </summary>
 public class LecturasQueNoPidenPermisoTests
 {
-    private static readonly string Controladores =
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
-            "..", "..", "..", "..", "Controllers"));
+    /// <summary>
+    /// La carpeta de controladores, buscada SUBIENDO y no con una cuenta de
+    /// ".." escrita a mano.
+    ///
+    /// Aqui habia cuatro `..`. Acertaban, pero el repo tiene `ISL_Service` dos
+    /// veces y es exactamente la cuenta que `ClavesQuePideLaAppMovilTests` tenia
+    /// mal: alli se equivoco en uno y la prueba paso meses en verde sin leer un
+    /// archivo. Aqui no habria pasado inadvertido —`Fuente` afirma que el
+    /// archivo existe, asi que se pondria roja— pero romperia las once pruebas
+    /// de esta clase a la vez, y el mensaje hablaria de un archivo que si esta.
+    ///
+    /// Subiendo hasta encontrar `Controllers` al lado del .csproj no hay cuenta
+    /// que equivocar, y aguanta que alguien mueva el proyecto de carpeta.
+    /// </summary>
+    private static readonly string Controladores = BuscarControladores();
+
+    private static string BuscarControladores()
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory);
+             dir is not null;
+             dir = dir.Parent)
+        {
+            if (!File.Exists(Path.Combine(dir.FullName, "ISL_Service.csproj"))) continue;
+
+            var candidata = Path.Combine(dir.FullName, "Controllers");
+            if (Directory.Exists(candidata)) return candidata;
+        }
+
+        throw new InvalidOperationException(
+            "No se encontro la carpeta Controllers subiendo desde "
+            + $"{AppContext.BaseDirectory}. Esta clase lee el codigo fuente: sin esa carpeta no "
+            + "puede medir nada, y saltarse la prueba en silencio seria mentir.");
+    }
 
     private static string Fuente(string archivo)
     {

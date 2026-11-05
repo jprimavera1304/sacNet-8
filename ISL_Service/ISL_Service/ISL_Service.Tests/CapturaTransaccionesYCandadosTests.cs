@@ -213,8 +213,28 @@ public class CapturaTransaccionesYCandadosTests
 
             await DeshacerTransaccionColgadaAsync(conn);
 
-            Assert.Equal(0, await TransaccionesAbiertasDeAsync(espia, spid));
-            Assert.Equal(0, await CandadosExclusivosDeAsync(espia, spid));
+            /*
+              KILL NO ES SINCRONO, Y POR ESO ESTA PRUEBA FALLABA SOLA.
+
+              `KILL` vuelve en cuanto SQL Server acepta la orden, no cuando
+              termino de deshacer. Preguntar `open_transaction_count` en la
+              linea siguiente pilla la sesion a mitad del rollback y contesta 1:
+              "Expected 0, Actual 1", medido en MacZ.
+
+              Eso es peor que un hueco: una prueba que se pone roja sin que nada
+              este mal ensena a mirar el rojo y seguir. Y la que importa, la de
+              arriba —que exige que la transaccion SI quedara abierta antes del
+              KILL—, se pierde en el ruido.
+
+              Se espera a que acabe, con tope. El tope es la parte que no se
+              puede quitar: si pasados cinco segundos la transaccion sigue
+              abierta, eso ya NO es el rollback tardando, y la prueba tiene que
+              fallar.
+            */
+            Assert.Equal(0, await EsperandoCeroAsync(
+                () => TransaccionesAbiertasDeAsync(espia, spid)));
+            Assert.Equal(0, await EsperandoCeroAsync(
+                () => CandadosExclusivosDeAsync(espia, spid)));
 
             // Y el renglon que la transaccion habia escrito NO quedo: nada a medias.
             Assert.Equal(0, Convert.ToInt32(await EscalarAsync(espia, "SELECT COUNT(*) FROM dbo.zz_prueba_bitacora")));
@@ -768,6 +788,28 @@ DROP TABLE IF EXISTS dbo.zz_prueba_bitacora;", conn) { CommandTimeout = 30 };
         {
             /* El aviso esperado. */
         }
+    }
+
+    /// <summary>
+    /// Vuelve a preguntar hasta que la cuenta llegue a cero, o devuelve la
+    /// ultima que vio cuando se agota el tope.
+    ///
+    /// Es para lo que SQL Server hace EN DIFERIDO —el rollback de una sesion
+    /// matada con <c>KILL</c>—, no para tapar una espera que no deberia existir:
+    /// devolver el ultimo valor en vez de lanzar deja que el <c>Assert</c> de
+    /// quien llama falle con el numero de verdad.
+    /// </summary>
+    private static async Task<int> EsperandoCeroAsync(
+        Func<Task<int>> cuenta, int topeMs = 5000, int pasoMs = 100)
+    {
+        var ultima = await cuenta();
+        for (var esperado = 0; ultima != 0 && esperado < topeMs; esperado += pasoMs)
+        {
+            await Task.Delay(pasoMs);
+            ultima = await cuenta();
+        }
+
+        return ultima;
     }
 
     private static async Task<int> TransaccionesAbiertasDeAsync(SqlConnection espia, int spid)

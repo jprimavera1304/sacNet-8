@@ -175,13 +175,22 @@ public class EscenariosPermisosContraLaBase
             Assert.Equal(antesDelAlta, await FotoDeMac31Async(conn, legacyId));
             _out.WriteLine("  8 OK  limpiar overrides sin sincronizar no apaga nada en Mac31");
 
-            // ── 7. Revocar desde el web apaga en Mac31 (IDStatus 2, no borra) ─
+            // ── 7. Guardar sin esa clave NO la apaga en Mac31 ────────────────
+            //
+            // Esto afirmaba lo contrario —que guardar sin la clave escribia
+            // IDStatus=2— y era la prueba de un comportamiento que el
+            // 2026-11-04 apago 46 permisos de Mac31 a tres personas de Tauro:
+            // la pantalla dejo de mandar las familias de Mac31 en el PUT y
+            // "no me lo mandaron" volvio a significar "apagalo". Desde el
+            // arreglo el write-back SOLO OTORGA; quitar se hace en Mac31 o,
+            // para esta plataforma sola, con la copia de permisos.
+            var antesDelGuardadoVacio = await FotoDeMac31Async(conn, legacyId);
             await Servicio(baseDatos).UpsertUserOverridesAsync(
                 EmpresaId, usuarioWeb, Array.Empty<string>(), Array.Empty<string>(),
                 sincronizarConLegacy: true, CancellationToken.None);
-            var trasRevocar = await EstadoEnMac31Async(conn, legacyId, "btnModificar");
-            Assert.Equal(2, trasRevocar);
-            _out.WriteLine("  7 OK  revocar escribe IDStatus=2 y conserva la fila");
+            Assert.Equal(1, await EstadoEnMac31Async(conn, legacyId, "btnModificar"));
+            Assert.Equal(antesDelGuardadoVacio, await FotoDeMac31Async(conn, legacyId));
+            _out.WriteLine("  7 OK  guardar sin la clave NO baja ningun IDStatus de Mac31");
 
             // ── 6. Conceder desde el web enciende en Mac31 ───────────────────
             await Servicio(baseDatos).UpsertUserOverridesAsync(

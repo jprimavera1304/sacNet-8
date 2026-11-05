@@ -29,8 +29,10 @@ namespace ISL_Service.Tests;
 ///   1. ENCENDER EN MAC31  -> la clave aparece en el snapshot del web.
 ///   2. APAGAR EN MAC31    -> la clave desaparece del snapshot.
 ///   3. CONCEDER EN EL WEB -> IDStatus = 1 en [Usuario Forma Procesos].
-///   4. RETIRAR EN EL WEB  -> IDStatus = 2 (de baja, sin borrar la fila, que es
-///                            como lo hace Mac31 en su propia pantalla).
+///   4. RETIRAR EN EL WEB  -> NO SE TOCA MAC31: la fila sigue en IDStatus = 1.
+///                            Desde el 2026-11-04 el write-back solo otorga
+///                            (antes aqui se exigia un 2, y eso es lo que
+///                            apago 46 permisos a tres personas de Tauro).
 ///
 /// COMO ELIGE EL BOTON
 /// -------------------
@@ -126,10 +128,34 @@ public class SincronizacionBidireccionalDeTodasLasFamiliasTests
             return;
         }
 
-        if (await EscalarAsync(conn, $"SELECT COUNT(*) FROM dbo.Usuarios WHERE Usuario = '{UsuarioPrueba}'") > 0
-            || await EscalarAsync(conn, $"SELECT COUNT(*) FROM dbo.UsuarioWeb WHERE Usuario = '{UsuarioPrueba}'") > 0)
+        /*
+          EL SOBRANTE DE UNA CORRIDA ANTERIOR SE LIMPIA; NO WEDGEA LA PRUEBA.
+
+          Antes esto era `Assert.Fail`, y el efecto medido el 2026-11-04 en MacZ
+          fue que la prueba quedo MUERTA: `LimpiarAsync` se come sus SqlException
+          sin decir nada, asi que cualquier corrida interrumpida —un Ctrl-C, un
+          timeout— deja la cuenta puesta y desde ese momento esta prueba falla
+          siempre, en las dos bases, por un motivo que no tiene nada que ver con
+          lo que mide. Y arrastra a otra: `AuditoriaHerenciaLegacyVsWeb` encontro
+          a ZZBIDI7 en el catalogo y denuncio cinco "modulos que se ven en el
+          Inicio y rebotan al abrirlos" que eran los permisos sueltos del
+          sobrante. Dos pruebas rojas y ni un defecto del producto.
+
+          Se puede limpiar sin riesgo porque `ZZBIDI7` es un nombre RESERVADO de
+          esta prueba —ninguna persona se llama asi— y porque lo que se borra es
+          exactamente lo que el `finally` de abajo borra. La guardia de "no
+          escribir encima" se queda: si despues de limpiar la cuenta SIGUE ahi,
+          entonces no es un sobrante y la prueba aborta como antes.
+        */
+        if (await ExisteLaCuentaAsync(conn))
         {
-            Assert.Fail($"{UsuarioPrueba} ya existe en {baseDatos}. No se escribe encima.");
+            _out.WriteLine($"{UsuarioPrueba} estaba en {baseDatos} de una corrida anterior: se limpia.");
+            await LimpiarAsync(conn, Guid.Empty);
+
+            Assert.False(await ExisteLaCuentaAsync(conn),
+                $"{UsuarioPrueba} sigue en {baseDatos} despues de intentar limpiarla, asi que no es "
+                + "un sobrante de esta prueba. No se escribe encima: averigua de quien es esa cuenta."
+                + (UltimoFalloDeLimpieza is null ? "" : $" La limpieza dijo: {UltimoFalloDeLimpieza}"));
         }
 
         var verbos = (IDictionary)LeerCampo("VerbosLegacy");
@@ -184,13 +210,20 @@ public class SincronizacionBidireccionalDeTodasLasFamiliasTests
                 if (trasConceder != 1)
                     fallos.Add($"[3 Web->Legacy CONCEDER] {forma.Prefijo}: se concedio '{clave}' y {boton} quedo en IDStatus={trasConceder}, no en 1");
 
-                // ── 4. Retirar desde el web -> IDStatus 2, sin borrar fila ───
+                // ── 4. Retirar desde el web NO apaga en Mac31 ────────────────
+                //
+                // Esta direccion se midio al reves hasta el 2026-11-04: se
+                // exigia que retirar en el web dejara IDStatus=2. Eso es lo
+                // que, con una pantalla que dejo de mandar estas familias en
+                // el PUT, apago 46 permisos a tres personas de Tauro. Ahora el
+                // write-back SOLO OTORGA y lo que se mide es que la fila
+                // SIGUE EN 1. Ver GuardarEnElWebNuncaRevocaEnMac31Tests.
                 await Servicio(baseDatos).UpsertUserOverridesAsync(
                     EmpresaId, usuarioWeb, Array.Empty<string>(), Array.Empty<string>(),
                     sincronizarConLegacy: true, CancellationToken.None);
                 var trasRetirar = await EstadoAsync(conn, legacyId, idProceso);
-                if (trasRetirar != 2)
-                    fallos.Add($"[4 Web->Legacy RETIRAR] {forma.Prefijo}: se retiro '{clave}' y {boton} quedo en IDStatus={trasRetirar}, no en 2");
+                if (trasRetirar != 1)
+                    fallos.Add($"[4 Web->Legacy RETIRAR] {forma.Prefijo}: se retiro '{clave}' del web y {boton} quedo en IDStatus={trasRetirar}: el guardado del web no puede apagar nada en Mac31");
 
                 _out.WriteLine($"  {forma.Prefijo,-26} {boton,-22} -> {clave}");
             }
@@ -313,12 +346,34 @@ VALUES ('{id}', '{UsuarioPrueba}', 'no-se-usa-en-esta-prueba', 'User', {EmpresaI
         EscalarAsync(conn,
             $"SELECT ISNULL(MAX(IDStatus), 0) FROM dbo.[Usuario Forma Procesos] WHERE IDUsuario = {legacyId} AND IDProceso = {idProceso};");
 
+    /// <summary>Si la cuenta reservada de esta prueba esta en la base.</summary>
+    private static async Task<bool> ExisteLaCuentaAsync(SqlConnection conn) =>
+        await EscalarAsync(conn, $"SELECT COUNT(*) FROM dbo.Usuarios WHERE Usuario = '{UsuarioPrueba}'") > 0
+        || await EscalarAsync(conn, $"SELECT COUNT(*) FROM dbo.UsuarioWeb WHERE Usuario = '{UsuarioPrueba}'") > 0;
+
     private static async Task LimpiarAsync(SqlConnection conn, Guid usuarioWeb)
     {
         try
         {
-            if (usuarioWeb != Guid.Empty)
-                await EjecutarAsync(conn, $"DELETE FROM dbo.WUsuarioPermiso WHERE UsuarioWebId = '{usuarioWeb}';");
+            /*
+              LOS PERMISOS SE BORRAN SIEMPRE, TAMBIEN CUANDO NO SE SABE EL ID.
+
+              Antes, con `usuarioWeb` en Guid.Empty —el caso de limpiar un
+              SOBRANTE, donde el id de aquella corrida ya no se tiene— este
+              DELETE se saltaba y la cuenta se iba dejando sus filas de
+              `WUsuarioPermiso` HUERFANAS, apuntando a un UsuarioWebId que ya no
+              existe. Medido: la corrida siguiente reventaba con
+              "Usuario no encontrado: 3262f89a-..." dentro de
+              `PermissionService.EnsureUserExistsAsync`, que es ese id fantasma.
+
+              Cuando no se sabe el id se saca de la base por el nombre, que es
+              reservado de esta prueba.
+            */
+            var aBorrar = usuarioWeb != Guid.Empty
+                ? $"'{usuarioWeb}'"
+                : $"(SELECT Id FROM dbo.UsuarioWeb WHERE Usuario = '{UsuarioPrueba}')";
+            await EjecutarAsync(conn,
+                $"DELETE FROM dbo.WUsuarioPermiso WHERE UsuarioWebId IN ({aBorrar});");
             await EjecutarAsync(conn, $@"
 DELETE FROM dbo.UsuarioWeb WHERE Usuario = '{UsuarioPrueba}';
 DECLARE @u INT = (SELECT IDUsuario FROM dbo.Usuarios WHERE Usuario = '{UsuarioPrueba}');
@@ -328,9 +383,25 @@ BEGIN
     DELETE FROM dbo.Usuarios WHERE IDUsuario = @u;
 END");
         }
-        catch (SqlException)
+        catch (SqlException ex)
         {
-            // Que la limpieza falle no debe tapar el fallo original.
+            /*
+              QUE LA LIMPIEZA FALLE NO DEBE TAPAR EL FALLO ORIGINAL —pero
+              callarselo fue lo que dejo esta prueba muerta—.
+
+              Antes era un `catch` vacio. Si el DELETE fallaba, la cuenta se
+              quedaba puesta y la UNICA señal llegaba en la corrida siguiente,
+              como "ZZBIDI7 ya existe", que no dice ni que la limpieza fallo ni
+              por que. Ahora se anota: sigue sin lanzar —para no pisar el fallo
+              de verdad— pero queda escrito en el log de la prueba.
+            */
+            UltimoFalloDeLimpieza = ex.Message;
         }
     }
+
+    /// <summary>
+    /// El motivo por el que la ultima limpieza no pudo borrar la cuenta, si no
+    /// pudo. Se publica para que el mensaje de arriba lo pueda contar.
+    /// </summary>
+    private static string? UltimoFalloDeLimpieza;
 }

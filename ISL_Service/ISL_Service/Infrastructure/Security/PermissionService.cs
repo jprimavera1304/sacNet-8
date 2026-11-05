@@ -1391,7 +1391,7 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
         new("transferencias.aplicar", "Transferencias - Aplicar pagos", "transferencias"),
         new("transferencias.cancelar", "Transferencias - Cancelar movimiento", "transferencias"),
 
-        new("cambiosvigencia.ver_modulo", "Cambios de vigencia - Ver módulo", "cambiosvigencia"),
+        new("cambiosvigencia.ver_modulo", "Cambios de vigencia - Ver módulo (el mismo, escrito sin guion)", "cambiosvigencia"),
         new("cambiosvigencia.ver", "Cambios de vigencia - Consultar", "cambiosvigencia"),
         new("cambiosvigencia.crear", "Cambios de vigencia - Registrar", "cambiosvigencia"),
         new("cambiosvigencia.editar", "Cambios de vigencia - Modificar / regresar", "cambiosvigencia"),
@@ -1448,7 +1448,7 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
           dato y no codigo. El script esta en
           `migracion/sql/alta-modulo-facturacion.sql`.
         */
-        new("facturacion.ver_modulo", "Facturacion - Ver el modulo", "facturacion"),
+        new("facturacion.ver_modulo", "Facturas - Ver módulo (el mismo, con el nombre viejo)", "facturacion"),
 
         new("huellas.editar", "Huellas - Registrar y cancelar", "huellas"),
         new("seguridad.bitacora.registrar", "Seguridad - Registrar intentos de contraseña", "seguridad"),
@@ -1879,6 +1879,24 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
         new("app_movil.ventas.consulta.pagos", "App móvil - Consulta de ventas: Ver pagos", "app_movil"),
         new("app_movil.ventas.consulta.cancelar", "App móvil - Consulta de ventas: Cancelar remisión", "app_movil"),
         new("app_movil.ventas.consulta.ver_de_otros", "App móvil - Consulta de ventas: Ver las de otros usuarios", "app_movil"),
+        /*
+          LA CLAVE DEL BOTON "+ NUEVO PEDIDO", SEPARADA DEL PORTAL DE REPARTIDOR.
+
+          Hasta hoy ese boton se encendia con `app_movil.pedidos`, que ademas
+          abre la tarjeta "Pedidos" con el PORTAL DE REPARTIDOR entero. O sea
+          que dejar a alguien levantar un pedido desde Consulta de ventas le
+          regalaba el portal, y no habia manera de dar una cosa sin la otra.
+
+          La otra clave que la captura acepta —`ventas.pedidos.crear`— NO SIRVE
+          para esto: viene del `btnNuevoPedido` de Mac31 y el puente legacy la
+          borra del snapshot en cada calculo, asi que concederla por base queda
+          escrito y sin efecto. Por eso la clave nueva es `app_movil.*`: ningun
+          puente se lleva ese prefijo.
+
+          El nombre dice lo que la persona VE (el boton), no como se llama el
+          endpoint: quien reparte permisos busca "nuevo pedido", no "captura".
+        */
+        new("app_movil.ventas.pedidos.crear", "App móvil - Pedidos: Levantar un pedido nuevo", "app_movil"),
         new("app_movil.ventas.pedidos.procesar", "App móvil - Pedidos: Procesar", "app_movil"),
         new("app_movil.ventas.pedidos.cancelar", "App móvil - Pedidos: Cancelar", "app_movil"),
         new("app_movil.clientes.crear", "App móvil - Clientes: Dar de alta", "app_movil"),
@@ -2183,9 +2201,40 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
         new("app_movil.dinero_usados.aplicar", "App móvil - Cobros ingresos: Aplicar", "app_movil"),
         new("app_movil.dinero_usados.cancelar", "App móvil - Cobros ingresos: Cancelar", "app_movil"),
 
+        /*
+          Y SUS ACCIONES, QUE ES LO QUE FALTABA PARA QUE EL CANAL SEA DE VERDAD
+          INDEPENDIENTE.
+
+          Estas tres pantallas se quedaron a medias en la tanda anterior: se
+          sembro el `ver` de cada una y las ACCIONES siguieron siendo las del
+          web. O sea que se podia dar o quitar la ENTRADA por canal, pero
+          cerrar una hoja, aplicar un deposito o autorizar una liquidacion
+          seguia siendo un solo permiso para los dos canales: quitarselo en el
+          telefono se lo quitaba en la computadora.
+
+          En las tres se mueve dinero (aplicar un deposito, cuadrar el dia,
+          aplicar una liquidacion), y es justo donde mas se quiere poder decir
+          "en la oficina si, en el telefono no". Los controladores ya aceptan
+          las dos formas, asi que mientras nadie las tenga el efecto es CERO.
+
+          NO SE CONCEDEN AL SEMBRAR, igual que sus `ver`.
+        */
         new("app_movil.transferencias.ver", "App móvil - Bancos transferencias: Ver", "app_movil"),
+        new("app_movil.transferencias.cargar", "App móvil - Bancos transferencias: Cargar estado de cuenta", "app_movil"),
+        new("app_movil.transferencias.identificar", "App móvil - Bancos transferencias: Identificar al cliente", "app_movil"),
+        new("app_movil.transferencias.aplicar", "App móvil - Bancos transferencias: Aplicar el depósito", "app_movil"),
+        new("app_movil.transferencias.cancelar", "App móvil - Bancos transferencias: Cancelar la aplicación", "app_movil"),
+
         new("app_movil.descuentos.ajustes.ver", "App móvil - Liquidaciones de descuento: Ver", "app_movil"),
+        new("app_movil.descuentos.ajustes.crear", "App móvil - Liquidaciones de descuento: Capturar", "app_movil"),
+        new("app_movil.descuentos.ajustes.autorizar", "App móvil - Liquidaciones de descuento: Autorizar o rechazar", "app_movil"),
+        new("app_movil.descuentos.ajustes.aplicar", "App móvil - Liquidaciones de descuento: Aplicar", "app_movil"),
+
         new("app_movil.liquidaciones_cobros.ver", "App móvil - Liquidaciones cobros: Ver", "app_movil"),
+        new("app_movil.liquidaciones_cobros.editar", "App móvil - Liquidaciones cobros: Guardar la nota", "app_movil"),
+        new("app_movil.liquidaciones_cobros.cerrar", "App móvil - Liquidaciones cobros: Cerrar la hoja", "app_movil"),
+        new("app_movil.liquidaciones_cobros.abrir", "App móvil - Liquidaciones cobros: Reabrir la hoja", "app_movil"),
+        new("app_movil.liquidaciones_cobros.cancelar", "App móvil - Liquidaciones cobros: Cancelar la hoja", "app_movil"),
 
         /*
           `app_movil.garantias.cancelar` la pide `garantias.dart` desde que la
@@ -2214,6 +2263,17 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
         {
             return await BuildSnapshotAsync(userId, empresaId, rolLegacy, ct);
         }
+
+        /*
+          ANTES DE SERVIR DE MEMORIA, ¿SIGUE SIENDO VERDAD?
+
+          Esta linea es lo que hace que conceder un permiso con un INSERT
+          directo surta efecto sin reiniciar el pool de IIS. En regimen normal
+          no hace nada y no cuesta nada: mide como mucho una vez cada 15
+          segundos por empresa. Ver PermissionService.CacheAlDia.cs, que explica
+          el precio exacto y lo que esta comprobacion NO garantiza.
+        */
+        await AsegurarCacheAlDiaAsync(empresaId, ct);
 
         var cacheKey = BuildCacheKey(userId, empresaId, rolLegacy);
         var staleCacheKey = $"{cacheKey}:stale";
@@ -4840,6 +4900,54 @@ ORDER BY COALESCE(f.Orden, 0), COALESCE(p.Orden, 0), p.IDProceso;", conn);
     }
 
     /// <summary>
+    /// QUE SE LE VA A DEJAR AL USUARIO EN `[Usuario Forma Procesos]`:
+    /// IDProceso -> IDStatus. **SOLO DEVUELVE ALTAS (1). NUNCA UNA BAJA.**
+    /// </summary>
+    /// <remarks>
+    /// ESTA ES LA REGLA "SOLO OTORGA, NUNCA REVOCA", Y VIVE AQUI A PROPOSITO.
+    ///
+    /// Las dos veces que el guardado del web apago permisos de Mac31
+    /// —2026-08-26 (JANET, 44 permisos) y 2026-11-04 (JESY, ALVARELYS y MARINA
+    /// BERNAL, 46 permisos)— el mecanismo fue el mismo: tratar la AUSENCIA de
+    /// una clave en el conjunto efectivo del web como una orden de apagarla en
+    /// el escritorio. Y las dos veces la ausencia no era una decision de nadie:
+    /// la primera porque el web no sabia que existia, y la segunda porque la
+    /// pantalla dejo de mandar esas familias en el PUT.
+    ///
+    /// Por eso la regla no se escribe en el sitio que decide (habia dos, y
+    /// cada uno con su propio candado) sino en una sola funcion que no sabe de
+    /// pantallas, de modulos ni de familias: lo que no esta concedido NO SE
+    /// MENCIONA, y lo que no se menciona no se toca (ver CambiosQueHacenFalta,
+    /// que solo recorre lo que esta aqui dentro).
+    ///
+    /// Un proceso puede llegar por DOS CLAVES distintas —medido el 2026-10-12
+    /// en Produccion_svr: las familias "cobranza." y "cobranzas." comparten
+    /// botones, y btnModificarRFC es "clientes.rfc.abrir" en una pantalla y
+    /// "clientes.facturacion.editar" en otra—, asi que se agrupa por IDProceso:
+    /// basta UNA clave concedida para encender el boton.
+    /// </remarks>
+    /// <param name="catalogo">Clave de permiso -> IDProceso de Mac31.</param>
+    /// <param name="efectivoDelWeb">
+    /// Lo que el web le concede hoy (rol + ajustes). Su comparador decide si se
+    /// distinguen mayusculas: el de verdad viene como OrdinalIgnoreCase.
+    /// </param>
+    public static Dictionary<int, int> EstadoDeseadoEnLegacy(
+        IEnumerable<(string Clave, int IdProceso)> catalogo,
+        ISet<string> efectivoDelWeb)
+    {
+        var deseado = new Dictionary<int, int>();
+        foreach (var entrada in catalogo)
+        {
+            if (string.IsNullOrWhiteSpace(entrada.Clave))
+                continue;
+            if (!efectivoDelWeb.Contains(entrada.Clave))
+                continue;
+            deseado[entrada.IdProceso] = 1;
+        }
+        return deseado;
+    }
+
+    /// <summary>
     /// QUE PROCESOS HAY QUE ESCRIBIR DE VERDAD. Es la decision entera del
     /// arreglo, y esta aparte para que se pueda probar sin base: es puramente
     /// comparar dos diccionarios.
@@ -4854,12 +4962,35 @@ ORDER BY COALESCE(f.Orden, 0), COALESCE(p.Orden, 0), p.IDProceso;", conn);
 
         foreach (var par in deseado)
         {
+            /*
+              EL CANDADO FINAL: DE AQUI NO SALE UNA BAJA.
+
+              Quien calcula `deseado` ya no las produce (ver
+              EstadoDeseadoEnLegacy), y esto es la segunda vuelta de la misma
+              llave: cualquier camino nuevo que vuelva a pedir "apaga este
+              proceso" al guardar desde el web se queda aqui, sin escribir.
+
+              Esta puesto porque el fallo de 2026-11-04 no fue un calculo mal
+              hecho: fue un calculo correcto alimentado con menos datos de los
+              que suponia. La proxima vez que alguien cambie que se manda, esta
+              linea es la que impide que vuelva a costar 46 permisos.
+
+              IDStatus = 1 es el unico que concede; se compara contra 1 y no
+              contra 2 para que un valor raro cuente como baja, no como alta.
+            */
+            if (par.Value != 1) continue;
+
             var hayFila = estadoActual.TryGetValue(par.Key, out var actual);
 
             // Ya dice lo mismo: no se escribe. Es el 97% de los viajes viejos.
             if (hayFila && actual == par.Value) continue;
 
-            /* SIN FILA Y SE PIDE BAJA: `sp_n_ActualizarUsuarioFormaProceso` no
+            /* YA NO SE LLEGA AQUI CON UNA BAJA —la descarta el candado de
+               arriba—, y la comprobacion se queda escrita porque es lo que
+               documenta el comportamiento del procedimiento y porque, si
+               alguna vez se quita ese candado, este es el segundo cierre.
+
+               SIN FILA Y SE PIDE BAJA: `sp_n_ActualizarUsuarioFormaProceso` no
                inserta nada con IDStatus = 2 y sin fila previa —esta
                documentado en SyncLegacyModulePermissionsForUserAsync y asi lo
                hace Mac31 en su propia pantalla—, asi que el viaje no haria
@@ -4964,50 +5095,20 @@ ORDER BY COALESCE(f.Orden, 0), COALESCE(p.Orden, 0), p.IDProceso;", conn);
         var movementUserId = await ResolveMovementLegacyUserIdAsync(conn, ct);
 
         /*
-          SE OTORGA Y TAMBIEN SE QUITA, PERO SOLO SI LA PANTALLA LO ENSEÑO.
+          SOLO OTORGA. NUNCA REVOCA. Es la misma regla, la misma funcion y las
+          mismas razones que en SyncLegacyModulePermissionsForUserAsync, donde
+          esta contada entera (incluido por que la condicion "solo si el modulo
+          esta encendido" no alcanzaba).
 
-          Antes esto solo otorgaba. La razon era buena —guardar desde el web le
-          estaba borrando a la gente sus reportes de Mac31— pero dejaba una
-          puerta de un solo sentido: dabas un reporte, se escribia en Mac31, y
-          al volver a leer lo de Mac31 sustituia a lo del web, asi que la
-          casilla volvia a salir encendida y ya no habia forma de quitarla
-          desde ninguna de las dos pantallas.
-
-          Medido en produccion de Zaragoza (28-sep-2026): tres guardados
-          seguidos, uno con ocho reportes y dos sin ellos, los tres con
-          respuesta 200, y los ocho seguian encendidos en Mac31.
-
-          Que lo hace seguro ahora y no antes: el bootstrap ya mezcla lo de
-          Mac31 dentro de las casillas, asi que quien desmarca esta viendo el
-          estado de verdad y lo esta quitando a proposito. Antes el web no sabia
-          lo que habia en Mac31 y lo pisaba sin enterarse.
-
-          EL CANDADO: solo se toca si el modulo 'reportes' esta ENCENDIDO. Con
-          el modulo apagado sus permisos se caen del catalogo y la pantalla no
-          los enseña; sin este candado, guardar a alguien cualquier otra cosa le
-          apagaria en Mac31 todos los reportes que nadie vio ni pidio quitar.
-          Ese es exactamente el accidente viejo.
+          Aqui empezo la marcha atras: el 28-sep-2026 se midio en Zaragoza que
+          un reporte concedido no se podia quitar desde ninguna de las dos
+          pantallas, y se abrio la revocacion para 'reportes.*'. Lo que ese
+          arreglo compro —poder apagar desde el web— es exactamente lo que el
+          2026-11-04 apago 46 permisos que nadie habia tocado. Se cierra.
         */
-        var activeModules = await GetActiveModulesAsync(conn, empresaId, ct);
-        var puedeQuitar = IsPermissionInActiveModule(ReportesViewPermission, activeModules);
-
-        /* Se arma lo que se QUIERE dejar y se escribe solo la diferencia. Ver
-           el bloque de LeerEstadoLegacyDelUsuarioAsync: antes esto eran tantos
-           viajes como reportes tuviera el catalogo. */
-        var deseado = new Dictionary<int, int>();
-        foreach (var report in reportCatalog.Values)
-        {
-            var loTiene = effective.Contains(report.Key);
-            if (!loTiene && !puedeQuitar)
-                continue;
-
-            /* Si dos reportes comparten IDProceso, cualquier SI gana: la misma
-               regla que el agrupado de SyncLegacyModulePermissionsForUserAsync,
-               y por la misma razon (nunca convertir un detalle del catalogo en
-               una revocacion de un permiso real de Mac31). */
-            if (loTiene || !deseado.ContainsKey(report.LegacyProcessId))
-                deseado[report.LegacyProcessId] = loTiene ? 1 : 2;
-        }
+        var deseado = EstadoDeseadoEnLegacy(
+            reportCatalog.Values.Select(r => (r.Key, r.LegacyProcessId)),
+            effective);
 
         var estadoActual = await LeerEstadoLegacyDelUsuarioAsync(conn, legacyUserId.Value, ct);
         await EscribirCambiosLegacyAsync(
@@ -5473,88 +5574,62 @@ ORDER BY COALESCE(p.Orden, 0), p.IDProceso;", conn);
         var movementUserId = await ResolveMovementLegacyUserIdAsync(conn, ct);
 
         /*
-          SE OTORGA Y TAMBIEN SE QUITA, PERO SOLO SI LA PANTALLA LO ENSEÑO.
+          SOLO OTORGA. NUNCA REVOCA. Y ESTA VEZ NO DEPENDE DE QUE LA PANTALLA
+          SE PORTE BIEN: ver EstadoDeseadoEnLegacy.
 
-          Antes esto solo otorgaba, y por una razon buena: el 2026-08-26, en
-          produccion, guardar permisos de un usuario desde la pantalla web le
-          revoco 44 de sus 135 permisos de Mac31 —todos los botones de CONSULTA
-          DE VENTAS y varios reportes— sin avisar y sin que nadie los hubiera
-          tocado. La causa no fue escribir en legacy: fue tratar la AUSENCIA en
-          "effective" como una negacion. El web no sabia lo que habia en Mac31,
-          asi que "no lo tengo" y "no me lo ensenaron" eran la misma cosa.
+          Ya paso DOS VECES. El 2026-08-26 en Tauro, guardar permisos de un
+          usuario desde la pantalla web le revoco 44 de sus 135 permisos de
+          Mac31 (JANET). Se arreglo dejandolo en solo-otorgar (9cbb34c). Luego
+          se volvio a permitir que quitara —primero para `reportes.*`
+          (28-sep-2026) y despues para `ventas.`, `empleados.` y `prestamos.`—
+          con este razonamiento: "el bootstrap ya mezcla lo de Mac31 dentro de
+          las casillas, asi que quien desmarca esta viendo el estado de verdad".
 
-          Pero dejarlo en solo-otorgar deja una puerta de un solo sentido:
-          encendias un boton, se escribia en Mac31, y al volver a leer lo de
-          Mac31 pisaba lo del web, asi que la casilla volvia a salir encendida y
-          ya no habia forma de apagarla desde ninguna de las dos pantallas. Es
-          el mismo sintoma que se midio en Zaragoza para `reportes.*` el
-          28-sep-2026 y que ahi ya se arreglo con el candado de abajo; esto solo
-          extiende ese arreglo —ya probado— a `ventas.`, `empleados.` y
-          `prestamos.`.
+          ERA CIERTO CUANDO SE ESCRIBIO Y DEJO DE SER CIERTO SIN QUE NADA
+          FALLARA. El 2026-10-08 la pantalla de permisos del web empezo a
+          EXCLUIR del PUT las familias que reparte Mac31 (`sinLosDeMac31` /
+          `FAMILIAS_DE_MAC31` en Web/QR_Web/docs2/src/nucleo/permisosWeb.ts),
+          para no escribir en WUsuarioPermiso filas que el siguiente calculo
+          borraba. Correcto por su lado, y mortal por este: desde entonces el
+          Allow que llega NO CONTIENE NI UNA clave de esas familias, `effective`
+          —que es solo rol + overrides del web— tampoco, y "no me lo mandaron"
+          volvio a significar "quitalo".
 
-          QUE LO HACE SEGURO AHORA Y NO EN AGOSTO: el bootstrap ya mezcla el
-          estado real de Mac31 dentro de las casillas de estas tres familias
-          (ver GetPermisosBootstrapAsync, donde a cada usuario se le cargan
-          legacyVentas / legacyEmpleados / legacyPrestamos y se le quita del
-          Allow/Deny todo lo que no sea semilla del web). O sea: quien desmarca
-          esta viendo el estado de verdad y lo esta quitando a proposito.
+          Resultado medido el 2026-11-04 en Tauro: un Guardar por persona bajo
+          46 filas de [Usuario Forma Procesos] a IDStatus = 2 —JESY 19,
+          ALVARELYS 16, MARINA BERNAL 11— y hubo que reponerlas del respaldo de
+          las 03:00.
 
-          EL CANDADO: solo se toca un permiso si SU modulo esta ENCENDIDO. Con el
-          modulo apagado sus permisos se caen del catalogo y la pantalla no los
-          ensena; sin este candado, guardarle a alguien cualquier otra cosa le
-          apagaria en Mac31 permisos que nadie vio ni pidio quitar. Ese es
-          exactamente el accidente de agosto. Se pregunta por la clave de cada
-          permiso —no por una sola del modulo— porque este mismo metodo lo usan
-          las tres familias.
+          POR QUE AHORA LA REGLA ES ABSOLUTA Y NO CONDICIONADA. El candado
+          anterior ("solo se apaga si su modulo esta encendido") protege contra
+          que el catalogo esconda el permiso, no contra que QUIEN LLAMA mande un
+          conjunto incompleto, que es lo que paso las dos veces. Mientras la
+          revocacion exista, el web vuelve a poder apagar Mac31 en cuanto
+          cualquiera de las dos puntas cambie de idea sobre que se manda, y eso
+          ya se demostro dos veces que pasa. Quitar una capacidad se hace donde
+          vive: en Mac31 (su propia pantalla, o la replica del web
+          UsuariosMacController.GuardarProcesos, donde el administrador decide
+          IDStatus renglon por renglon) o, si es solo para esta plataforma, en
+          las tablas del web — ver la copia de permisos
+          (PermissionService.CopiaDeMac31.cs), que existe justo para eso.
 
-          Dar de baja es IDStatus = 2, NUNCA borrar la fila: asi lo hace Mac31 en
-          su propia pantalla (UsuariosFormasProcesoPermisos manda
-          enumStatus.Inactivo = 2) y asi lo entiende
-          sp_n_ActualizarUsuarioFormaProceso, que con IDStatus = 2 y sin fila
-          previa no inserta nada. El SP toca una sola fila, la de ESTE usuario y
-          ESTE proceso, y trae su propia transaccion.
+          EL AGRUPADO POR IDProceso SE QUEDA, y con el la regla "cualquier SI
+          gana": medido el 2026-10-12 en Produccion_svr, dos claves distintas
+          pueden apuntar al MISMO IDProceso a proposito —las familias
+          "cobranza." y "cobranzas.", o btnModificarRFC, que es
+          "clientes.rfc.abrir" en una pantalla y "clientes.facturacion.editar"
+          en otra— y recorriendo clave por clave la ultima pisaba a la primera.
+          Con solo-otorga ese choque ya no puede apagar nada, pero el agrupado
+          evita escribir dos veces la misma fila.
+
+          Y YA NO SE LEEN LOS MODULOS ENCENDIDOS aqui: solo servian para decidir
+          si se podia apagar. Lo que esta en un modulo apagado no se concede
+          igualmente, porque LoadEffectivePermissionsAsync lo quita de
+          `effective` antes de llegar.
         */
-        var activeModules = await GetActiveModulesAsync(conn, empresaId, ct);
-
-        /*
-          UN BOTON DE MAC31 PUEDE TENER DOS CLAVES, Y ANTES DECIDIA LA ULTIMA.
-
-          Medido el 2026-10-12 en Produccion_svr: conceder
-          `cobranza.cobranzas.consultar` dejaba el btnBuscar de CONSULTA DE
-          COBRANZAS en IDStatus = 2, o sea que CONCEDER APAGABA. La causa es que
-          dos claves distintas apuntan al MISMO IDProceso, a proposito y
-          documentado: esa forma la alimentan las familias "cobranza." y
-          "cobranzas." (ver PermissionService.Familias.Cobros.cs), y
-          btnModificarRFC es "clientes.rfc.abrir" en una pantalla y
-          "clientes.facturacion.editar" en la otra. Al recorrer el catalogo
-          clave por clave, la primera escribia 1 y la segunda 2 sobre la misma
-          fila: ganaba el orden del diccionario.
-
-          Asi que se agrupa por IDProceso y se decide una sola vez. La regla es
-          "CUALQUIER SI GANA": si alguna de las claves de ese boton esta
-          concedida, el boton se enciende. Nunca al contrario, porque la
-          alternativa -que cualquier NO apague- convierte un detalle de como
-          esta partido el catalogo en una revocacion de un permiso real de
-          Mac31, que es justo lo que no puede pasar.
-
-          Y para APAGAR se exige que TODAS sus claves esten en modulos
-          encendidos. Con una sola clave escondida -su modulo apagado- la
-          pantalla no ensenó ese boton completo, asi que apagarlo seria quitar
-          algo que nadie vio ni pidio quitar: el accidente de agosto otra vez,
-          por la puerta de al lado.
-        */
-        /* El agrupado y las dos reglas de arriba NO cambian. Lo unico nuevo es
-           que el resultado se junta y se escribe solo la diferencia, en un
-           viaje (ver LeerEstadoLegacyDelUsuarioAsync). */
-        var deseado = new Dictionary<int, int>();
-        foreach (var grupo in ventasCatalog.Values.GroupBy(a => a.LegacyProcessId))
-        {
-            var loTiene = grupo.Any(a => effective.Contains(a.Key));
-            if (!loTiene && !grupo.All(a => IsPermissionInActiveModule(a.Key, activeModules)))
-                continue;
-
-            deseado[grupo.Key] = loTiene ? 1 : 2;
-        }
+        var deseado = EstadoDeseadoEnLegacy(
+            ventasCatalog.Values.Select(a => (a.Key, a.LegacyProcessId)),
+            effective);
 
         var estadoActual = await LeerEstadoLegacyDelUsuarioAsync(conn, legacyUserId.Value, ct);
         await EscribirCambiosLegacyAsync(

@@ -409,14 +409,40 @@ WHERE ufp.IDStatus = 1 AND ISNULL(p.IDStatus, 1) = 1 AND ISNULL(u.IDStatus, 1) =
         // Se LEE el archivo del front en vez de copiar la tabla aqui, para que
         // esto no empiece a medir una copia que se quedo vieja. Si no se puede
         // leer, se dice y no se mide.
-        var rutaFront = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "..",
-            "Web", "QR_Web", "docs2", "src", "nucleo", "entradaDeModulo.ts"));
+        /*
+          LA RUTA SE BUSCA SUBIENDO, NO CON UNA CUENTA DE ".." ESCRITA A MANO.
+
+          Aqui habia siete `..`. La cuenta estaba bien HOY, y aun asi es la misma
+          trampa que dejo a `ClavesQuePideLaAppMovilTests` dos meses pasando en
+          verde sin leer un archivo: el repo tiene `ISL_Service` DOS veces, asi
+          que nadie puede verificar de un vistazo si siete es el numero, y el dia
+          que alguien mueva el proyecto de carpeta esta parte se apaga sola —con
+          un mensaje en el log que nadie lee, porque la prueba sigue verde—.
+
+          Subiendo hasta encontrar `Web\QR_Web` no hay cuenta que equivocar.
+        */
+        var raizDelFront = SubiendoHasta(Path.Combine("Web", "QR_Web"));
+        var rutaFront = raizDelFront is null
+            ? string.Empty
+            : Path.Combine(raizDelFront, "docs2", "src", "nucleo", "entradaDeModulo.ts");
 
         Di("");
-        if (!File.Exists(rutaFront))
+        if (rutaFront.Length == 0 || !File.Exists(rutaFront))
         {
-            Di($"--- PUERTA DEL FRONT: NO MEDIDA, no se encontro {rutaFront} ---");
+            /*
+              Y SI EL FRONT ESTA AL LADO, NO MEDIR ES UN FALLO.
+
+              Dos casos distintos que antes se trataban igual: que nadie haya
+              clonado el front (CI del backend solo) es legitimo y se salta; que
+              el front SI este y el archivo no aparezca es un renombre, y
+              entonces la parte 5 tiene que gritar en vez de anotarlo.
+            */
+            Assert.True(raizDelFront is null,
+                $"El front esta en {raizDelFront} pero no se encontro "
+                + "docs2/src/nucleo/entradaDeModulo.ts. Si el archivo se renombro o se movio hay "
+                + "que seguirlo aqui: la parte 5 de la auditoria no mide nada sin el.");
+
+            Di("--- PUERTA DEL FRONT: NO MEDIDA, el front no esta clonado al lado ---");
         }
         else
         {
@@ -654,5 +680,39 @@ WHERE ufp.IDStatus = 1 AND ISNULL(p.IDStatus, 1) = 1 AND ISNULL(u.IDStatus, 1) =
         Directory.CreateDirectory(dir);
         await File.WriteAllLinesAsync(Path.Combine(dir, $"auditoria-herencia-{baseDatos}.txt"), renglones);
         _out.WriteLine($"[escrito en artifacts\\auditoria-herencia-{baseDatos}.txt]");
+
+        /*
+          EL SUELO: QUE LA AUDITORIA NO DIGA "LISTO" CON EL INFORME VACIO.
+
+          Esta prueba es un DIAGNOSTICO: casi todo lo que hace es imprimir, y por
+          eso no tiene asertos que puedan fallar. Lo que si puede fallar —y hay
+          que vigilar— es que deje de MEDIR: si la reflexion no encuentra
+          `VerbosLegacy`, si la consulta a `n_Procesos` cambia de forma o si el
+          nombre de una tabla se mueve, el informe sale con tres renglones de
+          encabezado y la prueba se pone verde igual.
+
+          Veinte renglones es un suelo deliberadamente bajo: una auditoria de
+          verdad saca cientos en las dos bases.
+        */
+        Assert.True(renglones.Count >= 20,
+            $"La auditoria de {baseDatos} solo produjo {renglones.Count} renglones. "
+            + "Abrio la base pero no midio: hay que revisar la reflexion y las consultas.");
+    }
+
+    /// <summary>
+    /// La primera carpeta, subiendo desde el binario de las pruebas, que
+    /// contenga <paramref name="relativa"/>, o <c>null</c>.
+    /// </summary>
+    private static string? SubiendoHasta(string relativa)
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory);
+             dir is not null;
+             dir = dir.Parent)
+        {
+            var candidata = Path.Combine(dir.FullName, relativa);
+            if (Directory.Exists(candidata)) return candidata;
+        }
+
+        return null;
     }
 }

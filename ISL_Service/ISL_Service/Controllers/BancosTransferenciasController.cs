@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.OperacionMac;
+﻿using ISL_Service.Application.DTOs.OperacionMac;
 using ISL_Service.Application.Interfaces;
 using ISL_Service.Application.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -16,18 +16,40 @@ namespace ISL_Service.Controllers;
 [Authorize]
 public class BancosTransferenciasController : PermisoControllerBase
 {
-    private static readonly string[] PermisosVer = { "transferencias.ver" };
+    /*
+      LAS CINCO LLEVAN TAMBIEN LA CLAVE DEL CANAL MOVIL.
+
+      Hasta hoy este modulo solo aceptaba las claves del web, asi que dar
+      transferencias en la computadora las daba tambien en el telefono y no
+      habia forma de separarlas: no eran dos permisos parecidos, era EL MISMO.
+      El telefono se presta y la computadora de la oficina no, y aqui se MUEVE
+      DINERO, asi que la separacion importa mas que en ningun otro modulo.
+
+      `ExigirPermisoAsync` pide CUALQUIERA de la lista, asi que la clave del web
+      sigue valiendo igual y nadie pierde la pantalla el dia del despliegue.
+      `CanalDeAcceso.Filtrar` tira las `app_movil.*` cuando el token es de canal
+      web, asi que esto no abre nada en el navegador.
+
+      El plan completo, con el guion de reparto, esta en
+      `Movil/mac-mac-mobile/lib/modules/verticals/transferencias.permisos.md`.
+    */
+    private static readonly string[] PermisosVer =
+        { "transferencias.ver", "app_movil.transferencias.ver" };
 
     // Cargar el estado de cuenta no mueve dinero, pero es lo que se concilia
     // despues: un archivo mal cargado descuadra todo lo que venga detras.
-    private static readonly string[] PermisosCargar = { "transferencias.cargar" };
+    private static readonly string[] PermisosCargar =
+        { "transferencias.cargar", "app_movil.transferencias.cargar" };
 
-    private static readonly string[] PermisosIdentificar = { "transferencias.identificar" };
+    private static readonly string[] PermisosIdentificar =
+        { "transferencias.identificar", "app_movil.transferencias.identificar" };
 
     // Aplicar y cancelar SI mueven dinero: tocan Ventas, [Ventas Pagos] y el
     // saldo del cliente. Cada uno con su permiso.
-    private static readonly string[] PermisosAplicar = { "transferencias.aplicar" };
-    private static readonly string[] PermisosCancelar = { "transferencias.cancelar" };
+    private static readonly string[] PermisosAplicar =
+        { "transferencias.aplicar", "app_movil.transferencias.aplicar" };
+    private static readonly string[] PermisosCancelar =
+        { "transferencias.cancelar", "app_movil.transferencias.cancelar" };
 
     private readonly IOperacionMacService _service;
 
