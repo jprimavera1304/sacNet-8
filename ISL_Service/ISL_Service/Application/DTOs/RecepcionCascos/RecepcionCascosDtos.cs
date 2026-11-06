@@ -3,9 +3,14 @@ namespace ISL_Service.Application.DTOs.RecepcionCascos;
 /*
   RECEPCION DE CASCOS USADOS: LOS DATOS QUE VIAJAN
 
-  Tauro apunta en una hoja de papel, dia por dia, cuantos cascos usados le
-  entrega cada agente separados por tamano. La hoja lleva ademas dos apartados
-  propios: lo que llega de tiendas y lo de los galleros. Esto es esa hoja.
+  Tauro apunta en una hoja de papel, dia por dia, cuantos cascos usados entrega
+  cada REPARTIDOR separados por tamano. Esto es esa hoja.
+
+  QUIEN ENTREGA ES EL REPARTIDOR, NO EL AGENTE. Nacio al reves y lo corrigio el
+  negocio: el agente es a quien se le factura la ruta; el repartidor es la
+  persona que trae los cascos. Son dos catalogos distintos. Con el cambio se
+  cayeron el origen (agente / tienda / gallero) y la referencia escrita a mano:
+  una recepcion es un dia y un repartidor.
 
   LO QUE NO TRAE NINGUN DTO DE ENTRADA, A PROPOSITO:
 
@@ -15,8 +20,8 @@ namespace ISL_Service.Application.DTOs.RecepcionCascos;
     * El USUARIO y el CANAL. Salen del token y del encabezado de la peticion,
       nunca del cuerpo: si viajaran en el cuerpo, cualquiera podria firmar una
       recepcion a nombre de otro.
-    * El NOMBRE del agente ni el del tipo de casco. Viajan los ids y los
-      nombres se leen del catalogo al consultar. Un nombre mandado por el
+    * El NOMBRE del repartidor ni el del tipo de casco. Viaja el id y el
+      nombre lo lee el procedimiento del catalogo. Un nombre mandado por el
       cliente es un nombre que puede no corresponder al id.
 */
 
@@ -38,12 +43,14 @@ public class TipoRecepcionCascoDto
     public int orden { get; set; }
 }
 
-public class AgenteRecepcionCascoDto
+/* Un repartidor activo de [Catalogo Repartidores]. */
+public class RepartidorRecepcionCascoDto
 {
-    public int idAgente { get; set; }
-    /* El numero visible del agente. Puede repetirse entre agentes. */
-    public int numero { get; set; }
+    public int idRepartidor { get; set; }
     public string? nombre { get; set; }
+    /* La zona a la que esta asignado. Viaja porque el catalogo la trae y
+       distingue a dos personas con nombre parecido. */
+    public int? idZona { get; set; }
 }
 
 /* ------------------------------------------------------------------ */
@@ -55,14 +62,12 @@ public class RecepcionCascoDto
     public int idRecepcion { get; set; }
     /* El dia que se recibieron los cascos, no el dia que se capturo. */
     public DateTime fecha { get; set; }
-    /* 1 AGENTE, 2 TIENDA, 3 GALLERO. */
-    public int idOrigen { get; set; }
-    public string? origen { get; set; }
-    public int? idAgente { get; set; }
-    public string? agente { get; set; }
-    /* El nombre de la tienda o del gallero, que no tienen catalogo. */
-    public string? referencia { get; set; }
-    /* El agente cuando lo hay, y si no la referencia: es la columna que se lee. */
+    public int idRepartidor { get; set; }
+    /* El nombre TAL COMO ESTABA el dia de la captura: se guarda en la propia
+       fila, no se lee por JOIN. El catalogo es de legacy y sus filas se
+       renombran y se dan de baja. */
+    public string? repartidor { get; set; }
+    /* El mismo nombre, con la etiqueta que usa la pantalla. */
     public string? quienEntrego { get; set; }
     public int totalPiezas { get; set; }
     public int estatus { get; set; }
@@ -106,7 +111,7 @@ public class BitacoraRecepcionCascoDto
     public string? tipo { get; set; }
     public int? piezasAnterior { get; set; }
     public int? piezasNueva { get; set; }
-    /* Para lo que no son cantidades: Fecha, Origen, Agente, Observaciones... */
+    /* Para lo que no son cantidades: Fecha, Repartidor, Observaciones... */
     public string? campo { get; set; }
     public string? valorAnterior { get; set; }
     public string? valorNuevo { get; set; }
@@ -128,9 +133,7 @@ public class PiezasPorTipoRecepcionRequest
 public class CrearRecepcionCascoRequest
 {
     public DateTime? Fecha { get; set; }
-    public int IdOrigen { get; set; }
-    public int? IdAgente { get; set; }
-    public string? Referencia { get; set; }
+    public int IdRepartidor { get; set; }
     public string? Observaciones { get; set; }
     public List<PiezasPorTipoRecepcionRequest>? Piezas { get; set; }
 }
@@ -161,7 +164,7 @@ public class ResultadoRecepcionCascoDto
     public string? mensaje { get; set; }
     public int idRecepcion { get; set; }
     /* Se guardo, y ademas hay algo que la persona tiene que saber (por ejemplo
-       que ese agente ya tenia una recepcion ese dia). No es un error. */
+       que ese repartidor ya tenia una recepcion ese dia). No es un error. */
     public string? advertencia { get; set; }
 }
 
@@ -182,11 +185,8 @@ public class RenglonReporteRecepcionCascoDto
 {
     public int idRecepcion { get; set; }
     public DateTime fecha { get; set; }
-    public int idOrigen { get; set; }
-    public string? origen { get; set; }
     public string? quienEntrego { get; set; }
-    public int? idAgente { get; set; }
-    public int? numeroAgente { get; set; }
+    public int idRepartidor { get; set; }
     public int idTipoUsado { get; set; }
     public int piezas { get; set; }
     public int totalPiezas { get; set; }

@@ -13,16 +13,16 @@ namespace ISL_Service.Application.Security;
 
   POR QUE NO SE REUSA ReporteUsadosTicket. Aquel pase lleva estatus, variante y
   una bandera de "por fecha de registro" que aqui no existen, y le falta lo
-  unico que este necesita ademas del periodo: el ORIGEN y el AGENTE, que es
-  como se pide esta hoja. Meter las dos cosas en el mismo formato obligaria a
+  unico que este necesita ademas del periodo: el REPARTIDOR, que es como se
+  pide esta hoja. Meter las dos cosas en el mismo formato obligaria a
   que cada uno entienda los campos del otro, y el dia que uno cambie se rompe
   el otro sin que nada lo avise. La firma se hace igual —HMAC con la llave del
   JWT—, que es lo que de verdad importa que no se separe.
 
-  QUE PROTEGE. Que alguien escriba otro periodo o otro agente en la barra del
-  navegador y se saque un papel de algo que no puede ver. El cuerpo va en claro
-  —no es secreto, son dos fechas y dos numeros— pero firmado: cambiar un digito
-  invalida el pase.
+  QUE PROTEGE. Que alguien escriba otro periodo u otro repartidor en la barra
+  del navegador y se saque un papel de algo que no puede ver. El cuerpo va en
+  claro —no es secreto, son dos fechas y dos numeros— pero firmado: cambiar un
+  digito invalida el pase.
 
   LOS DIEZ MINUTOS son para que el enlace no sirva de aqui a manana si queda en
   el historial del navegador. Da de sobra para abrir el PDF y no para guardarlo
@@ -36,10 +36,8 @@ public static class ReporteRecepcionCascosTicket
     {
         public DateTime Desde { get; init; }
         public DateTime Hasta { get; init; }
-        /* 0 = los tres origenes; 1 AGENTE, 2 TIENDA, 3 GALLERO. */
-        public int IdOrigen { get; init; }
-        /* 0 = todos los agentes. */
-        public int IdAgente { get; init; }
+        /* 0 = todos los repartidores. */
+        public int IdRepartidor { get; init; }
         public int IdUsuario { get; init; }
         /*
           QUIEN PIDIO EL PAPEL. Se imprime arriba: cuando una copia aparece
@@ -52,10 +50,10 @@ public static class ReporteRecepcionCascosTicket
 
     public static string Firmar(
         string llave, DateTime desde, DateTime hasta,
-        int idOrigen, int idAgente, int idUsuario, string usuario = "")
+        int idRepartidor, int idUsuario, string usuario = "")
     {
         var expira = DateTimeOffset.UtcNow.Add(Vigencia).ToUnixTimeSeconds();
-        var cuerpo = $"{Fecha(desde)}|{Fecha(hasta)}|{Origen(idOrigen)}|{Mayor(idAgente)}" +
+        var cuerpo = $"{Fecha(desde)}|{Fecha(hasta)}|{Mayor(idRepartidor)}" +
                      $"|{idUsuario}|{expira}|{SinSeparador(usuario)}";
         return Base64Url(Encoding.UTF8.GetBytes(cuerpo)) + "." + Base64Url(Firma(llave, cuerpo));
     }
@@ -85,9 +83,9 @@ public static class ReporteRecepcionCascosTicket
             return null;
 
         var campos = cuerpo.Split('|');
-        if (campos.Length != 7) return null;
+        if (campos.Length != 6) return null;
 
-        if (!long.TryParse(campos[5], out var expira) ||
+        if (!long.TryParse(campos[4], out var expira) ||
             DateTimeOffset.UtcNow.ToUnixTimeSeconds() > expira)
             return null;
 
@@ -99,21 +97,17 @@ public static class ReporteRecepcionCascosTicket
         {
             Desde = desde.Value,
             Hasta = hasta.Value,
-            IdOrigen = Origen(Numero(campos[2])),
-            IdAgente = Mayor(Numero(campos[3])),
-            IdUsuario = Numero(campos[4]),
-            Usuario = campos[6]
+            IdRepartidor = Mayor(Numero(campos[2])),
+            IdUsuario = Numero(campos[3]),
+            Usuario = campos[5]
         };
     }
 
     /*
-      Solo los origenes conocidos; cualquier otra cosa cae en 0 = todos. Este
-      numero llega hasta un WHERE: dejarlo pasar tal cual seria confiar en que
-      nadie escriba nada raro en un pase que ademas se puede intentar
-      falsificar.
+      Cualquier cosa que no sea un id valido cae en 0 = todos. Este numero
+      llega hasta un filtro: dejarlo pasar tal cual seria confiar en que nadie
+      escriba nada raro en un pase que ademas se puede intentar falsificar.
     */
-    private static int Origen(int valor) => valor is 1 or 2 or 3 ? valor : 0;
-
     private static int Mayor(int valor) => valor > 0 ? valor : 0;
 
     private static int Numero(string texto) => int.TryParse(texto, out var n) ? n : 0;

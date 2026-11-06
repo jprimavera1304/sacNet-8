@@ -19,11 +19,6 @@ namespace ISL_Service.Application.Services;
 /// </summary>
 public class RecepcionCascosService : IRecepcionCascosService
 {
-    /* Los tres origenes de la hoja. */
-    public const int OrigenAgente  = 1;
-    public const int OrigenTienda  = 2;
-    public const int OrigenGallero = 3;
-
     /*
       Tope de renglones del detalle. El catalogo tiene 8 tipos activos; 40 deja
       sitio de sobra para que crezca y corta de golpe una peticion armada a
@@ -48,11 +43,11 @@ public class RecepcionCascosService : IRecepcionCascosService
     public Task<List<TipoRecepcionCascoDto>> ConsultarTiposAsync(CancellationToken ct = default)
         => _repository.ConsultarTiposAsync(ct);
 
-    public Task<List<AgenteRecepcionCascoDto>> ConsultarAgentesAsync(CancellationToken ct = default)
-        => _repository.ConsultarAgentesAsync(ct);
+    public Task<List<RepartidorRecepcionCascoDto>> ConsultarRepartidoresAsync(CancellationToken ct = default)
+        => _repository.ConsultarRepartidoresAsync(ct);
 
     public Task<List<RecepcionCascoDto>> ConsultarAsync(
-        DateTime? fechaInicio, DateTime? fechaFin, int? idOrigen, int? idAgente,
+        DateTime? fechaInicio, DateTime? fechaFin, int? idRepartidor,
         int? estatus, bool incluirCanceladas, CancellationToken ct = default)
     {
         /*
@@ -64,7 +59,7 @@ public class RecepcionCascosService : IRecepcionCascosService
             (fechaInicio, fechaFin) = (fechaFin, fechaInicio);
 
         return _repository.ConsultarAsync(
-            fechaInicio, fechaFin, idOrigen, idAgente, estatus, incluirCanceladas, ct);
+            fechaInicio, fechaFin, idRepartidor, estatus, incluirCanceladas, ct);
     }
 
     public Task<List<DetalleRecepcionCascoDto>> ConsultarDetalleAsync(
@@ -193,17 +188,11 @@ public class RecepcionCascosService : IRecepcionCascosService
         if (request.Fecha.Value.Date > DateTime.Today)
             return "La fecha no puede ser posterior a hoy.";
 
-        if (request.IdOrigen != OrigenAgente
-            && request.IdOrigen != OrigenTienda
-            && request.IdOrigen != OrigenGallero)
-            return "Elija de quien se recibieron los cascos.";
-
-        if (request.IdOrigen == OrigenAgente && (request.IdAgente ?? 0) <= 0)
-            return "Elija el agente que entrego los cascos.";
-
-        if (request.IdOrigen != OrigenAgente
-            && string.IsNullOrWhiteSpace(request.Referencia))
-            return "Escriba de donde se recibieron los cascos.";
+        /*  Que el repartidor EXISTA y siga activo no se comprueba aqui sino en
+            el procedimiento, que es quien tiene el catalogo delante. Aqui solo
+            se para lo que ni siquiera es un id.  */
+        if (request.IdRepartidor <= 0)
+            return "Elija el repartidor que entrego los cascos.";
 
         var piezas = request.Piezas ?? new List<PiezasPorTipoRecepcionRequest>();
 

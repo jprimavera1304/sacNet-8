@@ -53,7 +53,7 @@ public static class RecepcionCascosHtmlBuilder
     */
     public static string Encabezado(
         string empresa, string logoDataUri,
-        DateTime desde, DateTime hasta, string origen, string agente, string usuario)
+        DateTime desde, DateTime hasta, string repartidor, string usuario)
     {
         var html = new StringBuilder();
 
@@ -105,7 +105,7 @@ public static class RecepcionCascosHtmlBuilder
            el logo no llega, es borrar una clase. */
         html.Append("<span class=\"emp oculto\">").Append(Texto(empresa)).Append("</span><br>");
         html.Append("<span class=\"fec\">")
-            .Append(Texto(Periodo(desde, hasta, origen, agente)))
+            .Append(Texto(Periodo(desde, hasta, repartidor)))
             .Append("</span>");
         html.Append("</td>");
 
@@ -218,9 +218,14 @@ public static class RecepcionCascosHtmlBuilder
         else
         {
             /*
-              UNA SECCION POR ORIGEN, como la hoja: primero los agentes, luego
-              lo que llego de tiendas, luego los galleros. Cada seccion lleva su
-              subtotal, porque es la cuenta que se compara.
+              UN SOLO BLOQUE, ORDENADO POR REPARTIDOR.
+
+              Antes esto se partia en tres secciones con su subtotal —agentes,
+              tiendas, galleros—, que es como venia la hoja de papel. Esa
+              separacion se cayo entera cuando el negocio corrigio quien
+              entrega: no hay tres clases de origen, hay repartidores. Un
+              subtotal por repartidor no se pidio y ademas repetiria el renglon
+              en los dias de una sola entrega.
             */
             var porRecepcion = datos.Renglones
                 .GroupBy(r => r.idRecepcion)
@@ -230,56 +235,28 @@ public static class RecepcionCascosHtmlBuilder
                     Primero = g.First(),
                     Piezas = g.ToDictionary(x => x.idTipoUsado, x => x.piezas)
                 })
-                .OrderBy(x => x.Primero.idOrigen)
-                .ThenBy(x => x.Primero.quienEntrego, StringComparer.Create(Cultura, true))
+                .OrderBy(x => x.Primero.quienEntrego, StringComparer.Create(Cultura, true))
                 .ThenBy(x => x.Primero.fecha)
                 .ThenBy(x => x.Id)
                 .ToList();
 
-            var origenActual = -1;
-
-            foreach (var grupo in porRecepcion.GroupBy(x => x.Primero.idOrigen))
+            foreach (var r in porRecepcion)
             {
-                origenActual = grupo.Key;
+                html.Append("<tr>");
+                html.Append("<td class=\"izq\">")
+                    .Append(r.Primero.fecha.ToString("dd/MM/yyyy", Cultura)).Append("</td>");
+                html.Append("<td class=\"izq\">").Append(Texto(r.Primero.quienEntrego)).Append("</td>");
 
-                html.Append("<tr class=\"grupo\"><td class=\"izq\" colspan=\"")
-                    .Append(tipos.Count + 4)
-                    .Append("\">").Append(Texto(Seccion(origenActual))).Append("</td></tr>");
-
-                foreach (var r in grupo)
-                {
-                    html.Append("<tr>");
-                    html.Append("<td class=\"izq\">")
-                        .Append(r.Primero.fecha.ToString("dd/MM/yyyy", Cultura)).Append("</td>");
-                    html.Append("<td class=\"izq\">").Append(Texto(r.Primero.quienEntrego)).Append("</td>");
-
-                    foreach (var t in tipos)
-                    {
-                        r.Piezas.TryGetValue(t.idTipoUsado, out var piezas);
-                        html.Append("<td class=\"der\">").Append(Numero(piezas)).Append("</td>");
-                    }
-
-                    html.Append("<td class=\"der\">")
-                        .Append(piezasDeGrupo(r.Piezas).ToString("N0", Cultura)).Append("</td>");
-                    html.Append("<td class=\"izq obs\">").Append(Texto(r.Primero.observaciones)).Append("</td>");
-                    html.Append("</tr>");
-                }
-
-                /* Subtotal de la seccion. Se acumula recorriendo LO QUE SE
-                   IMPRIME, no pidiendoselo a la base: si un dia el reporte
-                   recorta algo, los subtotales siguen cuadrando con el papel. */
-                html.Append("<tr class=\"sub\">");
-                html.Append("<td class=\"izq\" colspan=\"2\">TOTAL ")
-                    .Append(Texto(Seccion(origenActual))).Append("</td>");
-                var sumaSeccion = 0;
                 foreach (var t in tipos)
                 {
-                    var suma = grupo.Sum(x => x.Piezas.TryGetValue(t.idTipoUsado, out var p) ? p : 0);
-                    sumaSeccion += suma;
-                    html.Append("<td class=\"der\">").Append(Numero(suma)).Append("</td>");
+                    r.Piezas.TryGetValue(t.idTipoUsado, out var piezas);
+                    html.Append("<td class=\"der\">").Append(Numero(piezas)).Append("</td>");
                 }
-                html.Append("<td class=\"der\">").Append(sumaSeccion.ToString("N0", Cultura)).Append("</td>");
-                html.Append("<td></td></tr>");
+
+                html.Append("<td class=\"der\">")
+                    .Append(piezasDeGrupo(r.Piezas).ToString("N0", Cultura)).Append("</td>");
+                html.Append("<td class=\"izq obs\">").Append(Texto(r.Primero.observaciones)).Append("</td>");
+                html.Append("</tr>");
             }
 
             /* ---- el total general, ultima fila de la tabla ---- */
@@ -305,13 +282,6 @@ public static class RecepcionCascosHtmlBuilder
 
     private static int piezasDeGrupo(Dictionary<int, int> piezas) => piezas.Values.Sum();
 
-    private static string Seccion(int idOrigen) => idOrigen switch
-    {
-        2 => "CASCOS RECIBIDOS DE TIENDAS",
-        3 => "GALLEROS",
-        _ => "AGENTES"
-    };
-
     /*
       El rotulo de la columna: el nombre corto si lo hay. El catalogo guarda
       'MINI CHICO(1)' en el corto y '11141608 MINI CHICO (1)' en el largo —ese
@@ -331,7 +301,7 @@ public static class RecepcionCascosHtmlBuilder
     private static string Numero(int valor)
         => valor == 0 ? "<span class=\"vacio\">0</span>" : valor.ToString("N0", Cultura);
 
-    private static string Periodo(DateTime desde, DateTime hasta, string origen, string agente)
+    private static string Periodo(DateTime desde, DateTime hasta, string repartidor)
     {
         var texto = new StringBuilder();
 
@@ -339,16 +309,13 @@ public static class RecepcionCascosHtmlBuilder
             ? $"Del día {desde:dd/MM/yyyy}"
             : $"Del {desde:dd/MM/yyyy} al {hasta:dd/MM/yyyy}");
 
-        if (!string.IsNullOrWhiteSpace(origen))
-            texto.Append("  ·  ").Append(origen.Trim());
-
-        if (!string.IsNullOrWhiteSpace(agente))
-            texto.Append("  ·  ").Append(agente.Trim());
+        if (!string.IsNullOrWhiteSpace(repartidor))
+            texto.Append("  ·  ").Append(repartidor.Trim());
 
         return texto.ToString();
     }
 
-    /* Escapar es obligatorio y no decorativo: los nombres de agente y las
+    /* Escapar es obligatorio y no decorativo: los nombres de repartidor y las
        observaciones los teclea una persona, y un "&" suelto rompe el
        documento sin que wkhtmltopdf diga nada. */
     private static string Texto(string? valor)

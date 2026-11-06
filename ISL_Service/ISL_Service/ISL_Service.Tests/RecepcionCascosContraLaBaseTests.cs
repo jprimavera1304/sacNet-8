@@ -22,7 +22,7 @@ namespace ISL_Service.Tests;
 /// Solo en las tres tablas de este modulo, que son nuestras y nacieron vacias.
 /// Cada prueba marca sus renglones en Observaciones con una firma propia y los
 /// borra en un finally, pase lo que pase. No toca ninguna tabla de legacy: de
-/// Agentes y [Catalogo TiposUsados] solo lee.
+/// [Catalogo Repartidores] y [Catalogo TiposUsados] solo lee.
 ///
 /// Y SOLO EN Produccion_svr. Este modulo es de Tauro; la ultima prueba
 /// comprueba justamente que en MacZ (Zaragoza) no existe nada de esto.
@@ -56,10 +56,6 @@ public class RecepcionCascosContraLaBaseTests
     private const int TipoChico = 1;
     private const int TipoMoto = 8;
 
-    private const int OrigenAgente = 1;
-    private const int OrigenTienda = 2;
-    private const int OrigenGallero = 3;
-
     private const int UsuarioDePrueba = 3;
 
     private readonly ITestOutputHelper _out;
@@ -82,21 +78,6 @@ public class RecepcionCascosContraLaBaseTests
     private static RecepcionCascosService Servicio(string firma)
         => new(Repositorio(BaseTauro, firma));
 
-    /// <summary>
-    /// La fecha de la recepcion mas reciente que hay en la base, o <c>null</c> si
-    /// no hay ninguna. Sirve para que las pruebas del papel se apoyen en datos
-    /// que EXISTEN en vez de en el calendario.
-    /// </summary>
-    private static async Task<DateTime?> UltimaFechaConRecepcionAsync(string firma)
-    {
-        await using var conn = new SqlConnection(Cadena(BaseTauro, firma));
-        await conn.OpenAsync();
-        await using var cmd = new SqlCommand(
-            "SELECT MAX(Fecha) FROM dbo.WRecepcionCasco WHERE Estatus = 1;", conn);
-        var valor = await cmd.ExecuteScalarAsync();
-        return valor is DateTime f ? f : null;
-    }
-
     // ==================================================================
     // 1. EL CASO BUENO
     // ==================================================================
@@ -110,15 +91,14 @@ public class RecepcionCascosContraLaBaseTests
     {
         var firma = Firma();
         var servicio = Servicio(firma);
-        var agente = await UnAgenteActivoAsync(firma);
+        var repartidor = await UnRepartidorActivoAsync(firma);
 
         try
         {
             var alta = await servicio.CrearAsync(new CrearRecepcionCascoRequest
             {
                 Fecha = DateTime.Today,
-                IdOrigen = OrigenAgente,
-                IdAgente = agente,
+                IdRepartidor = repartidor,
                 Observaciones = firma,
                 Piezas = new()
                 {
@@ -132,15 +112,19 @@ public class RecepcionCascosContraLaBaseTests
             Assert.True(alta.idRecepcion > 0);
 
             var lista = await servicio.ConsultarAsync(
-                DateTime.Today, DateTime.Today, null, agente, null, false);
+                DateTime.Today, DateTime.Today, repartidor, null, false);
             var mia = lista.Single(r => r.idRecepcion == alta.idRecepcion);
 
             /* 5 + 3 + 10. El total NO se mando: lo sumo el procedimiento. */
             Assert.Equal(18, mia.totalPiezas);
             Assert.Equal(3, mia.tipos);
             Assert.Equal(1, mia.estatus);
-            Assert.Equal("AGENTE", mia.origen);
-            Assert.False(string.IsNullOrWhiteSpace(mia.agente));
+            Assert.Equal(repartidor, mia.idRepartidor);
+            /*  EL NOMBRE SE GUARDO, NO SE LEYO POR JOIN. Es la diferencia que
+                hace que una hoja vieja siga diciendo lo mismo el dia que el
+                catalogo de legacy cambie esa fila.  */
+            Assert.Equal(await NombreDelRepartidorAsync(firma, repartidor), mia.repartidor);
+            Assert.Equal(mia.repartidor, mia.quienEntrego);
             Assert.Equal("WEB", mia.canal);
 
             /* El detalle trae los 8 tamanos del catalogo, con cero en los que
@@ -176,15 +160,14 @@ public class RecepcionCascosContraLaBaseTests
     {
         var firma = Firma();
         var servicio = Servicio(firma);
-        var agente = await UnAgenteActivoAsync(firma);
+        var repartidor = await UnRepartidorActivoAsync(firma);
 
         try
         {
             var alta = await servicio.CrearAsync(new CrearRecepcionCascoRequest
             {
                 Fecha = DateTime.Today,
-                IdOrigen = OrigenAgente,
-                IdAgente = agente,
+                IdRepartidor = repartidor,
                 Observaciones = firma,
                 Piezas = new()
                 {
@@ -208,23 +191,23 @@ public class RecepcionCascosContraLaBaseTests
     }
 
     /// <summary>
-    /// Dos recepciones del mismo agente el mismo dia SE GUARDAN y la segunda
+    /// Dos recepciones del mismo repartidor el mismo dia SE GUARDAN y la segunda
     /// avisa. No se prohibe porque no hay ninguna regla en el sistema que lo
     /// prohiba; se avisa porque capturar dos veces la misma es el error que
     /// descuadra la hoja.
     /// </summary>
     [Fact]
-    public async Task Dos_Recepciones_Del_Mismo_Agente_El_Mismo_Dia_Avisan_Pero_Se_Guardan()
+    public async Task Dos_Recepciones_Del_Mismo_Repartidor_El_Mismo_Dia_Avisan_Pero_Se_Guardan()
     {
         var firma = Firma();
         var servicio = Servicio(firma);
-        var agente = await UnAgenteActivoAsync(firma);
+        var repartidor = await UnRepartidorActivoAsync(firma);
 
         /*
             UN DIA PROPIO, Y NO HOY.
 
             La prueba afirma que la PRIMERA recepcion no avisa, y eso solo es
-            cierto si ese agente no tiene ya otra ese dia. Con hoy fallaba en
+            cierto si ese repartidor no tiene ya otra ese dia. Con hoy fallaba en
             cuanto la base local tenia datos de ejemplo: el aviso salia desde
             la primera y la prueba acusaba al codigo de algo que hacia bien.
             Un dia de hace mes y medio es de esta prueba y de nadie mas.
@@ -234,8 +217,7 @@ public class RecepcionCascosContraLaBaseTests
         CrearRecepcionCascoRequest DeEseDia() => new()
         {
             Fecha = dia,
-            IdOrigen = OrigenAgente,
-            IdAgente = agente,
+            IdRepartidor = repartidor,
             Observaciones = firma,
             Piezas = new() { new() { IdTipoUsado = TipoChico, Piezas = 1 } }
         };
@@ -271,17 +253,16 @@ public class RecepcionCascosContraLaBaseTests
     [InlineData("sin fecha")]
     [InlineData("fecha futura")]
     [InlineData("sin piezas")]
-    [InlineData("tienda sin referencia")]
-    [InlineData("origen que no existe")]
-    [InlineData("agente dado de baja")]
+    [InlineData("sin repartidor")]
+    [InlineData("repartidor dado de baja")]
     [InlineData("tamano que no existe")]
     public async Task Lo_Que_No_Cuadra_No_Se_Guarda(string caso)
     {
         var firma = Firma();
         var servicio = Servicio(firma);
-        var agente = await UnAgenteActivoAsync(firma);
+        var repartidor = await UnRepartidorActivoAsync(firma);
 
-        var peticion = Basica(agente, firma);
+        var peticion = Basica(repartidor, firma);
 
         switch (caso)
         {
@@ -291,12 +272,10 @@ public class RecepcionCascosContraLaBaseTests
                 peticion.Fecha = DateTime.Today.AddDays(1); break;
             case "sin piezas":
                 peticion.Piezas = new(); break;
-            case "tienda sin referencia":
-                peticion.IdOrigen = OrigenTienda; peticion.IdAgente = null; peticion.Referencia = "   "; break;
-            case "origen que no existe":
-                peticion.IdOrigen = 9; break;
-            case "agente dado de baja":
-                peticion.IdAgente = await UnAgenteInactivoAsync(firma); break;
+            case "sin repartidor":
+                peticion.IdRepartidor = 0; break;
+            case "repartidor dado de baja":
+                peticion.IdRepartidor = await UnRepartidorInactivoAsync(firma); break;
             case "tamano que no existe":
                 peticion.Piezas = new() { new() { IdTipoUsado = 999999, Piezas = 4 } }; break;
         }
@@ -332,12 +311,12 @@ public class RecepcionCascosContraLaBaseTests
     {
         var firma = Firma();
         var repositorio = Repositorio(BaseTauro, firma);
-        var agente = await UnAgenteActivoAsync(firma);
+        var repartidor = await UnRepartidorActivoAsync(firma);
 
         try
         {
             var resultado = await repositorio.InsertarAsync(
-                Basica(agente, firma), 0, "", "WEB");
+                Basica(repartidor, firma), 0, "", "WEB");
 
             Assert.False(resultado.ok);
             Assert.Contains("usuario", resultado.mensaje ?? "", StringComparison.OrdinalIgnoreCase);
@@ -350,9 +329,15 @@ public class RecepcionCascosContraLaBaseTests
     }
 
     /// <summary>
-    /// La tabla no se deja llenar a mano con un origen y un agente que se
-    /// contradicen, ni con piezas en cero. Son CHECK de tabla: valen aunque
-    /// alguien escriba por fuera del procedimiento.
+    /// La tabla no se deja llenar a mano sin repartidor o con el nombre en
+    /// blanco. Son CHECK de tabla: valen aunque alguien escriba por fuera del
+    /// procedimiento.
+    ///
+    /// ESTA PRUEBA CAMBIO DE SUJETO Y NO DE SENTIDO. Comprobaba los candados
+    /// del origen —tienda con agente pegado, agente sin agente, gallero sin
+    /// nombre—, que se cayeron junto con el origen cuando el negocio corrigio
+    /// que quien entrega es el repartidor. Lo que sigue valiendo es la idea:
+    /// que la fila no pueda existir sin decir de quien es.
     /// </summary>
     [Fact]
     public async Task Los_Candados_De_La_Tabla_Aguantan_Una_Escritura_Directa()
@@ -364,39 +349,27 @@ public class RecepcionCascosContraLaBaseTests
 
         try
         {
-            /* Origen TIENDA con agente pegado: saldria contado dos veces. */
+            /* Sin repartidor: la fila no diria de quien son los cascos. */
             await Assert.ThrowsAsync<SqlException>(async () =>
             {
                 await using var cmd = conexion.CreateCommand();
                 cmd.CommandText = @"
 INSERT INTO dbo.WRecepcionCasco
-      (Fecha, IdOrigen, IDAgente, Referencia, Observaciones, IDUsuarioCreacion, UsuarioCreacion)
-VALUES (GETDATE(), 2, 1, N'X', @firma, 3, N'PRUEBA');";
+      (Fecha, IDRepartidor, Repartidor, Observaciones, IDUsuarioCreacion, UsuarioCreacion)
+VALUES (GETDATE(), 0, N'ALGUIEN', @firma, 3, N'PRUEBA');";
                 cmd.Parameters.AddWithValue("@firma", firma);
                 await cmd.ExecuteNonQueryAsync();
             });
 
-            /* Origen AGENTE sin agente. */
+            /* Con id pero sin nombre: es lo que se lee en la hoja el dia que
+               el catalogo de legacy ya no tenga esa fila. */
             await Assert.ThrowsAsync<SqlException>(async () =>
             {
                 await using var cmd = conexion.CreateCommand();
                 cmd.CommandText = @"
 INSERT INTO dbo.WRecepcionCasco
-      (Fecha, IdOrigen, IDAgente, Observaciones, IDUsuarioCreacion, UsuarioCreacion)
-VALUES (GETDATE(), 1, NULL, @firma, 3, N'PRUEBA');";
-                cmd.Parameters.AddWithValue("@firma", firma);
-                await cmd.ExecuteNonQueryAsync();
-            });
-
-            /* Gallero sin nombre: no hay catalogo del que sacarlo, asi que sin
-               texto el renglon no identifica a nadie. */
-            await Assert.ThrowsAsync<SqlException>(async () =>
-            {
-                await using var cmd = conexion.CreateCommand();
-                cmd.CommandText = @"
-INSERT INTO dbo.WRecepcionCasco
-      (Fecha, IdOrigen, Referencia, Observaciones, IDUsuarioCreacion, UsuarioCreacion)
-VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
+      (Fecha, IDRepartidor, Repartidor, Observaciones, IDUsuarioCreacion, UsuarioCreacion)
+VALUES (GETDATE(), 1, N'   ', @firma, 3, N'PRUEBA');";
                 cmd.Parameters.AddWithValue("@firma", firma);
                 await cmd.ExecuteNonQueryAsync();
             });
@@ -422,15 +395,14 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
     {
         var firma = Firma();
         var servicio = Servicio(firma);
-        var agente = await UnAgenteActivoAsync(firma);
+        var repartidor = await UnRepartidorActivoAsync(firma);
 
         try
         {
             var alta = await servicio.CrearAsync(new CrearRecepcionCascoRequest
             {
                 Fecha = DateTime.Today,
-                IdOrigen = OrigenAgente,
-                IdAgente = agente,
+                IdRepartidor = repartidor,
                 Observaciones = firma,
                 Piezas = new()
                 {
@@ -444,8 +416,7 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
             {
                 IdRecepcion = alta.idRecepcion,
                 Fecha = DateTime.Today,
-                IdOrigen = OrigenAgente,
-                IdAgente = agente,
+                IdRepartidor = repartidor,
                 Observaciones = firma,
                 Piezas = new()
                 {
@@ -479,7 +450,7 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
             Assert.Equal(2, bitacora.Count(b => b.operacion == "ALTA"));
 
             /* El total se recalculo: 3 + 4. */
-            var lista = await servicio.ConsultarAsync(DateTime.Today, DateTime.Today, null, agente, null, false);
+            var lista = await servicio.ConsultarAsync(DateTime.Today, DateTime.Today, repartidor, null, false);
             Assert.Equal(7, lista.Single(r => r.idRecepcion == alta.idRecepcion).totalPiezas);
         }
         finally
@@ -494,11 +465,11 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
     {
         var firma = Firma();
         var servicio = Servicio(firma);
-        var agente = await UnAgenteActivoAsync(firma);
+        var repartidor = await UnRepartidorActivoAsync(firma);
 
         try
         {
-            var alta = await servicio.CrearAsync(Basica(agente, firma), UsuarioDePrueba, "PRUEBA", "WEB");
+            var alta = await servicio.CrearAsync(Basica(repartidor, firma), UsuarioDePrueba, "PRUEBA", "WEB");
             Assert.True(alta.ok, alta.mensaje);
 
             var cancelada = await servicio.CancelarAsync(new CancelarRecepcionesCascoRequest
@@ -512,8 +483,7 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
             {
                 IdRecepcion = alta.idRecepcion,
                 Fecha = DateTime.Today,
-                IdOrigen = OrigenAgente,
-                IdAgente = agente,
+                IdRepartidor = repartidor,
                 Observaciones = firma,
                 Piezas = new() { new() { IdTipoUsado = TipoChico, Piezas = 1 } }
             }, UsuarioDePrueba, "PRUEBA", "WEB");
@@ -541,14 +511,14 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
     {
         var firma = Firma();
         var servicio = Servicio(firma);
-        var agente = await UnAgenteActivoAsync(firma);
+        var repartidor = await UnRepartidorActivoAsync(firma);
 
         try
         {
             var ids = new List<int>();
             for (var i = 0; i < 3; i++)
             {
-                var alta = await servicio.CrearAsync(Basica(agente, firma), UsuarioDePrueba, "PRUEBA", "WEB");
+                var alta = await servicio.CrearAsync(Basica(repartidor, firma), UsuarioDePrueba, "PRUEBA", "WEB");
                 Assert.True(alta.ok, alta.mensaje);
                 ids.Add(alta.idRecepcion);
             }
@@ -563,7 +533,7 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
             Assert.Equal(3, resultado.canceladas);
 
             var todas = await servicio.ConsultarAsync(
-                DateTime.Today, DateTime.Today, null, agente, null, true);
+                DateTime.Today, DateTime.Today, repartidor, null, true);
 
             foreach (var id in ids)
             {
@@ -582,7 +552,7 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
 
             /* Y la lista de todos los dias ya no las trae. */
             var vigentes = await servicio.ConsultarAsync(
-                DateTime.Today, DateTime.Today, null, agente, null, false);
+                DateTime.Today, DateTime.Today, repartidor, null, false);
             Assert.DoesNotContain(vigentes, r => ids.Contains(r.idRecepcion));
         }
         finally
@@ -601,12 +571,12 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
     {
         var firma = Firma();
         var servicio = Servicio(firma);
-        var agente = await UnAgenteActivoAsync(firma);
+        var repartidor = await UnRepartidorActivoAsync(firma);
 
         try
         {
-            var buena = await servicio.CrearAsync(Basica(agente, firma), UsuarioDePrueba, "PRUEBA", "WEB");
-            var yaCancelada = await servicio.CrearAsync(Basica(agente, firma), UsuarioDePrueba, "PRUEBA", "WEB");
+            var buena = await servicio.CrearAsync(Basica(repartidor, firma), UsuarioDePrueba, "PRUEBA", "WEB");
+            var yaCancelada = await servicio.CrearAsync(Basica(repartidor, firma), UsuarioDePrueba, "PRUEBA", "WEB");
 
             await servicio.CancelarAsync(new CancelarRecepcionesCascoRequest
             {
@@ -625,7 +595,7 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
 
             /* La que si se podia cancelar sigue viva: no se quedo a medias. */
             var todas = await servicio.ConsultarAsync(
-                DateTime.Today, DateTime.Today, null, agente, null, true);
+                DateTime.Today, DateTime.Today, repartidor, null, true);
             Assert.Equal(1, todas.Single(r => r.idRecepcion == buena.idRecepcion).estatus);
 
             /* Una que no existe tampoco cancela el resto. */
@@ -636,7 +606,7 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
             }, UsuarioDePrueba, "PRUEBA", "WEB");
 
             Assert.False(conFantasma.ok);
-            todas = await servicio.ConsultarAsync(DateTime.Today, DateTime.Today, null, agente, null, true);
+            todas = await servicio.ConsultarAsync(DateTime.Today, DateTime.Today, repartidor, null, true);
             Assert.Equal(1, todas.Single(r => r.idRecepcion == buena.idRecepcion).estatus);
         }
         finally
@@ -651,11 +621,11 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
     {
         var firma = Firma();
         var servicio = Servicio(firma);
-        var agente = await UnAgenteActivoAsync(firma);
+        var repartidor = await UnRepartidorActivoAsync(firma);
 
         try
         {
-            var alta = await servicio.CrearAsync(Basica(agente, firma), UsuarioDePrueba, "PRUEBA", "WEB");
+            var alta = await servicio.CrearAsync(Basica(repartidor, firma), UsuarioDePrueba, "PRUEBA", "WEB");
 
             var sinMotivo = await servicio.CancelarAsync(new CancelarRecepcionesCascoRequest
             {
@@ -673,7 +643,7 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
 
             Assert.False(sinNada.ok);
 
-            var viva = await servicio.ConsultarAsync(DateTime.Today, DateTime.Today, null, agente, null, true);
+            var viva = await servicio.ConsultarAsync(DateTime.Today, DateTime.Today, repartidor, null, true);
             Assert.Equal(1, viva.Single(r => r.idRecepcion == alta.idRecepcion).estatus);
         }
         finally
@@ -701,20 +671,20 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
     {
         var firma = Firma();
         var servicio = Servicio(firma);
-        var agente = await UnAgenteActivoAsync(firma);
+        var repartidor = await UnRepartidorActivoAsync(firma);
         var dia = DateTime.Today.AddDays(-3);
 
         try
         {
             var vive = await servicio.CrearAsync(new CrearRecepcionCascoRequest
             {
-                Fecha = dia, IdOrigen = OrigenAgente, IdAgente = agente, Observaciones = firma,
+                Fecha = dia, IdRepartidor = repartidor, Observaciones = firma,
                 Piezas = new() { new() { IdTipoUsado = TipoChico, Piezas = 7 } }
             }, UsuarioDePrueba, "PRUEBA", "WEB");
 
             var muere = await servicio.CrearAsync(new CrearRecepcionCascoRequest
             {
-                Fecha = dia, IdOrigen = OrigenAgente, IdAgente = agente, Observaciones = firma,
+                Fecha = dia, IdRepartidor = repartidor, Observaciones = firma,
                 Piezas = new() { new() { IdTipoUsado = TipoChico, Piezas = 100 } }
             }, UsuarioDePrueba, "PRUEBA", "WEB");
 
@@ -725,7 +695,7 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
 
             var datos = await servicio.ConsultarDatosDeReporteAsync(dia, dia);
 
-            var mios = datos.Renglones.Where(r => r.idAgente == agente).ToList();
+            var mios = datos.Renglones.Where(r => r.idRepartidor == repartidor).ToList();
             Assert.Contains(mios, r => r.idRecepcion == vive.idRecepcion);
             Assert.DoesNotContain(mios, r => r.idRecepcion == muere.idRecepcion);
 
@@ -751,50 +721,45 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
     }
 
     /// <summary>
-    /// El HTML del papel sale con las tres secciones de la hoja, los subtotales
-    /// y el total general, y escapa lo que teclea una persona.
+    /// El HTML del papel trae sus renglones, el total general y escapa lo que
+    /// teclea una persona.
+    ///
+    /// ANTES ESTO EXIGIA TRES SECCIONES —agentes, tiendas y galleros— con sus
+    /// subtotales. Se cayeron con el origen el dia que el negocio corrigio que
+    /// quien entrega es el repartidor. Lo que se conserva es lo que de verdad
+    /// protegia: que el papel sume lo que imprime y que no se rompa con un
+    /// ampersand.
     /// </summary>
     [Fact]
-    public async Task El_Papel_Trae_Las_Tres_Secciones_Y_Sus_Totales()
+    public async Task El_Papel_Trae_Sus_Renglones_Y_El_Total_General()
     {
         var firma = Firma();
         var servicio = Servicio(firma);
-        var agente = await UnAgenteActivoAsync(firma);
+        var repartidor = await UnRepartidorActivoAsync(firma);
         var dia = DateTime.Today.AddDays(-4);
+
+        /*  El & y las comillas viajan en las OBSERVACIONES, que es lo unico de
+            esta hoja que teclea una persona: el nombre de quien entrega sale
+            ahora del catalogo. Un & suelto rompe el documento y wkhtmltopdf no
+            dice nada: sale una hoja a medias.  */
+        var tecleado = "ENTREGO EN \"EL & CENTRO\"";
 
         try
         {
             await servicio.CrearAsync(new CrearRecepcionCascoRequest
             {
-                Fecha = dia, IdOrigen = OrigenAgente, IdAgente = agente, Observaciones = firma,
+                Fecha = dia, IdRepartidor = repartidor,
+                Observaciones = $"{firma} {tecleado}",
                 Piezas = new() { new() { IdTipoUsado = TipoChico, Piezas = 4 } }
-            }, UsuarioDePrueba, "PRUEBA", "WEB");
-
-            await servicio.CrearAsync(new CrearRecepcionCascoRequest
-            {
-                Fecha = dia, IdOrigen = OrigenTienda, Referencia = "TIENDA \"EL & CENTRO\"",
-                Observaciones = firma,
-                Piezas = new() { new() { IdTipoUsado = TipoMiniChico, Piezas = 6 } }
-            }, UsuarioDePrueba, "PRUEBA", "WEB");
-
-            await servicio.CrearAsync(new CrearRecepcionCascoRequest
-            {
-                Fecha = dia, IdOrigen = OrigenGallero, Referencia = "GALLERO DE PRUEBA",
-                Observaciones = firma,
-                Piezas = new() { new() { IdTipoUsado = TipoMoto, Piezas = 2 } }
             }, UsuarioDePrueba, "PRUEBA", "WEB");
 
             var datos = await servicio.ConsultarDatosDeReporteAsync(dia, dia);
             var html = RecepcionCascosHtmlBuilder.Construir(datos);
 
-            Assert.Contains("AGENTES", html);
-            Assert.Contains("CASCOS RECIBIDOS DE TIENDAS", html);
-            Assert.Contains("GALLEROS", html);
             Assert.Contains("TOTAL DE CASCOS RECIBIDOS", html);
+            Assert.Contains("QUIÉN ENTREGÓ", html);
 
-            /* Lo que teclea una persona va escapado: un & suelto rompe el
-               documento y wkhtmltopdf no dice nada. */
-            Assert.Contains("TIENDA &quot;EL &amp; CENTRO&quot;", html);
+            Assert.Contains("&quot;EL &amp; CENTRO&quot;", html);
             Assert.DoesNotContain("EL & CENTRO", html);
 
             /* Nada de variables CSS: el WebKit de wkhtmltopdf 0.12.4 las
@@ -804,7 +769,7 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
             /* Y el encabezado no promete un numero de pagina que no sabe
                sustituir. */
             var encabezado = RecepcionCascosHtmlBuilder.Encabezado(
-                "EMPRESA", "", dia, dia, "", "", "QUIEN LO PIDIO");
+                "EMPRESA", "", dia, dia, "", "QUIEN LO PIDIO");
             Assert.Contains("class=\"page\"", encabezado);
             Assert.DoesNotContain("[page]", encabezado);
             Assert.Contains("QUIEN LO PIDIO", encabezado);
@@ -852,100 +817,132 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
     [Fact]
     public async Task El_Reporte_Sale_Como_PDF_De_Varias_Hojas()
     {
-        var servicio = Servicio("zzQaRecepcionPdf");
+        var firma = Firma();
+        var servicio = Servicio(firma);
 
         /*
-          LA VENTANA SE ANCLA A LA ULTIMA RECEPCION DE LA BASE, NO A `Today`.
+          LA PRUEBA SE SIEMBRA SU PROPIO PAPEL.
 
-          Esto pedia "los ultimos cinco dias" y por eso se rompia sola de dos
-          maneras, las dos medidas el 5-nov:
+          Esto se apoyaba en lo que la base local tuviera: primero en "los
+          ultimos cinco dias" —que se vacian solos cuando el calendario deja
+          atras la copia— y despues en `MAX(Fecha)`, que es mejor pero sigue
+          midiendo datos de otros. Medido el 5-nov: salia con dos hojas, con
+          una o con ninguna segun quien hubiera corrido antes.
 
-            - la base local es una copia que se queda en una fecha; cuando el
-              calendario la deja atras, "los ultimos cinco dias" no tienen NADA
-              y el `Assert.NotEmpty` falla sin que nada este mal (es la misma
-              trampa que vacia las pantallas que abren en "hoy");
-            - y mientras tenia algo, lo que tenia eran las recepciones que
-              ACABABAN DE CREAR sus pruebas hermanas con `Fecha = DateTime.Today`.
-              O sea que medía la basura de otra prueba, y segun el orden salia
-              con dos hojas, con una o con ninguna. Medido: primero fallo con "1
-              hoja(s)" y despues con "Collection was empty", sin tocar el codigo.
+          Y el dia que el modulo cambio de agentes a repartidores hubo que
+          rehacer las tablas, asi que la base local se quedo sin nada y la
+          prueba se puso roja sin que nada estuviera mal. Una prueba que
+          depende de lo que otro dejo no prueba el codigo: prueba la base.
 
-          Anclando a `MAX(Fecha)` el periodo siempre cae donde hay papel de
-          verdad, pase lo que pase con el reloj y con el orden de las pruebas.
+          Doce repartidores por siete dias —ochenta y cuatro renglones— pasan
+          de largo de una hoja apaisada, que es lo que esta prueba quiere
+          comprobar: que el papel sigue en la segunda pagina y no se corta. Se
+          borran enteros en el finally.
+
+          El numero esta MEDIDO, no elegido a ojo: con veinticinco renglones
+          cabia todo en una pagina y la prueba se ponia roja diciendo "1
+          hoja(s)" sin que nada estuviera mal.
         */
-        var ultima = await UltimaFechaConRecepcionAsync("zzQaRecepcionPdf");
-        Assert.NotNull(ultima);
+        var hasta = DateTime.Today.AddDays(-10);
+        var desde = hasta.AddDays(-6);
 
-        var hasta = ultima!.Value.Date;
-        var desde = hasta.AddDays(-4);
-        _out.WriteLine($"periodo del papel: {desde:yyyy-MM-dd} a {hasta:yyyy-MM-dd}");
+        try
+        {
+            var repartidores = await RepartidoresActivosAsync(firma, 12);
 
-        var datos = await servicio.ConsultarDatosDeReporteAsync(desde, hasta);
-        Assert.NotEmpty(datos.Renglones);
-
-        var html = RecepcionCascosHtmlBuilder.Construir(datos);
-        var encabezado = RecepcionCascosHtmlBuilder.Encabezado(
-            "TAURO", "", desde, hasta, "", "", "PRUEBA");
-
-        var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(
-            html, "Landscape", "Cascos usados recibidos", CancellationToken.None,
-            new WkhtmltopdfHtmlPdfRenderer.Opciones
+            for (var dia = desde; dia <= hasta; dia = dia.AddDays(1))
             {
-                MargenSuperior = 24,
-                EspacioEncabezado = 4,
-                MargenInferior = 12,
-                MargenIzquierdo = 10,
-                MargenDerecho = 10,
-                ImagenDpi = 900,
-                PieIzquierdo = "TAURO",
-                PieConLinea = false,
-                PieFuente = "Tahoma",
-                EncabezadoHtml = encabezado
-            });
+                foreach (var quien in repartidores)
+                {
+                    var alta = await servicio.CrearAsync(new CrearRecepcionCascoRequest
+                    {
+                        Fecha = dia,
+                        IdRepartidor = quien,
+                        Observaciones = firma,
+                        Piezas = new()
+                        {
+                            new() { IdTipoUsado = TipoMiniChico, Piezas = 3 },
+                            new() { IdTipoUsado = TipoChico, Piezas = 2 },
+                            new() { IdTipoUsado = TipoMoto, Piezas = 4 }
+                        }
+                    }, UsuarioDePrueba, "PRUEBA", "WEB");
+                    Assert.True(alta.ok, alta.mensaje);
+                }
+            }
 
-        /* Es un PDF de verdad, no una pagina de error. */
-        Assert.True(pdf.Length > 5000, $"El PDF salio de {pdf.Length} bytes.");
-        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(pdf, 0, 4));
+            _out.WriteLine($"periodo del papel: {desde:yyyy-MM-dd} a {hasta:yyyy-MM-dd}");
 
-        /* Y tiene mas de una hoja: con cinco dias de recepciones, un PDF de una
-           sola pagina significaria que se quedo a medias. */
-        var crudo = System.Text.Encoding.Latin1.GetString(pdf);
-        var hojas = System.Text.RegularExpressions.Regex.Matches(crudo, @"/Type\s*/Page[^s]").Count;
-        Assert.True(hojas >= 2, $"El PDF trae {hojas} hoja(s) y se esperaban al menos 2.");
+            var datos = await servicio.ConsultarDatosDeReporteAsync(desde, hasta);
+            Assert.NotEmpty(datos.Renglones);
 
-        var carpeta = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "artifacts");
-        Directory.CreateDirectory(carpeta);
-        var archivo = Path.GetFullPath(Path.Combine(carpeta, "recepcion-cascos.pdf"));
-        await File.WriteAllBytesAsync(archivo, pdf);
-        _out.WriteLine($"{hojas} hojas, {pdf.Length} bytes -> {archivo}");
+            var html = RecepcionCascosHtmlBuilder.Construir(datos);
+            var encabezado = RecepcionCascosHtmlBuilder.Encabezado(
+                "TAURO", "", desde, hasta, "", "PRUEBA");
 
-        /*
-          Y el papel de UN DIA, que es el caso de todos los dias: la hoja se
-          llena por jornada. Tiene que caber en una sola pagina y traer el
-          total general al final.
-        */
-        var deUnDia = await servicio.ConsultarDatosDeReporteAsync(hasta, hasta);
-        var pdfDia = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(
-            RecepcionCascosHtmlBuilder.Construir(deUnDia), "Landscape",
-            "Cascos usados recibidos", CancellationToken.None,
-            new WkhtmltopdfHtmlPdfRenderer.Opciones
-            {
-                MargenSuperior = 24,
-                EspacioEncabezado = 4,
-                MargenInferior = 12,
-                MargenIzquierdo = 10,
-                MargenDerecho = 10,
-                PieIzquierdo = "TAURO",
-                PieConLinea = false,
-                PieFuente = "Tahoma",
-                EncabezadoHtml = RecepcionCascosHtmlBuilder.Encabezado(
-                    "TAURO", "", hasta, hasta, "", "", "PRUEBA")
-            });
+            var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(
+                html, "Landscape", "Cascos usados recibidos", CancellationToken.None,
+                new WkhtmltopdfHtmlPdfRenderer.Opciones
+                {
+                    MargenSuperior = 24,
+                    EspacioEncabezado = 4,
+                    MargenInferior = 12,
+                    MargenIzquierdo = 10,
+                    MargenDerecho = 10,
+                    ImagenDpi = 900,
+                    PieIzquierdo = "TAURO",
+                    PieConLinea = false,
+                    PieFuente = "Tahoma",
+                    EncabezadoHtml = encabezado
+                });
 
-        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(pdfDia, 0, 4));
-        var archivoDia = Path.GetFullPath(Path.Combine(carpeta, "recepcion-cascos-un-dia.pdf"));
-        await File.WriteAllBytesAsync(archivoDia, pdfDia);
+            /* Es un PDF de verdad, no una pagina de error. */
+            Assert.True(pdf.Length > 5000, $"El PDF salio de {pdf.Length} bytes.");
+            Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(pdf, 0, 4));
+
+            /* Y tiene mas de una hoja: con cinco dias de recepciones, un PDF de una
+               sola pagina significaria que se quedo a medias. */
+            var crudo = System.Text.Encoding.Latin1.GetString(pdf);
+            var hojas = System.Text.RegularExpressions.Regex.Matches(crudo, @"/Type\s*/Page[^s]").Count;
+            Assert.True(hojas >= 2, $"El PDF trae {hojas} hoja(s) y se esperaban al menos 2.");
+
+            var carpeta = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "artifacts");
+            Directory.CreateDirectory(carpeta);
+            var archivo = Path.GetFullPath(Path.Combine(carpeta, "recepcion-cascos.pdf"));
+            await File.WriteAllBytesAsync(archivo, pdf);
+            _out.WriteLine($"{hojas} hojas, {pdf.Length} bytes -> {archivo}");
+
+            /*
+              Y el papel de UN DIA, que es el caso de todos los dias: la hoja se
+              llena por jornada. Tiene que caber en una sola pagina y traer el
+              total general al final.
+            */
+            var deUnDia = await servicio.ConsultarDatosDeReporteAsync(hasta, hasta);
+            var pdfDia = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(
+                RecepcionCascosHtmlBuilder.Construir(deUnDia), "Landscape",
+                "Cascos usados recibidos", CancellationToken.None,
+                new WkhtmltopdfHtmlPdfRenderer.Opciones
+                {
+                    MargenSuperior = 24,
+                    EspacioEncabezado = 4,
+                    MargenInferior = 12,
+                    MargenIzquierdo = 10,
+                    MargenDerecho = 10,
+                    PieIzquierdo = "TAURO",
+                    PieConLinea = false,
+                    PieFuente = "Tahoma",
+                    EncabezadoHtml = RecepcionCascosHtmlBuilder.Encabezado(
+                        "TAURO", "", hasta, hasta, "", "PRUEBA")
+                });
+
+            Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(pdfDia, 0, 4));
+            var archivoDia = Path.GetFullPath(Path.Combine(carpeta, "recepcion-cascos-un-dia.pdf"));
+            await File.WriteAllBytesAsync(archivoDia, pdfDia);
         _out.WriteLine($"un dia: {pdfDia.Length} bytes -> {archivoDia}");
+        }
+        finally
+        {
+            await LimpiarAsync(firma);
+        }
     }
 
     // ==================================================================
@@ -953,7 +950,7 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
     // ==================================================================
 
     /// <summary>
-    /// Los filtros de la pantalla: por dia, por rango, por origen y por agente.
+    /// Los filtros de la pantalla: por dia, por rango y por repartidor.
     /// Y el rango invertido se endereza en vez de devolver vacio, porque un
     /// listado vacio se lee como "no hubo nada", que es una respuesta falsa.
     /// </summary>
@@ -962,39 +959,43 @@ VALUES (GETDATE(), 3, NULL, @firma, 3, N'PRUEBA');";
     {
         var firma = Firma();
         var servicio = Servicio(firma);
-        var agente = await UnAgenteActivoAsync(firma);
+        var repartidor = await UnRepartidorActivoAsync(firma);
+        /*  Dos repartidores distintos: con uno solo, "el filtro recorta" no se
+            puede distinguir de "el filtro no hace nada".  */
+        var otro = await OtroRepartidorActivoAsync(firma, repartidor);
         var ayer = DateTime.Today.AddDays(-1);
 
         try
         {
-            var deAgente = await servicio.CrearAsync(new CrearRecepcionCascoRequest
+            var mia = await servicio.CrearAsync(new CrearRecepcionCascoRequest
             {
-                Fecha = ayer, IdOrigen = OrigenAgente, IdAgente = agente, Observaciones = firma,
+                Fecha = ayer, IdRepartidor = repartidor, Observaciones = firma,
                 Piezas = new() { new() { IdTipoUsado = TipoChico, Piezas = 1 } }
             }, UsuarioDePrueba, "PRUEBA", "WEB");
 
-            var deTienda = await servicio.CrearAsync(new CrearRecepcionCascoRequest
+            var deOtro = await servicio.CrearAsync(new CrearRecepcionCascoRequest
             {
-                Fecha = ayer, IdOrigen = OrigenTienda, Referencia = "UNA TIENDA", Observaciones = firma,
+                Fecha = ayer, IdRepartidor = otro, Observaciones = firma,
                 Piezas = new() { new() { IdTipoUsado = TipoChico, Piezas = 1 } }
             }, UsuarioDePrueba, "PRUEBA", "WEB");
 
-            var soloTiendas = await servicio.ConsultarAsync(ayer, ayer, OrigenTienda, null, null, false);
-            Assert.Contains(soloTiendas, r => r.idRecepcion == deTienda.idRecepcion);
-            Assert.DoesNotContain(soloTiendas, r => r.idRecepcion == deAgente.idRecepcion);
+            var soloMia = await servicio.ConsultarAsync(ayer, ayer, repartidor, null, false);
+            Assert.Contains(soloMia, r => r.idRecepcion == mia.idRecepcion);
+            Assert.DoesNotContain(soloMia, r => r.idRecepcion == deOtro.idRecepcion);
 
-            var soloAgente = await servicio.ConsultarAsync(ayer, ayer, null, agente, null, false);
-            Assert.Contains(soloAgente, r => r.idRecepcion == deAgente.idRecepcion);
-            Assert.DoesNotContain(soloAgente, r => r.idRecepcion == deTienda.idRecepcion);
+            /* Sin filtro de repartidor salen las dos. */
+            var ambas = await servicio.ConsultarAsync(ayer, ayer, null, null, false);
+            Assert.Contains(ambas, r => r.idRecepcion == mia.idRecepcion);
+            Assert.Contains(ambas, r => r.idRecepcion == deOtro.idRecepcion);
 
             /* Otro dia: ninguna de las dos. */
             var otroDia = await servicio.ConsultarAsync(
-                DateTime.Today.AddDays(-9), DateTime.Today.AddDays(-9), null, null, null, false);
-            Assert.DoesNotContain(otroDia, r => r.idRecepcion == deAgente.idRecepcion);
+                DateTime.Today.AddDays(-9), DateTime.Today.AddDays(-9), null, null, false);
+            Assert.DoesNotContain(otroDia, r => r.idRecepcion == mia.idRecepcion);
 
             /* Rango al reves: se endereza. */
-            var invertido = await servicio.ConsultarAsync(DateTime.Today, ayer, null, agente, null, false);
-            Assert.Contains(invertido, r => r.idRecepcion == deAgente.idRecepcion);
+            var invertido = await servicio.ConsultarAsync(DateTime.Today, ayer, repartidor, null, false);
+            Assert.Contains(invertido, r => r.idRecepcion == mia.idRecepcion);
         }
         finally
         {
@@ -1082,60 +1083,56 @@ ORDER BY Clave;";
     }
 
     /// <summary>
-    /// Zaragoza no queda afectada.
+    /// Las tablas, donde existan, tienen la forma de HOY.
     ///
-    /// QUE SE COMPRUEBA Y QUE NO, QUE AQUI ESTA EL MATIZ
+    /// POR QUE ESTA PRUEBA CAMBIO DE PREGUNTA
     ///
-    /// La primera version de esta prueba exigia que en MacZ no existiera NI UNA
-    /// clave `recepcion_cascos`, y fallo. Investigado: el catalogo de claves lo
-    /// siembra el backend al arrancar (CatalogoDePermisosHostedService ->
-    /// PermissionCatalogSeeds), y ese catalogo es del BACKEND, no de una
-    /// empresa: las claves aparecen en cualquier base a la que ese backend se
-    /// conecte. En local las sembro la propia serie de pruebas, que corre
-    /// contra las dos bases.
+    /// Antes exigia que en MacZ (Zaragoza) no hubiera NI TABLAS NI
+    /// PROCEDIMIENTOS: era la prueba de que el modulo, siendo de Tauro, no se
+    /// habia colado en la otra base. Eso dejo de ser cierto por una decision,
+    /// no por un descuido: se instala en las DOS empresas y en Zaragoza queda
+    /// con los permisos apagados, para poder prenderlo el dia que lo pidan sin
+    /// volver a tocar la base. Quien decide que una empresa lo vea es
+    /// `WModuloEmpresa.Activo` y a quien se le concede la clave, no si las
+    /// tablas existen; eso ya se comprueba arriba.
     ///
-    /// No es una fuga, es como funciona el sistema, y se comprobo contra el
-    /// modulo equivalente: `cascos_cambio` es de Tauro y en MacZ tiene sus 7
-    /// claves y su renglon de WModulo desde septiembre, con CERO tablas y sin
-    /// que nadie en Zaragoza lo vea. Lo que decide de quien es un modulo es
-    /// WModuloEmpresa.Activo y a quien se le concede la clave, no la existencia
-    /// de la clave en el catalogo.
-    ///
-    /// Asi que lo que se exige es lo que de verdad significa "no afecta a
-    /// Zaragoza": alla no hay DATOS (ni tablas ni procedimientos), el modulo no
-    /// esta prendido para ninguna empresa de esa base, y NADIE tiene concedida
-    /// ninguna de las claves.
+    /// Lo que si hace falta vigilar ahora es otra cosa, y es justo lo que se
+    /// rompio al cambiar de agentes a repartidores: que una base se quede con
+    /// la tabla VIEJA mientras el backend ya manda la nueva. Eso no da un
+    /// error claro —da un "nombre de columna no valido" en medio de una
+    /// captura— y aqui se caza antes.
     /// </summary>
-    [Fact]
-    public async Task En_Zaragoza_No_Hay_Datos_Ni_Nadie_Con_Permiso()
+    [Theory]
+    [InlineData(BaseTauro)]
+    [InlineData(BaseZaragoza)]
+    public async Task Donde_Estan_Las_Tablas_Tienen_La_Forma_De_Hoy(string baseDatos)
     {
-        await using var conexion = new SqlConnection(Cadena(BaseZaragoza, "zzQaRecepcionAislamiento"));
+        await using var conexion = new SqlConnection(Cadena(baseDatos, "zzQaRecepcionForma"));
         await conexion.OpenAsync();
 
         await using var cmd = conexion.CreateCommand();
         cmd.CommandText = @"
-SELECT
-  (SELECT COUNT(*) FROM sys.tables     WHERE name LIKE 'WRecepcionCasco%')      AS tablas,
-  (SELECT COUNT(*) FROM sys.procedures WHERE name LIKE 'sp_w_%RecepcionCasco%') AS procedimientos,
-  (SELECT COUNT(*) FROM sys.table_types WHERE name LIKE 'WRecepcionCasco%')     AS tipos,
-  (SELECT COUNT(*) FROM dbo.WModuloEmpresa
-    WHERE ModuloClave = 'recepcion_cascos' AND Activo = 1)                      AS prendido,
-  (SELECT COUNT(*) FROM dbo.WRolPermiso rp
-     INNER JOIN dbo.WPermiso p ON p.Id = rp.WPermisoId
-    WHERE p.Clave LIKE '%recepcion_cascos%')                                    AS concedidoARoles,
-  (SELECT COUNT(*) FROM dbo.WUsuarioPermiso up
-     INNER JOIN dbo.WPermiso p ON p.Id = up.WPermisoId
-    WHERE p.Clave LIKE '%recepcion_cascos%')                                    AS concedidoAUsuarios;";
+SELECT name FROM sys.columns WHERE object_id = OBJECT_ID('dbo.WRecepcionCasco');";
 
-        await using var reader = await cmd.ExecuteReaderAsync();
-        Assert.True(await reader.ReadAsync());
+        var columnas = new List<string>();
+        await using (var reader = await cmd.ExecuteReaderAsync())
+            while (await reader.ReadAsync()) columnas.Add(reader.GetString(0));
 
-        Assert.Equal(0, reader.GetInt32(0));   // ninguna tabla
-        Assert.Equal(0, reader.GetInt32(1));   // ningun procedimiento
-        Assert.Equal(0, reader.GetInt32(2));   // ningun tipo de tabla
-        Assert.Equal(0, reader.GetInt32(3));   // apagado para todas sus empresas
-        Assert.Equal(0, reader.GetInt32(4));   // ningun rol lo trae
-        Assert.Equal(0, reader.GetInt32(5));   // ningun usuario lo trae
+        if (columnas.Count == 0)
+        {
+            _out.WriteLine($"{baseDatos}: el modulo no esta instalado aqui.");
+            return;
+        }
+
+        Assert.Contains("IDRepartidor", columnas);
+        Assert.Contains("Repartidor", columnas);
+
+        /* Y NO las del modelo viejo: si siguen, esa base se quedo a medias. */
+        Assert.DoesNotContain("IdOrigen", columnas);
+        Assert.DoesNotContain("IDAgente", columnas);
+        Assert.DoesNotContain("Referencia", columnas);
+
+        _out.WriteLine($"{baseDatos}: {columnas.Count} columnas, modelo de repartidores.");
     }
 
     // ==================================================================
@@ -1148,35 +1145,78 @@ SELECT
     */
     private static string Firma() => $"ZZQA-RECEP-{Guid.NewGuid():N}";
 
-    private static CrearRecepcionCascoRequest Basica(int agente, string firma) => new()
+    private static CrearRecepcionCascoRequest Basica(int repartidor, string firma) => new()
     {
         Fecha = DateTime.Today,
-        IdOrigen = OrigenAgente,
-        IdAgente = agente,
+        IdRepartidor = repartidor,
         Observaciones = firma,
         Piezas = new() { new() { IdTipoUsado = TipoChico, Piezas = 1 } }
     };
 
-    private static async Task<int> UnAgenteActivoAsync(string firma)
+    private static async Task<int> UnRepartidorActivoAsync(string firma)
+        => await UnoDelCatalogoAsync(firma, activo: true);
+
+    /// Otro distinto del que se pasa, para poder probar que un filtro recorta.
+    private static async Task<int> OtroRepartidorActivoAsync(string firma, int distintoDe)
     {
         await using var conexion = new SqlConnection(Cadena(BaseTauro, firma));
         await conexion.OpenAsync();
         await using var cmd = conexion.CreateCommand();
-        cmd.CommandText = "SELECT MIN(IDAgente) FROM dbo.Agentes WHERE IDStatus = 1;";
+        cmd.CommandText =
+            "SELECT MIN(IDRepartidor) FROM dbo.[Catalogo Repartidores] " +
+            "WHERE IDStatus = 1 AND IDRepartidor <> @otro;";
+        cmd.Parameters.AddWithValue("@otro", distintoDe);
         var valor = await cmd.ExecuteScalarAsync();
-        Assert.True(valor != null && valor != DBNull.Value, "La base de Tauro no tiene agentes activos.");
+        Assert.True(valor != null && valor != DBNull.Value,
+            "La base de Tauro solo tiene un repartidor activo.");
         return Convert.ToInt32(valor);
     }
 
-    private static async Task<int> UnAgenteInactivoAsync(string firma)
+    /// Hasta <paramref name="cuantos"/> repartidores activos, para sembrar un
+    /// papel con varios renglones.
+    private static async Task<List<int>> RepartidoresActivosAsync(string firma, int cuantos)
     {
         await using var conexion = new SqlConnection(Cadena(BaseTauro, firma));
         await conexion.OpenAsync();
         await using var cmd = conexion.CreateCommand();
-        cmd.CommandText = "SELECT MIN(IDAgente) FROM dbo.Agentes WHERE IDStatus <> 1;";
+        cmd.CommandText =
+            "SELECT TOP (@n) IDRepartidor FROM dbo.[Catalogo Repartidores] " +
+            "WHERE IDStatus = 1 ORDER BY Repartidor;";
+        cmd.Parameters.AddWithValue("@n", cuantos);
+        var ids = new List<int>();
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) ids.Add(reader.GetInt32(0));
+        Assert.NotEmpty(ids);
+        return ids;
+    }
+
+    private static async Task<int> UnRepartidorInactivoAsync(string firma)
+        => await UnoDelCatalogoAsync(firma, activo: false);
+
+    private static async Task<int> UnoDelCatalogoAsync(string firma, bool activo)
+    {
+        await using var conexion = new SqlConnection(Cadena(BaseTauro, firma));
+        await conexion.OpenAsync();
+        await using var cmd = conexion.CreateCommand();
+        cmd.CommandText = activo
+            ? "SELECT MIN(IDRepartidor) FROM dbo.[Catalogo Repartidores] WHERE IDStatus = 1;"
+            : "SELECT MIN(IDRepartidor) FROM dbo.[Catalogo Repartidores] WHERE IDStatus <> 1;";
         var valor = await cmd.ExecuteScalarAsync();
-        Assert.True(valor != null && valor != DBNull.Value, "La base de Tauro no tiene agentes inactivos.");
+        Assert.True(valor != null && valor != DBNull.Value,
+            $"La base de Tauro no tiene repartidores {(activo ? "activos" : "inactivos")}.");
         return Convert.ToInt32(valor);
+    }
+
+    /// El nombre que el catalogo tiene HOY para ese repartidor.
+    private static async Task<string> NombreDelRepartidorAsync(string firma, int id)
+    {
+        await using var conexion = new SqlConnection(Cadena(BaseTauro, firma));
+        await conexion.OpenAsync();
+        await using var cmd = conexion.CreateCommand();
+        cmd.CommandText =
+            "SELECT LTRIM(RTRIM(Repartidor)) FROM dbo.[Catalogo Repartidores] WHERE IDRepartidor = @id;";
+        cmd.Parameters.AddWithValue("@id", id);
+        return (await cmd.ExecuteScalarAsync()) as string ?? "";
     }
 
     private static async Task<int> CuantasAsync(string firma)

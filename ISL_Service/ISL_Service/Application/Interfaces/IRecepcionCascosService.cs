@@ -6,10 +6,10 @@ public interface IRecepcionCascosService
 {
     Task<List<TipoRecepcionCascoDto>> ConsultarTiposAsync(CancellationToken ct = default);
 
-    Task<List<AgenteRecepcionCascoDto>> ConsultarAgentesAsync(CancellationToken ct = default);
+    Task<List<RepartidorRecepcionCascoDto>> ConsultarRepartidoresAsync(CancellationToken ct = default);
 
     Task<List<RecepcionCascoDto>> ConsultarAsync(
-        DateTime? fechaInicio, DateTime? fechaFin, int? idOrigen, int? idAgente,
+        DateTime? fechaInicio, DateTime? fechaFin, int? idRepartidor,
         int? estatus, bool incluirCanceladas, CancellationToken ct = default);
 
     Task<List<DetalleRecepcionCascoDto>> ConsultarDetalleAsync(

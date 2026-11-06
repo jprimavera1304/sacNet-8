@@ -11,8 +11,9 @@ namespace ISL_Service.Infrastructure.Repositories;
 /// Recepcion de cascos usados: la hoja de papel de Tauro.
 ///
 /// TODO LO QUE ESCRIBE PASA POR sp_w_*. De legacy solo se LEE el catalogo de
-/// tipos y el de agentes, y se lee DENTRO de los procedimientos: asi el nombre
-/// del tipo o la validez del agente no dependen de lo que mande el cliente.
+/// tipos y el de repartidores, y se lee DENTRO de los procedimientos: asi el
+/// nombre del tipo o la validez del repartidor no dependen de lo que mande el
+/// cliente.
 ///
 /// EL DETALLE VIAJA COMO TVP Y NO COMO JSON
 /// Las dos bases estan en nivel de compatibilidad 100 y ahi OPENJSON no existe.
@@ -23,7 +24,7 @@ namespace ISL_Service.Infrastructure.Repositories;
 public class RecepcionCascosRepository : IRecepcionCascosRepository
 {
     private const string SpTipos     = "dbo.sp_w_ConsultarTiposRecepcionCasco";
-    private const string SpAgentes   = "dbo.sp_w_ConsultarAgentesRecepcionCasco";
+    private const string SpRepartidores = "dbo.sp_w_ConsultarRepartidoresRecepcionCasco";
     private const string SpConsultar = "dbo.sp_w_ConsultarRecepcionesCasco";
     private const string SpDetalle   = "dbo.sp_w_ConsultarRecepcionCascoDetalle";
     private const string SpBitacora  = "dbo.sp_w_ConsultarRecepcionCascoBitacora";
@@ -51,17 +52,17 @@ public class RecepcionCascosRepository : IRecepcionCascosRepository
         return Funciones.DataTableToList<TipoRecepcionCascoDto>(dt);
     }
 
-    public async Task<List<AgenteRecepcionCascoDto>> ConsultarAgentesAsync(CancellationToken ct = default)
+    public async Task<List<RepartidorRecepcionCascoDto>> ConsultarRepartidoresAsync(CancellationToken ct = default)
     {
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
-        await using var cmd = Sp(SpAgentes, conn);
+        await using var cmd = Sp(SpRepartidores, conn);
         var dt = await FillAsync(cmd, ct);
-        return Funciones.DataTableToList<AgenteRecepcionCascoDto>(dt);
+        return Funciones.DataTableToList<RepartidorRecepcionCascoDto>(dt);
     }
 
     public async Task<List<RecepcionCascoDto>> ConsultarAsync(
-        DateTime? fechaInicio, DateTime? fechaFin, int? idOrigen, int? idAgente,
+        DateTime? fechaInicio, DateTime? fechaFin, int? idRepartidor,
         int? estatus, bool incluirCanceladas, CancellationToken ct = default)
     {
         await using var conn = GetConnection();
@@ -70,8 +71,7 @@ public class RecepcionCascosRepository : IRecepcionCascosRepository
         await using var cmd = Sp(SpConsultar, conn);
         cmd.Parameters.AddWithValue("@FechaInicio", (object?)fechaInicio?.Date ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@FechaFin", (object?)fechaFin?.Date ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@IdOrigen", (object?)idOrigen ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@IDAgente", (object?)idAgente ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@IDRepartidor", (object?)idRepartidor ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@Estatus", (object?)estatus ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@IncluirCanceladas", incluirCanceladas ? 1 : 0);
 
@@ -265,9 +265,7 @@ public class RecepcionCascosRepository : IRecepcionCascosRepository
         int idUsuario, string usuario, string? canal)
     {
         cmd.Parameters.AddWithValue("@Fecha", (object?)request.Fecha?.Date ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@IdOrigen", request.IdOrigen);
-        cmd.Parameters.AddWithValue("@IDAgente", (object?)request.IdAgente ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@Referencia", (object?)Texto(request.Referencia) ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@IDRepartidor", request.IdRepartidor);
         cmd.Parameters.AddWithValue("@Observaciones", (object?)Texto(request.Observaciones) ?? DBNull.Value);
 
         var tabla = TablaDeDetalle(request.Piezas);

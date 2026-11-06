@@ -12,13 +12,13 @@ namespace ISL_Service.Controllers;
 ///
 /// QUE REEMPLAZA
 /// La hoja que hoy se llena a mano: "Relacion de cascos usados que entregan del
-/// dia [FECHA]". Cuantos cascos usados entrego cada agente, separados por
+/// dia [FECHA]". Cuantos cascos usados entrego cada repartidor, separados por
 /// tamano, mas los apartados de tiendas y galleros. Aqui se capturan la fecha,
 /// de quien se recibieron y las PIEZAS por tamano; el total lo suma la base.
 ///
 /// LO QUE ESTE MODULO NO HACE, Y ES A PROPOSITO
 /// No mueve inventario ni saldos. En la base no hay nada que diga si el casco
-/// que entrega un agente venia de un cliente, y no se invento: registrar lo que
+/// que entrega un repartidor venia de un cliente, y no se invento: registrar lo que
 /// llega es util por si mismo, y el dia que el negocio defina a donde se aplica
 /// se agrega con ese dato en la mano. Ver el comentario del script
 /// 62 Recepcion De Cascos Usados.
@@ -82,22 +82,22 @@ public class RecepcionCascosController : PermisoControllerBase
         return Ok(new { ok = true, message = "Tipos consultados.", data });
     }
 
-    /// <summary>Agentes activos, para elegir quien entrego.</summary>
-    [HttpGet("agentes")]
+    /// <summary>Repartidores activos, para elegir quien entrego.</summary>
+    [HttpGet("repartidores")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> Agentes(CancellationToken ct)
+    public async Task<IActionResult> Repartidores(CancellationToken ct)
     {
         var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
         if (sinPermiso != null) return sinPermiso;
 
-        var data = await _service.ConsultarAgentesAsync(ct);
-        return Ok(new { ok = true, message = "Agentes consultados.", data });
+        var data = await _service.ConsultarRepartidoresAsync(ct);
+        return Ok(new { ok = true, message = "Repartidores consultados.", data });
     }
 
     /// <summary>
     /// Las recepciones del periodo.
     /// </summary>
-    /// <param name="idOrigen">1 agente, 2 tienda, 3 gallero. Sin valor: los tres.</param>
+    /// <param name="idRepartidor">Sin valor: todos.</param>
     /// <param name="incluirCanceladas">
     /// Por omision NO. Una cancelada se ve solo si se pide: esta ahi para poder
     /// explicar lo que paso, no para estorbar en la lista de todos los dias.
@@ -107,8 +107,7 @@ public class RecepcionCascosController : PermisoControllerBase
     public async Task<IActionResult> Consultar(
         [FromQuery] DateTime? fechaInicio,
         [FromQuery] DateTime? fechaFin,
-        [FromQuery] int? idOrigen,
-        [FromQuery] int? idAgente,
+        [FromQuery] int? idRepartidor,
         [FromQuery] int? estatus,
         [FromQuery] bool incluirCanceladas = false,
         CancellationToken ct = default)
@@ -117,7 +116,7 @@ public class RecepcionCascosController : PermisoControllerBase
         if (sinPermiso != null) return sinPermiso;
 
         var data = await _service.ConsultarAsync(
-            fechaInicio, fechaFin, idOrigen, idAgente, estatus, incluirCanceladas, ct);
+            fechaInicio, fechaFin, idRepartidor, estatus, incluirCanceladas, ct);
 
         return Ok(new { ok = true, message = "Recepciones consultadas.", data, total = data.Count });
     }
@@ -279,8 +278,7 @@ public class RecepcionCascosController : PermisoControllerBase
     public async Task<IActionResult> Reporte(
         [FromQuery] DateTime? fechaInicio,
         [FromQuery] DateTime? fechaFin,
-        [FromQuery] int? idOrigen,
-        [FromQuery] int? idAgente,
+        [FromQuery] int? idRepartidor,
         CancellationToken ct = default)
     {
         var sinPermiso = await ExigirPermisoAsync(PermisosImprimir, ct);
@@ -295,7 +293,7 @@ public class RecepcionCascosController : PermisoControllerBase
 
         var llave = _configuration["Jwt:Key"] ?? "";
         var ticket = ReporteRecepcionCascosTicket.Firmar(
-            llave, desde, hasta, idOrigen ?? 0, idAgente ?? 0,
+            llave, desde, hasta, idRepartidor ?? 0,
             IdUsuarioLegacy(), CurrentUser.GetUsername(User, ""));
 
         /*
@@ -329,16 +327,14 @@ public class RecepcionCascosController : PermisoControllerBase
         var datos = await _service.ConsultarDatosDeReporteAsync(pase.Desde, pase.Hasta, ct);
 
         /*
-          El pase puede traer un origen o un agente: se recorta aqui y no en el
+          El pase puede traer un repartidor: se recorta aqui y no en el
           procedimiento porque es la MISMA consulta con menos renglones, y un
           parametro mas en el reporte obligaria a tocar la base por una
           pregunta que no cambia como se consulta.
         */
-        if (pase.IdOrigen > 0)
-            datos.Renglones = datos.Renglones.Where(r => r.idOrigen == pase.IdOrigen).ToList();
-
-        if (pase.IdAgente > 0)
-            datos.Renglones = datos.Renglones.Where(r => r.idAgente == pase.IdAgente).ToList();
+        if (pase.IdRepartidor > 0)
+            datos.Renglones = datos.Renglones
+                .Where(r => r.idRepartidor == pase.IdRepartidor).ToList();
 
         /*
           Y si se recorto, los TOTALES por tipo hay que recalcularlos sobre lo
@@ -346,7 +342,7 @@ public class RecepcionCascosController : PermisoControllerBase
           un papel filtrado con los totales del periodo entero dice dos cosas
           distintas en la misma hoja.
         */
-        if (pase.IdOrigen > 0 || pase.IdAgente > 0)
+        if (pase.IdRepartidor > 0)
         {
             foreach (var total in datos.Totales)
                 total.piezas = datos.Renglones
@@ -356,19 +352,21 @@ public class RecepcionCascosController : PermisoControllerBase
 
         var (logo, empresa) = await _service.ConsultarMarcaParaReporteAsync(ct);
 
-        var nombreAgente = pase.IdAgente > 0
-            ? datos.Renglones.FirstOrDefault(r => r.idAgente == pase.IdAgente)?.quienEntrego ?? ""
+        var nombreRepartidor = pase.IdRepartidor > 0
+            ? datos.Renglones
+                  .FirstOrDefault(r => r.idRepartidor == pase.IdRepartidor)?.quienEntrego ?? ""
             : "";
 
         var encabezado = RecepcionCascosHtmlBuilder.Encabezado(
             empresa, logo, pase.Desde, pase.Hasta,
-            NombreDeOrigen(pase.IdOrigen), nombreAgente, pase.Usuario);
+            nombreRepartidor, pase.Usuario);
 
         var html = RecepcionCascosHtmlBuilder.Construir(datos);
 
         /*
           Apaisado: son once columnas (fecha, quien entrego, ocho tamanos,
-          total) y en vertical el nombre del agente se parte en dos renglones.
+          total) y en vertical el nombre del repartidor se parte en dos
+          renglones.
         */
         var pdf = await WkhtmltopdfHtmlPdfRenderer.RenderAsync(
             html, "Landscape", "Cascos usados recibidos", ct,
@@ -412,14 +410,6 @@ public class RecepcionCascosController : PermisoControllerBase
     }
 
     /* ---------------------------------------------------------------- */
-
-    private static string NombreDeOrigen(int idOrigen) => idOrigen switch
-    {
-        1 => "Agentes",
-        2 => "Tiendas",
-        3 => "Galleros",
-        _ => ""
-    };
 
     /*
       POR DONDE ENTRO. Sale del encabezado que pone la app, no del cuerpo: es
