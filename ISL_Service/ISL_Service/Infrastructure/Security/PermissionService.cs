@@ -2048,6 +2048,33 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
         new("app_movil.pedidos.editar", "App móvil - Editar en «Mis pedidos»", "app_movil"),
 
         /*
+          CANCELAR EN «MIS PEDIDOS»: LA HERMANA DE EDITAR, Y SE SIEMBRA SIN
+          CONCEDER A NADIE.
+
+          El modulo Pedidos del telefono —el portal del repartidor— ya tenia el
+          boton Editar con su clave propia (`app_movil.pedidos.editar`) y no
+          tenia el de Cancelar. El endpoint que cancela
+          (PedidosOperacionesController, POST ventas/cancelar) solo aceptaba la
+          clave del web y la de VENTAS en el telefono, que es otro modulo: para
+          dejar a un repartidor cancelar su propio pedido habia que darle
+          Ventas, o el permiso de la computadora.
+
+          NO SE CONCEDE AL SEMBRAR, por el mismo criterio de Querrys/49 que ya
+          se aplico a garantias aceptadas y a gasolina: es una accion que el
+          telefono ESTRENA, asi que nadie pierde nada el dia del despliegue
+          —hoy ese boton no existe— y copiar la concesion del web le daria de
+          golpe a cualquiera que cancele pedidos en la computadora la facultad
+          de cancelarlos DESDE UN TELEFONO sin que nadie lo haya revisado.
+          Cancelar un pedido ESCRIBE EN LA BASE. Se reparte a mano desde
+          Accesos y permisos -> pestaña Movil, tarjeta «Pedidos (repartidor)».
+
+          OJO CON EL NOMBRE: es `app_movil.pedidos.cancelar` y NO
+          `app_movil.ventas.pedidos.cancelar`, que existe aparte unas lineas
+          arriba y es la de Ventas. Son dos modulos distintos a proposito.
+        */
+        new("app_movil.pedidos.cancelar", "App móvil - Cancelar en «Mis pedidos»", "app_movil"),
+
+        /*
           LAS CUATRO PANTALLAS DE ADMINISTRACION, QUE NO TENIAN NADA.
 
           Usuarios, Modulos, Roles y Permisos de usuarios eran las unicas del

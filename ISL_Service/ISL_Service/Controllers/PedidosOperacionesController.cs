@@ -72,8 +72,35 @@ public class PedidosOperacionesController : PermisoControllerBase
     */
     private static readonly string[] PermisoRechazar =
         { "ventas.pedidos.rechazar", "app_movil.ventas.pedidos.rechazar" };
+
+    /*
+      CANCELAR LLEVA TRES CLAVES, Y LA TERCERA ES DE OTRO MODULO.
+
+      Las dos primeras son el par de siempre: la del web (btnCancelarPedido de
+      Mac31) y la de Ventas en el telefono, que es la que gobierna el boton
+      Cancelar DENTRO de Consulta de ventas.
+
+      La tercera, `app_movil.pedidos.cancelar`, es la del modulo PEDIDOS del
+      telefono —el portal del repartidor, la pantalla "Mis pedidos"—, y es un
+      modulo aparte de Ventas: quien reparte pedidos no tiene por que entrar a
+      Consulta de ventas, y hasta hoy no habia manera de dejarlo cancelar su
+      propio pedido sin regalarle el permiso de Ventas (o el de la
+      computadora).
+
+      ES LA HERMANA DE `app_movil.pedidos.editar`, que ya existe y enciende el
+      boton Editar de esa misma pantalla. El par editar/cancelar vive en el
+      mismo modulo y se reparte en la misma tarjeta del panel.
+
+      `ExigirPermisoAsync` pide ALGUNA de la lista, asi que agregar la tercera
+      NO LE QUITA NADA A NADIE: quien hoy cancela por la clave del web o por la
+      de Ventas en el telefono sigue cancelando igual.
+    */
     private static readonly string[] PermisoCancelar =
-        { "ventas.pedidos.cancelar", "app_movil.ventas.pedidos.cancelar" };
+    {
+        "ventas.pedidos.cancelar",
+        "app_movil.ventas.pedidos.cancelar",
+        "app_movil.pedidos.cancelar"
+    };
     /*
       MODIFICAR LLEVA SU PAREJA DEL MOVIL, COMO EL RESTO DEL CANAL.
 
