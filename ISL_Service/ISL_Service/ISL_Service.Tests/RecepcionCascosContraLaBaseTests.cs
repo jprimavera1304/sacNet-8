@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.RecepcionCascos;
+﻿using ISL_Service.Application.DTOs.RecepcionCascos;
 using ISL_Service.Application.Services;
 using ISL_Service.Infrastructure.Reports;
 using ISL_Service.Infrastructure.Repositories;
@@ -142,6 +142,79 @@ public class RecepcionCascosContraLaBaseTests
             Assert.All(bitacora, b => Assert.Equal("ALTA", b.operacion));
             Assert.All(bitacora, b => Assert.Equal("PRUEBA", b.usuario));
             Assert.Equal(5, bitacora.Single(b => b.idTipoUsado == TipoMiniChico).piezasNueva);
+        }
+        finally
+        {
+            await LimpiarAsync(firma);
+        }
+    }
+
+    /// <summary>
+    /// EL ADELANTO DE LA LISTA SE LEE, Y TRAE EL ORDEN PARA PINTARLO.
+    ///
+    /// La queja fue de la pantalla del telefono: una recepcion decia
+    /// "G1 2, G2 1" y eso no lo entiende quien la captura. "G1" salia de
+    /// TipoUsadoCorto, que NO quiere decir lo mismo en las dos empresas: en
+    /// Zaragoza es una clave ('G1') y en Tauro es el nombre ('CHICO(2)'),
+    /// mientras el largo de Tauro trae el codigo de producto pegado delante.
+    ///
+    /// Por eso esta prueba no compara contra un texto escrito a mano —seria
+    /// verde en una base y roja en la otra—: comprueba la REGLA. El nombre no
+    /// empieza por cifras, el resumen lleva sus dos puntos, y el desglose trae
+    /// el Orden del catalogo, que es por donde se elige el color (por nombre,
+    /// el mismo tamano saldria de otro color en cada empresa).
+    /// </summary>
+    [Fact]
+    public async Task La_Lista_Dice_Los_Tamanos_Con_Su_Nombre_Y_Su_Orden()
+    {
+        var firma = Firma();
+        var servicio = Servicio(firma);
+        var repartidor = await UnRepartidorActivoAsync(firma);
+
+        try
+        {
+            var alta = await servicio.CrearAsync(new CrearRecepcionCascoRequest
+            {
+                Fecha = DateTime.Today,
+                IdRepartidor = repartidor,
+                Observaciones = firma,
+                Piezas = new()
+                {
+                    new() { IdTipoUsado = TipoMiniChico, Piezas = 5 },
+                    new() { IdTipoUsado = TipoMoto, Piezas = 2 }
+                }
+            }, UsuarioDePrueba, "PRUEBA", "WEB");
+            Assert.True(alta.ok, alta.mensaje);
+
+            var mia = (await servicio.ConsultarAsync(
+                    DateTime.Today, DateTime.Today, repartidor, null, false))
+                .Single(r => r.idRecepcion == alta.idRecepcion);
+
+            var detalle = await servicio.ConsultarDetalleAsync(alta.idRecepcion);
+            var mini = detalle.Single(d => d.idTipoUsado == TipoMiniChico);
+            var moto = detalle.Single(d => d.idTipoUsado == TipoMoto);
+
+            /* El nombre de pantalla no empieza por el codigo de producto. */
+            Assert.False(char.IsDigit(mini.clave![0]),
+                $"El tamano se sigue llamando '{mini.clave}'");
+
+            /* "<nombre>: 5, <nombre>: 2", en el orden de la hoja. */
+            Assert.Equal($"{mini.clave}: 5, {moto.clave}: 2", mia.resumen);
+
+            /* "<orden>~<nombre>~<piezas>", separados por |. */
+            var trozos = mia.desglose!.Split('|');
+            Assert.Equal(2, trozos.Length);
+            Assert.Equal($"{mini.orden}~{mini.clave}~5", trozos[0]);
+            Assert.Equal($"{moto.orden}~{moto.clave}~2", trozos[1]);
+
+            /* Y los dos dicen lo mismo: salen de la misma consulta. */
+            Assert.Equal(
+                mia.resumen,
+                string.Join(", ", trozos.Select(t =>
+                {
+                    var c = t.Split('~');
+                    return $"{c[1]}: {c[2]}";
+                })));
         }
         finally
         {

@@ -1,4 +1,4 @@
-namespace ISL_Service.Application.DTOs.RecepcionCascos;
+﻿namespace ISL_Service.Application.DTOs.RecepcionCascos;
 
 /*
   RECEPCION DE CASCOS USADOS: LOS DATOS QUE VIAJAN
@@ -81,9 +81,15 @@ public class RecepcionCascoDto
     public string? usuarioCancelacion { get; set; }
     public DateTime? fechaCancelacion { get; set; }
     public string? canal { get; set; }
-    /* "MINI CHICO(1) 5, CHICO(2) 3". Viene armado para no pedir N detalles
-       solo para pintar la lista. */
+    /* "MINI CHICO (1): 5, CHICO (2): 3". Viene armado para no pedir N
+       detalles solo para pintar la lista. Es texto PARA LEER: la tabla del
+       web lo imprime tal cual. */
     public string? resumen { get; set; }
+    /* El mismo desglose para PINTAR: "1~MINI CHICO (1)~5|2~CHICO (2)~3".
+       Lleva delante el Orden del catalogo porque el color de cada tamaño se
+       elige por ese numero y nunca por el nombre: el mismo tipo se llama
+       distinto en Tauro y en Zaragoza. */
+    public string? desglose { get; set; }
     public int tipos { get; set; }
 }
 
