@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.VentasPedidos;
+﻿using ISL_Service.Application.DTOs.VentasPedidos;
 using ISL_Service.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -23,8 +23,16 @@ public class VentasPedidosController : ControllerBase
     // Aqui basta con cualquiera de los dos porque el endpoint es el mismo para
     // los dos canales: quien no tiene el de su canal no llega a llamarlo,
     // porque su pantalla ni siquiera le muestra la opcion.
-    private static readonly string[] PermisosVer =
-        { "ventas.pendientes.ver", "app_movil.ventas.ver" };
+    // La del telefono paso a ser `app_movil.ventas.pendientes.ver`: antes era
+    // `app_movil.ventas.ver`, la misma de la pantalla de Ventas, asi que dar
+    // Ventas en el telefono abria tambien esto. La VIEJA se queda aceptada
+    // aqui para no quitarle el endpoint a quien ya lo usaba con ella; lo que
+    // cambio es QUIEN VE el mosaico, que lo decide la app.
+    private static readonly string[] PermisosVer = {
+        "ventas.pendientes.ver",
+        "app_movil.ventas.pendientes.ver",
+        "app_movil.ventas.ver",
+    };
     private static readonly string[] PermisosAutorizar =
         { "ventas.pendientes.autorizar", "app_movil.ventas.autorizar" };
 

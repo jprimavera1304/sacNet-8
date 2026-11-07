@@ -2048,6 +2048,30 @@ WHERE ISNULL(p.IDStatus, 1) = 1;", conn))
         new("app_movil.pedidos.editar", "App móvil - Editar en «Mis pedidos»", "app_movil"),
 
         /*
+          DOS CLAVES NUEVAS DEL TELEFONO, Y LAS DOS SE SIEMBRAN SIN CONCEDER.
+
+          «Mi jornada» no tenia ninguna: el mosaico se pintaba a todo el mundo
+          porque su permiso de verdad vive en el servidor de Jornada, que es
+          otro producto y otra base. El resultado era que no habia forma de
+          quitarselo a quien no marca jornada en el telefono, ni desde la app
+          ni desde la computadora. Esta clave es de MAC y decide UNA sola cosa:
+          si se enseña la puerta. Lo de adentro lo sigue decidiendo Jornada con
+          sus credenciales.
+
+          «Pendientes de autorizar» compartia `app_movil.ventas.ver` con la
+          pantalla de Ventas, asi que dar Ventas en el telefono encendia
+          tambien ese atajo. Medido en Tauro: cinco de las seis personas con la
+          app lo tenian sin que nadie se lo hubiera dado. Los pendientes se
+          siguen consultando DENTRO de Consulta de ventas; el mosaico de fuera
+          es el atajo para autorizar de corrido y ahora se reparte aparte.
+
+          Ninguna se concede a nadie aqui: se dan en Accesos y permisos ->
+          Movil, persona por persona.
+        */
+        new("app_movil.jornada", "App móvil - Mi jornada", "app_movil"),
+        new("app_movil.ventas.pendientes.ver", "App móvil - Pendientes de autorizar", "app_movil"),
+
+        /*
           CANCELAR EN «MIS PEDIDOS»: LA HERMANA DE EDITAR, Y SE SIEMBRA SIN
           CONCEDER A NADIE.
 
