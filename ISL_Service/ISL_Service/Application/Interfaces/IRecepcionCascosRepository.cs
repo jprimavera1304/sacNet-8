@@ -38,7 +38,8 @@ public interface IRecepcionCascosRepository
         CancellationToken ct = default);
 
     Task<DatosReporteRecepcionCascos> ConsultarDatosDeReporteAsync(
-        DateTime fechaInicio, DateTime fechaFin, CancellationToken ct = default);
+        DateTime fechaInicio, DateTime fechaFin, bool incluirCanceladas = false,
+        CancellationToken ct = default);
 
     /// <summary>
     /// La marca de la empresa para el papel: carpeta de imagenes, archivo del

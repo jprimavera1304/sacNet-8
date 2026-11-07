@@ -43,6 +43,9 @@ public class RecepcionCascosController : PermisoControllerBase
         { "recepcion_cascos.cancelar", "app_movil.recepcion_cascos.cancelar" };
     private static readonly string[] PermisosImprimir =
         { "recepcion_cascos.imprimir", "app_movil.recepcion_cascos.imprimir" };
+
+    /* El estatus de una recepcion cancelada, como lo guarda la tabla. */
+    private const int EstatusCancelada = 2;
     /*
       El historial tiene clave propia y SOLO del web: es una pantalla de
       revision, no de captura, y en el telefono no existe. Una clave movil que
@@ -279,6 +282,17 @@ public class RecepcionCascosController : PermisoControllerBase
         [FromQuery] DateTime? fechaInicio,
         [FromQuery] DateTime? fechaFin,
         [FromQuery] int? idRepartidor,
+        /*
+          EL PAPEL SALE CON LOS FILTROS QUE SE ELIGIERON, Y LAS CANCELADAS SON
+          UNO DE ELLOS. La pantalla puede estar ensenandolas y el papel salia
+          sin ellas: dos respuestas distintas a la misma pregunta, y la de
+          papel es la que se archiva.
+
+          Se escribe igual que en la consulta de la lista —`incluirCanceladas`—
+          porque es el mismo filtro, y de fabrica va apagado: quien no lo pida
+          recibe el reporte operativo de siempre.
+        */
+        [FromQuery] bool incluirCanceladas = false,
         CancellationToken ct = default)
     {
         var sinPermiso = await ExigirPermisoAsync(PermisosImprimir, ct);
@@ -294,7 +308,8 @@ public class RecepcionCascosController : PermisoControllerBase
         var llave = _configuration["Jwt:Key"] ?? "";
         var ticket = ReporteRecepcionCascosTicket.Firmar(
             llave, desde, hasta, idRepartidor ?? 0,
-            IdUsuarioLegacy(), CurrentUser.GetUsername(User, ""));
+            IdUsuarioLegacy(), CurrentUser.GetUsername(User, ""),
+            incluirCanceladas);
 
         /*
           La direccion se arma con el esquema y el host DE LA PETICION, no de
@@ -324,7 +339,8 @@ public class RecepcionCascosController : PermisoControllerBase
             /* Texto plano y no JSON: esto lo lee una persona en una pestana. */
             return BadRequest("El enlace del reporte no es válido o ya venció. Vuelve a pedirlo desde la pantalla.");
 
-        var datos = await _service.ConsultarDatosDeReporteAsync(pase.Desde, pase.Hasta, ct);
+        var datos = await _service.ConsultarDatosDeReporteAsync(
+            pase.Desde, pase.Hasta, pase.IncluirCanceladas, ct);
 
         /*
           El pase puede traer un repartidor: se recorta aqui y no en el
@@ -345,9 +361,20 @@ public class RecepcionCascosController : PermisoControllerBase
         if (pase.IdRepartidor > 0)
         {
             foreach (var total in datos.Totales)
-                total.piezas = datos.Renglones
-                    .Where(r => r.idTipoUsado == total.idTipoUsado)
-                    .Sum(r => r.piezas);
+            {
+                /*
+                  LAS DOS SUMAS SE RECALCULAN POR SEPARADO, Y SE SEPARAN POR
+                  ESTATUS. Sumar aqui todos los renglones metia las canceladas
+                  en `piezas` —el total de cascos recibidos— y el papel diria
+                  que hay cascos que nadie tiene. La regla es la misma que
+                  aplica el procedimiento cuando no se filtra por repartidor:
+                  lo recibido es lo activo, y lo cancelado va aparte.
+                */
+                var suyos = datos.Renglones.Where(r => r.idTipoUsado == total.idTipoUsado);
+                total.piezas = suyos.Where(r => r.estatus != EstatusCancelada).Sum(r => r.piezas);
+                total.piezasCanceladas = suyos
+                    .Where(r => r.estatus == EstatusCancelada).Sum(r => r.piezas);
+            }
         }
 
         var (logo, empresa) = await _service.ConsultarMarcaParaReporteAsync(ct);

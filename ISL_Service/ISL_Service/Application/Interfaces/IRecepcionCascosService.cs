@@ -33,7 +33,8 @@ public interface IRecepcionCascosService
         CancellationToken ct = default);
 
     Task<DatosReporteRecepcionCascos> ConsultarDatosDeReporteAsync(
-        DateTime fechaInicio, DateTime fechaFin, CancellationToken ct = default);
+        DateTime fechaInicio, DateTime fechaFin, bool incluirCanceladas = false,
+        CancellationToken ct = default);
 
     /// <summary>
     /// El logo ya como data URI y el nombre con el que la empresa se presenta.

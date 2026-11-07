@@ -206,7 +206,8 @@ public class RecepcionCascosRepository : IRecepcionCascosRepository
       desglose.
     */
     public async Task<DatosReporteRecepcionCascos> ConsultarDatosDeReporteAsync(
-        DateTime fechaInicio, DateTime fechaFin, CancellationToken ct = default)
+        DateTime fechaInicio, DateTime fechaFin, bool incluirCanceladas = false,
+        CancellationToken ct = default)
     {
         await using var conn = GetConnection();
         await conn.OpenAsync(ct);
@@ -214,6 +215,11 @@ public class RecepcionCascosRepository : IRecepcionCascosRepository
         await using var cmd = Sp(SpReporte, conn);
         cmd.Parameters.AddWithValue("@FechaInicio", fechaInicio.Date);
         cmd.Parameters.AddWithValue("@FechaFin", fechaFin.Date);
+        /*
+          EL MISMO NOMBRE QUE USA LA CONSULTA DE LA LISTA: es el mismo filtro,
+          escrito igual. De fabrica va en 0, que es el papel de siempre.
+        */
+        cmd.Parameters.AddWithValue("@IncluirCanceladas", incluirCanceladas ? 1 : 0);
 
         var señal = CancelacionSegura.SeñalPara(cmd, ct);
         var datos = new DatosReporteRecepcionCascos();

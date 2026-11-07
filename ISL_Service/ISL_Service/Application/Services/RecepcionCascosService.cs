@@ -116,10 +116,12 @@ public class RecepcionCascosService : IRecepcionCascosService
     }
 
     public Task<DatosReporteRecepcionCascos> ConsultarDatosDeReporteAsync(
-        DateTime fechaInicio, DateTime fechaFin, CancellationToken ct = default)
+        DateTime fechaInicio, DateTime fechaFin, bool incluirCanceladas = false,
+        CancellationToken ct = default)
     {
         if (fechaFin < fechaInicio) (fechaInicio, fechaFin) = (fechaFin, fechaInicio);
-        return _repository.ConsultarDatosDeReporteAsync(fechaInicio, fechaFin, ct);
+        return _repository.ConsultarDatosDeReporteAsync(
+            fechaInicio, fechaFin, incluirCanceladas, ct);
     }
 
     public async Task<(string Logo, string Empresa)> ConsultarMarcaParaReporteAsync(

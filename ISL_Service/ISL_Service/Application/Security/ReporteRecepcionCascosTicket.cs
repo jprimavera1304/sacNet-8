@@ -46,15 +46,30 @@ public static class ReporteRecepcionCascosTicket
           no hay token del que sacarlo.
         */
         public string Usuario { get; init; } = "";
+
+        /*
+          SI EL PAPEL LLEVA LAS CANCELADAS. Viaja FIRMADO y no como parametro
+          suelto de la direccion por la misma razon que el periodo: lo que
+          decide que sale en la hoja no se deja a lo que alguien escriba en la
+          barra del navegador.
+        */
+        public bool IncluirCanceladas { get; init; }
     }
 
     public static string Firmar(
         string llave, DateTime desde, DateTime hasta,
-        int idRepartidor, int idUsuario, string usuario = "")
+        int idRepartidor, int idUsuario, string usuario = "",
+        bool incluirCanceladas = false)
     {
         var expira = DateTimeOffset.UtcNow.Add(Vigencia).ToUnixTimeSeconds();
+        /*
+          EL CAMPO NUEVO VA AL FINAL, Y ESO NO ES CASUALIDAD: asi un pase de
+          seis campos —los que firmo el servidor anterior— se sigue leyendo
+          mientras dura el despliegue. Ver `Validar`.
+        */
         var cuerpo = $"{Fecha(desde)}|{Fecha(hasta)}|{Mayor(idRepartidor)}" +
-                     $"|{idUsuario}|{expira}|{SinSeparador(usuario)}";
+                     $"|{idUsuario}|{expira}|{SinSeparador(usuario)}" +
+                     $"|{(incluirCanceladas ? 1 : 0)}";
         return Base64Url(Encoding.UTF8.GetBytes(cuerpo)) + "." + Base64Url(Firma(llave, cuerpo));
     }
 
@@ -83,7 +98,16 @@ public static class ReporteRecepcionCascosTicket
             return null;
 
         var campos = cuerpo.Split('|');
-        if (campos.Length != 6) return null;
+        /*
+          SEIS O SIETE. Siete es el pase de hoy; seis es el que firmaba el
+          servidor anterior, que vive diez minutos y puede estar en el aire
+          justo cuando se despliega. Rechazarlo le daria "el enlace no es
+          valido" a quien pidio su reporte un minuto antes de la subida.
+
+          La firma se comprueba ANTES, sobre el cuerpo entero: aceptar dos
+          largos no afloja nada, solo reconoce un formato mas viejo.
+        */
+        if (campos.Length is not (6 or 7)) return null;
 
         if (!long.TryParse(campos[4], out var expira) ||
             DateTimeOffset.UtcNow.ToUnixTimeSeconds() > expira)
@@ -99,7 +123,9 @@ public static class ReporteRecepcionCascosTicket
             Hasta = hasta.Value,
             IdRepartidor = Mayor(Numero(campos[2])),
             IdUsuario = Numero(campos[3]),
-            Usuario = campos[5]
+            Usuario = campos[5],
+            /* El pase viejo no lo trae: sin canceladas, como era entonces. */
+            IncluirCanceladas = campos.Length > 6 && campos[6] == "1"
         };
     }
 

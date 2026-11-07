@@ -173,6 +173,19 @@ public static class RecepcionCascosHtmlBuilder
            encontrar el numero que si cuenta. Es lo que hace la hoja a mano. */
         html.Append(".vacio{color:#fff;}");
         html.Append(".nada{font-size:11pt;padding:14px 4px;}");
+        /*
+          LA CANCELADA SE MARCA, NO SE DISFRAZA. Va en rojo y con el numero
+          tachado: en blanco y negro —que es como sale la mayoria de las
+          copias— el color solo no distingue nada, y el tachado si.
+
+          La palabra CANCELADA va ademas escrita en el renglon, porque ni el
+          color ni el tachado sobreviven a una fotocopia mala.
+        */
+        html.Append("tr.cancelada td{color:#b00020;text-decoration:line-through;}");
+        html.Append("tr.cancelada td.marca{text-decoration:none;font-weight:bold;}");
+        /* El aviso de lo cancelado cuelga del total, separado por una linea
+           fina: se lee como una nota al pie, no como otro total. */
+        html.Append(".cancelado td{color:#b00020;font-weight:bold;border-top:1px solid #b00020;}");
 
         /*
           LAS DOS REGLAS DE IMPRESION. Sin ellas el papel sale mal, y se vio:
@@ -233,7 +246,8 @@ public static class RecepcionCascosHtmlBuilder
                 {
                     Id = g.Key,
                     Primero = g.First(),
-                    Piezas = g.ToDictionary(x => x.idTipoUsado, x => x.piezas)
+                    Piezas = g.ToDictionary(x => x.idTipoUsado, x => x.piezas),
+                    Cancelada = g.First().estatus == EstatusCancelada
                 })
                 .OrderBy(x => x.Primero.quienEntrego, StringComparer.Create(Cultura, true))
                 .ThenBy(x => x.Primero.fecha)
@@ -242,7 +256,7 @@ public static class RecepcionCascosHtmlBuilder
 
             foreach (var r in porRecepcion)
             {
-                html.Append("<tr>");
+                html.Append(r.Cancelada ? "<tr class=\"cancelada\">" : "<tr>");
                 html.Append("<td class=\"izq\">")
                     .Append(r.Primero.fecha.ToString("dd/MM/yyyy", Cultura)).Append("</td>");
                 html.Append("<td class=\"izq\">").Append(Texto(r.Primero.quienEntrego)).Append("</td>");
@@ -255,22 +269,71 @@ public static class RecepcionCascosHtmlBuilder
 
                 html.Append("<td class=\"der\">")
                     .Append(piezasDeGrupo(r.Piezas).ToString("N0", Cultura)).Append("</td>");
-                html.Append("<td class=\"izq obs\">").Append(Texto(r.Primero.observaciones)).Append("</td>");
+                /*
+                  La palabra va DELANTE de las observaciones, no en una columna
+                  nueva: once columnas ya llenan la hoja apaisada, y el motivo
+                  de la cancelacion —cuando lo hay— se lee justo al lado.
+                */
+                var observaciones = Texto(r.Primero.observaciones);
+                html.Append(r.Cancelada ? "<td class=\"izq obs marca\">" : "<td class=\"izq obs\">")
+                    .Append(r.Cancelada
+                        ? (observaciones.Length > 0 ? "CANCELADA — " + observaciones : "CANCELADA")
+                        : observaciones)
+                    .Append("</td>");
                 html.Append("</tr>");
             }
 
             /* ---- el total general, ultima fila de la tabla ---- */
+            /*
+              EL TOTAL NO SUMA LAS CANCELADAS, NI PIDIENDOLAS.
+
+              Una recepcion cancelada es justamente la que NO se recibio. Si
+              entrara aqui, el papel sumaria cascos que nadie tiene —y cuadraria
+              consigo mismo, que es lo peor: un numero equivocado que no se
+              contradice a la vista no lo descubre nadie.
+
+              Por eso el total se arma SOLO con lo activo, y lo cancelado baja
+              a su propio renglon.
+            */
             html.Append("<tr class=\"tot\">");
             html.Append("<td class=\"izq\" colspan=\"2\">TOTAL DE CASCOS RECIBIDOS</td>");
             var granTotal = 0;
             foreach (var t in tipos)
             {
-                var suma = porRecepcion.Sum(x => x.Piezas.TryGetValue(t.idTipoUsado, out var p) ? p : 0);
+                var suma = porRecepcion
+                    .Where(x => !x.Cancelada)
+                    .Sum(x => x.Piezas.TryGetValue(t.idTipoUsado, out var p) ? p : 0);
                 granTotal += suma;
                 html.Append("<td class=\"der\">").Append(Numero(suma)).Append("</td>");
             }
             html.Append("<td class=\"der\">").Append(granTotal.ToString("N0", Cultura)).Append("</td>");
             html.Append("<td></td></tr>");
+
+            /*
+              Y SOLO SI HUBO ALGUNA. Un renglon de ceros en cada hoja ensena a
+              no mirarlo, y el dia que diga algo tampoco lo miraria nadie.
+            */
+            var canceladas = porRecepcion.Where(x => x.Cancelada).ToList();
+            if (canceladas.Count > 0)
+            {
+                html.Append("<tr class=\"cancelado\">");
+                html.Append("<td class=\"izq\" colspan=\"2\">DE LO CANCELADO (no suma)</td>");
+                var totalCancelado = 0;
+                foreach (var t in tipos)
+                {
+                    var suma = canceladas
+                        .Sum(x => x.Piezas.TryGetValue(t.idTipoUsado, out var p) ? p : 0);
+                    totalCancelado += suma;
+                    html.Append("<td class=\"der\">").Append(Numero(suma)).Append("</td>");
+                }
+                html.Append("<td class=\"der\">")
+                    .Append(totalCancelado.ToString("N0", Cultura)).Append("</td>");
+                html.Append("<td class=\"izq obs\">")
+                    .Append(canceladas.Count == 1
+                        ? "1 recepción cancelada en el periodo"
+                        : canceladas.Count.ToString("N0", Cultura) + " recepciones canceladas en el periodo")
+                    .Append("</td></tr>");
+            }
         }
 
         html.Append("</tbody></table>");
@@ -281,6 +344,9 @@ public static class RecepcionCascosHtmlBuilder
     /* ---------------------------------------------------------------- */
 
     private static int piezasDeGrupo(Dictionary<int, int> piezas) => piezas.Values.Sum();
+
+    /* El estatus de una recepcion cancelada, como lo guarda la tabla. */
+    private const int EstatusCancelada = 2;
 
     /*
       El rotulo de la columna: el nombre corto si lo hay. El catalogo guarda

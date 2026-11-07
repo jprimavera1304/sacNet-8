@@ -1,4 +1,4 @@
-﻿namespace ISL_Service.Application.DTOs.RecepcionCascos;
+namespace ISL_Service.Application.DTOs.RecepcionCascos;
 
 /*
   RECEPCION DE CASCOS USADOS: LOS DATOS QUE VIAJAN
@@ -197,6 +197,15 @@ public class RenglonReporteRecepcionCascoDto
     public int piezas { get; set; }
     public int totalPiezas { get; set; }
     public string? observaciones { get; set; }
+
+    /*
+      1 = activa, 2 = cancelada. Solo llega con canceladas cuando se pidieron:
+      sin pedirlas el procedimiento ni las devuelve, y esto es siempre 1.
+
+      El papel lo necesita para MARCARLAS en vez de mezclarlas. Una cancelada
+      impresa como una mas es un casco que nadie tiene.
+    */
+    public int estatus { get; set; }
 }
 
 public class TotalPorTipoRecepcionCascoDto
@@ -205,7 +214,18 @@ public class TotalPorTipoRecepcionCascoDto
     public string? clave { get; set; }
     public string? nombre { get; set; }
     public int orden { get; set; }
+
+    /* Lo recibido de verdad: solo activas, se pidan o no las canceladas. */
     public int piezas { get; set; }
+
+    /*
+      Lo que se cayo, APARTE. Va en 0 si no se pidieron las canceladas.
+
+      Es columna propia y no parte de `piezas` a proposito: el total del papel
+      no puede depender de un parametro, y una recepcion cancelada es
+      justamente la que NO se recibio. Entra como aviso, no como mercancia.
+    */
+    public int piezasCanceladas { get; set; }
 }
 
 public class DatosReporteRecepcionCascos
