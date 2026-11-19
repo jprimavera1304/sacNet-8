@@ -49,7 +49,42 @@ public class VentasFacturacionRepository : SpLegacyRepositoryBase, IVentasFactur
     private const int LargoNombreEquipo = 1000;
     private const int LargoFecha = 20;
 
-    public VentasFacturacionRepository(IConfiguration configuration) : base(configuration) { }
+    private readonly IConexionDelCentro _centro;
+
+    public VentasFacturacionRepository(IConfiguration configuration, IConexionDelCentro centro)
+        : base(configuration)
+    {
+        _centro = centro;
+    }
+
+    /*
+      QUE SIGUE AL CENTRO ELEGIDO Y QUE NO, EN ESTE REPOSITORIO
+      ---------------------------------------------------------
+      No se puede contestar "todo" ni "nada", y es la razon de que la clase base
+      reciba la conexion por LLAMADA y no por repositorio.
+
+      SIGUEN AL CENTRO (lecturas de datos del negocio):
+        · ConsultarAsync        la lista de facturas, y con ella LeerFacturaAsync
+        · LeerDatosCorreoAsync  el papel de una factura de ese centro
+
+      SE QUEDAN EN LA MATRIZ, A PROPOSITO:
+        · LeerLlaveFacturapiAsync   las credenciales de timbrado
+        · LeerConstantesAsync       las constantes de la empresa
+        · GuardarParametrosAsync    escribe esas mismas constantes
+
+      Las credenciales y las constantes son de LA EMPRESA, no de un centro.
+      Leerlas de la base de un centro seria timbrar con las llaves de otro —o
+      con ninguna, si alla esa fila no existe— y el CFDI ya emitido no se
+      deshace. Esta es la clase de diferencia que no revienta: contesta, y
+      contesta mal.
+
+      Y LAS DOS ESCRITURAS DE VERDAD —timbrar y cancelar— van por
+      AbrirParaEscribirAsync. `facturacion` esta declarado como SoloLectura, asi
+      que con un centro puesto la capa contesta "esta accion solo se puede hacer
+      en la matriz" en vez de escribir, y en la matriz siguen funcionando
+      igual que hoy. El dia que se decida que un centro puede timbrar lo suyo,
+      se nombra esa operacion en ModulosConCentros y esta linea ya esta puesta.
+    */
 
     /// <summary>
     /// Solo lo que hace falta para hablar con Facturapi: la llave y el nombre de
@@ -267,7 +302,7 @@ FROM dbo.Constantes;", conn)
             cmd.Parameters.Add(Entero("@NumComplementosPago", numComplementosPago));
             cmd.Parameters.Add(Entero("@IDUsuario", idUsuario));
             cmd.Parameters.Add(Varchar("@Equipo", LargoCien, FiltrosLegacy.Texto(equipo, LargoCien)));
-        }, ct);
+        }, ct, ct2 => _centro.AbrirParaEscribirAsync("facturacion", "timbrar", ct2));
 
         return Resultado(tablas, "IDResult");
     }
@@ -289,7 +324,7 @@ FROM dbo.Constantes;", conn)
             cmd.Parameters.Add(Varchar("@FechaCancelacionSat", LargoCien, ReglasFacturacion.FechaHoraCfdi(fechaCancelacionSat)));
             cmd.Parameters.Add(Entero("@IDUsuario", idUsuario));
             cmd.Parameters.Add(Varchar("@Equipo", LargoCien, FiltrosLegacy.Texto(equipo, LargoCien)));
-        }, ct);
+        }, ct, ct2 => _centro.AbrirParaEscribirAsync("facturacion", "cancelar", ct2));
 
         return Resultado(tablas, "IDResult");
     }
@@ -316,7 +351,7 @@ FROM dbo.Constantes;", conn)
             cmd.Parameters.Add(Entero("@Identico", request.Identico));
             cmd.Parameters.Add(Entero("@IDEmpresaCS", request.IdEmpresaCs));
             cmd.Parameters.Add(Varchar("@IDsClientes", LargoLista, FiltrosLegacy.Ids(request.IdsCliente)));
-        }, ct);
+        }, ct, ct2 => _centro.AbrirParaLeerAsync("facturacion", ct2));
 
         return new FilasLegacyDto { Rows = filas };
     }
@@ -356,7 +391,7 @@ FROM dbo.Constantes;", conn)
         {
             cmd.Parameters.Add(Varchar("@Params", LargoParam,
                 "@" + idVentaFactura.ToString(System.Globalization.CultureInfo.InvariantCulture)));
-        }, ct);
+        }, ct, ct2 => _centro.AbrirParaLeerAsync("facturacion", ct2));
 
         if (filas.Count == 0) return null;
         var fila = filas[0];

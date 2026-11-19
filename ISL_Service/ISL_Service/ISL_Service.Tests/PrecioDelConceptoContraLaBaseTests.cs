@@ -118,7 +118,7 @@ public class PrecioDelConceptoContraLaBaseTests
     {
         if (!await HayBaseAsync(baseDatos)) return;
 
-        var constantes = await new VentasFacturacionRepository(ConfigDe(baseDatos))
+        var constantes = await new VentasFacturacionRepository(ConfigDe(baseDatos), new ConexionDelCentroDeMentira())
             .LeerConstantesAsync(default);
 
         /* La variante sale de `funcionalidad`, igual que en el servicio. */

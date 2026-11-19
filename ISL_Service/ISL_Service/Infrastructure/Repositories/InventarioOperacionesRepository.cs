@@ -44,7 +44,37 @@ public class InventarioOperacionesRepository : SpLegacyRepositoryBase, IInventar
     private const int LargoListaFiltro = 2000;
     private const int LargoNombre = 250;
 
-    public InventarioOperacionesRepository(IConfiguration configuration) : base(configuration) { }
+    private readonly IConexionDelCentro _centro;
+
+    public InventarioOperacionesRepository(IConfiguration configuration, IConexionDelCentro centro)
+        : base(configuration)
+    {
+        _centro = centro;
+    }
+
+    /*
+      QUE SIGUE AL CENTRO ELEGIDO EN ESTE REPOSITORIO, Y QUE NO
+
+      SIGUE AL CENTRO:
+        · ConsultarAjustesAsync   la lista de ajustes de inventario
+
+      Y nada mas. Lo demas se queda en la matriz a proposito:
+
+        · Los PEDIDOS de inventario (crear, cancelar, consultar) son OTRA
+          pantalla, de Mac31, que nadie pidio llevar a los centros. Cambiar de
+          base algo que no se pidio es la forma mas facil de romper lo que
+          funcionaba.
+        · El catalogo de TIPOS USADOS (leer, crear, actualizar) es de la
+          empresa, no de un centro.
+
+      LAS DOS ESCRITURAS DE AJUSTES —crear y cancelar— van por
+      AbrirParaEscribirAsync con su nombre. `inventario.ajustes` esta declarado
+      como SoloLectura, asi que con un centro puesto la capa contesta "esta
+      accion solo se puede hacer en la matriz" en vez de escribir en la base de
+      otro, y en la matriz siguen igual que hoy. Un ajuste mueve EXISTENCIAS:
+      aplicarlo a la base equivocada no se nota hasta que alguien cuenta el
+      almacen.
+    */
 
     /* ------------------------ Ajustes de inventario ------------------------ */
 
@@ -60,7 +90,7 @@ public class InventarioOperacionesRepository : SpLegacyRepositoryBase, IInventar
             cmd.Parameters.Add(Entero("@Salida", request.Salida));
             cmd.Parameters.Add(Varchar("@Motivo", LargoTexto, FiltrosLegacy.Texto(request.Motivo)));
             cmd.Parameters.Add(Varchar("@Equipo", LargoEquipoLargo, FiltrosLegacy.Texto(equipo, LargoEquipoLargo)));
-        }, ct);
+        }, ct, ct2 => _centro.AbrirParaEscribirAsync("inventario.ajustes", "crear", ct2));
 
         return Resultado(tablas, "IDAjusteInventario");
     }
@@ -75,7 +105,7 @@ public class InventarioOperacionesRepository : SpLegacyRepositoryBase, IInventar
             cmd.Parameters.Add(Entero("@IDAjusteInventario", request.IdAjusteInventario));
             cmd.Parameters.Add(Entero("@IDUsuarioCancelacion", idUsuario));
             cmd.Parameters.Add(Varchar("@EquipoCancelacion", LargoEquipoLargo, FiltrosLegacy.Texto(equipo, LargoEquipoLargo)));
-        }, ct);
+        }, ct, ct2 => _centro.AbrirParaEscribirAsync("inventario.ajustes", "cancelar", ct2));
 
         return Resultado(tablas, "IDAjusteInventario");
     }
@@ -100,7 +130,7 @@ public class InventarioOperacionesRepository : SpLegacyRepositoryBase, IInventar
             cmd.Parameters.Add(Varchar("@FechaInicial", LargoFecha, FiltrosLegacy.FechaDesde(request.FechaInicial)));
             cmd.Parameters.Add(Varchar("@FechaFinal", LargoFecha, FiltrosLegacy.FechaHasta(request.FechaFinal)));
             cmd.Parameters.Add(Entero("@IDUsuarioActual", idUsuarioActual));
-        }, ct);
+        }, ct, ct2 => _centro.AbrirParaLeerAsync("inventario.ajustes", ct2));
 
         return new FilasLegacyDto { Rows = filas };
     }

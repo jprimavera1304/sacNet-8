@@ -44,10 +44,12 @@ public class CortesRepository : ICortesRepository
     private const int CommandTimeoutCentrosSeconds = 120;
 
     private readonly IConfiguration _configuration;
+    private readonly IConexionDelCentro _centro;
 
-    public CortesRepository(IConfiguration configuration)
+    public CortesRepository(IConfiguration configuration, IConexionDelCentro centro)
     {
         _configuration = configuration;
+        _centro = centro;
     }
 
     private SqlConnection GetConnection()
@@ -62,10 +64,41 @@ public class CortesRepository : ICortesRepository
         return connector.GetConnection;
     }
 
-    private async Task<DataTable> EjecutarAsync(string sp, Action<SqlCommand> parametros, CancellationToken ct, int? timeout = null)
+    /// <summary>
+    /// La conexion de esta consulta, ya abierta: la del centro elegido, o la de
+    /// la matriz cuando la consulta se queda ahi a proposito.
+    /// </summary>
+    /// <remarks>
+    /// La de la capa de centros llega ABIERTA y ya validada —el centro existe,
+    /// esta activo, su base es de esta empresa, el usuario tiene
+    /// `centros.&lt;n&gt;.ver` y el modulo esta declarado—, y con centro 0 es
+    /// identica a la de hoy. La de la matriz se abre aqui, que es lo que hacia
+    /// este repositorio antes de saber de centros.
+    /// </remarks>
+    private async Task<SqlConnection> AbrirAsync(bool soloMatriz, CancellationToken ct)
     {
-        await using var conn = GetConnection();
+        if (!soloMatriz) return await _centro.AbrirParaLeerAsync("cortes", ct);
+
+        var conn = GetConnection();
         await conn.OpenAsync(ct);
+        return conn;
+    }
+
+    /// <param name="soloMatriz">
+    /// true = esta consulta se queda en la matriz aunque haya un centro puesto.
+    ///
+    /// Es para las dos consultas CONSOLIDADAS: `sp_n_ConsultarCortesCSCobros`
+    /// lleva un cursor sobre CentrosServicio y va una por una a las bases de
+    /// los centros —ya recorre los trece por su cuenta—, asi que corrida DENTRO
+    /// de un centro volveria a recorrerlos desde alla y sumaria lo mismo otra
+    /// vez. Un total que sale al doble no revienta: se cree. Ninguna de las dos
+    /// la llama el telefono; son de pantallas de Mac31.
+    /// </param>
+    private async Task<DataTable> EjecutarAsync(
+        string sp, Action<SqlCommand> parametros, CancellationToken ct,
+        int? timeout = null, bool soloMatriz = false)
+    {
+        await using var conn = await AbrirAsync(soloMatriz, ct);
 
         await using var cmd = new SqlCommand(sp, conn) { CommandType = CommandType.StoredProcedure };
         if (timeout.HasValue) cmd.CommandTimeout = timeout.Value;
@@ -122,7 +155,7 @@ public class CortesRepository : ICortesRepository
             // filtros del sistema.
             cmd.Parameters.AddWithValue("@IDCobroDineroUsado", idCobroDineroUsado);
             cmd.Parameters.AddWithValue("@IDTipoRetiro", idTipoRetiro);
-        }, ct, CommandTimeoutCentrosSeconds);
+        }, ct, CommandTimeoutCentrosSeconds, soloMatriz: true);
 
         return Funciones.DataTableToList<CorteCsCobroDto>(dt);
     }
@@ -136,7 +169,7 @@ public class CortesRepository : ICortesRepository
             // los pagos cancelados que aun no se han llevado a ningun corte.
             cmd.Parameters.AddWithValue("@IDCorte", idCorte);
             cmd.Parameters.AddWithValue("@IDTipoRetiro", idTipoRetiro);
-        }, ct);
+        }, ct, soloMatriz: true);
 
         var renglones = Funciones.DataTableToList<CorteVentaCanceladaCsDto>(dt);
 

@@ -1,4 +1,5 @@
 using System.Data;
+using ISL_Service.Application.Interfaces;
 using ISL_Service.Infrastructure.Data;
 using Microsoft.Data.SqlClient;
 
@@ -70,6 +71,55 @@ public abstract class SpLegacyRepositoryBase
     }
 
     /// <summary>
+    /// De donde sale la conexion de UNA llamada. Devuelve una conexion ya
+    /// ABIERTA.
+    /// </summary>
+    /// <remarks>
+    /// POR QUE ESTO EXISTE, Y POR QUE ES POR LLAMADA Y NO POR REPOSITORIO
+    ///
+    /// Los modulos que saben de centros de servicio no pueden pedir "la
+    /// conexion de este repositorio": dentro del MISMO repositorio hay
+    /// lecturas que tienen que seguir al centro elegido y escrituras que
+    /// NO pueden salir de la matriz. Facturacion es el ejemplo claro: la lista
+    /// de facturas es del centro, pero las credenciales de timbrado y las
+    /// constantes de la empresa viven en la matriz, y leerlas de un centro
+    /// seria timbrar con las llaves de otro.
+    ///
+    /// Asi que la decision va en cada sitio que llama, con su nombre:
+    ///
+    ///     EjecutarFilasAsync(Sp, p, ct,
+    ///         ct2 =&gt; _centro.AbrirParaLeerAsync("facturacion", ct2));
+    ///
+    ///     EjecutarFilaAsync(Sp, p, ct,
+    ///         ct2 =&gt; _centro.AbrirParaEscribirAsync("facturacion", "cancelar", ct2));
+    ///
+    /// ES OPCIONAL A PROPOSITO. Sin el, se abre la de siempre: los ~275 sitios
+    /// que ya usaban esta base no cambian ni un byte de comportamiento, y no
+    /// hay que migrarlos para que un modulo adopte centros.
+    /// </remarks>
+    protected delegate Task<SqlConnection> ProveedorDeConexion(CancellationToken ct);
+
+    /// <summary>
+    /// La conexion de esta llamada, ya abierta: la del centro si quien llama
+    /// la pidio, y si no la de siempre.
+    /// </summary>
+    /// <remarks>
+    /// La de <see cref="IConexionDelCentro"/> llega ABIERTA y ya validada, asi
+    /// que aqui NO se vuelve a abrir: `OpenAsync` sobre una conexion abierta
+    /// lanza. Por eso el camino de siempre abre aqui dentro y no en cada
+    /// ayudante — para que los dos caminos devuelvan lo mismo y el que llama no
+    /// tenga que saber cual le toco.
+    /// </remarks>
+    private async Task<SqlConnection> AbrirAsync(ProveedorDeConexion? proveedor, CancellationToken ct)
+    {
+        if (proveedor is not null) return await proveedor(ct);
+
+        var conn = GetConnection();
+        await conn.OpenAsync(ct);
+        return conn;
+    }
+
+    /// <summary>
     /// Corre el procedimiento y devuelve TODOS sus conjuntos de resultados como
     /// listas de diccionarios columna -> valor.
     ///
@@ -82,12 +132,12 @@ public abstract class SpLegacyRepositoryBase
     protected async Task<List<List<Dictionary<string, object?>>>> EjecutarTablasAsync(
         string procedimiento,
         Action<SqlCommand> parametros,
-        CancellationToken ct)
+        CancellationToken ct,
+        ProveedorDeConexion? conexion = null)
     {
         var tablas = new List<List<Dictionary<string, object?>>>();
 
-        await using var conn = GetConnection();
-        await conn.OpenAsync(ct);
+        await using var conn = await AbrirAsync(conexion, ct);
 
         await using var cmd = new SqlCommand(procedimiento, conn)
         {
@@ -137,9 +187,10 @@ public abstract class SpLegacyRepositoryBase
     protected async Task<List<Dictionary<string, object?>>> EjecutarFilasAsync(
         string procedimiento,
         Action<SqlCommand> parametros,
-        CancellationToken ct)
+        CancellationToken ct,
+        ProveedorDeConexion? conexion = null)
     {
-        var tablas = await EjecutarTablasAsync(procedimiento, parametros, ct);
+        var tablas = await EjecutarTablasAsync(procedimiento, parametros, ct, conexion);
         return tablas.Count > 0 ? tablas[0] : new List<Dictionary<string, object?>>();
     }
 
@@ -151,9 +202,10 @@ public abstract class SpLegacyRepositoryBase
     protected async Task<Dictionary<string, object?>?> EjecutarFilaAsync(
         string procedimiento,
         Action<SqlCommand> parametros,
-        CancellationToken ct)
+        CancellationToken ct,
+        ProveedorDeConexion? conexion = null)
     {
-        var filas = await EjecutarFilasAsync(procedimiento, parametros, ct);
+        var filas = await EjecutarFilasAsync(procedimiento, parametros, ct, conexion);
         return filas.Count > 0 ? filas[0] : null;
     }
 
@@ -164,10 +216,10 @@ public abstract class SpLegacyRepositoryBase
     protected async Task<int> EjecutarAsync(
         string procedimiento,
         Action<SqlCommand> parametros,
-        CancellationToken ct)
+        CancellationToken ct,
+        ProveedorDeConexion? conexion = null)
     {
-        await using var conn = GetConnection();
-        await conn.OpenAsync(ct);
+        await using var conn = await AbrirAsync(conexion, ct);
 
         await using var cmd = new SqlCommand(procedimiento, conn)
         {

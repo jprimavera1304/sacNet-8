@@ -113,8 +113,13 @@ public class CentrosLaCapaDeConexionTests
            tiene por que saberlo — y costaria un viaje a SQL por nada. */
         var capa = Capa(cabecera: "99", permisos: new[] { ClavesDeCentros.Cambiar });
 
+        /*  El modulo tiene que ser uno SIN declarar, claro. Aqui decia "cortes"
+            hasta que cortes se declaro el 19-nov-2026; se cambio por
+            "cobranzas", que esta fuera a proposito y con su propia prueba que
+            lo explica (CobranzaEnElMovilTests). Si alguien declara cobranzas,
+            esta prueba se cae y hay que elegir otro, no borrarla.  */
         var ex = await Assert.ThrowsAsync<CentroException>(
-            () => capa.BaseValidadaParaLeerAsync("cortes", 99));
+            () => capa.BaseValidadaParaLeerAsync("cobranzas", 99));
 
         Assert.StartsWith("CENTRO", ex.Code);
         Assert.Contains("todavia no funciona por centro", ex.Message);

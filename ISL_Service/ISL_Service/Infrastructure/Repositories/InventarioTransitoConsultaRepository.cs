@@ -28,10 +28,12 @@ public class InventarioTransitoConsultaRepository : IInventarioTransitoConsultaR
     private const string FormatoFechaLegacy = "MM-dd-yyyy HH:mm:ss";
 
     private readonly IConfiguration _configuration;
+    private readonly IConexionDelCentro _centro;
 
-    public InventarioTransitoConsultaRepository(IConfiguration configuration)
+    public InventarioTransitoConsultaRepository(IConfiguration configuration, IConexionDelCentro centro)
     {
         _configuration = configuration;
+        _centro = centro;
     }
 
     private SqlConnection GetConnection()
@@ -81,8 +83,25 @@ public class InventarioTransitoConsultaRepository : IInventarioTransitoConsultaR
                 "La fecha de emision inicial es obligatoria en la consulta de inventario en transito.");
         }
 
-        await using var conn = GetConnection();
-        await conn.OpenAsync(ct);
+        /*  LA CONEXION LA DECIDE LA CAPA DE CENTROS, NO ESTE REPOSITORIO.
+
+            Llega ABIERTA y ya validada: el centro existe, esta activo, su base
+            pertenece a esta empresa, el usuario tiene `centros.<n>.ver` y el
+            modulo esta declarado en ModulosConCentros. Con centro 0 —que es lo
+            que pasa cuando no viene la cabecera— es la de siempre, byte por
+            byte.
+
+            Y ENCAJA SOLO CON LO QUE YA HACE EL PROCEDIMIENTO, que es la razon
+            de que transito sea el mas limpio de los cuatro: con @IDCliente = 0
+            el SP toma `Constantes.IDClienteCS` de LA BASE EN LA QUE CORRE. En
+            la matriz no hay centro propio, asi que cae al IN sobre
+            CentrosServicio y consolida los trece (la conducta de Mac31). Dentro
+            de MacZCS4, `IDClienteCS` ES el cliente de ORIENTE, asi que trae
+            exactamente las remisiones de ese centro. No hubo que tocar ni un
+            parametro: el mismo procedimiento ya contesta lo correcto en los dos
+            sitios. Medido: 97,195 filas en la matriz y 27,066 repartidas en los
+            centros.  */
+        await using var conn = await _centro.AbrirParaLeerAsync("inventario.transito", ct);
 
         await using var cmd = new SqlCommand(SpConsultaVentasTransito, conn) { CommandType = CommandType.StoredProcedure };
         cmd.Parameters.AddWithValue("@StatusInventario", filtro.StatusInventario);

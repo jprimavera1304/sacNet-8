@@ -48,6 +48,53 @@ public static class ModulosConCentros
                hace ReportesVentasRepository.GetConnection(baseDelCentro). No
                escribe nada fuera de la matriz — un reporte solo lee. */
             ["reportes"] = ModuloConCentros.SoloLectura("reportes"),
+
+            /*  LOS CUATRO QUE ENTRARON EL 19-NOV-2026, TODOS DE SOLO LECTURA.
+                ---------------------------------------------------------------
+                Se midio cuanto hay en cada sitio antes de declararlos, porque
+                un modulo no merece selector de centro si alla no hay nada que
+                ensenar. En produccion de Zaragoza:
+
+                  modulo    | matriz (MacZ) | los trece centros
+                  ----------|---------------|-------------------
+                  cortes    |             0 | 2,163  <- TODO esta alla
+                  facturas  |        41,059 | 6,799
+                  ajustes   |        15,612 | 1,501
+                  transito  |        97,195 | 27,066
+
+                Y los nueve sp_n_ que estos cuatro llaman estan en LAS TRECE
+                bases: Mac31 las instalo asi. No hizo falta ningun script.
+
+                Cortes es el caso que lo justifica solo: su tabla de la matriz
+                tiene CERO filas en Zaragoza y los ~2,163 retiros viven en
+                [Corte CS] dentro de cada base de centro. Sin esta linea el
+                modulo esta condenado a salir vacio para siempre.
+
+                ALMACEN DE CASCOS NO ESTA AQUI, Y NO ES UN OLVIDO: su tabla
+                WMovimientoCasco NO EXISTE en ninguna de las trece. No es que
+                este vacia alla; es que no hay donde guardar. Declararlo seria
+                cambiar una pantalla vacia por un 500. Se queda en la matriz, y
+                el telefono lo dice con SoporteDeCentros.soloMatriz.
+
+                POR QUE LOS CUATRO SON SoloLectura
+                ----------------------------------
+                Fue lo que se pidio: "asi como en reportes". Y reportes es de
+                solo lectura porque un reporte solo lee.
+
+                Las escrituras de estos cuatro —cancelar una factura, capturar
+                o cancelar un ajuste, procesar una remision— NO se declaran, asi
+                que con un centro puesto la capa contesta "esta accion solo se
+                puede hacer en la matriz" (ConexionDelCentro.cs:144) y en la
+                matriz siguen funcionando byte por byte como hoy. Eso es
+                deliberado: escribir en la base de un centro desde una sola
+                instalacion es la parte que puede estropear datos ajenos, y
+                cada operacion se concede por su nombre cuando alguien decida
+                que toca. Lo que hoy se gana es poder MIRAR el centro, que es
+                justo lo que no se podia.  */
+            ["cortes"]               = ModuloConCentros.SoloLectura("cortes"),
+            ["facturacion"]          = ModuloConCentros.SoloLectura("facturacion"),
+            ["inventario.ajustes"]   = ModuloConCentros.SoloLectura("inventario.ajustes"),
+            ["inventario.transito"]  = ModuloConCentros.SoloLectura("inventario.transito"),
         };
 
     /// <summary>Los modulos declarados, para diagnostico y para las pruebas.</summary>

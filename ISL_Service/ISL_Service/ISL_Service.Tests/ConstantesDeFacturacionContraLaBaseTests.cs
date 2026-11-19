@@ -64,7 +64,9 @@ public class ConstantesDeFacturacionContraLaBaseTests
             })
             .Build();
 
-        return new VentasFacturacionRepository(config);
+        /* El doble no abre nada: lo que se prueba aqui son las constantes, que
+           se quedan en la matriz. Ver ConexionDelCentroDeMentira. */
+        return new VentasFacturacionRepository(config, new ConexionDelCentroDeMentira());
     }
 
     private async Task<bool> HayBaseAsync(string baseDatos)

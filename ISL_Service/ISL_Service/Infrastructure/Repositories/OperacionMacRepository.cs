@@ -39,27 +39,56 @@ public partial class OperacionMacRepository : IOperacionMacRepository
     private const string FormatoFechaLegacy = "MM-dd-yyyy";
 
     private readonly IConfiguration _configuration;
+    private readonly IConexionDelCentro _centro;
 
-    public OperacionMacRepository(IConfiguration configuration)
+    public OperacionMacRepository(IConfiguration configuration, IConexionDelCentro centro)
     {
         _configuration = configuration;
+        _centro = centro;
     }
 
     // -----------------------------------------------------------------------
     // Infraestructura
     // -----------------------------------------------------------------------
 
+    /// <param name="moduloDeCentro">
+    /// La clave del modulo cuando ESTA consulta tiene que seguir al centro
+    /// elegido. Null —lo normal— es la matriz de siempre, byte por byte.
+    ///
+    /// POR QUE POR LLAMADA: por este ayudante pasan decenas de operaciones de
+    /// toda la aplicacion, y solo unas pocas saben de centros. Cambiarlo para
+    /// todas mandaria a otra base consultas que nadie reviso.
+    /// </param>
     private async Task<List<Dictionary<string, object?>>> ConsultarAsync(
-        string sp, Action<SqlCommand> parametros, CancellationToken ct)
+        string sp, Action<SqlCommand> parametros, CancellationToken ct,
+        string? moduloDeCentro = null)
     {
-        await using var conn = GetConnection();
-        await conn.OpenAsync(ct);
+        await using var conn = await AbrirAsync(moduloDeCentro, ct);
 
         await using var cmd = Sp(sp, conn);
         parametros(cmd);
 
         var dt = await FillAsync(cmd, ct);
         return Funciones.DataTableToRows(dt);
+    }
+
+    /// <summary>
+    /// La conexion de esta consulta, ya abierta: la del centro elegido cuando
+    /// quien llama dio la clave de su modulo, y si no la de siempre.
+    /// </summary>
+    /// <remarks>
+    /// La de la capa de centros llega ABIERTA y ya validada; la de la matriz se
+    /// abre aqui. Los dos caminos devuelven lo mismo para que el que llama no
+    /// tenga que saber cual le toco.
+    /// </remarks>
+    private async Task<SqlConnection> AbrirAsync(string? moduloDeCentro, CancellationToken ct)
+    {
+        if (moduloDeCentro is not null)
+            return await _centro.AbrirParaLeerAsync(moduloDeCentro, ct);
+
+        var conn = GetConnection();
+        await conn.OpenAsync(ct);
+        return conn;
     }
 
     private async Task<ResultadoLegacy> EjecutarAsync(

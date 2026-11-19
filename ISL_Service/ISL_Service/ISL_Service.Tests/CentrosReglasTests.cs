@@ -103,10 +103,50 @@ public class CentrosReglasTests
     }
 
     [Theory]
-    [InlineData("ventas")]
     [InlineData("cortes")]
     [InlineData("facturacion")]
+    [InlineData("inventario.ajustes")]
+    [InlineData("inventario.transito")]
+    public void Los_Cuatro_Que_Entraron_Leen_Pero_No_Escriben(string modulo)
+    {
+        /*  Entraron el 19-nov-2026 y se midio antes de declararlos: en
+            produccion de Zaragoza hay 2,163 cortes, 6,799 facturas, 1,501
+            ajustes y 27,066 remisiones DENTRO de las trece bases de centro, y
+            la tabla de cortes de la matriz esta en CERO. Sin esto, cortes esta
+            condenado a salir vacio para siempre.
+
+            Y NINGUNO ESCRIBE FUERA DE LA MATRIZ. Fue lo que se pidio —"asi como
+            en reportes"— y reportes es de solo lectura. Un ajuste mueve
+            existencias y una cancelacion de factura toca un CFDI: aplicarlos a
+            la base equivocada no se deshace con un boton. Cuando se decida, se
+            nombra la operacion y esta prueba se cae, que es lo correcto.  */
+        Assert.True(ModulosConCentros.SoportaCentros(modulo));
+
+        foreach (var operacion in new[] { "crear", "guardar", "cancelar", "timbrar", "procesar" })
+            Assert.False(ModulosConCentros.PuedeEscribirFueraDeLaMatriz(modulo, operacion));
+    }
+
+    [Fact]
+    public void Almacen_De_Cascos_NO_Esta_Declarado_Y_No_Es_Un_Olvido()
+    {
+        /*  Medido el 19-nov-2026: `WMovimientoCasco` NO EXISTE en ninguna de
+            las trece bases de centro. No es que este vacia alla; es que no hay
+            donde guardar. Declararlo cambiaria una pantalla vacia por un 500.
+
+            El telefono lo dice del mismo lado con
+            SoporteDeCentros.soloMatriz, para que la pantalla ni ensene el
+            selector.
+
+            Si alguien lo declara, esta prueba se cae y hay que leer esto
+            antes de borrarla: primero habria que crear las tablas alla.  */
+        Assert.Null(ModulosConCentros.Buscar("almacen_cascos"));
+        Assert.False(ModulosConCentros.SoportaCentros("almacen_cascos"));
+    }
+
+    [Theory]
+    [InlineData("ventas")]
     [InlineData("inventario")]
+    [InlineData("cobranzas")]
     [InlineData("")]
     [InlineData(null)]
     public void Un_Modulo_No_Declarado_No_Soporta_Centros(string? modulo)

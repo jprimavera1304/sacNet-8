@@ -139,6 +139,22 @@ public partial class OperacionMacRepository
             cmd.Parameters.AddWithValue("@FechaFinal", AHasta(hasta));
         }, ct);
 
+    /// <remarks>
+    /// ESTA ES LA CONSULTA QUE DE VERDAD TRAE LOS CORTES DE ZARAGOZA, y por eso
+    /// sigue al centro elegido.
+    ///
+    /// `sp_n_ConsultarCortesCS` lee `FROM [Corte CS]` LOCAL, sin prefijo de
+    /// base. Medido en produccion el 19-nov-2026:
+    ///
+    ///   · `MacZ.dbo.Cortes`      0 filas      (la lista de caja, vacia)
+    ///   · `MacZ.dbo.[Corte CS]`  0 filas
+    ///   · `MacZCS1..13.[Corte CS]`  2,163 filas repartidas
+    ///
+    /// O sea que el procedimiento siempre estuvo bien: lo que faltaba era
+    /// ejecutarlo apuntando a la base del centro. Corrido en la matriz da cero
+    /// y seguira dando cero — no es un fallo, es que el dato nunca estuvo ahi.
+    /// Mac31 los ve porque en legacy hay una instalacion por centro.
+    /// </remarks>
     public Task<List<Dictionary<string, object?>>> ConsultarCortesCentroServicioAsync(
         int idCorte, int folio, DateTime? desde, DateTime? hasta, int idTipoRetiro, CancellationToken ct)
         => ConsultarAsync("dbo.sp_n_ConsultarCortesCS", cmd =>
@@ -150,7 +166,7 @@ public partial class OperacionMacRepository
             cmd.Parameters.AddWithValue("@FechaInicial", porFolio ? string.Empty : ADesde(desde));
             cmd.Parameters.AddWithValue("@FechaFinal", porFolio ? string.Empty : AHasta(hasta));
             cmd.Parameters.AddWithValue("@IDTipoRetiro", porFolio ? 0 : idTipoRetiro);
-        }, ct);
+        }, ct, moduloDeCentro: "cortes");
 
     /// <summary>
     /// Alta del corte de caja.
