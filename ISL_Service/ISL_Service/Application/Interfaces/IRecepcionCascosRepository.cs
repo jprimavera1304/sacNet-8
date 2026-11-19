@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.RecepcionCascos;
+﻿using ISL_Service.Application.DTOs.RecepcionCascos;
 
 namespace ISL_Service.Application.Interfaces;
 
@@ -11,6 +11,9 @@ public interface IRecepcionCascosRepository
     Task<List<TipoRecepcionCascoDto>> ConsultarTiposAsync(CancellationToken ct = default);
 
     Task<List<RepartidorRecepcionCascoDto>> ConsultarRepartidoresAsync(CancellationToken ct = default);
+
+    /// <summary>El otro catalogo de quien entrego: los clientes activos.</summary>
+    Task<List<ClienteRecepcionCascoDto>> ConsultarClientesAsync(CancellationToken ct = default);
 
     Task<List<RecepcionCascoDto>> ConsultarAsync(
         DateTime? fechaInicio, DateTime? fechaFin, int? idRepartidor,

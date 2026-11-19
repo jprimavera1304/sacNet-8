@@ -53,6 +53,30 @@ public class RepartidorRecepcionCascoDto
     public int? idZona { get; set; }
 }
 
+/*
+  El otro catalogo de "quien entrego".
+
+  LOS NOMBRES DE LOS CAMPOS NO SON LIBRES: son los que lee `leerClienteDeMac`
+  del kit del telefono, el mismo lector que usa el buscador de clientes de
+  nuevo pedido. Asi esta pantalla reusa ese widget tal cual en vez de llevar
+  una copia que se desincroniza en cuanto alguien toque una de las dos.
+*/
+public class ClienteRecepcionCascoDto
+{
+    public int idCliente { get; set; }
+    /* El numero con el que el negocio llama al cliente, que casi nunca es su
+       id. Se ensena junto al nombre. */
+    public int? numero { get; set; }
+    public string? nombre { get; set; }
+    public string? apellidoPaterno { get; set; }
+    public string? apellidoMaterno { get; set; }
+    public string? nombreNegocio { get; set; }
+    /* Apellidos + nombre, ya armado por el procedimiento. Es EXACTAMENTE lo
+       que se guarda en la recepcion: armarlo aqui y alla por separado es como
+       se acaba buscando un nombre y guardando otro. */
+    public string? nombreCompleto { get; set; }
+}
+
 /* ------------------------------------------------------------------ */
 /* Consulta                                                            */
 /* ------------------------------------------------------------------ */
@@ -62,7 +86,13 @@ public class RecepcionCascoDto
     public int idRecepcion { get; set; }
     /* El dia que se recibieron los cascos, no el dia que se capturo. */
     public DateTime fecha { get; set; }
+    /* 'REPARTIDOR' o 'CLIENTE': de que catalogo salio quien entrego. Las
+       recepciones anteriores a este campo son todas de repartidor, que es lo
+       que la base les puso por omision. */
+    public string? tipoEntrega { get; set; }
     public int idRepartidor { get; set; }
+    /* Solo cuando entrego un cliente; null en las de repartidor. */
+    public int? idCliente { get; set; }
     /* El nombre TAL COMO ESTABA el dia de la captura: se guarda en la propia
        fila, no se lee por JOIN. El catalogo es de legacy y sus filas se
        renombran y se dan de baja. */
@@ -139,11 +169,34 @@ public class PiezasPorTipoRecepcionRequest
 public class CrearRecepcionCascoRequest
 {
     public DateTime? Fecha { get; set; }
+    /* 'REPARTIDOR' (por omision) o 'CLIENTE'.
+
+       Va con valor por omision y no es obligatorio a proposito: el web de hoy
+       y la app ya publicada no lo mandan, y las dos tienen que seguir
+       capturando exactamente igual que antes. Quien decide si es valido es el
+       procedimiento, no este DTO. */
+    public string? TipoEntrega { get; set; }
     public int IdRepartidor { get; set; }
+    /* Solo se mira cuando TipoEntrega es 'CLIENTE'. */
+    public int IdCliente { get; set; }
     public string? Observaciones { get; set; }
     public List<PiezasPorTipoRecepcionRequest>? Piezas { get; set; }
 }
 
+/*
+  MODIFICAR NO PUEDE CAMBIAR QUIEN ENTREGO.
+
+  Hereda los campos de quien entrego y aun asi no los usa para reasignar: el
+  procedimiento los compara contra lo guardado y rechaza la operacion si no
+  coinciden. La regla la puso el negocio y es la que hace que el libro del
+  cliente (WRecepcionCascoCliente) signifique algo: si una hoja pudiera
+  cambiar de dueno despues de firmada, el acuse no probaria nada. Si se
+  equivocaron de persona, se cancela y se captura de nuevo.
+
+  Se heredan en vez de borrarse porque el web los sigue mandando, y recibirlos
+  y compararlos es lo que permite contestarle con un mensaje claro en vez de
+  guardar en silencio algo distinto de lo que vio en pantalla.
+*/
 public class ActualizarRecepcionCascoRequest : CrearRecepcionCascoRequest
 {
     public int IdRecepcion { get; set; }

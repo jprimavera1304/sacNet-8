@@ -97,6 +97,30 @@ public class RecepcionCascosController : PermisoControllerBase
         return Ok(new { ok = true, message = "Repartidores consultados.", data });
     }
 
+    /// <summary>Clientes activos, el otro catalogo de quien entrego.</summary>
+    /// <remarks>
+    /// EXISTE APARTE DE `/api/ventas/pedidos/captura/clientes/buscar`, Y NO
+    /// POR GUSTO: aquel pide permiso de PEDIDOS, y quien captura esta hoja
+    /// puede tener unicamente los permisos de recepcion de cascos. Reusarlo
+    /// le daria un 403 a media captura, con el agravante de que el 403
+    /// hablaria de pedidos —un modulo que esa persona no abre— y mandaria a
+    /// buscar el problema al sitio equivocado.
+    ///
+    /// Pide el MISMO permiso que el resto de la pantalla (`ver`): es un
+    /// catalogo para llenar un campo, no una consulta de cartera. No trae
+    /// saldos, ni domicilios, ni credito; solo nombre y numero.
+    /// </remarks>
+    [HttpGet("clientes")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> Clientes(CancellationToken ct)
+    {
+        var sinPermiso = await ExigirPermisoAsync(PermisosVer, ct);
+        if (sinPermiso != null) return sinPermiso;
+
+        var data = await _service.ConsultarClientesAsync(ct);
+        return Ok(new { ok = true, message = "Clientes consultados.", data });
+    }
+
     /// <summary>
     /// Las recepciones del periodo.
     /// </summary>

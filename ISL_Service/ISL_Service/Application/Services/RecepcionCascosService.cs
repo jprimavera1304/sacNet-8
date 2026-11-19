@@ -1,4 +1,4 @@
-using ISL_Service.Application.DTOs.RecepcionCascos;
+﻿using ISL_Service.Application.DTOs.RecepcionCascos;
 using ISL_Service.Application.Interfaces;
 
 namespace ISL_Service.Application.Services;
@@ -46,6 +46,9 @@ public class RecepcionCascosService : IRecepcionCascosService
     public Task<List<RepartidorRecepcionCascoDto>> ConsultarRepartidoresAsync(CancellationToken ct = default)
         => _repository.ConsultarRepartidoresAsync(ct);
 
+    public Task<List<ClienteRecepcionCascoDto>> ConsultarClientesAsync(CancellationToken ct = default)
+        => _repository.ConsultarClientesAsync(ct);
+
     public Task<List<RecepcionCascoDto>> ConsultarAsync(
         DateTime? fechaInicio, DateTime? fechaFin, int? idRepartidor,
         int? estatus, bool incluirCanceladas, CancellationToken ct = default)
@@ -77,7 +80,7 @@ public class RecepcionCascosService : IRecepcionCascosService
         CrearRecepcionCascoRequest request, int idUsuario, string usuario, string? canal,
         CancellationToken ct = default)
     {
-        var falla = Revisar(request);
+        var falla = Revisar(request, esAlta: true);
         if (falla != null) return No(falla, 0);
 
         return await _repository.InsertarAsync(request, idUsuario, usuario, canal, ct);
@@ -90,7 +93,7 @@ public class RecepcionCascosService : IRecepcionCascosService
         if (request.IdRecepcion <= 0)
             return No("No se recibio la recepcion que se quiere modificar.", 0);
 
-        var falla = Revisar(request);
+        var falla = Revisar(request, esAlta: false);
         if (falla != null) return No(falla, request.IdRecepcion);
 
         return await _repository.ActualizarAsync(request, idUsuario, usuario, canal, ct);
@@ -182,7 +185,22 @@ public class RecepcionCascosService : IRecepcionCascosService
     /* ---------------------------------------------------------------- */
 
     /// <summary>Lo que esta mal, o null si todo esta bien.</summary>
-    private static string? Revisar(CrearRecepcionCascoRequest request)
+    /*  Las dos palabras que entiende la base. Viven aqui como constantes y no
+        sueltas en el codigo para que un cambio de texto no sea un cambio de
+        comportamiento a medias.  */
+    private const string TipoEntregaRepartidor = "REPARTIDOR";
+    private const string TipoEntregaCliente    = "CLIENTE";
+
+    /// <param name="esAlta">
+    /// QUIEN ENTREGO SOLO SE REVISA AL DAR DE ALTA.
+    ///
+    /// Al modificar no se puede cambiar —si se equivocaron de persona se
+    /// cancela y se captura de nuevo—, asi que la app nueva ya no manda ese
+    /// campo. Exigirlo aqui bloquearia una correccion de cantidades por un
+    /// dato que la pantalla ni siquiera ofrece. Quien hace cumplir que no
+    /// cambie es el procedimiento, que compara contra lo guardado.
+    /// </param>
+    private static string? Revisar(CrearRecepcionCascoRequest request, bool esAlta)
     {
         if (request.Fecha == null)
             return "La fecha es obligatoria.";
@@ -190,11 +208,34 @@ public class RecepcionCascosService : IRecepcionCascosService
         if (request.Fecha.Value.Date > DateTime.Today)
             return "La fecha no puede ser posterior a hoy.";
 
-        /*  Que el repartidor EXISTA y siga activo no se comprueba aqui sino en
-            el procedimiento, que es quien tiene el catalogo delante. Aqui solo
-            se para lo que ni siquiera es un id.  */
-        if (request.IdRepartidor <= 0)
-            return "Elija el repartidor que entrego los cascos.";
+        /*  QUIEN ENTREGO: SE REVISA EL CATALOGO QUE TOQUE, NO SIEMPRE EL DEL
+            REPARTIDOR.
+
+            Aqui habia un `IdRepartidor <= 0` a secas, de cuando entregar solo
+            lo podia hacer un repartidor. Con la entrega de cliente eso rechaza
+            TODA captura de cliente antes de llegar al procedimiento, con un
+            mensaje que ademas manda a mirar el campo equivocado.
+
+            Que la persona EXISTA y siga activa se sigue comprobando en el
+            procedimiento, que es quien tiene el catalogo delante. Aqui solo se
+            para lo que ni siquiera es un id.
+
+            El tipo vacio es 'REPARTIDOR': es lo que mandan el web de hoy y la
+            app ya publicada, que no conocen este campo.  */
+        if (esAlta)
+        {
+            var tipo = (request.TipoEntrega ?? string.Empty).Trim().ToUpperInvariant();
+            if (tipo.Length == 0) tipo = TipoEntregaRepartidor;
+
+            if (tipo != TipoEntregaRepartidor && tipo != TipoEntregaCliente)
+                return "Indique si entrego un repartidor o un cliente.";
+
+            if (tipo == TipoEntregaRepartidor && request.IdRepartidor <= 0)
+                return "Elija el repartidor que entrego los cascos.";
+
+            if (tipo == TipoEntregaCliente && request.IdCliente <= 0)
+                return "Elija el cliente que entrego los cascos.";
+        }
 
         var piezas = request.Piezas ?? new List<PiezasPorTipoRecepcionRequest>();
 

@@ -25,6 +25,12 @@ public class RecepcionCascosRepository : IRecepcionCascosRepository
 {
     private const string SpTipos     = "dbo.sp_w_ConsultarTiposRecepcionCasco";
     private const string SpRepartidores = "dbo.sp_w_ConsultarRepartidoresRecepcionCasco";
+    /*  El otro catalogo de quien entrego. Es propio del modulo y no el de
+        pedidos (`/api/ventas/pedidos/captura/clientes/buscar`) por una razon
+        concreta: ese pide permiso de PEDIDOS, y quien captura esta hoja puede
+        tener unicamente los de recepcion de cascos. Reusarlo le daria 403 a
+        media captura.  */
+    private const string SpClientes  = "dbo.sp_w_ConsultarClientesRecepcionCasco";
     private const string SpConsultar = "dbo.sp_w_ConsultarRecepcionesCasco";
     private const string SpDetalle   = "dbo.sp_w_ConsultarRecepcionCascoDetalle";
     private const string SpBitacora  = "dbo.sp_w_ConsultarRecepcionCascoBitacora";
@@ -59,6 +65,15 @@ public class RecepcionCascosRepository : IRecepcionCascosRepository
         await using var cmd = Sp(SpRepartidores, conn);
         var dt = await FillAsync(cmd, ct);
         return Funciones.DataTableToList<RepartidorRecepcionCascoDto>(dt);
+    }
+
+    public async Task<List<ClienteRecepcionCascoDto>> ConsultarClientesAsync(CancellationToken ct = default)
+    {
+        await using var conn = GetConnection();
+        await conn.OpenAsync(ct);
+        await using var cmd = Sp(SpClientes, conn);
+        var dt = await FillAsync(cmd, ct);
+        return Funciones.DataTableToList<ClienteRecepcionCascoDto>(dt);
     }
 
     public async Task<List<RecepcionCascoDto>> ConsultarAsync(
@@ -273,6 +288,23 @@ public class RecepcionCascosRepository : IRecepcionCascosRepository
         cmd.Parameters.AddWithValue("@Fecha", (object?)request.Fecha?.Date ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@IDRepartidor", request.IdRepartidor);
         cmd.Parameters.AddWithValue("@Observaciones", (object?)Texto(request.Observaciones) ?? DBNull.Value);
+
+        /*  QUIEN ENTREGO, EN DOS PARAMETROS QUE VIAJAN SIEMPRE Y A VECES EN
+            NULL.
+
+            NULL no significa "repartidor": significa "no lo mande". Los dos
+            procedimientos lo interpretan distinto y los dos tienen razon:
+            al INSERTAR, un tipo que no viene es 'REPARTIDOR', que es lo que
+            capturan hoy el web y la app publicada; al MODIFICAR, un tipo que
+            no viene es "no pretendo cambiar quien entrego", que es lo que
+            manda la app nueva —ahi ese campo ya no se puede tocar—.
+
+            Por eso no se traduce aqui a 'REPARTIDOR': hacerlo convertiria
+            cada modificacion de una hoja de cliente en un intento de
+            reasignarla a un repartidor, y el procedimiento la rechazaria.  */
+        cmd.Parameters.AddWithValue("@TipoEntrega", (object?)Texto(request.TipoEntrega) ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@IDCliente",
+            request.IdCliente > 0 ? request.IdCliente : (object)DBNull.Value);
 
         var tabla = TablaDeDetalle(request.Piezas);
         var pDetalle = cmd.Parameters.AddWithValue("@Detalle", tabla);
