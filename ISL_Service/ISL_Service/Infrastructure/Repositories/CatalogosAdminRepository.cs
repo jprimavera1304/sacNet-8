@@ -45,10 +45,22 @@ public partial class CatalogosAdminRepository : ICatalogosAdminRepository
     /// </summary>
     private readonly ILogger<CatalogosAdminRepository>? _logger;
 
-    public CatalogosAdminRepository(IConfiguration configuration, ILogger<CatalogosAdminRepository>? logger = null)
+    /// <summary>
+    /// La capa de centros. OPCIONAL a proposito: este repositorio lo construyen
+    /// a mano varias pruebas contra la base local, y de sus ~30 catalogos solo
+    /// UNO sabe de centros. Sin ella, todo sale de la matriz, que es como se
+    /// comporto siempre.
+    /// </summary>
+    private readonly IConexionDelCentro? _centro;
+
+    public CatalogosAdminRepository(
+        IConfiguration configuration,
+        ILogger<CatalogosAdminRepository>? logger = null,
+        IConexionDelCentro? centro = null)
     {
         _configuration = configuration;
         _logger = logger;
+        _centro = centro;
     }
 
     /// <summary>

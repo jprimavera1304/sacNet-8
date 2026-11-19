@@ -95,6 +95,22 @@ public static class ModulosConCentros
             ["facturacion"]          = ModuloConCentros.SoloLectura("facturacion"),
             ["inventario.ajustes"]   = ModuloConCentros.SoloLectura("inventario.ajustes"),
             ["inventario.transito"]  = ModuloConCentros.SoloLectura("inventario.transito"),
+
+            /*  EL CATALOGO QUE LOS ACOMPANA, Y SOLO ESE.
+                ---------------------------------------------------------------
+                Los almacenes son de la base en la que viven. La pantalla de
+                ajustes manda `idAlmacen` al servidor para filtrar, y ese id se
+                resuelve DENTRO de la base que se esta consultando: con los
+                ajustes saliendo de un centro y el catalogo saliendo de la
+                matriz, el filtro buscaria un numero que alla significa otra
+                cosa, o nada.
+
+                La clave es `catalogos.almacenes` y no `catalogos` a proposito:
+                declarar el modulo entero arrastraria los otros veintitantos
+                catalogos —agentes, tipos de gasto, dias festivos— que NO
+                cambian de significado por centro, y los arrastraria en las
+                veinte pantallas que los piden. Un catalogo, una linea.  */
+            ["catalogos.almacenes"]  = ModuloConCentros.SoloLectura("catalogos.almacenes"),
         };
 
     /// <summary>Los modulos declarados, para diagnostico y para las pruebas.</summary>

@@ -127,6 +127,26 @@ public class CentrosReglasTests
     }
 
     [Fact]
+    public void De_Los_Catalogos_Solo_Almacenes_Sigue_Al_Centro()
+    {
+        /*  POR QUE ALMACENES SI. La pantalla de ajustes manda `idAlmacen` al
+            servidor para filtrar, y ese id se resuelve DENTRO de la base que
+            se consulta. Con los ajustes saliendo de un centro y el catalogo
+            saliendo de la matriz, el filtro buscaria un numero que alla
+            significa otra cosa, o nada: lista vacia sin motivo a la vista, o
+            los renglones de otro almacen. Nada falla; solo miente.  */
+        Assert.True(ModulosConCentros.SoportaCentros("catalogos.almacenes"));
+        Assert.False(
+            ModulosConCentros.PuedeEscribirFueraDeLaMatriz("catalogos.almacenes", "guardar"));
+
+        /*  Y POR QUE NO EL MODULO ENTERO. `catalogos` arrastraria los otros
+            veintitantos —agentes, tipos de gasto, dias festivos— que NO
+            cambian de significado por centro, y los arrastraria en las veinte
+            pantallas que los piden. Un catalogo, una linea.  */
+        Assert.False(ModulosConCentros.SoportaCentros("catalogos"));
+    }
+
+    [Fact]
     public void Almacen_De_Cascos_NO_Esta_Declarado_Y_No_Es_Un_Olvido()
     {
         /*  Medido el 19-nov-2026: `WMovimientoCasco` NO EXISTE en ninguna de

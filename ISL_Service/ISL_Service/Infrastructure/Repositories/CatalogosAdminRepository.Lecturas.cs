@@ -39,17 +39,41 @@ public partial class CatalogosAdminRepository
     /// El 100% de este archivo: ejecuta un sp_n_Consulta* y devuelve sus
     /// renglones. Mismo cuerpo que ConsultarDiasFestivosAsync, factorizado.
     /// </summary>
+    /// <param name="moduloDeCentro">
+    /// La clave con la que este catalogo esta declarado en
+    /// <c>ModulosConCentros</c>, si sigue al centro de servicio. Null —que es
+    /// lo que pasan los otros veintitantos— abre la matriz como siempre.
+    /// </param>
     private async Task<List<Dictionary<string, object?>>> ConsultarAsync(
-        string sp, Action<SqlCommand> parametros, CancellationToken ct)
+        string sp, Action<SqlCommand> parametros, CancellationToken ct,
+        string? moduloDeCentro = null)
     {
-        await using var conn = GetConnection();
-        await conn.OpenAsync(ct);
+        await using var conn = await AbrirAsync(moduloDeCentro, ct);
 
         await using var cmd = Sp(sp, conn);
         parametros(cmd);
 
         var dt = await FillAsync(cmd, ct);
         return Funciones.DataTableToRows(dt);
+    }
+
+    /// <summary>
+    /// La conexion de una consulta: la del centro cuando el catalogo lo sabe,
+    /// la de siempre cuando no.
+    /// </summary>
+    /// <remarks>
+    /// Llega ABIERTA en los dos caminos. Con centro 0 —que es lo que manda la
+    /// app cuando nadie eligio nada— la capa de centros devuelve la matriz, asi
+    /// que el comportamiento es identico byte por byte al de antes.
+    /// </remarks>
+    private async Task<SqlConnection> AbrirAsync(string? moduloDeCentro, CancellationToken ct)
+    {
+        if (moduloDeCentro is not null && _centro is not null)
+            return await _centro.AbrirParaLeerAsync(moduloDeCentro, ct);
+
+        var conn = GetConnection();
+        await conn.OpenAsync(ct);
+        return conn;
     }
 
     /*
@@ -72,6 +96,21 @@ public partial class CatalogosAdminRepository
     // Almacenes
     // -----------------------------------------------------------------------
 
+    /*
+      EL UNICO CATALOGO DE ESTE ARCHIVO QUE SIGUE AL CENTRO DE SERVICIO.
+
+      Y no es un capricho: los ALMACENES son de la base en la que viven. El
+      filtro de la pantalla de ajustes manda `idAlmacen` al servidor, y ese id
+      se resuelve dentro de la base que se este consultando. Con los ajustes
+      saliendo de MacZCS4 y el catalogo saliendo de MacZ, el telefono filtraria
+      los ajustes de ORIENTE por el numero de un almacen de la matriz: un id que
+      alla significa otra cosa, o nada. La lista saldria vacia, o —peor— con los
+      renglones equivocados y sin que nada avise.
+
+      Los demas catalogos de aqui NO se tocan. Un agente, un tipo de gasto o un
+      dia festivo no cambian de significado por centro, y declararlos uno a uno
+      sin necesidad es justo lo que el registro viene a evitar.
+    */
     public Task<List<Dictionary<string, object?>>> ConsultarAlmacenesAsync(AlmacenesFiltro f, CancellationToken ct)
         => ConsultarAsync("dbo.sp_n_ConsultaAlmacenes", cmd =>
         {
@@ -79,7 +118,7 @@ public partial class CatalogosAdminRepository
             cmd.Parameters.AddWithValue("@IDStatus", f.IdStatus);
             cmd.Parameters.AddWithValue("@Almacen", Texto(f.Almacen));
             cmd.Parameters.AddWithValue("@Identico", Bandera(f.Identico));
-        }, ct);
+        }, ct, moduloDeCentro: "catalogos.almacenes");
 
     // -----------------------------------------------------------------------
     // Agentes
