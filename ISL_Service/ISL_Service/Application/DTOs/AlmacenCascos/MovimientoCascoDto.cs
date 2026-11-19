@@ -6,6 +6,18 @@ namespace ISL_Service.Application.DTOs.AlmacenCascos;
 public class MovimientoCascoDto
 {
     public int IdMovimiento { get; set; }
+
+    /// <summary>
+    /// El folio COMO LO LEE LA GENTE: `ZARA-SAL-CAM-565`.
+    /// </summary>
+    /// <remarks>
+    /// Solo viene de un centro de servicio, donde los movimientos salen de la
+    /// tabla de legacy y ese folio es el que esta impreso en el papel y el que
+    /// ensena Mac31. En la matriz es null y la pantalla cae al numero interno,
+    /// que es lo que ensenaba antes de que existiera este campo.
+    /// </remarks>
+    public string? Folio { get; set; }
+
     public int TipoMovimiento { get; set; }
     public int? IdMovimientoSalida { get; set; }
     public int Estatus { get; set; }

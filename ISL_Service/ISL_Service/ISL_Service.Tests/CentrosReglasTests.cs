@@ -147,20 +147,32 @@ public class CentrosReglasTests
     }
 
     [Fact]
-    public void Almacen_De_Cascos_NO_Esta_Declarado_Y_No_Es_Un_Olvido()
+    public void Almacen_De_Cascos_Lee_Los_Centros_Pero_No_Escribe_En_Ellos()
     {
-        /*  Medido el 19-nov-2026: `WMovimientoCasco` NO EXISTE en ninguna de
-            las trece bases de centro. No es que este vacia alla; es que no hay
-            donde guardar. Declararlo cambiaria una pantalla vacia por un 500.
+        /*  ESTA PRUEBA NACIO DICIENDO LO CONTRARIO, y la correccion vale mas
+            que la regla.
 
-            El telefono lo dice del mismo lado con
-            SoporteDeCentros.soloMatriz, para que la pantalla ni ensene el
-            selector.
+            Primero se dejo el modulo fuera del registro porque `WMovimientoCasco`
+            no existe en ninguna de las trece bases. El dato era cierto y la
+            conclusion falsa: esa tabla es NUEVA, se hizo para la app y solo
+            vive en la matriz. Los movimientos de cascos de verdad estan en
+            `UsadosMovimientos`, que es lo que lee Mac31, y ahi el reparto es
+            el de cortes. Medido en produccion el 19-nov-2026:
 
-            Si alguien lo declara, esta prueba se cae y hay que leer esto
-            antes de borrarla: primero habria que crear las tablas alla.  */
-        Assert.Null(ModulosConCentros.Buscar("almacen_cascos"));
-        Assert.False(ModulosConCentros.SoportaCentros("almacen_cascos"));
+              UsadosMovimientos  ->  MacZ: 0    los trece centros: 7,818
+              WMovimientoCasco   ->  MacZ: 2    los trece centros: no existe
+
+            Asi que el modulo SI sabe de centros, leyendo otra tabla alla.
+
+            Y NO ESCRIBE FUERA DE LA MATRIZ, que aqui pesa mas que en los otros
+            cuatro: las tablas de la app existen solo en la matriz, asi que una
+            captura en un centro o se perderia o crearia una segunda lista al
+            lado de la de legacy, sin forma de saber cual es la buena. La
+            captura de un centro se hace en Mac31.  */
+        Assert.True(ModulosConCentros.SoportaCentros("almacen.cascos"));
+
+        foreach (var operacion in new[] { "crear", "aceptar", "editar", "kilos", "cancelar" })
+            Assert.False(ModulosConCentros.PuedeEscribirFueraDeLaMatriz("almacen.cascos", operacion));
     }
 
     [Theory]

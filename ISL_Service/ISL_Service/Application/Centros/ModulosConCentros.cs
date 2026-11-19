@@ -70,11 +70,8 @@ public static class ModulosConCentros
                 [Corte CS] dentro de cada base de centro. Sin esta linea el
                 modulo esta condenado a salir vacio para siempre.
 
-                ALMACEN DE CASCOS NO ESTA AQUI, Y NO ES UN OLVIDO: su tabla
-                WMovimientoCasco NO EXISTE en ninguna de las trece. No es que
-                este vacia alla; es que no hay donde guardar. Declararlo seria
-                cambiar una pantalla vacia por un 500. Se queda en la matriz, y
-                el telefono lo dice con SoporteDeCentros.soloMatriz.
+                ALMACEN DE CASCOS entro despues y por otra puerta: ver su
+                propia linea mas abajo.
 
                 POR QUE LOS CUATRO SON SoloLectura
                 ----------------------------------
@@ -111,6 +108,31 @@ public static class ModulosConCentros
                 cambian de significado por centro, y los arrastraria en las
                 veinte pantallas que los piden. Un catalogo, una linea.  */
             ["catalogos.almacenes"]  = ModuloConCentros.SoloLectura("catalogos.almacenes"),
+
+            /*  ALMACEN DE CASCOS, Y ES EL CASO RARO DEL REGISTRO.
+                ---------------------------------------------------------------
+                Primero se dejo FUERA, y por una medicion equivocada: se busco
+                `WMovimientoCasco` en las trece bases, no estaba, y se concluyo
+                que alla no habia nada que ensenar. La tabla que no existe alla
+                no es donde estan los datos.
+
+                Lo que de verdad hay, medido en produccion el 19-nov-2026:
+
+                  UsadosMovimientos (lo que lee Mac31) | MacZ: 0 | centros: 7,818
+                  WMovimientoCasco  (lo que lee la app)| MacZ: 2 | centros: no existe
+
+                O sea el mismo reparto que cortes -todo en los centros, cero en
+                la matriz- solo que en la tabla de LEGACY. Las tablas W son
+                nuevas, se hicieron para la app y solo viven en la matriz.
+
+                Por eso este modulo no lee lo mismo en los dos sitios: en la
+                matriz, sus propias tablas; en un centro,
+                `sp_n_ConsultarUsadosMovimientos`, que es el procedimiento de
+                la pantalla de Mac31. Esta declarado SIN escrituras y eso aqui
+                pesa mas que en los otros: escribir en la tabla nueva de un
+                centro crearia una segunda verdad al lado de la de legacy, y
+                nadie sabria cual de las dos listas es la buena.  */
+            ["almacen.cascos"]       = ModuloConCentros.SoloLectura("almacen.cascos"),
         };
 
     /// <summary>Los modulos declarados, para diagnostico y para las pruebas.</summary>
